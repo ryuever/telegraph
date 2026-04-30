@@ -1,0 +1,7 @@
+
+(server)           (client)
+sharedprocess => main process
+
+  (client)    (client)            (server)
+    UI -> pagelet process -> sharedprocess ->
+
