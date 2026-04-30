@@ -1,84 +1,66 @@
-import { app, BrowserWindow } from 'electron'
+const { app, BrowserWindow } = require('electron')
+const path = require('path')
 
-// Simple development version - just create a window and load the renderer
-let mainWindow: BrowserWindow
+let mainWindow
 
-console.log('Main process started!')
+console.error('========== MAIN PROCESS STARTED ==========')
 
 function createWindow() {
-  console.log('Creating window...')
+  console.error('Creating window...')
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,
-      // preload will be injected by forge
+      contextIsolation: false,
+      // preload: path.join(__dirname, 'preload.js'),
     },
   })
 
-  console.log('Window created, loading URL...')
-
-  // In development, load from vite dev server
-  // In production, load from bundled HTML
-  const loadURL = async () => {
-    try {
-      console.log('Attempting to load http://localhost:5173')
-      await mainWindow.loadURL('http://localhost:5173')
-      console.log('URL loaded successfully')
-    } catch (error) {
-      console.log('Failed to load dev server, trying file:', error)
-      try {
-        await mainWindow.loadFile('index.html')
-        console.log('File loaded successfully')
-      } catch (fileError) {
-        console.error('Failed to load file:', fileError)
-      }
-    }
-  }
-
-  loadURL()
-
-  mainWindow.webContents.openDevTools()
-
   mainWindow.once('ready-to-show', () => {
-    console.log('Window ready to show')
+    console.error('✅ Window ready to show - displaying window')
     mainWindow.show()
   })
 
   mainWindow.on('closed', () => {
-    console.log('Window closed')
-    mainWindow = null as any
+    console.error('Window closed')
+    mainWindow = null
   })
 
-  mainWindow.webContents.on('crashed', () => {
-    console.log('Renderer process crashed!')
-  })
+  console.error('Loading http://localhost:5173...')
+  mainWindow.loadURL('http://localhost:5173')
+    .then(() => console.error('✅ URL loaded'))
+    .catch((error) => {
+      console.error('Failed to load dev server, trying file...', error)
+      mainWindow.loadFile('index.html')
+        .then(() => console.error('✅ File loaded'))
+        .catch((err) => console.error('Failed to load file:', err))
+    })
+
+  mainWindow.webContents.openDevTools()
 }
 
-// Use whenReady() to handle both synchronous and asynchronous app ready states
-app.whenReady().then(() => {
-  console.log('App ready event')
+console.error('Setting up app event listeners...')
+
+app.on('ready', () => {
+  console.error('App ready event')
   createWindow()
-}).catch((error) => {
-  console.error('Error when app ready:', error)
 })
 
 app.on('window-all-closed', () => {
-  console.log('All windows closed')
+  console.error('All windows closed')
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
 app.on('activate', () => {
-  console.log('App activated')
-  if (!mainWindow) {
+  console.error('App activated')
+  if (mainWindow === null) {
     createWindow()
   }
 })
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error)
-})
+console.error('========== MAIN PROCESS SETUP COMPLETE ==========')
