@@ -8,6 +8,14 @@ const nodeModules = [
   'tty', 'url', 'util', 'v8', 'vm', 'zlib',
 ]
 
+const externalPackages = [
+  'electron-log',
+  '@sentry/node',
+  '@common/fetch',
+  'electron-store',
+  /@x-oasis\/async-call-rpc\/.*/,
+]
+
 // https://vitejs.dev/config
 export default defineConfig({
   resolve: {
@@ -19,7 +27,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: [...nodeModules, 'electron'],
+      external: [...nodeModules, 'electron', ...externalPackages],
       output: {
         entryFileNames: 'index.js',
       },
