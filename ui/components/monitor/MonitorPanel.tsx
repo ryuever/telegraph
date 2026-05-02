@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { Toolbar } from '@app/index/components/Toolbar'
+import { Toolbar } from '@ui/components/Toolbar'
 import { ProcessesTable } from './ProcessesTable'
 import { PsTreePanel } from './PsTreePanel'
 import { Sparkline, cpuColorClass } from './Sparkline'
 import { useMonitorSnapshots, useNowTick, useSnapshotHistory } from './hooks'
 import type { MonitorSnapshot, ProcessRow } from '@app/services/monitor/common/types'
-import { cn } from '@app/index/lib/utils'
+import { cn } from '@ui/lib/utils'
 
 type TabId = 'overview' | 'processes' | 'tree'
 

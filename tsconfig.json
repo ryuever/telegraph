@@ -16,11 +16,13 @@
     "strictNullChecks": true,
     "paths": {
       "@app/*": ["./app/*"],
-      "@common/*": ["./app/common/*"]
+      "@common/*": ["./app/common/*"],
+      "@ui/*": ["./ui/*"]
     }
   },
   "include": [
     "app",
+    "ui",
     "*.{ts,json,js}",
     "vite.main.config.ts",
     "vite.preload.config.ts",

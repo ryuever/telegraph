@@ -10,6 +10,7 @@ export default defineConfig(async () => {
     resolve: {
       alias: {
         '@app': resolve(__dirname, 'app'),
+        '@ui': resolve(__dirname, 'ui'),
       },
     },
     server: {

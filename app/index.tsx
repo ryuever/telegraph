@@ -1,8 +1,8 @@
-import './index/styles/globals.css'
+import '@ui/styles/globals.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { Toolbar } from './index/components/Toolbar'
-import { MonitorPanel } from './index/components/monitor/MonitorPanel'
+import { Toolbar } from '@ui/components/Toolbar'
+import { MonitorPanel } from '@ui/components/monitor/MonitorPanel'
 
 declare global {
   interface Window {

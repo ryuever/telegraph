@@ -1,5 +1,5 @@
 import React from 'react'
-import { cn } from '@app/index/lib/utils'
+import { cn } from '@ui/lib/utils'
 
 interface SparklineProps {
   values: number[]

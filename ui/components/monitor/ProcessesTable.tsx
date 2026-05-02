@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { cn } from '@app/index/lib/utils'
+import { cn } from '@ui/lib/utils'
 import type { ProcessRow } from '@app/services/monitor/common/types'
 
 type SortKey = 'pid' | 'name' | 'type' | 'cpu' | 'memory'

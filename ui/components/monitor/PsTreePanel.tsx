@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { cn } from '@app/index/lib/utils'
+import { cn } from '@ui/lib/utils'
 import type { PidTreeJson } from '@app/services/monitor/common/types'
 
 interface PsTreePanelProps {
