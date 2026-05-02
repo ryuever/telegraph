@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import './index/styles/globals.css'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Toolbar } from './index/components/Toolbar'
-import { MonitorDrawer } from './index/components/MonitorDrawer'
-import { MONITOR_TOGGLE_CHANNEL } from '@app/services/monitor/common/config'
+import { MonitorPanel } from './index/components/monitor/MonitorPanel'
 
 declare global {
   interface Window {
@@ -11,22 +11,19 @@ declare global {
 }
 
 function App() {
-  const [monitorOpen, setMonitorOpen] = useState(false)
   const hasBridge = typeof window !== 'undefined' && !!window.redcity
   const bridgeKeys = hasBridge ? Object.keys(window.redcity) : []
 
-  useEffect(() => {
-    const bridge = (window as any).redcity?.ipcRenderer
-    if (!bridge?.on) return
-    const listener = () => setMonitorOpen(v => !v)
-    bridge.on(MONITOR_TOGGLE_CHANNEL, listener)
-    return () => {
-      bridge.removeListener?.(MONITOR_TOGGLE_CHANNEL, listener)
-    }
-  }, [])
-
   return (
-    <div style={{ height: '100vh', color: 'white', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        height: '100vh',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      }}
+    >
       <Toolbar />
       <div style={{ flex: 1, padding: '40px', textAlign: 'center' }}>
         <h1>🚀 Speedy</h1>
@@ -48,10 +45,17 @@ function App() {
           preload bridge: {hasBridge ? `OK (${bridgeKeys.join(', ')})` : 'NOT EXPOSED'}
         </div>
       </div>
-      <MonitorDrawer open={monitorOpen} />
     </div>
   )
 }
 
+function pickRoot() {
+  const hash = typeof window !== 'undefined' ? window.location.hash : ''
+  if (hash.includes('/monitor')) return <MonitorPanel />
+  return <App />
+}
+
+document.documentElement.classList.add('dark')
+
 const root = ReactDOM.createRoot(document.getElementById('root')!)
-root.render(<App />)
+root.render(pickRoot())

@@ -3,14 +3,17 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 // https://vitejs.dev/config
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@app': resolve(__dirname, 'app'),
+export default defineConfig(async () => {
+  const tailwindcss = (await import('@tailwindcss/vite')).default
+  return {
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        '@app': resolve(__dirname, 'app'),
+      },
     },
-  },
-  server: {
-    host: '127.0.0.1',
-  },
+    server: {
+      host: '127.0.0.1',
+    },
+  }
 })

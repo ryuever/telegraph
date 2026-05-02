@@ -76,7 +76,7 @@ export class RedcityMenu extends Disposable {
           {
             label: 'Toggle Monitor',
             accelerator: 'CmdOrCtrl+Shift+M',
-            click: () => this.monitorBridge.toggleDrawer(),
+            click: () => this.monitorBridge.toggleMonitorWindow(),
           },
           { type: 'separator' },
           { role: 'reload' },

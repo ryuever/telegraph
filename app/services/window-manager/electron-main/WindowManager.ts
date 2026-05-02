@@ -14,6 +14,11 @@ import type { IBrowserWindowFactory, BrowserWindow } from './BrowserWindow'
 
 export const WindowManagerId = createId('browser-window-factory')
 
+const MONITOR_WINDOW_WIDTH = 620
+const MONITOR_WINDOW_HEIGHT = 760
+const MONITOR_WINDOW_MIN_WIDTH = 480
+const MONITOR_WINDOW_MIN_HEIGHT = 520
+
 @injectable()
 export class WindowManager extends Disposable {
   private workbench: Workbench
@@ -21,6 +26,8 @@ export class WindowManager extends Disposable {
   private mainWindow: BrowserWindow
 
   private auxiliaryWindow: BrowserWindow
+
+  private monitorWindow: BrowserWindow | null = null
 
   private windowMap = new Map<string, BrowserWindow>()
 
@@ -74,6 +81,64 @@ export class WindowManager extends Disposable {
 
   getMainWindow() {
     return this.mainWindow
+  }
+
+  getMonitorWindow() {
+    if (this.monitorWindow && !this.monitorWindow.window?.isDestroyed()) {
+      return this.monitorWindow
+    }
+    return null
+  }
+
+  createMonitorWindow() {
+    const existing = this.getMonitorWindow()
+    if (existing) {
+      existing.window.focus()
+      return existing
+    }
+
+    const monitorWindow = this.browserWindowFactory({
+      isPrimary: false,
+      workbench: this.workbench,
+      width: MONITOR_WINDOW_WIDTH,
+      height: MONITOR_WINDOW_HEIGHT,
+      minWidth: MONITOR_WINDOW_MIN_WIDTH,
+      minHeight: MONITOR_WINDOW_MIN_HEIGHT,
+      title: 'Monitor',
+    })
+
+    this.registerDisposable(
+      monitorWindow.onDidWindowCreated(() => {
+        monitorWindow.window.loadURL(
+          ...this.fileAccess.asLoadURL(
+            `/monitor?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=monitor-window-app`
+          )
+        )
+      })
+    )
+
+    this.registerDisposable(
+      monitorWindow.onWindowDidCloseHandler(() => {
+        this.windowMap.delete(monitorWindow.id)
+        if (this.monitorWindow === monitorWindow) {
+          this.monitorWindow = null
+        }
+      })
+    )
+
+    monitorWindow.createWindow()
+    this.monitorWindow = monitorWindow
+    this.windowMap.set(monitorWindow.id, monitorWindow)
+    return monitorWindow
+  }
+
+  toggleMonitorWindow() {
+    const existing = this.getMonitorWindow()
+    if (existing) {
+      existing.window.close()
+      return
+    }
+    this.createMonitorWindow()
   }
 
   createDisposablePanel(props: { windowId?: string; projectName: string }) {
