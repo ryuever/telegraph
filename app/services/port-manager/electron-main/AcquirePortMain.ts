@@ -1,6 +1,9 @@
 import { createId, inject, injectable } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import IPCMainGlobalChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCMainGlobalChannelProtocol'
+import {
+  IPCMainChannel,
+  ElectronMessagePortMainChannel,
+} from '@x-oasis/async-call-rpc-electron'
 import type { MessagePortMain } from 'electron'
 import { MessageChannelMain } from 'electron'
 import type SharedProcessMain from '@app/services/process/shared-process/electron-main/SharedProcessMain'
@@ -10,8 +13,8 @@ import type DaemonProcessMain from '@app/services/process/daemon-process/electro
 import type MainProcess from '@app/services/process/main-process/electron-main/MainProcess'
 
 import type { WindowManager } from '@app/services/window-manager/electron-main/WindowManager'
-import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
-import type { MainPort } from '@app/core/common/async-rpc-compat'
+import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
+import type { MainPort } from '@x-oasis/async-call-rpc-electron'
 
 import {
   acquirePortMainServicePath,
@@ -30,13 +33,11 @@ import type {
 } from '@app/services/port-manager/common/types'
 import type { IAssignPassingPortProps } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
-import DeferredMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/DeferredMessageChannelProtocol'
 
 import { sharedProcessName } from '@app/services/process/shared-process/common/config'
 import { daemonProcessName } from '@app/services/process/daemon-process/common/config'
 import { LogServiceId } from '@app/services/log/common/log'
 import type { LogService } from '@app/services/log/common/log'
-import IPCMainChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCMainChannelProtocol'
 import { PortManagerLog } from '@app/services/log/common/constants'
 import { MessageChannelPair } from '../common/MessageChannelPair'
 import { parseConnectId } from '../common/connectId'
@@ -73,20 +74,20 @@ export class AcquirePortMain extends Disposable implements IAcquirePortMain {
   /**
    * created on default, then connect channel later
    */
-  sharedProcessChannel: DeferredMessageChannelProtocol
+  sharedProcessChannel: ElectronMessagePortMainChannel
 
   /**
    * created on default, then connect channel later
    */
-  daemonProcessChannel: DeferredMessageChannelProtocol
+  daemonProcessChannel: ElectronMessagePortMainChannel
 
   private portChannelServiceHost: RPCServiceHost
 
-  protected acquirePortFromRenderer: IPCMainGlobalChannelProtocol
+  protected acquirePortFromRenderer: IPCMainChannel
 
   constructor(@inject(LogServiceId) private logService: LogService) {
     super()
-    this.portChannelServiceHost = new RPCServiceHost('port-channel')
+    this.portChannelServiceHost = new RPCServiceHost()
     this.portChannelServiceHost.registerServiceHandler(acquirePortMainServicePath, this)
     this.buildInProcessNames = [sharedProcessName, daemonProcessName]
 
@@ -108,9 +109,8 @@ export class AcquirePortMain extends Disposable implements IAcquirePortMain {
    * channel client no need serviceHost. it will send request to the end...
    */
   initBuiltInChannelClient(processName: string) {
-    const messageChannel = new DeferredMessageChannelProtocol({
-      serviceHost: this.serviceHost,
-      masterProcessName: 'main-process',
+    const messageChannel = new ElectronMessagePortMainChannel({
+      description: 'main-process',
     })
 
     switch (processName) {
@@ -146,11 +146,12 @@ export class AcquirePortMain extends Disposable implements IAcquirePortMain {
     this._serviceHost = serviceHost
 
     // note: the global listener serviceHost should be `portChannelServiceHost`
-    this.acquirePortFromRenderer = new IPCMainGlobalChannelProtocol({
+    this.acquirePortFromRenderer = new IPCMainChannel({
       channelName: 'acquire-port',
-      serviceHost: this.portChannelServiceHost,
-      masterProcessName: 'main-process',
+      acceptAllSenders: true,
+      description: 'main-process',
     })
+    this.acquirePortFromRenderer.setServiceHost(this.portChannelServiceHost)
 
     this.sharedProcessChannel.setServiceHost(this._serviceHost)
     this.daemonProcessChannel.setServiceHost(this._serviceHost)
@@ -165,16 +166,15 @@ export class AcquirePortMain extends Disposable implements IAcquirePortMain {
   initAssignPageletRendererPassingPort(pageletId: string) {
     if (this.pageletRendererChannelClientMap.has(pageletId)) return
     // TODO: note: the global listener serviceHost should be `portChannelServiceHost`
-    const channel = new IPCMainChannelProtocol({
+    const channel = new IPCMainChannel({
       webContents: this.windowManager.getMainWindow().window.webContents,
       channelName: `${pageletId}-assign-passing-port`,
-      masterProcessName: 'main-process',
+      description: 'main-process',
     })
 
     this.pageletRendererChannelClientMap.set(
       pageletId,
-      new ProxyRPCClient({
-        requestPath: pageletClintChannelServicePath,
+      new ProxyRPCClient(pageletClintChannelServicePath, {
         channel,
       }).createProxy()
     )
@@ -230,11 +230,11 @@ export class AcquirePortMain extends Disposable implements IAcquirePortMain {
       return this.daemonProcessChannel
     }
 
-    const messageChannel = new DeferredMessageChannelProtocol({
+    const messageChannel = new ElectronMessagePortMainChannel({
       port: port as any as MainPort,
-      serviceHost: this.serviceHost,
-      masterProcessName: 'main-process',
+      description: 'main-process',
     })
+    messageChannel.setServiceHost(this.serviceHost)
 
     pairProps.channel = messageChannel
 

@@ -8,8 +8,8 @@ import type DaemonProcessMain from '@app/services/process/daemon-process/electro
 
 import type MainProcess from '@app/services/process/main-process/electron-main/MainProcess'
 
-import { RPCServiceHost, ProxyRPCClient } from '@app/core/common/async-rpc-compat'
-import ProcessChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessChannelProtocol'
+import { RPCServiceHost, ProxyRPCClient } from '@x-oasis/async-call-rpc'
+import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron'
 import type { IProcessNode } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
 
@@ -62,7 +62,7 @@ export class AcquireProcessPortMain extends Disposable implements IAcquireProces
 
   protected windowManager: WindowManager
 
-  private processChannel: ProcessChannelProtocol
+  private processChannel: ElectronUtilityProcessChannel
 
   private portChannelServiceHost: RPCServiceHost
 
@@ -95,21 +95,20 @@ export class AcquireProcessPortMain extends Disposable implements IAcquireProces
     this.daemonProcessMain = daemonProcessMain
     this.mainProcess = mainProcess
 
-    this.portChannelServiceHost = new RPCServiceHost('port-channel')
+    this.portChannelServiceHost = new RPCServiceHost()
 
     this.portChannelServiceHost.registerServiceHandler(acquirePortMainServicePath, this)
   }
 
   initAcquirePortListener(process: UtilityProcess) {
     this._process = process
-    this.processChannel = new ProcessChannelProtocol({
+    this.processChannel = new ElectronUtilityProcessChannel({
       process,
-      serviceHost: this.portChannelServiceHost,
-      masterProcessName: 'main-process',
+      description: 'main-process',
     })
+    this.processChannel.setServiceHost(this.portChannelServiceHost)
 
-    this.rpcClient = new ProxyRPCClient({
-      requestPath: acquirePortMainServicePath,
+    this.rpcClient = new ProxyRPCClient(acquirePortMainServicePath, {
       channel: this.processChannel,
     }).createProxy()
 
@@ -126,14 +125,13 @@ export class AcquireProcessPortMain extends Disposable implements IAcquireProces
       this.processChannel.disconnect()
     }
 
-    this.processChannel = new ProcessChannelProtocol({
+    this.processChannel = new ElectronUtilityProcessChannel({
       process,
-      serviceHost: this.portChannelServiceHost,
-      masterProcessName: 'main-process',
+      description: 'main-process',
     })
+    this.processChannel.setServiceHost(this.portChannelServiceHost)
 
-    this.rpcClient = new ProxyRPCClient({
-      requestPath: acquirePortMainServicePath,
+    this.rpcClient = new ProxyRPCClient(acquirePortMainServicePath, {
       channel: this.processChannel,
     }).createProxy()
 

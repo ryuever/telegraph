@@ -1,5 +1,5 @@
-import type DeferredMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/DeferredMessageChannelProtocol'
-import type IPCRendererMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererMessageChannelProtocol'
+import type { ElectronMessagePortMainChannel } from '@x-oasis/async-call-rpc-electron'
+import type { RPCMessageChannel } from '@x-oasis/async-call-rpc-web'
 import type { LogService } from '@app/services/log/common/log'
 import type { AssignPassingPortType } from '@app/services/process/common/types'
 import type { PromisifyService } from '@app/services/types'
@@ -63,7 +63,7 @@ export interface IAcquireProcessPortMain {
 }
 
 export type MessageChannelPairHostEntry = {
-  channel: DeferredMessageChannelProtocol | IPCRendererMessageChannelProtocol
+  channel: ElectronMessagePortMainChannel | RPCMessageChannel | null
 }
 
 export type MessageChannelPairPeerEntry = {
@@ -74,8 +74,8 @@ export type MessageChannelPairPeerEntry = {
 }
 
 export type messageChannelPairChannel =
-  | DeferredMessageChannelProtocol
-  | IPCRendererMessageChannelProtocol
+  | ElectronMessagePortMainChannel
+  | RPCMessageChannel
 
 export type MessageChannelPairProps = {
   connectId: string

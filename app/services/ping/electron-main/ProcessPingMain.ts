@@ -1,7 +1,7 @@
 import { createId, injectable } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import ProcessChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessChannelProtocol'
-import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
+import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron'
+import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
 import { PingMainServicePath } from '@app/services/ping/common/config'
 import { Emitter } from '@x-oasis/emitter'
 import type { IProcessPingClient } from '../common/types'
@@ -18,7 +18,7 @@ export class ProcessPingMain extends Disposable {
 
   private _processName: string
 
-  protected _processListener: ProcessChannelProtocol
+  protected _processListener: ElectronUtilityProcessChannel
 
   private _rpcClient: IProcessPingClient
 
@@ -39,7 +39,7 @@ export class ProcessPingMain extends Disposable {
 
     this._processName = props?.processName
     this._process = props?.process
-    this.serviceHost = new RPCServiceHost('ping-service')
+    this.serviceHost = new RPCServiceHost()
     this.serviceHost.registerServiceHandler(PingMainServicePath, this)
 
     this.setupListener()
@@ -68,14 +68,13 @@ export class ProcessPingMain extends Disposable {
   setupListener() {
     // TODO：这么做现在有问题，比如shared process相当于有两个地方接受
     // process client发来的消息
-    this._processListener = new ProcessChannelProtocol({
+    this._processListener = new ElectronUtilityProcessChannel({
       process: this._process,
-      serviceHost: this.serviceHost,
-      masterProcessName: `${this._processName}-process`,
+      description: `${this._processName}-process`,
     })
+    this._processListener.setServiceHost(this.serviceHost)
 
-    this._rpcClient = new ProxyRPCClient({
-      requestPath: PingMainServicePath,
+    this._rpcClient = new ProxyRPCClient(PingMainServicePath, {
       channel: this._processListener,
     }).createProxy<IProcessPingClient>()
 

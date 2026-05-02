@@ -1,6 +1,6 @@
 import type { IpcRendererEvent } from 'electron'
 import { ipcRenderer, webFrame, contextBridge } from 'electron'
-// import IPCRendererChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererChannelProtocol'
+// import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron'
 
 // const url = new URL(window.location.href)
 // const { pathname } = url
@@ -22,7 +22,7 @@ import { ipcRenderer, webFrame, contextBridge } from 'electron'
 //     return value
 //   }
 
-//   new IPCRendererChannelProtocol({
+//   new IPCRendererChannel({
 //     channelName: `${platform}-pagelet-port`,
 //     projectName: `${platform}`,
 //     masterProcessName: `${platform}-renderer`,

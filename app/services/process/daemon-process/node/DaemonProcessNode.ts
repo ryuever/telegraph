@@ -18,7 +18,7 @@ import {
   processName,
   daemonProcessServicePath,
 } from '@app/services/process/daemon-process/common/config'
-import { RPCServiceHost } from '@app/core/common/async-rpc-compat'
+import { RPCServiceHost } from '@x-oasis/async-call-rpc'
 
 import { servicePath as StorageServicePath } from '@app/services/storage/common/config'
 import { AssignPassingPortType } from '../../common/types'
@@ -39,7 +39,7 @@ export default class DaemonProcessNode extends NodeProcess {
     @inject(ProcessPingClientFactoryId) private processPingClientFactory: IProcessPingClientFactory
   ) {
     super('daemon-process', workbenchClient)
-    this.serviceHost = new RPCServiceHost('daemon-process')
+    this.serviceHost = new RPCServiceHost()
     this.serviceHost.registerServiceHandler(DiagnosticsServicePath, this.diagnostics)
   }
 

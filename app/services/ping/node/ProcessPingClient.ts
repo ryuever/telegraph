@@ -1,8 +1,8 @@
 import { createId, injectable } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import ProcessClientChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessClientChannelProtocol'
+import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron'
 import { Event } from '@x-oasis/emitter'
-import { RPCServiceHost, ProxyRPCClient } from '@app/core/common/async-rpc-compat'
+import { RPCServiceHost, ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import { PingMainServicePath } from '@app/services/ping/common/config'
 
 import type { IProcessPingMain } from '../common/types'
@@ -19,7 +19,7 @@ export class ProcessPingClient extends Disposable {
 
   private _processName: string
 
-  private _processReporter: ProcessClientChannelProtocol
+  private _processReporter: ElectronUtilityProcessChannel
 
   private _updateTime: number
 
@@ -39,7 +39,7 @@ export class ProcessPingClient extends Disposable {
     this.pingInterval = 10 * 1000
     this._processName = props?.processName
     this._process = props?.process
-    this.serviceHost = new RPCServiceHost('ping-service')
+    this.serviceHost = new RPCServiceHost()
     this.serviceHost.registerServiceHandler(PingMainServicePath, this)
 
     this.setupReporter()
@@ -50,18 +50,17 @@ export class ProcessPingClient extends Disposable {
   }
 
   setupReporter() {
-    this._processReporter = new ProcessClientChannelProtocol({
-      port: process.parentPort,
-      serviceHost: this.serviceHost,
-      masterProcessName: `${this._processName}-xxxx-process`,
+    this._processReporter = new ElectronUtilityProcessChannel({
+      parentPort: process.parentPort as any,
+      description: `${this._processName}-xxxx-process`,
     })
+    this._processReporter.setServiceHost(this.serviceHost)
 
     setInterval(() => {
       this.onPingEvent.fire(this._processName)
     }, this.pingInterval)
 
-    this._rpcClient = new ProxyRPCClient({
-      requestPath: PingMainServicePath,
+    this._rpcClient = new ProxyRPCClient(PingMainServicePath, {
       channel: this._processReporter,
     }).createProxy<IProcessPingMain>()
 

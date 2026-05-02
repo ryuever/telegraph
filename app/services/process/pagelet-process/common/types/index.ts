@@ -1,4 +1,4 @@
-import type RPCServiceHost from '@app/core/common/async-rpc-compat/RPCServiceHost'
+import type { RPCServiceHost } from '@x-oasis/async-call-rpc'
 import type { Container } from '@x-oasis/di'
 
 export type IPageletProcess = any

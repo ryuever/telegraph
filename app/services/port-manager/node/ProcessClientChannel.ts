@@ -9,15 +9,17 @@ import {
   sharedProcessPortServicePath,
 } from '@app/services/port-manager/common/config'
 
-import ProcessClientChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessClientChannelProtocol'
-import type { MainPort } from '@app/core/common/async-rpc-compat'
-import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
+import {
+  ElectronUtilityProcessChannel,
+  ElectronMessagePortMainChannel,
+} from '@x-oasis/async-call-rpc-electron'
+import type { MainPort } from '@x-oasis/async-call-rpc-electron'
+import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
 import type { MessagePortMain } from 'electron'
 
 import type { IAssignPassingPortProps, IProcessNode } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
 import type { IAcquireProcessPortMainPromisify } from '@app/services/port-manager/common/types'
-import DeferredMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/DeferredMessageChannelProtocol'
 import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId } from '@app/services/log/common/log'
 import { PortManagerLog } from '@app/services/log/common/constants'
@@ -32,15 +34,15 @@ export class ProcessClientChannel extends Disposable implements IProcessNode {
 
   private serviceHost: RPCServiceHost
 
-  private _portChannel: ProcessClientChannelProtocol
+  private _portChannel: ElectronUtilityProcessChannel
 
   private _portChannelRPCClient: IAcquireProcessPortMainPromisify
 
-  private _sharedProcessChannelProtocol: DeferredMessageChannelProtocol
+  private _sharedProcessChannelProtocol: ElectronMessagePortMainChannel
 
-  private _daemonProcessChannelProtocol: DeferredMessageChannelProtocol
+  private _daemonProcessChannelProtocol: ElectronMessagePortMainChannel
 
-  private _mainProcessChannelProtocol: DeferredMessageChannelProtocol
+  private _mainProcessChannelProtocol: ElectronMessagePortMainChannel
 
   private messageChannelPairs = new Map<string, MessageChannelPair>()
 
@@ -64,14 +66,14 @@ export class ProcessClientChannel extends Disposable implements IProcessNode {
   }
 
   initBuiltInChannelProtocol() {
-    this._sharedProcessChannelProtocol = new DeferredMessageChannelProtocol({
-      masterProcessName: 'process-client',
+    this._sharedProcessChannelProtocol = new ElectronMessagePortMainChannel({
+      description: 'process-client',
     })
-    this._daemonProcessChannelProtocol = new DeferredMessageChannelProtocol({
-      masterProcessName: 'process-client',
+    this._daemonProcessChannelProtocol = new ElectronMessagePortMainChannel({
+      description: 'process-client',
     })
-    this._mainProcessChannelProtocol = new DeferredMessageChannelProtocol({
-      masterProcessName: 'process-client',
+    this._mainProcessChannelProtocol = new ElectronMessagePortMainChannel({
+      description: 'process-client',
     })
   }
 
@@ -86,17 +88,16 @@ export class ProcessClientChannel extends Disposable implements IProcessNode {
     this.serviceHost.registerServiceHandler(pageletProcessPortServicePath, this)
     this.serviceHost.registerServiceHandler(daemonProcessPortServicePath, this)
 
-    const portServiceHost = new RPCServiceHost('port-service-host')
+    const portServiceHost = new RPCServiceHost()
     portServiceHost.registerServiceHandler(acquirePortMainServicePath, this)
 
-    this._portChannel = new ProcessClientChannelProtocol({
-      port: process.parentPort as unknown as MainPort,
-      serviceHost: portServiceHost,
-      masterProcessName: `shared-utility-process`,
+    this._portChannel = new ElectronUtilityProcessChannel({
+      parentPort: process.parentPort as any,
+      description: `shared-utility-process`,
     })
+    this._portChannel.setServiceHost(portServiceHost)
 
-    this._portChannelRPCClient = new ProxyRPCClient({
-      requestPath: acquirePortMainServicePath,
+    this._portChannelRPCClient = new ProxyRPCClient(acquirePortMainServicePath, {
       channel: this._portChannel,
     }).createProxy<IAcquireProcessPortMainPromisify>()
 
@@ -203,11 +204,11 @@ export class ProcessClientChannel extends Disposable implements IProcessNode {
 
     this.logService.info(PortManagerLog.AssignPort, `connectId: ${connectId}`)
 
-    const messageChannel = new DeferredMessageChannelProtocol({
+    const messageChannel = new ElectronMessagePortMainChannel({
       port: port as unknown as MainPort,
-      serviceHost: this.serviceHost,
-      masterProcessName: 'shared-utility-process',
+      description: 'shared-utility-process',
     })
+    messageChannel.setServiceHost(this.serviceHost)
 
     if (fromType === AssignPassingPortType.PageletRenderer) {
       const pair = new MessageChannelPair({

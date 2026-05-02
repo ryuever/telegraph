@@ -79,7 +79,7 @@ import {
   AcquireProcessPortMainFactoryId,
 } from '@app/services/port-manager/electron-main/AcquireProcessPortMain'
 
-import { ProxyRPCClient } from '@app/core/common/async-rpc-compat'
+import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import { CommonNodeLogger } from '@app/services/log/electron-main/nodeLogger'
 import { FileSystemManager } from '@app/services/file-manager/electron-main'
 import { FileSystemManagerId } from '@app/services/file-manager/common/config'
@@ -132,8 +132,7 @@ export default new Registry(bind => {
 
   bind(StorageServiceClient).toDynamicValue(({ container }) => {
     const mainProcess = container.get(MainProcessId)
-    return new ProxyRPCClient({
-      requestPath: StorageServicePath,
+    return new ProxyRPCClient(StorageServicePath, {
       channel: mainProcess.getSharedProcessChannel(),
     }).createProxy()
   })

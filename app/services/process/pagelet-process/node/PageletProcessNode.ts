@@ -12,7 +12,7 @@ import {
   processName,
   pageletProcessServicePath,
 } from '@app/services/process/pagelet-process/common/config'
-import { RPCServiceHost } from '@app/core/common/async-rpc-compat'
+import { RPCServiceHost } from '@x-oasis/async-call-rpc'
 import { REDCITY_PROCESS_ID, REDCITY_PROJECT_NAME } from '@app/core/node/process/env'
 import { AssignPassingPortType } from '../../common/types'
 import { NodeProcess } from '../../node/NodeProcess'
@@ -36,7 +36,7 @@ export default class PageletProcessNode extends NodeProcess {
   ) {
     super(processId, workbenchClient)
     this.projectName = process.env[REDCITY_PROJECT_NAME]!
-    this.serviceHost = new RPCServiceHost('shared-process')
+    this.serviceHost = new RPCServiceHost()
   }
 
   start() {

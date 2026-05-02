@@ -1,9 +1,8 @@
 import { createId } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import type { MainPort } from '@app/core/common/async-rpc-compat'
-import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
-
-import IPCRendererChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererChannelProtocol'
+import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
+import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron'
+import { RPCMessageChannel } from '@x-oasis/async-call-rpc-web'
 import {
   acquirePortMainServicePath,
   mainProcessPortServicePath,
@@ -13,7 +12,6 @@ import {
   daemonProcessPortServicePath,
 } from '@app/services/port-manager/common/config'
 import type { IAcquirePortMainPromisify } from '@app/services/port-manager/common/types'
-import IPCRendererMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererMessageChannelProtocol'
 import type { IAssignPassingPortProps } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
 import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
@@ -38,19 +36,19 @@ export class PageletClientChannel extends Disposable {
 
   private serviceHost: RPCServiceHost
 
-  private _portChannel: IPCRendererChannelProtocol
+  private _portChannel: IPCRendererChannel
 
   private messageChannelPairs = new Map<string, MessageChannelPair>()
 
   private _portChannelRPCClient: IAcquirePortMainPromisify
 
-  private _pageletChannelProtocol: IPCRendererMessageChannelProtocol
+  private _pageletChannelProtocol: RPCMessageChannel
 
-  private _sharedProcessChannelProtocol: IPCRendererMessageChannelProtocol
+  private _sharedProcessChannelProtocol: RPCMessageChannel
 
-  private _daemonProcessChannelProtocol: IPCRendererMessageChannelProtocol
+  private _daemonProcessChannelProtocol: RPCMessageChannel
 
-  private _mainProcessChannelProtocol: IPCRendererMessageChannelProtocol
+  private _mainProcessChannelProtocol: RPCMessageChannel
 
   constructor(logService: LogService) {
     super()
@@ -70,29 +68,29 @@ export class PageletClientChannel extends Disposable {
     this.id = this.pageletRendererProcessId
     this.type = AssignPassingPortType.PageletRenderer
 
-    this.serviceHost = new RPCServiceHost('pagelet-client-channel')
+    this.serviceHost = new RPCServiceHost()
     this.serviceHost.registerServiceHandler(pageletClintChannelServicePath, this)
 
     this.initBuiltInChannelProtocol()
   }
 
   initBuiltInChannelProtocol() {
-    this._pageletChannelProtocol = new IPCRendererMessageChannelProtocol({
-      serviceHost: this.serviceHost,
-      masterProcessName: `${this._projectName}-pagelet-client`,
+    this._pageletChannelProtocol = new RPCMessageChannel({
+      description: `${this._projectName}-pagelet-client`,
     })
-    this._sharedProcessChannelProtocol = new IPCRendererMessageChannelProtocol({
-      serviceHost: this.serviceHost,
-      masterProcessName: `${this._projectName}-shared-client`,
+    this._pageletChannelProtocol.setServiceHost(this.serviceHost)
+    this._sharedProcessChannelProtocol = new RPCMessageChannel({
+      description: `${this._projectName}-shared-client`,
     })
-    this._daemonProcessChannelProtocol = new IPCRendererMessageChannelProtocol({
-      serviceHost: this.serviceHost,
-      masterProcessName: `${this._projectName}-daemon-client`,
+    this._sharedProcessChannelProtocol.setServiceHost(this.serviceHost)
+    this._daemonProcessChannelProtocol = new RPCMessageChannel({
+      description: `${this._projectName}-daemon-client`,
     })
-    this._mainProcessChannelProtocol = new IPCRendererMessageChannelProtocol({
-      serviceHost: this.serviceHost,
-      masterProcessName: `${this._projectName}-main-client`,
+    this._daemonProcessChannelProtocol.setServiceHost(this.serviceHost)
+    this._mainProcessChannelProtocol = new RPCMessageChannel({
+      description: `${this._projectName}-main-client`,
     })
+    this._mainProcessChannelProtocol.setServiceHost(this.serviceHost)
   }
 
   get pageletRendererProcessId() {
@@ -120,15 +118,14 @@ export class PageletClientChannel extends Disposable {
 
     this._projectName = projectName
 
-    this._portChannel = new IPCRendererChannelProtocol({
+    this._portChannel = new IPCRendererChannel({
       channelName: 'acquire-port',
       projectName,
-      masterProcessName,
+      description: masterProcessName,
       ipcRenderer: window.redcity.ipcRenderer as any,
     })
 
-    this._portChannelRPCClient = new ProxyRPCClient({
-      requestPath: acquirePortMainServicePath,
+    this._portChannelRPCClient = new ProxyRPCClient(acquirePortMainServicePath, {
       channel: this._portChannel,
     }).createProxy<IAcquirePortMainPromisify>()
 
@@ -147,13 +144,13 @@ export class PageletClientChannel extends Disposable {
   }
 
   initAssignPassingPortListener() {
-    new IPCRendererChannelProtocol({
+    const channel = new IPCRendererChannel({
       channelName: `${this.id}-assign-passing-port`,
       projectName: this._projectName,
-      masterProcessName: this.id,
-      serviceHost: this.serviceHost,
+      description: this.id,
       ipcRenderer: window.redcity.ipcRenderer as any,
     })
+    channel.setServiceHost(this.serviceHost)
   }
 
   private async acquirePort(toType: AssignPassingPortType) {
@@ -166,7 +163,7 @@ export class PageletClientChannel extends Disposable {
 
     const port = (await this._portChannelRPCClient.acquirePageletRendererPort({
       connectId,
-    })) as unknown as MainPort
+    })) as unknown as MessagePort
     this.logService.info(`receive port, connectId: ${connectId}`)
     return {
       port,

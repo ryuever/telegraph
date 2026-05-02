@@ -1,5 +1,5 @@
 import { Disposable } from '@x-oasis/disposable'
-import { ProxyRPCClient } from '@app/core/common/async-rpc-compat'
+import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import type { LogService } from '@app/services/log/common/log'
 import type { MessagePortMain } from 'electron'
 import { PortManagerLog } from '@app/services/log/common/constants'
@@ -26,9 +26,8 @@ export class MessageChannelPair extends Disposable {
     this._id = connectId
     this._logService = logService
     this.hostEntry = { channel }
-    const client = new ProxyRPCClient({
+    const client = new ProxyRPCClient(peerRequestPath, {
       channel,
-      requestPath: peerRequestPath,
     }).createProxy<MessageChannelPairPeerEntry['client']>()
 
     this.peerEntry = {
@@ -52,17 +51,17 @@ export class MessageChannelPair extends Disposable {
   }
 
   reconnect(port: MessagePortMain) {
-    this.channel.bindPort(port as any)
+    this.channel!.bindPort(port as any)
     this.sayHelloOptionsRequest()
   }
 
   disconnect() {
     this._logService.info(PortManagerLog.MessageChannelDisconnect, this.id)
-    this.hostEntry.channel.disconnect()
+    this.hostEntry.channel?.disconnect()
   }
 
   connect() {
-    if (!this.hostEntry.channel.isConnected()) {
+    if (this.hostEntry.channel && !this.hostEntry.channel.isConnected()) {
       this._logService.info(PortManagerLog.MessageChannelConnected, this.id)
       this.hostEntry.channel.activate()
       // 标记下对方也处于 ready 状态，不需要再主动进行 say hello 探测

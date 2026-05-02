@@ -14,7 +14,7 @@ import {
   WorkbenchClient,
   servicePath as workspaceServicePath,
 } from '@app/services/workbench/common/config'
-import { ProxyRPCClient } from '@app/core/common/async-rpc-compat'
+import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import type { IWorkbenchProsify } from '@app/services/workbench/common/types'
 
 import { CommonNodeLogger } from '@app/services/log/node/nodeLogger'
@@ -42,8 +42,7 @@ export default new Registry(bind => {
   bind(WorkbenchClient).toDynamicValue(({ container }) => {
     const channelClient = container.get(ProcessClientChannelId)
 
-    return new ProxyRPCClient({
-      requestPath: workspaceServicePath,
+    return new ProxyRPCClient(workspaceServicePath, {
       channel: channelClient.mainProcessChannelProtocol,
     }).createProxy<IWorkbenchProsify>()
   })
