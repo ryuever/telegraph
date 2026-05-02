@@ -9,15 +9,15 @@ import {
   sharedProcessPortServicePath,
 } from '@app/services/port-manager/common/config'
 
-import ProcessClientChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/ProcessClientChannelProtocol'
-import type { MainPort } from '@x-oasis/async-call-rpc'
-import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
+import ProcessClientChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessClientChannelProtocol'
+import type { MainPort } from '@app/core/common/async-rpc-compat'
+import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
 import type { MessagePortMain } from 'electron'
 
 import type { IAssignPassingPortProps, IProcessNode } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
 import type { IAcquireProcessPortMainPromisify } from '@app/services/port-manager/common/types'
-import DeferredMessageChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/DeferredMessageChannelProtocol'
+import DeferredMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/DeferredMessageChannelProtocol'
 import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId } from '@app/services/log/common/log'
 import { PortManagerLog } from '@app/services/log/common/constants'

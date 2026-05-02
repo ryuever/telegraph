@@ -1,5 +1,5 @@
-import type DeferredMessageChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/DeferredMessageChannelProtocol'
-import type IPCRendererMessageChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/IPCRendererMessageChannelProtocol'
+import type DeferredMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/DeferredMessageChannelProtocol'
+import type IPCRendererMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererMessageChannelProtocol'
 import type { LogService } from '@app/services/log/common/log'
 import type { AssignPassingPortType } from '@app/services/process/common/types'
 import type { PromisifyService } from '@app/services/types'

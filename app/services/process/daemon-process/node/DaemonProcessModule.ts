@@ -14,7 +14,7 @@ import {
   WorkbenchClient,
   servicePath as workspaceServicePath,
 } from '@app/services/workbench/common/config'
-import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
+import { ProxyRPCClient } from '@app/core/common/async-rpc-compat'
 import type { IWorkbenchProsify } from '@app/services/workbench/common/types'
 
 import { CommonNodeLogger } from '@app/services/log/node/nodeLogger'
@@ -24,6 +24,11 @@ import {
   MainProcessUtilsServicePath,
 } from '@app/services/main-process-util/common/config'
 import type { IMainProcessUtils } from '@app/services/main-process-util/common/types'
+import {
+  MonitorBridgeClient,
+  monitorServicePath,
+} from '@app/services/monitor/common/config'
+import type { IMonitorBridge } from '@app/services/monitor/common/types'
 import DaemonProcessNode, { DaemonProcessNodeId } from './DaemonProcessNode'
 
 export default new Registry(bind => {
@@ -61,5 +66,14 @@ export default new Registry(bind => {
       requestPath: MainProcessUtilsServicePath,
       channel: channelClient.mainProcessChannelProtocol,
     }).createProxy<IMainProcessUtils>()
+  })
+
+  bind(MonitorBridgeClient).toDynamicValue(({ container }) => {
+    const channelClient = container.get(ProcessClientChannelId)
+
+    return new ProxyRPCClient({
+      requestPath: monitorServicePath,
+      channel: channelClient.mainProcessChannelProtocol,
+    }).createProxy<IMonitorBridge>()
   })
 })

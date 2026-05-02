@@ -4,7 +4,7 @@ import type UtilityProcess from '@app/core/electron-main/utility-process/utility
 import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId } from '@app/services/log/common/log'
 import type { MessagePortMain } from 'electron'
-import { RPCServiceHost } from '@x-oasis/async-call-rpc'
+import { RPCServiceHost } from '@app/core/common/async-rpc-compat'
 import { AcquirePortId } from '@app/services/port-manager/electron-main/AcquirePortMain'
 import type { AcquirePortMain } from '@app/services/port-manager/electron-main/AcquirePortMain'
 

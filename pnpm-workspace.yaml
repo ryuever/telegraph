@@ -1,0 +1,5 @@
+overrides:
+  '@x-oasis/async-call-rpc': link:../../../red/x-oasis/packages/async/async-call-rpc
+  '@x-oasis/async-call-rpc-electron': link:../../../red/x-oasis/packages/async/async-call-rpc-electron
+  '@x-oasis/async-call-rpc-node': link:../../../red/x-oasis/packages/async/async-call-rpc-node
+  '@x-oasis/async-call-rpc-web': link:../../../red/x-oasis/packages/async/async-call-rpc-web

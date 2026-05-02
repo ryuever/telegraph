@@ -1,6 +1,6 @@
 import { createId, inject, injectable } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import IPCMainGlobalChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/IPCMainGlobalChannelProtocol'
+import IPCMainGlobalChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCMainGlobalChannelProtocol'
 import type { MessagePortMain } from 'electron'
 import { MessageChannelMain } from 'electron'
 import type SharedProcessMain from '@app/services/process/shared-process/electron-main/SharedProcessMain'
@@ -10,8 +10,8 @@ import type DaemonProcessMain from '@app/services/process/daemon-process/electro
 import type MainProcess from '@app/services/process/main-process/electron-main/MainProcess'
 
 import type { WindowManager } from '@app/services/window-manager/electron-main/WindowManager'
-import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
-import type { MainPort } from '@x-oasis/async-call-rpc'
+import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
+import type { MainPort } from '@app/core/common/async-rpc-compat'
 
 import {
   acquirePortMainServicePath,
@@ -30,13 +30,13 @@ import type {
 } from '@app/services/port-manager/common/types'
 import type { IAssignPassingPortProps } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
-import DeferredMessageChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/DeferredMessageChannelProtocol'
+import DeferredMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/DeferredMessageChannelProtocol'
 
 import { sharedProcessName } from '@app/services/process/shared-process/common/config'
 import { daemonProcessName } from '@app/services/process/daemon-process/common/config'
 import { LogServiceId } from '@app/services/log/common/log'
 import type { LogService } from '@app/services/log/common/log'
-import IPCMainChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/IPCMainChannelProtocol'
+import IPCMainChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCMainChannelProtocol'
 import { PortManagerLog } from '@app/services/log/common/constants'
 import { MessageChannelPair } from '../common/MessageChannelPair'
 import { parseConnectId } from '../common/connectId'

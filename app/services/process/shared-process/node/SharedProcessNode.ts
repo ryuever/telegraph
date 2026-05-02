@@ -20,7 +20,7 @@ import {
 
 import { servicePath as StorageServicePath } from '@app/services/storage/common/config'
 
-import { RPCServiceHost } from '@x-oasis/async-call-rpc'
+import { RPCServiceHost } from '@app/core/common/async-rpc-compat'
 
 import { AssignPassingPortType } from '../../common/types'
 

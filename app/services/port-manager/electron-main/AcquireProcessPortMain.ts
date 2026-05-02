@@ -8,8 +8,8 @@ import type DaemonProcessMain from '@app/services/process/daemon-process/electro
 
 import type MainProcess from '@app/services/process/main-process/electron-main/MainProcess'
 
-import { RPCServiceHost, ProxyRPCClient } from '@x-oasis/async-call-rpc'
-import ProcessChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/ProcessChannelProtocol'
+import { RPCServiceHost, ProxyRPCClient } from '@app/core/common/async-rpc-compat'
+import ProcessChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessChannelProtocol'
 import type { IProcessNode } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
 

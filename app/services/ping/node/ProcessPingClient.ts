@@ -1,8 +1,8 @@
 import { createId, injectable } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import ProcessClientChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/ProcessClientChannelProtocol'
+import ProcessClientChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/ProcessClientChannelProtocol'
 import { Event } from '@x-oasis/emitter'
-import { RPCServiceHost, ProxyRPCClient } from '@x-oasis/async-call-rpc'
+import { RPCServiceHost, ProxyRPCClient } from '@app/core/common/async-rpc-compat'
 import { PingMainServicePath } from '@app/services/ping/common/config'
 
 import type { IProcessPingMain } from '../common/types'

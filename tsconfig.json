@@ -15,7 +15,8 @@
     "jsx": "react-jsx",
     "strictNullChecks": true,
     "paths": {
-      "@app/*": ["./app/*"]
+      "@app/*": ["./app/*"],
+      "@common/*": ["./app/common/*"]
     }
   },
   "include": [

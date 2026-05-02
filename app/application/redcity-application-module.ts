@@ -2,9 +2,13 @@ import * as path from 'path'
 
 import { Registry } from '@x-oasis/di'
 
-import { ProjectRegistryId } from '@app/services/project-registry/electron-main/ProjectRegistry'
-// import { app as Projects } from '@playground/redcity/electron-main/main'
-// TODO: Add project registry when available
+import { ProjectRegistryId, Projects } from '@app/services/project-registry/electron-main/ProjectRegistry'
+
+class EmptyProjects extends Projects {
+  getLoadConfigs() {
+    return []
+  }
+}
 
 import { FileAccess, FileAccessId } from '@app/services/file-access/electron-main/FileAccess'
 import { LogService, LogServiceId } from '@app/services/log/common/log'
@@ -75,12 +79,14 @@ import {
   AcquireProcessPortMainFactoryId,
 } from '@app/services/port-manager/electron-main/AcquireProcessPortMain'
 
-import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
+import { ProxyRPCClient } from '@app/core/common/async-rpc-compat'
 import { CommonNodeLogger } from '@app/services/log/electron-main/nodeLogger'
 import { FileSystemManager } from '@app/services/file-manager/electron-main'
 import { FileSystemManagerId } from '@app/services/file-manager/common/config'
 import { MainProcessUtils } from '@app/services/main-process-util/electron-main'
 import { MainProcessUtilsId } from '@app/services/main-process-util/common/config'
+import { MonitorBridge } from '@app/services/monitor/electron-main/MonitorBridge'
+import { MonitorBridgeId } from '@app/services/monitor/common/config'
 
 export default new Registry(bind => {
   bind(ApplicationInfoId).to(ApplicationInfo)
@@ -109,7 +115,7 @@ export default new Registry(bind => {
   bind(MainProcessUtilsId).toConstantValue(new MainProcessUtils())
   bind(WorkbenchId).to(Workbench)
   bind(WindowManagerId).to(WindowManager)
-  // bind(ProjectRegistryId).toConstantValue(Projects) // TODO: Add project registry when available
+  bind(ProjectRegistryId).toConstantValue(new EmptyProjects())
   bind(BrowserWindowFactoryId).toParamsFactory(BrowserWindow)
   bind(UtilityProcessFactoryId).toParamsFactory(UtilityProcess)
   bind(SharedProcessMainId).to(SharedProcessMain)
@@ -138,4 +144,5 @@ export default new Registry(bind => {
   bind(ProcessPingMainFactoryId).toParamsFactory(ProcessPingMain)
   bind(AcquireProcessPortMainFactoryId).toParamsFactory(AcquireProcessPortMain)
   bind(FileSystemManagerId).to(FileSystemManager)
+  bind(MonitorBridgeId).to(MonitorBridge)
 })

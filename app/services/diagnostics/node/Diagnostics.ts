@@ -6,6 +6,14 @@ import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId } from '@app/services/log/common/log'
 import { MainProcessUtilsClient } from '@app/services/main-process-util/common/config'
 import type { AppMetric, IMainProcessUtils } from '@app/services/main-process-util/common/types'
+import { MonitorBridgeClient } from '@app/services/monitor/common/config'
+import type {
+  IMonitorBridge,
+  MonitorSnapshot,
+  PidTreeJson,
+  ProcessRow,
+} from '@app/services/monitor/common/types'
+import { getUsageInfo } from '@app/core/node/process/process-utils'
 
 export const DiagnosticsId = createId('diagnostics')
 
@@ -18,9 +26,12 @@ class Diagnostics extends Disposable {
 
   onPerformanceInfo = this.onPerformanceInfoEvent.subscribe
 
+  private mainPid: number | null = null
+
   constructor(
     @inject(LogServiceId) private logService: LogService,
-    @inject(MainProcessUtilsClient) private mainProcessUtilsClient: IMainProcessUtils
+    @inject(MainProcessUtilsClient) private mainProcessUtilsClient: IMainProcessUtils,
+    @inject(MonitorBridgeClient) private monitorBridgeClient: IMonitorBridge
   ) {
     super()
     this.diagnosticRoutine()
@@ -32,14 +43,14 @@ class Diagnostics extends Disposable {
 
   async getPerformanceInfo() {
     const result = await this.mainProcessUtilsClient.getAppMetrics()
-    const formatInfos: { memory: number; cpu: number; name?: string }[] = []
-    let totalMemory: number = 0 // MB
-    let totalCPU: number = 0 // percent
+    const formatInfos: ProcessRow[] = []
+    let totalMemory = 0 // MB
+    let totalCPU = 0 // percent
     for (const item of result) {
       if (this.excludeInfo(item)) {
         continue
       }
-      const formatInfo = {
+      const formatInfo: ProcessRow = {
         memory: +(item.memory.workingSetSize / 1024).toFixed(2),
         cpu: +item.cpu.percentCPUUsage.toFixed(2),
         name: item.name,
@@ -58,14 +69,58 @@ class Diagnostics extends Disposable {
       scene: TrackerScene.AppUsedCPU,
       value: +totalCPU.toFixed(2),
     })
-    return formatInfos
+    return {
+      processes: formatInfos,
+      totals: {
+        memory: +totalMemory.toFixed(2),
+        cpu: +totalCPU.toFixed(2),
+      },
+    }
+  }
+
+  private async resolveMainPid(): Promise<number | null> {
+    if (this.mainPid != null) return this.mainPid
+    try {
+      this.mainPid = await this.monitorBridgeClient.getMainPid()
+      return this.mainPid
+    } catch {
+      return null
+    }
+  }
+
+  private async getPidTree(): Promise<PidTreeJson | null> {
+    const pid = await this.resolveMainPid()
+    if (pid == null) return null
+    try {
+      const tree = (await getUsageInfo(String(pid))) as PidTreeJson | undefined
+      return tree ?? null
+    } catch {
+      return null
+    }
+  }
+
+  private async tick() {
+    const perf = await this.getPerformanceInfo()
+    this.onPerformanceInfoEvent.fire(perf.processes)
+
+    const pidTree = await this.getPidTree()
+    const snapshot: MonitorSnapshot = {
+      timestamp: Date.now(),
+      totals: perf.totals,
+      processes: perf.processes,
+      pidTree,
+    }
+
+    try {
+      await this.monitorBridgeClient.pushSnapshot(snapshot)
+    } catch (err) {
+      // Snapshot delivery failures shouldn't kill the routine.
+    }
   }
 
   diagnosticRoutine() {
     setInterval(() => {
-      this.getPerformanceInfo().then(value => {
-        this.onPerformanceInfoEvent.fire(value)
-      })
+      this.tick()
     }, 5000)
   }
 }

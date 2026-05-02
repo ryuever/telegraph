@@ -1,6 +1,6 @@
 import type { IpcRendererEvent } from 'electron'
 import { ipcRenderer, webFrame, contextBridge } from 'electron'
-// import IPCRendererChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/IPCRendererChannelProtocol'
+// import IPCRendererChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererChannelProtocol'
 
 // const url = new URL(window.location.href)
 // const { pathname } = url

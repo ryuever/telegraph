@@ -12,7 +12,7 @@ import {
   processName,
   pageletProcessServicePath,
 } from '@app/services/process/pagelet-process/common/config'
-import { RPCServiceHost } from '@x-oasis/async-call-rpc'
+import { RPCServiceHost } from '@app/core/common/async-rpc-compat'
 import { REDCITY_PROCESS_ID, REDCITY_PROJECT_NAME } from '@app/core/node/process/env'
 import { AssignPassingPortType } from '../../common/types'
 import { NodeProcess } from '../../node/NodeProcess'

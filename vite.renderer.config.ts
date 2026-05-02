@@ -10,4 +10,7 @@ export default defineConfig({
       '@app': resolve(__dirname, 'app'),
     },
   },
+  server: {
+    host: '127.0.0.1',
+  },
 })

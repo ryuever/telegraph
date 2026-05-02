@@ -55,6 +55,11 @@ import {
   MainProcessUtilsServicePath,
 } from '@app/services/main-process-util/common/config'
 import type { MainProcessUtils } from '@app/services/main-process-util/electron-main'
+import {
+  MonitorBridgeId,
+  monitorServicePath,
+} from '@app/services/monitor/common/config'
+import type { MonitorBridge } from '@app/services/monitor/electron-main/MonitorBridge'
 import { PerformanceTracker } from '@app/services/log/common/performance'
 import { initCrashListener } from './helper/crash'
 import { initAboutInfo } from './helper/about'
@@ -71,7 +76,7 @@ class RedcityApplication extends Disposable {
 
   onWillQuitEvent = fromNodeEvent(app, 'will-quit')
 
-  onWindowAllClosedEvent = fromNodeEvent(app, 'window-all-close')
+  onWindowAllClosedEvent = fromNodeEvent(app, 'window-all-closed')
 
   constructor(
     @inject(FileAccessId) private fileAccess: FileAccess,
@@ -86,7 +91,8 @@ class RedcityApplication extends Disposable {
     @inject(DaemonProcessMainId) private daemonProcessMain: DaemonProcessMain,
     @inject(AcquirePortId) private acquirePortMain: AcquirePortMain,
     @inject(FileSystemManagerId) private fileSystemManager: FileSystemManager,
-    @inject(MainProcessUtilsId) private mainProcessUtils: MainProcessUtils
+    @inject(MainProcessUtilsId) private mainProcessUtils: MainProcessUtils,
+    @inject(MonitorBridgeId) private monitorBridge: MonitorBridge
   ) {
     super()
     this.performanceTracker = new PerformanceTracker(this.logService.trace.bind(this.logService))
@@ -162,6 +168,7 @@ class RedcityApplication extends Disposable {
     this.mainProcess.registerServiceHandler(LogServicePath, this.logService)
     this.mainProcess.registerServiceHandler(FileSystemServicePath, this.fileSystemManager)
     this.mainProcess.registerServiceHandler(MainProcessUtilsServicePath, this.mainProcessUtils)
+    this.mainProcess.registerServiceHandler(monitorServicePath, this.monitorBridge)
   }
 
   initMainWindow() {

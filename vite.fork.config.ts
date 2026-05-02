@@ -11,7 +11,6 @@ const nodeModules = [
 const externalPackages = [
   'electron-log',
   '@sentry/node',
-  '@common/fetch',
   'electron-store',
   /@x-oasis\/async-call-rpc\/.*/,
 ]
@@ -21,6 +20,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@app': resolve(__dirname, 'app'),
+      '@common': resolve(__dirname, 'app/common'),
     },
   },
   build: {

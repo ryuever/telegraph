@@ -3,13 +3,18 @@ import { Disposable } from '@x-oasis/disposable'
 import { getLogPath } from '@app/services/log/node/nodeLogger'
 import type { Workbench } from '@app/services/workbench/electron-main/Workbench'
 import { WorkbenchId } from '@app/services/workbench/electron-main/Workbench'
+import type { MonitorBridge } from '@app/services/monitor/electron-main/MonitorBridge'
+import { MonitorBridgeId } from '@app/services/monitor/common/config'
 import { app, Menu, shell } from 'electron'
 
 export const RedcityMenuId = createId('redcity-menu')
 
 @injectable()
 export class RedcityMenu extends Disposable {
-  constructor(@inject(WorkbenchId) private workbench: Workbench) {
+  constructor(
+    @inject(WorkbenchId) private workbench: Workbench,
+    @inject(MonitorBridgeId) private monitorBridge: MonitorBridge
+  ) {
     super()
   }
 
@@ -68,6 +73,12 @@ export class RedcityMenu extends Disposable {
       {
         label: 'View',
         submenu: [
+          {
+            label: 'Toggle Monitor',
+            accelerator: 'CmdOrCtrl+Shift+M',
+            click: () => this.monitorBridge.toggleDrawer(),
+          },
+          { type: 'separator' },
           { role: 'reload' },
           { role: 'forceReload' },
           { role: 'toggleDevTools' },

@@ -1,9 +1,9 @@
 import { createId } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import type { MainPort } from '@x-oasis/async-call-rpc'
-import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
+import type { MainPort } from '@app/core/common/async-rpc-compat'
+import { ProxyRPCClient, RPCServiceHost } from '@app/core/common/async-rpc-compat'
 
-import IPCRendererChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/IPCRendererChannelProtocol'
+import IPCRendererChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererChannelProtocol'
 import {
   acquirePortMainServicePath,
   mainProcessPortServicePath,
@@ -13,7 +13,7 @@ import {
   daemonProcessPortServicePath,
 } from '@app/services/port-manager/common/config'
 import type { IAcquirePortMainPromisify } from '@app/services/port-manager/common/types'
-import IPCRendererMessageChannelProtocol from '@x-oasis/async-call-rpc/channel-protocol/IPCRendererMessageChannelProtocol'
+import IPCRendererMessageChannelProtocol from '@app/core/common/async-rpc-compat/channel-protocol/IPCRendererMessageChannelProtocol'
 import type { IAssignPassingPortProps } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
 import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'

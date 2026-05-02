@@ -1,5 +1,5 @@
 import { Disposable } from '@x-oasis/disposable'
-import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
+import { ProxyRPCClient } from '@app/core/common/async-rpc-compat'
 import type { LogService } from '@app/services/log/common/log'
 import type { MessagePortMain } from 'electron'
 import { PortManagerLog } from '@app/services/log/common/constants'
