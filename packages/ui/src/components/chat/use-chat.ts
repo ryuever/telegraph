@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AgentService,
   ChatConversation,
@@ -31,6 +31,11 @@ export function useChat({ agent }: UseChatOptions = {}) {
   const [activeId, setActiveId] = useState<string>(() => conversations[0].id)
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+
+  // Sync agent prop changes to the ref so sendMessage always uses the latest agent
+  useEffect(() => {
+    agentRef.current = agent ?? new MockAgentService()
+  }, [agent])
 
   const active = useMemo(
     () => conversations.find(c => c.id === activeId) ?? conversations[0],
