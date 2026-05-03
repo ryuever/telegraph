@@ -8,7 +8,7 @@ import {
   ProcessPingClientFactoryId,
   ProcessPingClient,
 } from '@app/services/ping/node/ProcessPingClient'
-import { REDCITY_PROJECT_NAME } from '@app/core/node/process/env'
+import { TELEGRAPH_PROJECT_NAME } from '@app/core/node/process/env'
 
 import {
   WorkbenchClient,
@@ -21,7 +21,7 @@ import { CommonNodeLogger } from '@app/services/log/node/nodeLogger'
 import ApplicationInfo, { ApplicationInfoId } from '@app/services/application-info/node'
 import PageletProcessNode, { PageletProcessNodeId } from './PageletProcessNode'
 
-const projectName = process.env[REDCITY_PROJECT_NAME]
+const projectName = process.env[TELEGRAPH_PROJECT_NAME]
 
 export default new Registry(bind => {
   bind(PageletProcessNodeId).to(PageletProcessNode)

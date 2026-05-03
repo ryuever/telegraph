@@ -16,7 +16,7 @@ export class PerformanceTracker {
     if (this.map.has(stage)) {
       const start = this.map.get(stage)!
       this.map.delete(stage)
-      this.tracker(TrackerEvent.RedCityPerformance, {
+      this.tracker(TrackerEvent.TelegraphPerformance, {
         duration: Date.now() - start,
         stage,
       })

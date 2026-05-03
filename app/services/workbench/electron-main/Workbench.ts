@@ -12,7 +12,7 @@ import type { Projects } from '@app/services/project-registry/electron-main/Proj
 import type { BrowserViewConfig } from '@app/services/project-registry/electron-main/types'
 import type { FileAccess } from '@app/services/file-access/electron-main/FileAccess'
 import { FileAccessId } from '@app/services/file-access/electron-main/FileAccess'
-import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
+import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
 import { PerformanceStage, WorkBenchLog } from '@app/services/log/common/constants'
 import { PerformanceTracker } from '@app/services/log/common/performance'
 import type { IWorkbench } from '../common/types'
@@ -76,7 +76,7 @@ export class Workbench extends Disposable implements IWorkbench {
       .getMainWindow()
       .window[
         MAIN_WINDOW_VITE_DEV_SERVER_URL ? 'loadURL' : 'loadFile'
-      ](...this.fileAccess.asLoadURL(`/app?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=main-renderer-app`))
+      ](...this.fileAccess.asLoadURL(`/app?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=main-renderer-app`))
     this.logService.info(WorkBenchLog.LoadAppPageEnd)
     this.performanceTracker.end(PerformanceStage.LoadAppPage)
   }

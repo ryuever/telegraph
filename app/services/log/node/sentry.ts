@@ -6,8 +6,8 @@ type SentryLevel = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug'
 const now = () => format('YYYY/MM/dd HH:mm:ss.sss', new Date())
 const tagReg = /^\[tag:(.+)\]$/
 // 默认 tag
-const DefaultTag = 'pc_redcity_log_tag'
-const DefaultGroup = 'pc_redcity_log_group'
+const DefaultTag = 'pc_telegraph_log_tag'
+const DefaultGroup = 'pc_telegraph_log_group'
 
 /**
  * https://new-sentry.devops.xiaohongshu.com/organizations/sentry/discover/results/?field=title&field=event.type&field=project&field=user.display&field=timestamp&name=All+Events&project=177&query=&sort=-timestamp&statsPeriod=24h&yAxis=count%28%29

@@ -14,7 +14,7 @@ import {
 import type { IAcquirePortMainPromisify } from '@app/services/port-manager/common/types'
 import type { IAssignPassingPortProps } from '@app/services/process/common/types'
 import { AssignPassingPortType } from '@app/services/process/common/types'
-import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
+import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
 import type { LogService } from '@app/services/log/common/log'
 import { toDisposable } from '@x-oasis/disposable'
 import type { MessagePortMain } from 'electron'
@@ -64,7 +64,7 @@ export class PageletClientChannel extends Disposable {
     }
 
     const urlParams = new URLSearchParams(search)
-    this._pageletRendererProcessId = urlParams.get(REDCITY_PAGELET_RENDERER_PROCESS_ID)!
+    this._pageletRendererProcessId = urlParams.get(TELEGRAPH_PAGELET_RENDERER_PROCESS_ID)!
     this.id = this.pageletRendererProcessId
     this.type = AssignPassingPortType.PageletRenderer
 
@@ -122,7 +122,7 @@ export class PageletClientChannel extends Disposable {
       channelName: 'acquire-port',
       projectName,
       description: masterProcessName,
-      ipcRenderer: window.redcity.ipcRenderer as any,
+      ipcRenderer: window.telegraph.ipcRenderer as any,
     })
 
     this._portChannelRPCClient = new ProxyRPCClient(acquirePortMainServicePath, {
@@ -148,7 +148,7 @@ export class PageletClientChannel extends Disposable {
       channelName: `${this.id}-assign-passing-port`,
       projectName: this._projectName,
       description: this.id,
-      ipcRenderer: window.redcity.ipcRenderer as any,
+      ipcRenderer: window.telegraph.ipcRenderer as any,
     })
     channel.setServiceHost(this.serviceHost)
   }

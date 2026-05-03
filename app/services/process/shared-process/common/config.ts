@@ -1,6 +1,6 @@
 export const SharedProcessChannelConnection = {
-  request: 'redcity:sharedProcessOnRequest',
-  response: 'redcity:shardProcessOnResponse',
+  request: 'telegraph:sharedProcessOnRequest',
+  response: 'telegraph:shardProcessOnResponse',
 }
 
 export const processName = 'shared-process'

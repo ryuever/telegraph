@@ -13,11 +13,11 @@ import {
   pageletProcessServicePath,
 } from '@app/services/process/pagelet-process/common/config'
 import { RPCServiceHost } from '@x-oasis/async-call-rpc'
-import { REDCITY_PROCESS_ID, REDCITY_PROJECT_NAME } from '@app/core/node/process/env'
+import { TELEGRAPH_PROCESS_ID, TELEGRAPH_PROJECT_NAME } from '@app/core/node/process/env'
 import { AssignPassingPortType } from '../../common/types'
 import { NodeProcess } from '../../node/NodeProcess'
 
-const processId = process.env[REDCITY_PROCESS_ID]!
+const processId = process.env[TELEGRAPH_PROCESS_ID]!
 
 export const PageletProcessNodeId = 'pagelet-process-node'
 
@@ -35,7 +35,7 @@ export default class PageletProcessNode extends NodeProcess {
     @inject(ProcessPingClientFactoryId) private processPingClientFactory: IProcessPingClientFactory
   ) {
     super(processId, workbenchClient)
-    this.projectName = process.env[REDCITY_PROJECT_NAME]!
+    this.projectName = process.env[TELEGRAPH_PROJECT_NAME]!
     this.serviceHost = new RPCServiceHost()
   }
 

@@ -1,7 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs'
 
-const __LOG = '/tmp/speedy-main.log'
+const __LOG = '/tmp/telegraph-main.log'
 function dlog(msg: string) {
   try {
     fs.appendFileSync(__LOG, `[${new Date().toISOString()}] ${msg}\n`)
@@ -16,9 +16,9 @@ process.on('exit', (code) => dlog(`EXIT code=${code}`))
 const { app } = require('electron')
 
 import { Container } from '@x-oasis/di'
-import registry from './redcity-application-module'
-import { RedcityApplicationId } from './redcity-application'
-import type RedcityApplication from './redcity-application'
+import registry from './telegraph-application-module'
+import { TelegraphApplicationId } from './telegraph-application'
+import type TelegraphApplication from './telegraph-application'
 
 dlog('imports ok; building DI container')
 
@@ -28,10 +28,10 @@ container.load(registry)
 dlog('container loaded; waiting for app.whenReady')
 
 app.whenReady().then(() => {
-  dlog('app.whenReady fired; resolving RedcityApplication')
+  dlog('app.whenReady fired; resolving TelegraphApplication')
   try {
-    const application = container.get(RedcityApplicationId) as RedcityApplication
-    dlog('RedcityApplication resolved; calling start()')
+    const application = container.get(TelegraphApplicationId) as TelegraphApplication
+    dlog('TelegraphApplication resolved; calling start()')
     application.start()
     dlog('start() returned')
   } catch (err) {

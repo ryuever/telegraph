@@ -2,11 +2,11 @@ import type { UtilityProcess as ElectronUtilityProcess } from 'electron'
 import { utilityProcess } from 'electron'
 import deepClone from '@x-oasis/deep-clone'
 import {
-  REDCITY_ENTRY,
-  REDCITY_PPID,
-  REDCITY_PROJECT_NAME,
-  REDCITY_AMD_ENTRY,
-  REDCITY_PROCESS_ID,
+  TELEGRAPH_ENTRY,
+  TELEGRAPH_PPID,
+  TELEGRAPH_PROJECT_NAME,
+  TELEGRAPH_AMD_ENTRY,
+  TELEGRAPH_PROCESS_ID,
 } from '@app/core/node/process/env'
 import { fromNodeEvent, Emitter } from '@x-oasis/emitter'
 import { createId, inject, injectable } from '@x-oasis/di'
@@ -97,22 +97,22 @@ export default class UtilityProcess extends Disposable {
     const env = configuration.env ? { ...configuration.env } : { ...deepClone(process.env) }
 
     // Apply supported environment variables from config
-    env[REDCITY_ENTRY] = configuration.entry
+    env[TELEGRAPH_ENTRY] = configuration.entry
 
     if (typeof configuration.ppid === 'number') {
-      env[REDCITY_PPID] = String(configuration.ppid)
+      env[TELEGRAPH_PPID] = String(configuration.ppid)
     }
 
     if (typeof configuration.amdEntry === 'string') {
-      env[REDCITY_AMD_ENTRY] = String(configuration.amdEntry)
+      env[TELEGRAPH_AMD_ENTRY] = String(configuration.amdEntry)
     }
 
     if (typeof configuration.projectName === 'string') {
-      env[REDCITY_PROJECT_NAME] = configuration.projectName
+      env[TELEGRAPH_PROJECT_NAME] = configuration.projectName
     }
 
     if (typeof configuration.id === 'string') {
-      env[REDCITY_PROCESS_ID] = configuration.id
+      env[TELEGRAPH_PROCESS_ID] = configuration.id
     }
 
     // Ensure all values are strings, otherwise the process will not start

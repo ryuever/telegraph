@@ -4,7 +4,7 @@ export interface IpcMessagePort {
   acquire(responseChannel: string, nonce: string): void
 }
 
-export const redcityGlobal = (window as any).redcity
-export const ipcRenderer: IpcRenderer = redcityGlobal?.ipcRenderer
-export const ipcMessagePort: IpcMessagePort = redcityGlobal?.ipcMessagePort
-export const webFrame: WebFrame = redcityGlobal?.webFrame
+export const telegraphGlobal = (window as any).telegraph
+export const ipcRenderer: IpcRenderer = telegraphGlobal?.ipcRenderer
+export const ipcMessagePort: IpcMessagePort = telegraphGlobal?.ipcMessagePort
+export const webFrame: WebFrame = telegraphGlobal?.webFrame

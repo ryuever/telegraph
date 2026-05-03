@@ -1,6 +1,6 @@
 export const DaemonProcessChannelConnection = {
-  request: 'redcity:daemonProcessRequest',
-  response: 'redcity:daemonProcessOnResponse',
+  request: 'telegraph:daemonProcessRequest',
+  response: 'telegraph:daemonProcessOnResponse',
 }
 
 export const daemonProcessName = 'daemon-process'

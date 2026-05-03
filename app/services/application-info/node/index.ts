@@ -2,9 +2,9 @@ import crypto from 'crypto'
 import { Disposable } from '@x-oasis/disposable'
 import { injectable } from '@x-oasis/di'
 import {
-  REDCITY_APP_NAME,
-  REDCITY_ROOT_TRACE_ID,
-  REDCITY_APP_VERSION,
+  TELEGRAPH_APP_NAME,
+  TELEGRAPH_ROOT_TRACE_ID,
+  TELEGRAPH_APP_VERSION,
 } from '@app/core/node/process/env'
 import type { AppInfo } from '../common/types'
 
@@ -25,13 +25,13 @@ export default class ApplicationInfo extends Disposable {
   }
 
   private getRootTraceId() {
-    return process.env[REDCITY_ROOT_TRACE_ID] || this.getUUID()
+    return process.env[TELEGRAPH_ROOT_TRACE_ID] || this.getUUID()
   }
 
   private getDefaultAppInfo() {
     return {
-      appName: process.env[REDCITY_APP_NAME] ?? '',
-      appVersion: process.env[REDCITY_APP_VERSION] ?? '',
+      appName: process.env[TELEGRAPH_APP_NAME] ?? '',
+      appVersion: process.env[TELEGRAPH_APP_VERSION] ?? '',
       rootTraceId: this.getRootTraceId(),
     }
   }
@@ -50,9 +50,9 @@ export default class ApplicationInfo extends Disposable {
 
   injectChildProcessEnv(env: { [key: string]: string | undefined }) {
     const { appName, appVersion, rootTraceId } = this.appInfo
-    env[REDCITY_APP_NAME] = appName
-    env[REDCITY_APP_VERSION] = appVersion
-    env[REDCITY_ROOT_TRACE_ID] = rootTraceId
+    env[TELEGRAPH_APP_NAME] = appName
+    env[TELEGRAPH_APP_VERSION] = appVersion
+    env[TELEGRAPH_ROOT_TRACE_ID] = rootTraceId
   }
 
   getAppInfo() {

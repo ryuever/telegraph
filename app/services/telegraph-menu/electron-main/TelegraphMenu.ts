@@ -7,10 +7,10 @@ import type { MonitorBridge } from '@app/services/monitor/electron-main/MonitorB
 import { MonitorBridgeId } from '@app/services/monitor/common/config'
 import { app, Menu, shell } from 'electron'
 
-export const RedcityMenuId = createId('redcity-menu')
+export const TelegraphMenuId = createId('telegraph-menu')
 
 @injectable()
-export class RedcityMenu extends Disposable {
+export class TelegraphMenu extends Disposable {
   constructor(
     @inject(WorkbenchId) private workbench: Workbench,
     @inject(MonitorBridgeId) private monitorBridge: MonitorBridge

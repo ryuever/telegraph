@@ -36,9 +36,9 @@ import { servicePath as workbenchServicePath } from '@app/services/workbench/com
 import { servicePath as AccountServicePath } from '@app/services/account/common/config'
 import type { WindowManager } from '@app/services/window-manager/electron-main/WindowManager'
 import { WindowManagerId } from '@app/services/window-manager/electron-main/WindowManager'
-import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
-import type { RedcityMenu } from '@app/services/redcity-menu/electron-main/RedcityMenu'
-import { RedcityMenuId } from '@app/services/redcity-menu/electron-main/RedcityMenu'
+import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
+import type { TelegraphMenu } from '@app/services/telegraph-menu/electron-main/TelegraphMenu'
+import { TelegraphMenuId } from '@app/services/telegraph-menu/electron-main/TelegraphMenu'
 import {
   ClientLaunchLog,
   PerformanceStage,
@@ -63,10 +63,10 @@ import { PerformanceTracker } from '@app/services/log/common/performance'
 import { initCrashListener } from './helper/crash'
 import { initAboutInfo } from './helper/about'
 
-export const RedcityApplicationId = createId('redcity-application')
+export const TelegraphApplicationId = createId('telegraph-application')
 
 @injectable()
-class RedcityApplication extends Disposable {
+class TelegraphApplication extends Disposable {
   private sharedProcess: UtilityProcess
 
   private daemonProcess: UtilityProcess
@@ -81,7 +81,7 @@ class RedcityApplication extends Disposable {
     @inject(FileAccessId) private fileAccess: FileAccess,
     @inject(LogServiceId) private logService: LogService,
     @inject(MainProcessId) private mainProcess: MainProcess,
-    @inject(RedcityMenuId) private redictyMenu: RedcityMenu,
+    @inject(TelegraphMenuId) private telegraphMenu: TelegraphMenu,
     @inject(StorageServiceClient) private storageServiceClient: StorageService,
     @inject(AccountId) private account: Account,
     @inject(WorkbenchId) private workbench: Workbench,
@@ -116,7 +116,7 @@ class RedcityApplication extends Disposable {
   }
 
   start() {
-    this.logService.trace(TrackerEvent.RedCityAppLaunch)
+    this.logService.trace(TrackerEvent.TelegraphAppLaunch)
     this.logService.info(ClientLaunchLog.AppStart)
     this.performanceTracker.start(PerformanceStage.AppLaunch)
 
@@ -171,7 +171,7 @@ class RedcityApplication extends Disposable {
   }
 
   initMainWindow() {
-    this.redictyMenu.init()
+    this.telegraphMenu.init()
     this.workbench.createMainWindow()
     this.registerDisposable(
       this.workbench.onDidMainWindowCreated(async (window: BrowserWindow) => {
@@ -188,7 +188,7 @@ class RedcityApplication extends Disposable {
                 await this.account.scanLogin(ticket)
                 window.loadURL(
                   ...this.fileAccess.asLoadURL(
-                    `/app?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=main-renderer-app`
+                    `/app?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=main-renderer-app`
                   )
                 )
               }
@@ -217,13 +217,13 @@ class RedcityApplication extends Disposable {
       if (isLogged) {
         await window.loadURL(
           ...this.fileAccess.asLoadURL(
-            `/app?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=main-renderer-app`
+            `/app?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=main-renderer-app`
           )
         )
       } else {
         await window.loadURL(
           ...this.fileAccess.asLoadURL(
-            `/login?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=main-renderer-login`
+            `/login?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=main-renderer-login`
           )
         )
       }
@@ -264,4 +264,4 @@ class RedcityApplication extends Disposable {
   }
 }
 
-export default RedcityApplication
+export default TelegraphApplication

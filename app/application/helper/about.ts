@@ -1,7 +1,7 @@
 import { app } from 'electron'
 
 /**
- * 初始化 redcity 关于面板
+ * 初始化 telegraph 关于面板
  */
 export function initAboutInfo() {
   app.setAboutPanelOptions({

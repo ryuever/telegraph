@@ -7,7 +7,7 @@ export function useMonitorSnapshots() {
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
 
   useEffect(() => {
-    const bridge = (window as any).redcity?.ipcRenderer
+    const bridge = (window as any).telegraph?.ipcRenderer
     if (!bridge?.on) return
 
     const listener = (_event: unknown, payload: MonitorSnapshot) => {

@@ -1,6 +1,6 @@
 export const PageletProcessChannelConnection = {
-  request: 'redcity:pageletProcessOnRequest',
-  response: 'redcity:pageletProcessOnResponse',
+  request: 'telegraph:pageletProcessOnRequest',
+  response: 'telegraph:pageletProcessOnResponse',
 }
 
 export const processName = 'pagelet-process'

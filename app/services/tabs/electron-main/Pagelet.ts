@@ -16,7 +16,7 @@ import type SharedProcessMain from '@app/services/process/shared-process/electro
 import type { Workbench } from '@app/services/workbench/electron-main/Workbench'
 
 import type { BrowserWindow } from '@app/services/window-manager/electron-main/BrowserWindow'
-import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
+import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
 import { buildId } from '@x-oasis/id'
 import { toDisposable } from '@x-oasis/disposable'
 import type { FileAccess } from '@app/services/file-access/electron-main/FileAccess'
@@ -156,7 +156,7 @@ export default class Pagelet extends Disposable {
       this._view.webContents.loadURL(
         ...this.fileAccess.asLoadURL(this.browserViewConfig.loadURL, {
           query: {
-            [REDCITY_PAGELET_RENDERER_PROCESS_ID]: this.id,
+            [TELEGRAPH_PAGELET_RENDERER_PROCESS_ID]: this.id,
           },
         })
       )
@@ -165,7 +165,7 @@ export default class Pagelet extends Disposable {
         .loadFile(
           ...(this.fileAccess.asLoadURL(this.browserViewConfig.loadURL, {
             query: {
-              [REDCITY_PAGELET_RENDERER_PROCESS_ID]: this.id,
+              [TELEGRAPH_PAGELET_RENDERER_PROCESS_ID]: this.id,
             },
           }) as [string, LoadFileOptions])
         )

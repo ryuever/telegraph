@@ -1,7 +1,7 @@
 export const TrackerEvent = {
-  RedCityPerformance: 'pc_redcity_performance',
-  RedCityStabilityValues: 'pc_redcity_stability_values',
-  RedCityAppLaunch: 'pc_redcity_app_launch',
+  TelegraphPerformance: 'pc_telegraph_performance',
+  TelegraphStabilityValues: 'pc_telegraph_stability_values',
+  TelegraphAppLaunch: 'pc_telegraph_app_launch',
 }
 
 export enum PerformanceStage {

@@ -1,5 +1,5 @@
 import { Container } from '@x-oasis/di'
-import { REDCITY_AMD_ENTRY } from '@app/core/node/process/env'
+import { TELEGRAPH_AMD_ENTRY } from '@app/core/node/process/env'
 
 import PageletProcessModule from './PageletProcessModule'
 import { PageletProcessNodeId } from './PageletProcessNode'
@@ -12,8 +12,8 @@ container.load(PageletProcessModule)
 const pageletProcessNode = container.get(PageletProcessNodeId)
 pageletProcessNode.start()
 
-if (process.env[REDCITY_AMD_ENTRY]) {
-  import(process.env[REDCITY_AMD_ENTRY]).then(module => {
+if (process.env[TELEGRAPH_AMD_ENTRY]) {
+  import(process.env[TELEGRAPH_AMD_ENTRY]).then(module => {
     const { initApplication } = module.default as {
       initApplication: InitApplicationInPagelet
     }

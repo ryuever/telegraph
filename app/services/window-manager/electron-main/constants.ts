@@ -9,5 +9,5 @@ export const EXPLORER_WINDOW_DEFAULT_MIN_WIDTH = 620
 export const EXPLORER_WINDOW_DEFAULT_MIN_HEIGHT = 480
 
 export enum COMMANDS {
-  'CREATE_PANEL' = 'redcity:create-panel',
+  'CREATE_PANEL' = 'telegraph:create-panel',
 }

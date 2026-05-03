@@ -1,1 +1,1 @@
-# speedy
+# telegraph

@@ -1,4 +1,4 @@
-import { REDCITY_PROCESS_ID } from '@app/core/node/process/env'
+import { TELEGRAPH_PROCESS_ID } from '@app/core/node/process/env'
 import Store from 'electron-store'
 
 let _store: Store
@@ -6,7 +6,7 @@ let _store: Store
 export const getStore = () => {
   if (!_store) {
     _store = new Store({
-      name: `${process.env[REDCITY_PROCESS_ID]}-redim-config`,
+      name: `${process.env[TELEGRAPH_PROCESS_ID]}-redim-config`,
       // prod need
       projectName: 'redim',
     })

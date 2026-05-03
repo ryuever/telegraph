@@ -33,7 +33,7 @@ import { ipcRenderer, webFrame, contextBridge } from 'electron'
 
 function validateIPC(channel: string) {
   return true
-  // if (!channel || !channel.startsWith('redcity:')) {
+  // if (!channel || !channel.startsWith('telegraph:')) {
   //   throw new Error(`Unsupported event IPC channel '${channel}'`);
   // }
 
@@ -123,10 +123,10 @@ const globals = {
 // add to the DOM global.
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('redcity', globals)
+    contextBridge.exposeInMainWorld('telegraph', globals)
   } catch (error) {
     console.error(error)
   }
 } else {
-  window.redcity = globals
+  window.telegraph = globals
 }

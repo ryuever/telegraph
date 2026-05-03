@@ -1,8 +1,8 @@
 {
-  "name": "speedy",
-  "productName": "Speedy",
+  "name": "telegraph",
+  "productName": "Telegraph",
   "version": "1.0.0",
-  "description": "A speedy desktop application",
+  "description": "A telegraph desktop application",
   "main": ".vite/build/index.js",
   "scripts": {
     "start": "electron-forge start --inspect-electron",

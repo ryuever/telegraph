@@ -8,7 +8,7 @@ import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId } from '@app/services/log/common/log'
 import type { FileAccess } from '@app/services/file-access/electron-main/FileAccess'
 import { FileAccessId } from '@app/services/file-access/electron-main/FileAccess'
-import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
+import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
 import { BrowserWindowFactoryId } from './BrowserWindow'
 import type { IBrowserWindowFactory, BrowserWindow } from './BrowserWindow'
 
@@ -70,7 +70,7 @@ export class WindowManager extends Disposable {
       this.auxiliaryWindow.onDidWindowCreated(() => {
         this.auxiliaryWindow.window.loadURL(
           ...this.fileAccess.asLoadURL(
-            `/auxiliary?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=auxiliary-app`
+            `/auxiliary?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=auxiliary-app`
           )
         )
       })
@@ -111,7 +111,7 @@ export class WindowManager extends Disposable {
       monitorWindow.onDidWindowCreated(() => {
         monitorWindow.window.loadURL(
           ...this.fileAccess.asLoadURL(
-            `/monitor?${REDCITY_PAGELET_RENDERER_PROCESS_ID}=monitor-window-app`
+            `/monitor?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=monitor-window-app`
           )
         )
       })

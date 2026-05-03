@@ -64,12 +64,12 @@ import {
 
 import Account, { AccountId } from '@app/services/account/electron-main/Account'
 
-import RedcityApplication, { RedcityApplicationId } from '@app/application/redcity-application'
+import TelegraphApplication, { TelegraphApplicationId } from '@app/application/telegraph-application'
 
 import {
-  RedcityMenu,
-  RedcityMenuId,
-} from '@app/services/redcity-menu/electron-main/RedcityMenu'
+  TelegraphMenu,
+  TelegraphMenuId,
+} from '@app/services/telegraph-menu/electron-main/TelegraphMenu'
 
 /**
  * =========================== factory ===========================
@@ -90,7 +90,7 @@ import { MonitorBridgeId } from '@app/services/monitor/common/config'
 
 export default new Registry(bind => {
   bind(ApplicationInfoId).to(ApplicationInfo)
-  bind(RedcityApplicationId).to(RedcityApplication)
+  bind(TelegraphApplicationId).to(TelegraphApplication)
   bind(LogServiceId).toDynamicValue(({ container }) => {
     const { rootTraceId, appVersion, appName } = container.get(ApplicationInfoId).getAppInfo()
     return new LogService({
@@ -123,7 +123,7 @@ export default new Registry(bind => {
   bind(MainProcessId).to(MainProcess)
   bind(PageletProcessFactoryId).toParamsFactory(PageletProcess)
 
-  bind(RedcityMenuId).to(RedcityMenu)
+  bind(TelegraphMenuId).to(TelegraphMenu)
 
   bind(PageletFactoryId).toParamsFactory(Pagelet)
   bind(PanelFactoryId).toParamsFactory(Panel)

@@ -1,4 +1,4 @@
-# speedy
+# telegraph
 
 Electron + React + Vite desktop app. The repo is split between **process code** (`app/`) and **UI code** (`ui/`) so that the renderer's view layer can evolve independently from main/preload/services.
 
@@ -9,7 +9,7 @@ Electron + React + Vite desktop app. The repo is split between **process code** 
   - `app/services/` — long-running services exposed over RPC (e.g. `monitor/`).
   - `app/core/`, `app/common/` — shared infra and types reachable from any process.
   - `app/index.tsx` — renderer entry mounted by `index.html` (`/app/index.tsx`). Picks a root component from the URL hash and renders into `#root`.
-  - `app/types.d.ts` — ambient renderer globals (e.g. `window.redcity` preload bridge).
+  - `app/types.d.ts` — ambient renderer globals (e.g. `window.telegraph` preload bridge).
 - `ui/` — renderer view layer. Pure React, no Electron imports.
   - `ui/styles/` — global CSS (Tailwind entry in `globals.css`).
   - `ui/components/` — feature components.

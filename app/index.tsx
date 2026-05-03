@@ -6,13 +6,13 @@ import { MonitorPanel } from '@ui/components/monitor/MonitorPanel'
 
 declare global {
   interface Window {
-    redcity?: any
+    telegraph?: any
   }
 }
 
 function App() {
-  const hasBridge = typeof window !== 'undefined' && !!window.redcity
-  const bridgeKeys = hasBridge ? Object.keys(window.redcity) : []
+  const hasBridge = typeof window !== 'undefined' && !!window.telegraph
+  const bridgeKeys = hasBridge ? Object.keys(window.telegraph) : []
 
   return (
     <div
@@ -26,7 +26,7 @@ function App() {
     >
       <Toolbar />
       <div style={{ flex: 1, padding: '40px', textAlign: 'center' }}>
-        <h1>🚀 Speedy</h1>
+        <h1>🚀 Telegraph</h1>
         <p style={{ fontSize: 18, marginTop: 20 }}>Electron App Started Successfully!</p>
         <div style={{ marginTop: 40, fontSize: 14, opacity: 0.85 }}>
           <p>Built with:</p>

@@ -4,7 +4,7 @@ import type { EventEntity, TrackerBaseConfig } from '../common/types/tracker'
 
 const MaxPendingQueueLen = 5
 const MaxPendingTime = 2000 // ms
-const TrackerAppName = 'pc-redcity'
+const TrackerAppName = 'pc-telegraph'
 
 /**
  * 上报业务指标到 X-Ray平台
