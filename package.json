@@ -8,6 +8,13 @@
     "package": "pnpm --filter telegraph package",
     "make": "pnpm --filter telegraph make",
     "dev": "pnpm --filter telegraph dev",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "docs:wiki:dev": "vitepress dev",
+    "docs:wiki:build": "vitepress build",
+    "docs:wiki:preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }
