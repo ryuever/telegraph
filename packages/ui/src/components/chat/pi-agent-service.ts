@@ -39,8 +39,9 @@ export class PiAgentService implements AgentService {
       } else if (data.type === 'done') {
         console.log('[PiAgentService] Stream done')
       } else if (data.type === 'error') {
-        console.error('[PiAgentService] Stream error received:', data.error)
-        error = new Error(data.error)
+        console.error('[PiAgentService] Stream error received - raw data:', data)
+        console.error('[PiAgentService] Error message:', data.error)
+        error = new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
       }
     }
 

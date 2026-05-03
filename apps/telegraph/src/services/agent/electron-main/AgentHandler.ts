@@ -27,8 +27,21 @@ export function setupAgentHandler() {
               event.sender.send(AGENT_STREAM_DATA_CHANNEL, { type: 'text_delta', text })
             },
             onError: (reason: string, errorObj: any) => {
-              const errorMsg = errorObj instanceof Error ? errorObj.message : String(errorObj)
-              console.error('[AgentHandler] Stream error - reason:', reason, 'error:', errorMsg)
+              let errorMsg = ''
+              if (errorObj instanceof Error) {
+                errorMsg = errorObj.message
+              } else if (typeof errorObj === 'string') {
+                errorMsg = errorObj
+              } else if (errorObj && typeof errorObj === 'object') {
+                try {
+                  errorMsg = JSON.stringify(errorObj)
+                } catch {
+                  errorMsg = String(errorObj)
+                }
+              } else {
+                errorMsg = String(errorObj)
+              }
+              console.error('[AgentHandler] Stream error - reason:', reason, 'error object:', errorObj, 'message:', errorMsg)
               event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
                 type: 'error',
                 error: `${reason}: ${errorMsg}`,
@@ -43,10 +56,14 @@ export function setupAgentHandler() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
         const stack = error instanceof Error ? error.stack : ''
-        console.error('[AgentHandler] Stream exception:', { message: msg, stack })
+        console.error('[AgentHandler] Stream exception caught:', {
+          message: msg,
+          stack,
+          fullError: error,
+        })
         event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
           type: 'error',
-          error: msg,
+          error: msg || String(error),
         })
       }
     })
