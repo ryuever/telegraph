@@ -30,15 +30,16 @@ export class PiAgentService implements AgentService {
     }
 
     let error: Error | null = null
-    let streamEnded = false
 
     const listener = (_event: any, data: any) => {
       if (signal?.aborted) return
+      console.log('[PiAgentService] Received event:', data.type)
       if (data.type === 'text_delta') {
         onChunk(data.text)
       } else if (data.type === 'done') {
-        streamEnded = true
+        console.log('[PiAgentService] Stream done')
       } else if (data.type === 'error') {
+        console.error('[PiAgentService] Stream error received:', data.error)
         error = new Error(data.error)
       }
     }
@@ -58,9 +59,6 @@ export class PiAgentService implements AgentService {
       })
 
       if (error) throw error
-      if (!streamEnded) {
-        console.warn('[PiAgentService] Stream ended without explicit done event')
-      }
     } catch (err) {
       console.error('[PiAgentService] Error:', err)
       throw err
