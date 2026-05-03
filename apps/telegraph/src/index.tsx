@@ -3,6 +3,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Toolbar } from '@telegraph/ui/components/Toolbar'
 import { MonitorPanel } from '@telegraph/ui/components/monitor/MonitorPanel'
+import { ChatPanel } from '@telegraph/ui/components/chat/ChatPanel'
 
 declare global {
   interface Window {
@@ -44,18 +45,48 @@ function App() {
         >
           preload bridge: {hasBridge ? `OK (${bridgeKeys.join(', ')})` : 'NOT EXPOSED'}
         </div>
+        <div style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <a href="#/chat" style={routeLinkStyle}>
+            Open Chat →
+          </a>
+          <a href="#/monitor" style={routeLinkStyle}>
+            Open Monitor →
+          </a>
+        </div>
       </div>
     </div>
   )
 }
 
-function pickRoot() {
-  const hash = typeof window !== 'undefined' ? window.location.hash : ''
+const routeLinkStyle: React.CSSProperties = {
+  padding: '8px 16px',
+  borderRadius: 8,
+  background: 'rgba(255,255,255,0.12)',
+  color: 'white',
+  fontSize: 13,
+  textDecoration: 'none',
+  border: '1px solid rgba(255,255,255,0.18)',
+}
+
+function useHashRoute() {
+  const get = () => (typeof window !== 'undefined' ? window.location.hash : '')
+  const [hash, setHash] = React.useState(get)
+  React.useEffect(() => {
+    const onChange = () => setHash(get())
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return hash
+}
+
+function Root() {
+  const hash = useHashRoute()
   if (hash.includes('/monitor')) return <MonitorPanel />
+  if (hash.includes('/chat')) return <ChatPanel />
   return <App />
 }
 
 document.documentElement.classList.add('dark')
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
-root.render(pickRoot())
+root.render(<Root />)
