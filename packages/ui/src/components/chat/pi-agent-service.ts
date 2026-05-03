@@ -33,14 +33,9 @@ export class PiAgentService implements AgentService {
 
     const listener = (_event: any, data: any) => {
       if (signal?.aborted) return
-      console.log('[PiAgentService] Received event:', data.type)
       if (data.type === 'text_delta') {
         onChunk(data.text)
-      } else if (data.type === 'done') {
-        console.log('[PiAgentService] Stream done')
       } else if (data.type === 'error') {
-        console.error('[PiAgentService] Stream error received - raw data:', data)
-        console.error('[PiAgentService] Error message:', data.error)
         error = new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
       }
     }
@@ -48,21 +43,12 @@ export class PiAgentService implements AgentService {
     ipc.on(AGENT_STREAM_DATA_CHANNEL, listener)
 
     try {
-      console.log('[PiAgentService] Invoking agent with settings:', {
-        provider: this.settings.provider,
-        modelId: this.settings.modelId,
-        hasApiKey: !!this.settings.apiKey,
-      })
-
       await ipc.invoke(AGENT_STREAM_CHANNEL, {
         message: lastMessage.content,
         settings: this.settings,
       })
 
       if (error) throw error
-    } catch (err) {
-      console.error('[PiAgentService] Error:', err)
-      throw err
     } finally {
       ipc.removeListener(AGENT_STREAM_DATA_CHANNEL, listener)
     }

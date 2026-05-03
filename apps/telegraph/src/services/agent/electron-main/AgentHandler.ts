@@ -13,11 +13,6 @@ interface StreamRequest {
 export function setupAgentHandler() {
   try {
     ipcMain.handle(AGENT_STREAM_CHANNEL, async (event, req: StreamRequest) => {
-      console.log('[AgentHandler] Stream request:', {
-        provider: req.settings.provider,
-        modelId: req.settings.modelId,
-        hasApiKey: !!req.settings.apiKey,
-      })
       const agent = new PiAgent(req.settings)
       try {
         await agent.send({
@@ -41,33 +36,24 @@ export function setupAgentHandler() {
               } else {
                 errorMsg = String(errorObj)
               }
-              console.error('[AgentHandler] Stream error - reason:', reason, 'error object:', errorObj, 'message:', errorMsg)
               event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
                 type: 'error',
                 error: `${reason}: ${errorMsg}`,
               })
             },
-            onDone: (reason: string) => {
-              console.log('[AgentHandler] Stream completed with reason:', reason)
+            onDone: () => {
               event.sender.send(AGENT_STREAM_DATA_CHANNEL, { type: 'done' })
             },
           },
         })
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
-        const stack = error instanceof Error ? error.stack : ''
-        console.error('[AgentHandler] Stream exception caught:', {
-          message: msg,
-          stack,
-          fullError: error,
-        })
         event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
           type: 'error',
           error: msg || String(error),
         })
       }
     })
-    console.log('[AgentHandler] Handler registered successfully')
   } catch (err) {
     console.error('[AgentHandler] Failed to register handler:', err)
   }

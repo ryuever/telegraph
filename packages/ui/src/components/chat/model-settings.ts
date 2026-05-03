@@ -1,5 +1,6 @@
 import {
   DEFAULT_MODEL_CATALOG,
+  MINIMAX_CN_PROVIDER_ID,
   MINIMAX_OPENAI_BASE_URL,
   MINIMAX_OPENAI_COMPAT_PROVIDER_ID,
   MINIMAX_PROVIDER_ID,
@@ -34,12 +35,13 @@ export interface ChatModelSettings {
 }
 
 export const DEFAULT_SETTINGS: ChatModelSettings = {
-  provider: MINIMAX_PROVIDER_ID,
+  provider: MINIMAX_CN_PROVIDER_ID,
   modelId: 'MiniMax-M2.7',
   byProvider: {
     // The same MiniMax key works against both the Anthropic-messages endpoint
     // (first-class `minimax`) and the OpenAI-compatible escape hatch.
     [MINIMAX_PROVIDER_ID]: { apiKey: SEED_MINIMAX_KEY },
+    [MINIMAX_CN_PROVIDER_ID]: { apiKey: SEED_MINIMAX_KEY },
     [MINIMAX_OPENAI_COMPAT_PROVIDER_ID]: { apiKey: SEED_MINIMAX_KEY, baseUrl: MINIMAX_OPENAI_BASE_URL },
   },
 }
