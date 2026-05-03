@@ -1,9 +1,19 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Toolbar } from '@telegraph/ui/components/Toolbar'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatMessages } from './ChatMessages'
 import { ChatComposer } from './ChatComposer'
+import { ChatSettingsDialog } from './ChatSettingsDialog'
+import { ModelBadge } from './ModelBadge'
 import { useChat } from './use-chat'
+import { MockAgentService } from './agent-service'
+import { PiAgentService } from './pi-agent-service'
+import {
+  loadSettings,
+  saveSettings,
+  toRuntimeSettings,
+  type ChatModelSettings,
+} from './model-settings'
 import type { AgentService } from './types'
 
 interface Props {
@@ -18,6 +28,20 @@ const SUGGESTIONS = [
 ]
 
 export function ChatPanel({ agent }: Props) {
+  const [settings, setSettings] = useState<ChatModelSettings>(() => loadSettings())
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // Build a single agent service per settings tuple. PiAgentService has no
+  // intrinsic state across `send` calls, so reconstructing it on settings
+  // change is cheap. Falls back to the mock when no agent prop is supplied
+  // and no API key is configured.
+  const agentService = useMemo<AgentService>(() => {
+    if (agent) return agent
+    const runtime = toRuntimeSettings(settings)
+    if (!runtime.apiKey) return new MockAgentService()
+    return new PiAgentService(runtime)
+  }, [agent, settings])
+
   const {
     conversations,
     active,
@@ -29,7 +53,7 @@ export function ChatPanel({ agent }: Props) {
     renameConversation,
     sendMessage,
     stop,
-  } = useChat({ agent })
+  } = useChat({ agent: agentService })
 
   const [draft, setDraft] = useState('')
   const [collapsed, setCollapsed] = useState(false)
@@ -38,6 +62,11 @@ export function ChatPanel({ agent }: Props) {
     const text = draft
     setDraft('')
     void sendMessage(text)
+  }
+
+  const handleSaveSettings = (next: ChatModelSettings) => {
+    setSettings(next)
+    saveSettings(next)
   }
 
   return (
@@ -68,6 +97,9 @@ export function ChatPanel({ agent }: Props) {
             title={active.title}
             messageCount={active.messages.length}
             isStreaming={isStreaming}
+            provider={settings.provider}
+            modelId={settings.modelId}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
           <div className="min-h-0 flex-1">
             {active.messages.length === 0 ? (
@@ -90,6 +122,13 @@ export function ChatPanel({ agent }: Props) {
           />
         </main>
       </div>
+
+      <ChatSettingsDialog
+        open={settingsOpen}
+        settings={settings}
+        onClose={() => setSettingsOpen(false)}
+        onSave={handleSaveSettings}
+      />
     </div>
   )
 }
@@ -98,10 +137,16 @@ function Header({
   title,
   messageCount,
   isStreaming,
+  provider,
+  modelId,
+  onOpenSettings,
 }: {
   title: string
   messageCount: number
   isStreaming: boolean
+  provider: string
+  modelId: string
+  onOpenSettings: () => void
 }) {
   return (
     <header className="flex items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-950/40 px-5 py-3">
@@ -125,9 +170,7 @@ function Header({
         >
           {isStreaming ? 'streaming' : 'idle'}
         </span>
-        <span className="rounded-full border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 font-mono">
-          mock-agent
-        </span>
+        <ModelBadge provider={provider} modelId={modelId} onClick={onOpenSettings} />
       </div>
     </header>
   )
@@ -176,3 +219,4 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
     </div>
   )
 }
+

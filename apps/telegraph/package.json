@@ -42,6 +42,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
     "@sentry/node": "^10.51.0",
+    "@telegraph/agent": "workspace:*",
     "@telegraph/ui": "workspace:*",
     "@types/node-fetch": "^2.6.13",
     "@x-oasis/ansi-colors": "^0.4.0",

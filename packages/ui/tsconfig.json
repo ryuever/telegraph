@@ -13,7 +13,9 @@
       "@telegraph/ui/*": ["./src/*"],
       "@telegraph/application/*": ["../../apps/telegraph/src/application/*"],
       "@telegraph/core/*": ["../../apps/telegraph/src/core/*"],
-      "@telegraph/services/*": ["../../apps/telegraph/src/services/*"]
+      "@telegraph/services/*": ["../../apps/telegraph/src/services/*"],
+      "@telegraph/agent": ["../agent/src/index.ts"],
+      "@telegraph/agent/*": ["../agent/src/*"]
     }
   },
   "include": ["."],

@@ -1,0 +1,19 @@
+{
+  "name": "@telegraph/agent",
+  "version": "0.0.0",
+  "description": "Telegraph agent runtime — pi-ai-backed streaming agent and harness framework foundation. Browser-safe (renderer + main).",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./providers/*": "./src/providers/*.ts",
+    "./harness/*": "./src/harness/*.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0.72.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}
