@@ -62,6 +62,7 @@ import type { MonitorBridge } from '@telegraph/services/monitor/electron-main/Mo
 import { PerformanceTracker } from '@telegraph/services/log/common/performance'
 import { initCrashListener } from './helper/crash'
 import { initAboutInfo } from './helper/about'
+import { setupAgentHandler } from '@telegraph/services/agent/electron-main/AgentHandler'
 
 export const TelegraphApplicationId = createId('telegraph-application')
 
@@ -168,6 +169,7 @@ class TelegraphApplication extends Disposable {
     this.mainProcess.registerServiceHandler(FileSystemServicePath, this.fileSystemManager)
     this.mainProcess.registerServiceHandler(MainProcessUtilsServicePath, this.mainProcessUtils)
     this.mainProcess.registerServiceHandler(monitorServicePath, this.monitorBridge)
+    setupAgentHandler()
   }
 
   initMainWindow() {

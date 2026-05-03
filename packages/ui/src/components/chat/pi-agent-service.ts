@@ -1,33 +1,48 @@
-import { PiAgent, type AgentRuntimeSettings, type AgentTextMessage } from '@telegraph/agent'
+import type { AgentRuntimeSettings, AgentTextMessage } from '@telegraph/agent'
 import type { AgentSendOptions, AgentService } from './types'
 
+const AGENT_STREAM_CHANNEL = 'telegraph:agent:stream'
+const AGENT_STREAM_DATA_CHANNEL = 'telegraph:agent:stream:data'
+
 /**
- * Adapter that fits a {@link PiAgent} into the chat UI's {@link AgentService}
- * contract. Translates ChatConversation → pi-ai message list and forwards the
+ * Adapter that proxies agent requests through IPC to the main process.
+ * Translates ChatConversation → pi-ai message list and forwards the
  * stream's text deltas into `onChunk`.
  */
 export class PiAgentService implements AgentService {
-  private agent: PiAgent
-
-  constructor(settings: AgentRuntimeSettings) {
-    this.agent = new PiAgent(settings)
-  }
+  constructor(private settings: AgentRuntimeSettings) {}
 
   updateSettings(next: AgentRuntimeSettings) {
-    this.agent = this.agent.withSettings(next)
+    this.settings = next
   }
 
   async send({ conversation, onChunk, signal }: AgentSendOptions): Promise<void> {
-    const messages: AgentTextMessage[] = conversation.messages
-      .filter(m => m.role === 'user' || m.role === 'assistant' || m.role === 'system')
-      .map(m => ({ role: m.role as AgentTextMessage['role'], content: m.content }))
+    const lastMessage = conversation.messages.at(-1)
+    if (!lastMessage || lastMessage.role !== 'user') {
+      throw new Error('Last message must be from user')
+    }
 
-    await this.agent.send({
-      messages,
-      signal,
-      callbacks: {
-        onTextDelta: delta => onChunk(delta),
-      },
-    })
+    const ipc = (window as any).telegraph?.ipcRenderer
+    if (!ipc) throw new Error('IPC not available')
+
+    const listener = (_event: any, data: any) => {
+      if (signal?.aborted) return
+      if (data.type === 'text_delta') {
+        onChunk(data.text)
+      } else if (data.type === 'error') {
+        throw new Error(data.error)
+      }
+    }
+
+    ipc.on(AGENT_STREAM_DATA_CHANNEL, listener)
+
+    try {
+      await ipc.invoke(AGENT_STREAM_CHANNEL, {
+        message: lastMessage.content,
+        settings: this.settings,
+      })
+    } finally {
+      ipc.removeListener(AGENT_STREAM_DATA_CHANNEL, listener)
+    }
   }
 }
