@@ -4,12 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@x-oasis/async-call-rpc': link:../../../red/x-oasis/packages/async/async-call-rpc
-  '@x-oasis/async-call-rpc-electron': link:../../../red/x-oasis/packages/async/async-call-rpc-electron
-  '@x-oasis/async-call-rpc-node': link:../../../red/x-oasis/packages/async/async-call-rpc-node
-  '@x-oasis/async-call-rpc-web': link:../../../red/x-oasis/packages/async/async-call-rpc-web
-
 importers:
 
   .: {}
@@ -32,53 +26,53 @@ importers:
         specifier: ^2.6.13
         version: 2.6.13
       '@x-oasis/ansi-colors':
-        specifier: link:../../../../../red/x-oasis/packages/misc/ansi-colors
-        version: link:../../../../../red/x-oasis/packages/misc/ansi-colors
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/async-call-rpc':
-        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc
-        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
-        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
+        specifier: ^0.2.0
+        version: 0.2.0(electron@41.5.0)
       '@x-oasis/async-call-rpc-node':
-        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-node
-        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-node
+        specifier: ^0.2.0
+        version: 0.2.0
       '@x-oasis/async-call-rpc-web':
-        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
-        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
+        specifier: ^0.2.0
+        version: 0.2.0
       '@x-oasis/deep-clone':
-        specifier: link:../../../../../red/x-oasis/packages/functional/deep-clone
-        version: link:../../../../../red/x-oasis/packages/functional/deep-clone
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/deferred':
-        specifier: link:../../../../../red/x-oasis/packages/promise/deferred
-        version: link:../../../../../red/x-oasis/packages/promise/deferred
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/di':
-        specifier: link:../../../../../red/x-oasis/packages/ioc/di
-        version: link:../../../../../red/x-oasis/packages/ioc/di
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/disposable':
-        specifier: link:../../../../../red/x-oasis/packages/event/disposable
-        version: link:../../../../../red/x-oasis/packages/event/disposable
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/emitter':
-        specifier: link:../../../../../red/x-oasis/packages/event/emitter
-        version: link:../../../../../red/x-oasis/packages/event/emitter
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/format-date':
-        specifier: link:../../../../../red/x-oasis/packages/misc/format-date
-        version: link:../../../../../red/x-oasis/packages/misc/format-date
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/id':
-        specifier: link:../../../../../red/x-oasis/packages/misc/id
-        version: link:../../../../../red/x-oasis/packages/misc/id
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/is':
-        specifier: link:../../../../../red/x-oasis/packages/assertion/is
-        version: link:../../../../../red/x-oasis/packages/assertion/is
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/is-promise':
-        specifier: link:../../../../../red/x-oasis/packages/assertion/is-promise
-        version: link:../../../../../red/x-oasis/packages/assertion/is-promise
+        specifier: ^0.4.0
+        version: 0.4.0
       '@x-oasis/node-fetch-json':
-        specifier: link:../../../../../red/x-oasis/packages/async/node-fetch-json
-        version: link:../../../../../red/x-oasis/packages/async/node-fetch-json
+        specifier: ^0.2.0
+        version: 0.2.0(encoding@0.1.13)
       '@x-oasis/url-search-params':
-        specifier: link:../../../../../red/x-oasis/packages/misc/url-search-params
-        version: link:../../../../../red/x-oasis/packages/misc/url-search-params
+        specifier: ^0.4.0
+        version: 0.4.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1566,6 +1560,71 @@ packages:
 
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
+
+  '@x-oasis/ansi-colors@0.4.0':
+    resolution: {integrity: sha512-x/OE4GP6vMpgHKU6J1mpHjCgSGjity+bKcBl0fcV7GDE4/aN8UuSZfFNd2r3ZrcUoyomDKE9Mx02xObbdLEjuA==}
+
+  '@x-oasis/async-call-rpc-electron@0.2.0':
+    resolution: {integrity: sha512-aO4CuvUst2Pyc50mrnRz/igWqr5BVx1LxFQwO3XXOvAZhVCsSnLWORuszmaJkxIN/G9vM3Hc8jZk3XGCgLG72Q==}
+    peerDependencies:
+      electron: '>=20.0.0'
+    peerDependenciesMeta:
+      electron:
+        optional: true
+
+  '@x-oasis/async-call-rpc-node@0.2.0':
+    resolution: {integrity: sha512-zdwA5bAqXHAhbLk0kqw6ejtCAV847VH8mzDtXFSiIfO1NMGhyDETPrZCD9SIJywzJkbEpkc5KsS+MousBUFZkA==}
+
+  '@x-oasis/async-call-rpc-web@0.2.0':
+    resolution: {integrity: sha512-Mu3bRkzZCA46So+oMOkBsET6vWahDV+YAVPXnVXkc82AHruP5bmwpJHXslZRn8Wu/KlOFCyZwNHj2Srzjz7UuA==}
+
+  '@x-oasis/async-call-rpc@0.4.0':
+    resolution: {integrity: sha512-S+k5ZpBZ1RdUtn1vo/UKANRX7LLbfa05X+x4Veh9xoUgYHwcnOdr5NyFoS+We/vcHaFwACLBZD6l9RO4jNQUHA==}
+
+  '@x-oasis/deep-clone@0.4.0':
+    resolution: {integrity: sha512-cfIj91rZZB8J/u1yaJqVvSEvKdoz+8GoDrgozJl3N5V04vLWJB5MzcY+biupQlXRpTy145lPhU3TNpruJfX0yw==}
+
+  '@x-oasis/deferred@0.4.0':
+    resolution: {integrity: sha512-MWWoCzd4uWP/YIUFNGnt+BuEvXE7SqKEiphokD1n/WYUoEf/lnsz4xwOuBDy7PHNHLY8peFSCfP4paRZmTjcPg==}
+
+  '@x-oasis/di@0.4.0':
+    resolution: {integrity: sha512-43WcUgUz8c4KBBn7N7XI/a8FjUV2B9cJhxWiYgETn4yxp36m3ynxJNEZfB+xCPXsYWPHTjvJL1VbQyUmyKBJEg==}
+
+  '@x-oasis/disposable@0.4.0':
+    resolution: {integrity: sha512-rwLSnlyyyOURIVDE6n5bwnvt8CR5Yfcg3p18ZAft1asJKxebLKvp0FgdwHqa3yYFghQZsbhXEiIaAPkZ6wQ9Og==}
+
+  '@x-oasis/emitter@0.4.0':
+    resolution: {integrity: sha512-NfrYtBACM86R7F8PgQOSFv4UFsZyMQu+6TSOhScxOdh5UUz0EErr35Jq9ibdjTU9ZkQ8AKpL4+1RaKQ7+2JMyg==}
+
+  '@x-oasis/format-date@0.4.0':
+    resolution: {integrity: sha512-tU29fRW020zV6h4Nw4CqgW9Cdazhq/+sGqL3pcfRNxwI2CL4WuTbA99RKK1aNxEC78fnDBKnFgIKc8wetmKzgg==}
+
+  '@x-oasis/id@0.4.0':
+    resolution: {integrity: sha512-0k7M0Bqs5b61Y6Yg+pJ3b7DRd5PO9bQ9H/qR7JIsvJ8mc2CU21cwEJIL1kuoddcpVKaM8YfSEMMxYoVwmXywvg==}
+
+  '@x-oasis/is-ascii@0.4.0':
+    resolution: {integrity: sha512-lTKAiXlQ9YjKtmO+CJRz9Fazr2xhNB5N/aDiFXVVEycIOc7jcHsyeKZKTCN94GnOmH9jhhQrX6hxxhrClOV5MQ==}
+
+  '@x-oasis/is-function@0.4.0':
+    resolution: {integrity: sha512-UYxbj+XCOl1Tqxl6KJuefjeAm51jN+1lrxxOkj5TJdbWVSb2YAQVyoZ5FZdrq3nHuFX+bYetH9juZ9m8A0WU3A==}
+
+  '@x-oasis/is-object@0.4.0':
+    resolution: {integrity: sha512-/wXaednLYu4+lgKM72irI62Q4xRS2yI5NuHyneDlLJJsNYBiRQrPyULY6/cOsGfa0DNmQ/zqhmvLlMap+3SojA==}
+
+  '@x-oasis/is-promise@0.4.0':
+    resolution: {integrity: sha512-CPQpPb+i+VwOt1CJTZmRvHhjzo0KmB7Qk8YzJwbEVmZBtegREdaT4O1Pk379zgFiRI/sdT5GFdBfHievEyUL+w==}
+
+  '@x-oasis/is@0.4.0':
+    resolution: {integrity: sha512-Yqc6696dxjJecfWkSKKJFtLSBgsMkYCdCYy0G/UNcKgO6ixvjslhlpZPsEj6bcEpjbWqt3ZZJ8YQKj7g7Vjasg==}
+
+  '@x-oasis/node-fetch-json@0.2.0':
+    resolution: {integrity: sha512-YsZu6Xy26eGwu4nAvRWEB+nruR/n29bzlKsBB33E15yudZjPvVI8eXW5rDfT62yiXInMXiQyZhpndYJLq2p8Rg==}
+
+  '@x-oasis/to-string@0.4.0':
+    resolution: {integrity: sha512-pM8R/Qy5QXI3RqSQugX6JxTaC6HEPnaVpQQYg3It/WRQLyKhumUSwalPQ87A8hYMb2/8DtjkNMQX4tA+fte1DQ==}
+
+  '@x-oasis/url-search-params@0.4.0':
+    resolution: {integrity: sha512-ikEtvx9CgiLJkv/pv6tJ+iklk3b2Sb4Vgomwu4u5vVRujIS4EBYHKsz4rcKTJvvbFZRWsH9fyIzSWD7KT7VJcA==}
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
@@ -5407,6 +5466,79 @@ snapshots:
     dependencies:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
+
+  '@x-oasis/ansi-colors@0.4.0': {}
+
+  '@x-oasis/async-call-rpc-electron@0.2.0(electron@41.5.0)':
+    dependencies:
+      '@x-oasis/async-call-rpc': 0.4.0
+    optionalDependencies:
+      electron: 41.5.0
+
+  '@x-oasis/async-call-rpc-node@0.2.0':
+    dependencies:
+      '@x-oasis/async-call-rpc': 0.4.0
+
+  '@x-oasis/async-call-rpc-web@0.2.0':
+    dependencies:
+      '@x-oasis/async-call-rpc': 0.4.0
+
+  '@x-oasis/async-call-rpc@0.4.0':
+    dependencies:
+      '@x-oasis/deferred': 0.4.0
+      '@x-oasis/disposable': 0.4.0
+      '@x-oasis/emitter': 0.4.0
+      '@x-oasis/id': 0.4.0
+      '@x-oasis/is-ascii': 0.4.0
+      '@x-oasis/is-function': 0.4.0
+      '@x-oasis/is-object': 0.4.0
+      '@x-oasis/is-promise': 0.4.0
+
+  '@x-oasis/deep-clone@0.4.0': {}
+
+  '@x-oasis/deferred@0.4.0': {}
+
+  '@x-oasis/di@0.4.0':
+    dependencies:
+      '@x-oasis/is-function': 0.4.0
+
+  '@x-oasis/disposable@0.4.0':
+    dependencies:
+      '@x-oasis/is-function': 0.4.0
+      '@x-oasis/is-object': 0.4.0
+
+  '@x-oasis/emitter@0.4.0':
+    dependencies:
+      '@x-oasis/disposable': 0.4.0
+      '@x-oasis/is-object': 0.4.0
+
+  '@x-oasis/format-date@0.4.0': {}
+
+  '@x-oasis/id@0.4.0': {}
+
+  '@x-oasis/is-ascii@0.4.0': {}
+
+  '@x-oasis/is-function@0.4.0': {}
+
+  '@x-oasis/is-object@0.4.0':
+    dependencies:
+      '@x-oasis/to-string': 0.4.0
+
+  '@x-oasis/is-promise@0.4.0':
+    dependencies:
+      '@x-oasis/to-string': 0.4.0
+
+  '@x-oasis/is@0.4.0': {}
+
+  '@x-oasis/node-fetch-json@0.2.0(encoding@0.1.13)':
+    dependencies:
+      node-fetch: 2.7.0(encoding@0.1.13)
+    transitivePeerDependencies:
+      - encoding
+
+  '@x-oasis/to-string@0.4.0': {}
+
+  '@x-oasis/url-search-params@0.4.0': {}
 
   '@xmldom/xmldom@0.9.10': {}
 
