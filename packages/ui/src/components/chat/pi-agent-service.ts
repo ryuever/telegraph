@@ -25,12 +25,14 @@ export class PiAgentService implements AgentService {
     const ipc = (window as any).telegraph?.ipcRenderer
     if (!ipc) throw new Error('IPC not available')
 
+    let error: Error | null = null
+
     const listener = (_event: any, data: any) => {
       if (signal?.aborted) return
       if (data.type === 'text_delta') {
         onChunk(data.text)
       } else if (data.type === 'error') {
-        throw new Error(data.error)
+        error = new Error(data.error)
       }
     }
 
@@ -41,6 +43,7 @@ export class PiAgentService implements AgentService {
         message: lastMessage.content,
         settings: this.settings,
       })
+      if (error) throw error
     } finally {
       ipc.removeListener(AGENT_STREAM_DATA_CHANNEL, listener)
     }
