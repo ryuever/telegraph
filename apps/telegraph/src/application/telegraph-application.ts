@@ -124,6 +124,7 @@ class TelegraphApplication extends Disposable {
     initAboutInfo()
     // 监听 crash
     initCrashListener(this.logService)
+    setupAgentHandler()
     this.acquirePortMain.initAcquirePort(
       this.sharedProcessMain,
       this.daemonProcessMain,
@@ -169,7 +170,6 @@ class TelegraphApplication extends Disposable {
     this.mainProcess.registerServiceHandler(FileSystemServicePath, this.fileSystemManager)
     this.mainProcess.registerServiceHandler(MainProcessUtilsServicePath, this.mainProcessUtils)
     this.mainProcess.registerServiceHandler(monitorServicePath, this.monitorBridge)
-    setupAgentHandler()
   }
 
   initMainWindow() {
