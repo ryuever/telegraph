@@ -12,7 +12,9 @@ overrides:
 
 importers:
 
-  .:
+  .: {}
+
+  apps/telegraph:
     dependencies:
       '@radix-ui/react-slot':
         specifier: ^1.2.4
@@ -23,42 +25,60 @@ importers:
       '@sentry/node':
         specifier: ^10.51.0
         version: 10.51.0
+      '@telegraph/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@types/node-fetch':
         specifier: ^2.6.13
         version: 2.6.13
+      '@x-oasis/ansi-colors':
+        specifier: link:../../../../../red/x-oasis/packages/misc/ansi-colors
+        version: link:../../../../../red/x-oasis/packages/misc/ansi-colors
       '@x-oasis/async-call-rpc':
-        specifier: link:../../../red/x-oasis/packages/async/async-call-rpc
-        version: link:../../../red/x-oasis/packages/async/async-call-rpc
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc
       '@x-oasis/async-call-rpc-electron':
-        specifier: link:../../../red/x-oasis/packages/async/async-call-rpc-electron
-        version: link:../../../red/x-oasis/packages/async/async-call-rpc-electron
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
       '@x-oasis/async-call-rpc-node':
-        specifier: link:../../../red/x-oasis/packages/async/async-call-rpc-node
-        version: link:../../../red/x-oasis/packages/async/async-call-rpc-node
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-node
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-node
       '@x-oasis/async-call-rpc-web':
-        specifier: link:../../../red/x-oasis/packages/async/async-call-rpc-web
-        version: link:../../../red/x-oasis/packages/async/async-call-rpc-web
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
+      '@x-oasis/deep-clone':
+        specifier: link:../../../../../red/x-oasis/packages/functional/deep-clone
+        version: link:../../../../../red/x-oasis/packages/functional/deep-clone
       '@x-oasis/deferred':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/promise/deferred
+        version: link:../../../../../red/x-oasis/packages/promise/deferred
       '@x-oasis/di':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/ioc/di
+        version: link:../../../../../red/x-oasis/packages/ioc/di
       '@x-oasis/disposable':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/event/disposable
+        version: link:../../../../../red/x-oasis/packages/event/disposable
       '@x-oasis/emitter':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/event/emitter
+        version: link:../../../../../red/x-oasis/packages/event/emitter
+      '@x-oasis/format-date':
+        specifier: link:../../../../../red/x-oasis/packages/misc/format-date
+        version: link:../../../../../red/x-oasis/packages/misc/format-date
       '@x-oasis/id':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/misc/id
+        version: link:../../../../../red/x-oasis/packages/misc/id
       '@x-oasis/is':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/assertion/is
+        version: link:../../../../../red/x-oasis/packages/assertion/is
       '@x-oasis/is-promise':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: link:../../../../../red/x-oasis/packages/assertion/is-promise
+        version: link:../../../../../red/x-oasis/packages/assertion/is-promise
+      '@x-oasis/node-fetch-json':
+        specifier: link:../../../../../red/x-oasis/packages/async/node-fetch-json
+        version: link:../../../../../red/x-oasis/packages/async/node-fetch-json
+      '@x-oasis/url-search-params':
+        specifier: link:../../../../../red/x-oasis/packages/misc/url-search-params
+        version: link:../../../../../red/x-oasis/packages/misc/url-search-params
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -156,6 +176,46 @@ importers:
       vite:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@20.19.39)(lightningcss@1.32.0)(terser@5.46.2)
+
+  packages/ui:
+    dependencies:
+      '@radix-ui/react-slot':
+        specifier: ^1.2.4
+        version: 1.2.4(@types/react@18.3.28)(react@18.3.1)
+      '@radix-ui/react-tabs':
+        specifier: ^1.1.13
+        version: 1.1.13(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      lucide-react:
+        specifier: ^1.14.0
+        version: 1.14.0(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      tailwind-merge:
+        specifier: ^3.5.0
+        version: 3.5.0
+    devDependencies:
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.2.0
+        version: 18.3.7(@types/react@18.3.28)
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
 
 packages:
 
@@ -1506,33 +1566,6 @@ packages:
 
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
-
-  '@x-oasis/deferred@0.3.0':
-    resolution: {integrity: sha512-GtE/AC3zAXByPbVACcBuWSvKVLd6LFnsiBBUaTev5nZ+JqCqSmIFdt9DvjpM+9U7yIvLtsGcYcQuiOMatvceHA==}
-
-  '@x-oasis/di@0.3.0':
-    resolution: {integrity: sha512-tp75ZHU7oLdXdvQS51vHYaiJsA0/MfBLaIR1Tokgyspz9WkiIZA1gt/RP4HM9IaBQhmhwpwc15rlgGS6fhMUFg==}
-
-  '@x-oasis/disposable@0.3.0':
-    resolution: {integrity: sha512-as3JSPiK6DqigYZG7jhWxhoq1gsa44Wd2TEOLrJ6QwUVMGRQJnUEzq9/qsuIqrKP4A5//LPJcQ3kj6qSOvnDsg==}
-
-  '@x-oasis/emitter@0.3.0':
-    resolution: {integrity: sha512-gzKYl3J2ENwsJ2uGW/TpAkH05dZwAq8YveglO3LqTujYB0ZBShhr3ohBG+v8BUh1r1rbEhmJdGxThHO013xb+g==}
-
-  '@x-oasis/id@0.3.0':
-    resolution: {integrity: sha512-YVp1l5GOaj2JwqhO58DQW4KWq+6CcWfSGB83InaXJuDB+5hxB12sPbiQd+50MsqU8/P/WkfrcIqcnXAwLJ/TLA==}
-
-  '@x-oasis/is-object@0.3.0':
-    resolution: {integrity: sha512-VSJkMso6q1JGp3hFMLrm3Qj21o2uiUhQi6VyScV6i50KDIWliVoyOI6R1rOAC4GHG3NeMVL+dfh6vtj6FMzmJQ==}
-
-  '@x-oasis/is-promise@0.3.0':
-    resolution: {integrity: sha512-fJneddMhdQFW8D2SGSr5+ezscAuIYgOHb6VJqQRVDoFwpLYbtGzYX08E2SBzOTP+chaRx7lHyN1Ii6RvuUP+mQ==}
-
-  '@x-oasis/is@0.3.0':
-    resolution: {integrity: sha512-VhBrCcJvwcUpf2f3ABQF/T72EX+Eztw58HEvFJNuEKzD4p8+CfCxzrrNvRvKPCYL6MKc6mJG7MFiBCOvNoym7g==}
-
-  '@x-oasis/to-string@0.3.0':
-    resolution: {integrity: sha512-Z03P8VW65BZrqW2RUTBjLOOj9+DBP//8Cv+ZhKsjJx2H2w9jFYKMCVIM/1OF3hOcdfmWvoG3ioO6zCYWvmy4nA==}
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
@@ -5374,33 +5407,6 @@ snapshots:
     dependencies:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
-
-  '@x-oasis/deferred@0.3.0': {}
-
-  '@x-oasis/di@0.3.0': {}
-
-  '@x-oasis/disposable@0.3.0':
-    dependencies:
-      '@x-oasis/is-object': 0.3.0
-
-  '@x-oasis/emitter@0.3.0':
-    dependencies:
-      '@x-oasis/disposable': 0.3.0
-      '@x-oasis/is-object': 0.3.0
-
-  '@x-oasis/id@0.3.0': {}
-
-  '@x-oasis/is-object@0.3.0':
-    dependencies:
-      '@x-oasis/to-string': 0.3.0
-
-  '@x-oasis/is-promise@0.3.0':
-    dependencies:
-      '@x-oasis/to-string': 0.3.0
-
-  '@x-oasis/is@0.3.0': {}
-
-  '@x-oasis/to-string@0.3.0': {}
 
   '@xmldom/xmldom@0.9.10': {}
 

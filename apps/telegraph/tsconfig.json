@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "outDir": "dist",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "jsx": "react-jsx",
+    "strictNullChecks": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@telegraph/application/*": ["./src/application/*"],
+      "@telegraph/core/*": ["./src/core/*"],
+      "@telegraph/services/*": ["./src/services/*"],
+      "@telegraph/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": [
+    ".",
+    "vite.main.config.ts",
+    "vite.preload.config.ts",
+    "vite.fork.config.ts",
+    "vite.renderer.config.ts",
+    "forge.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "out",
+    ".vite",
+    "dist"
+  ]
+}
