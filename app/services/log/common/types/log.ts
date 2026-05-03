@@ -1,4 +1,4 @@
-import type { Formatter } from '@app/core/common/utilities/colors'
+import type { Formatter } from '@x-oasis/ansi-colors'
 
 export enum LogLevel {
   Trace = 10,

@@ -18,7 +18,7 @@ import { REDCITY_PAGELET_RENDERER_PROCESS_ID } from '@app/core/node/process/env'
 
 import { buildId } from '@x-oasis/id'
 import { toDisposable } from '@x-oasis/disposable'
-import { colors } from '@app/core/common/utilities/colors'
+import { colors } from '@x-oasis/ansi-colors'
 import { FileAccessId } from '@app/services/file-access/electron-main/FileAccess'
 import type { FileAccess } from '@app/services/file-access/electron-main/FileAccess'
 

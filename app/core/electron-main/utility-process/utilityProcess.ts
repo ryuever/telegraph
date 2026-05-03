@@ -1,6 +1,6 @@
 import type { UtilityProcess as ElectronUtilityProcess } from 'electron'
 import { utilityProcess } from 'electron'
-import { deepClone } from '@app/core/common/utilities/object'
+import deepClone from '@x-oasis/deep-clone'
 import {
   REDCITY_ENTRY,
   REDCITY_PPID,
@@ -12,7 +12,7 @@ import { fromNodeEvent, Emitter } from '@x-oasis/emitter'
 import { createId, inject, injectable } from '@x-oasis/di'
 import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId } from '@app/services/log/common/log'
-import { Service } from '@app/core/common/service'
+import { Disposable } from '@x-oasis/disposable'
 
 import type ApplicationInfo from '@app/services/application-info/node'
 import { ApplicationInfoId } from '@app/services/application-info/node'
@@ -22,7 +22,7 @@ export const UtilityProcessFactoryId = createId('utility-process-factory')
 export type IUtilityProcessFactory = () => UtilityProcess
 
 @injectable()
-export default class UtilityProcess extends Service {
+export default class UtilityProcess extends Disposable {
   private _name: string
 
   private _process: ElectronUtilityProcess | undefined = undefined

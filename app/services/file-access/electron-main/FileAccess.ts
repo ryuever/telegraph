@@ -1,7 +1,7 @@
 import { injectable, createId } from '@x-oasis/di'
 import { resolve } from 'path'
 import type { LoadFileOptions, LoadURLOptions } from 'electron'
-import { flatten } from '@app/core/common/utilities/url'
+import { flatten } from '@x-oasis/url-search-params'
 import { Uri, toUri } from '../common'
 import type { FileAccessProps, IAlias } from './types/fileAccess'
 

@@ -1,5 +1,5 @@
-import { format } from '@app/core/common/utilities/date'
-import { colors, getUseColor, setUserColor } from '@app/core/common/utilities/colors'
+import { format } from '@x-oasis/format-date'
+import { colors, getUseColor, setUserColor } from '@x-oasis/ansi-colors'
 import { DEFAULT_LOG_LEVEL } from './log'
 import type { ILogger, IColor } from './types'
 import { LogLevel } from './types'

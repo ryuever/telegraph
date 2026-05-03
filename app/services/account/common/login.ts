@@ -1,4 +1,4 @@
-import { post } from '@common/fetch'
+import { post } from '@x-oasis/node-fetch-json'
 // import { session } from 'electron'
 import { buildCookie } from './util'
 import type { AccountInfo } from '../electron-main/types'

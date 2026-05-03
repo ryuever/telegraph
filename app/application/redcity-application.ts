@@ -3,8 +3,7 @@ import { app, session } from 'electron'
 
 import { inject, injectable, createId } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
-import { fromNodeEvent } from '@x-oasis/emitter'
-import { once } from '@app/core/common/emitter'
+import { fromNodeEvent, once } from '@x-oasis/emitter'
 import type { LogService } from '@app/services/log/common/log'
 import { LogServiceId, LogServicePath } from '@app/services/log/common/log'
 

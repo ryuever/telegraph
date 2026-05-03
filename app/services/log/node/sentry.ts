@@ -1,4 +1,4 @@
-import { format } from '@app/core/common/utilities/date'
+import { format } from '@x-oasis/format-date'
 import { init, setTag, setUser, captureEvent, withScope } from '@sentry/node'
 
 type SentryLevel = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug'
