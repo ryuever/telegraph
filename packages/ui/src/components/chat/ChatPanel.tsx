@@ -38,6 +38,7 @@ export function ChatPanel({ agent }: Props) {
   const agentService = useMemo<AgentService>(() => {
     if (agent) return agent
     const runtime = toRuntimeSettings(settings)
+    console.log('[ChatPanel] Creating agent service with settings:', runtime)
     if (!runtime.apiKey) return new MockAgentService()
     return new PiAgentService(runtime)
   }, [agent, settings])
