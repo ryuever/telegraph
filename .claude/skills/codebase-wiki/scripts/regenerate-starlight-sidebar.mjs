@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scan src/content/docs/{architecture,discussion,reference,roadmap}/*.md for
+ * Scan src/content/docs/{architecture,discussion,issue,reference,roadmap}/*.md for
  * frontmatter `id` + `title`, then rewrite .starlight/sidebar.generated.mjs
  * for Astro Starlight.
  *
@@ -13,6 +13,7 @@ import path from "node:path";
 const CATEGORIES = [
   { dir: "architecture", label: "架构分析" },
   { dir: "discussion", label: "技术讨论" },
+  { dir: "issue", label: "Issue 记录" },
   { dir: "reference", label: "参考手册" },
   { dir: "roadmap", label: "规划路线" },
 ];
@@ -43,9 +44,9 @@ function readFrontmatter(filePath) {
 
 function idSortKey(id) {
   const s = String(id || "");
-  const m = s.match(/^([ADRP])-(\d{3})$/);
+  const m = s.match(/^([ADIRP])-(\d{3})$/);
   if (!m) return [999, s];
-  const prefixOrder = { A: 0, D: 1, R: 2, P: 3 };
+  const prefixOrder = { A: 0, D: 1, I: 2, R: 3, P: 4 };
   return [prefixOrder[m[1]] ?? 50, Number(m[2], 10)];
 }
 

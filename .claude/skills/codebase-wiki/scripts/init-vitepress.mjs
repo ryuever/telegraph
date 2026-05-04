@@ -131,7 +131,7 @@ function main() {
   }
 
   // 1. Create wiki content directories with .gitkeep
-  for (const d of ["architecture", "discussion", "reference", "roadmap"]) {
+  for (const d of ["architecture", "discussion", "issue", "reference", "roadmap"]) {
     const dir = path.join(root, WIKI_DIR, d);
     fs.mkdirSync(dir, { recursive: true });
     const g = path.join(dir, ".gitkeep");

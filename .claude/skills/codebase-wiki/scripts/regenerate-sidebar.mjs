@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scan codebase-wiki/{architecture,discussion,reference,roadmap}/*.md for frontmatter
+ * Scan codebase-wiki/{architecture,discussion,issue,reference,roadmap}/*.md for frontmatter
  * `id` + `title`, then rewrite .vitepress/sidebar.generated.mts.
  *
  * Usage: node regenerate-sidebar.mjs --root <project-root>
@@ -17,6 +17,7 @@ const WIKI_DIR = "codebase-wiki";
 const CATEGORIES = [
   { dir: "architecture", group: "架构分析", nav: "架构分析" },
   { dir: "discussion", group: "技术讨论", nav: "技术讨论" },
+  { dir: "issue", group: "Issue 记录", nav: "Issue 记录" },
   { dir: "reference", group: "参考手册", nav: "参考手册" },
   { dir: "roadmap", group: "规划路线", nav: "开发规划" },
 ];
@@ -47,9 +48,9 @@ function readFrontmatter(filePath) {
 
 function idSortKey(id) {
   const s = String(id || "");
-  const m = s.match(/^([ADRP])-(\d{3})$/);
+  const m = s.match(/^([ADIRP])-(\d{3})$/);
   if (!m) return [999, s];
-  const prefixOrder = { A: 0, D: 1, R: 2, P: 3 };
+  const prefixOrder = { A: 0, D: 1, I: 2, R: 3, P: 4 };
   return [prefixOrder[m[1]] ?? 50, Number(m[2], 10)];
 }
 

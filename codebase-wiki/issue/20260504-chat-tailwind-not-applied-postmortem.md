@@ -1,13 +1,13 @@
 ---
-id: D-001
+id: I-001
 title: Chat 页面 Tailwind 未生效故障复盘
 description: >
   记录 Telegraph 在 Electron Forge 开发模式下 chat 页面样式失效的问题，
-  包含可见现象、根因分解、时间线、修复动作与复发排查清单。
-category: discussion
+  包含可见现象、根因分解、时间线、修复动作、回归验证与复发排查清单。
+category: issue
 created: 2026-05-04
 updated: 2026-05-04
-tags: [tailwind, vite, electron-forge, cache, postcss, incident]
+tags: [tailwind, vite, electron-forge, cache, postcss, incident, regression]
 status: final
 ---
 
@@ -26,6 +26,20 @@ status: final
 
 - 仅影响 renderer UI 的视觉呈现，业务逻辑（路由、会话、发送）大体可运行。
 - 影响调试效率：问题表象像 Tailwind 配置失效，但真实原因包含“错误 dev server 被连接”与“旧缓存复用”。
+
+## Issue 元信息（Issue Meta）
+
+- 严重级别：`S2`（主要功能可用，核心体验明显受损）
+- 状态：`resolved`
+- 首次发现时间：2026-05-04 11:20（UTC+8）
+- 关闭时间：2026-05-04 12:06（UTC+8）
+
+## 环境指纹（Environment Fingerprint）
+
+- OS：macOS Darwin 25.4.0
+- 运行形态：Electron Forge + Vite renderer dev server
+- 关键端口：Forge renderer `5173`，standalone dev `5174`
+- 关键路由：`#/chat`
 
 ## 根因（Root Cause）
 
@@ -93,6 +107,12 @@ status: final
    - `rounded-tr-md`
    - `max-w-3xl`
 4. 若命中以上类名且页面视觉正常，则修复生效。
+
+## 预防措施（Preventive Actions）
+
+- 将 `pnpm dev` 与 Forge renderer 分端口并开启 `strictPort`，防止“误连旧进程”。
+- 将 `@source` 改为显式 glob，降低扫描不确定性。
+- 在 wiki 的 issue 归档模板中固定“验证方法 + Runbook”章节，缩短下次排查时间。
 
 ## 复发排查清单（Runbook）
 

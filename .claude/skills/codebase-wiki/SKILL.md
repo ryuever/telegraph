@@ -1,6 +1,6 @@
 ---
 name: codebase-wiki
-description: "将对话中的源码阅读与分析整理为规范化 Markdown，归档到项目 codebase-wiki/（architecture/discussion/reference/roadmap）、维护 INDEX 与 references 图；支持 VitePress、Mintlify、Starlight、Fumadocs 等文档站点。适用于「保存到 wiki / 归档到 codebase-wiki / 生成学习笔记」等意图。"
+description: "将对话中的源码阅读与分析整理为规范化 Markdown，归档到项目 codebase-wiki/（architecture/discussion/issue/reference/roadmap）、维护 INDEX 与 references 图；支持 VitePress、Mintlify、Starlight、Fumadocs 等文档站点。适用于「保存到 wiki / 归档到 codebase-wiki / 生成学习笔记」等意图。"
 ---
 
 # Codebase wiki（知识库目录）
@@ -116,7 +116,7 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 
    以重写 `.starlight/sidebar.generated.mjs`（侧栏从各篇 frontmatter 的 `id`、`title` 生成）。
 
-   > Starlight 的内容目录为 `src/content/docs/`（Astro 内容集合规范），文档按 `architecture/`、`discussion/`、`reference/`、`roadmap/` 子目录组织。
+   > Starlight 的内容目录为 `src/content/docs/`（Astro 内容集合规范），文档按 `architecture/`、`discussion/`、`issue/`、`reference/`、`roadmap/` 子目录组织。
 
 ### 方案 D：Fumadocs
 
@@ -132,10 +132,11 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
    pnpm create fumadocs-app
    ```
 
-   将 `codebase-wiki/` 下文档同步到项目已配置的 Fumadocs 内容源目录（常见为 `content/docs/` 下的 `codebase-wiki/` 子目录），并保持四个分类子目录结构：
+   将 `codebase-wiki/` 下文档同步到项目已配置的 Fumadocs 内容源目录（常见为 `content/docs/` 下的 `codebase-wiki/` 子目录），并保持五个分类子目录结构：
 
    - `architecture/`
    - `discussion/`
+   - `issue/`
    - `reference/`
    - `roadmap/`
 
@@ -146,6 +147,7 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 - 用户要求把讨论保存到 `codebase-wiki/`、生成学习笔记、搭建/更新源码 wiki
 - 用户说「归档」「写到 wiki」「保存文档」等
 - 对话基于外部 URL 展开且用户希望沉淀成文
+- 用户明确说要沉淀“issue/故障复盘/踩坑记录/修复备案”时，优先归入 `issue/`
 
 ## 工作流
 
@@ -159,6 +161,7 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 |------|------|----------|----------|
 | 架构分析 | `codebase-wiki/architecture/` | A-xxx | 模块职责、依赖、系统设计 |
 | 技术讨论 | `codebase-wiki/discussion/` | D-xxx | 方案对比、概念辨析、深度笔记 |
+| Issue 记录 | `codebase-wiki/issue/` | I-xxx | AI coding 实操中遇到的问题现象、排查路径、修复动作与回归结论 |
 | 参考手册 | `codebase-wiki/reference/` | R-xxx | API、索引、示例、速查 |
 | 规划路线 | `codebase-wiki/roadmap/` | P-xxx | 计划、差距、优先级、待办 |
 
@@ -190,6 +193,16 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 - **行号引用**：关键实现标注 `file.ts:行号-行号`，便于跳转
 - **Type Guard 用法**：如有判别联合，说明正确的窄化方式与常见陷阱
 
+### Issue 文档建议结构
+
+生成 `issue` 类文档时，优先覆盖以下信息（按需取舍）：
+
+- **现象**：用户可见表现 + 触发路径（步骤/路由/命令）
+- **根因**：直接触发因、放大因、辅助因（避免只写“最终结论”）
+- **时间线**：关键排查节点（发现、验证、修复、回归）
+- **变更清单**：涉及文件、关键改动点、为什么这么改
+- **验证与回归**：复验步骤、判定标准、复发时 runbook
+
 ### 第 4 步：维护 references（双向）
 
 为新文与被引用文同时更新 `references`，并更新被引用文的 `updated` 日期。`rel` 取值与反向关系见 `references/CONVENTIONS.md` 表格。
@@ -201,6 +214,8 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 ### 第 6 步：同步侧栏与导航
 
 > **必做检查**：只要本次工作流中发生了文档的**新增、删除或重命名**，就**必须**在结束前执行下方对应的 sidebar 脚本。如果跳过此步骤，侧栏导航将与实际文档不同步，用户在站点中无法找到新文档或仍能看到已删除的文档入口。
+>
+> **执行要求（强约束）**：无论用户是否显式要求，只要发生增删改名，Agent 都应默认执行导航重建；并在最终回复中明确报告“已执行的脚本命令 + 输出结果（成功/失败）”。
 
 根据项目使用的文档引擎执行对应脚本：
 

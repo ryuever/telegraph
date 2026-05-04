@@ -138,6 +138,6 @@ node <skill-dir>/scripts/regenerate-starlight-sidebar.mjs --root .
 ### 注意事项
 
 - Starlight 使用 Astro 内容集合，内容目录为 `src/content/docs/`（而非 `codebase-wiki/`）
-- 文档按 `architecture/`、`discussion/`、`reference/`、`roadmap/` 子目录组织
+- 文档按 `architecture/`、`discussion/`、`issue/`、`reference/`、`roadmap/` 子目录组织
 - 侧栏配置生成到 `.starlight/sidebar.generated.mjs`，由 `astro.config.mjs` 导入
 - 支持 `.md` 和 `.mdx` 格式

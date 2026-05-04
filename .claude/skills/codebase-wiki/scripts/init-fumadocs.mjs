@@ -60,7 +60,7 @@ function writeFileIfNeeded(target, content, force) {
 }
 
 function ensureCategoryDirs(baseDir) {
-  for (const d of ["architecture", "discussion", "reference", "roadmap"]) {
+  for (const d of ["architecture", "discussion", "issue", "reference", "roadmap"]) {
     const dir = path.join(baseDir, d);
     fs.mkdirSync(dir, { recursive: true });
     const keep = path.join(dir, ".gitkeep");
@@ -116,6 +116,7 @@ function main() {
 
 - architecture
 - discussion
+- issue
 - reference
 - roadmap
 `,

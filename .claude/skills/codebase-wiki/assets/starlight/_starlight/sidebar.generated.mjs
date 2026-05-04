@@ -15,6 +15,12 @@ export const starlightSidebar = [
     }
   },
   {
+    "label": "Issue 记录",
+    "autogenerate": {
+      "directory": "issue"
+    }
+  },
+  {
     "label": "参考手册",
     "autogenerate": {
       "directory": "reference"

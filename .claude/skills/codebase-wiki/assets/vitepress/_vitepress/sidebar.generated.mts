@@ -16,6 +16,12 @@ export const wikiSidebar = {
       "items": []
     }
   ],
+  "/issue/": [
+    {
+      "text": "Issue 记录",
+      "items": []
+    }
+  ],
   "/reference/": [
     {
       "text": "参考手册",

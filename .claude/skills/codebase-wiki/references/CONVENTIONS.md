@@ -12,6 +12,7 @@
 |------|------|----------|----------|
 | 架构分析 | `architecture/` | A-xxx | 系统架构剖析、模块职责分析、依赖关系梳理 |
 | 技术讨论 | `discussion/` | D-xxx | 技术方案对比、概念辨析、深度探讨、Session 讨论记录 |
+| Issue 记录 | `issue/` | I-xxx | AI coding 实操中的问题现象、排查路径、修复动作与回归结论 |
 | 参考手册 | `reference/` | R-xxx | API 速查、结构索引、使用指南、代码示例 |
 | 规划路线 | `roadmap/` | P-xxx | 开发计划、差距分析、优先级建议、待办清单 |
 
@@ -77,7 +78,7 @@ references:
 | `id` | 是 | 分类前缀 + 三位数字序号，如 `A-001` |
 | `title` | 是 | 文档标题（中文） |
 | `description` | 是 | 1-3 句话的简短描述，用于索引和搜索摘要。可使用 YAML 多行语法 `>` |
-| `category` | 是 | 分类名：`architecture` / `discussion` / `reference` / `roadmap` |
+| `category` | 是 | 分类名：`architecture` / `discussion` / `issue` / `reference` / `roadmap` |
 | `created` | 是 | 创建日期，格式 `YYYY-MM-DD` |
 | `updated` | 是 | 最后更新日期，格式 `YYYY-MM-DD`。首次创建时与 `created` 相同 |
 | `tags` | 是 | 关键词标签数组，用于检索 |
@@ -151,6 +152,16 @@ references:
 详见 [Checkpoint 对比](../discussion/20250115-checkpoint-comparison.md)
 ```
 
+### 3.6 Issue 文档建议章节（推荐）
+
+`issue/` 文档建议包含以下章节，便于后续复盘与复发排查：
+
+1. `## 现象（Symptoms）`：用户可见表现与触发路径
+2. `## 根因（Root Cause）`：直接触发因、放大因、辅助因
+3. `## 时间线（Timeline）`：发现、定位、修复、回归节点
+4. `## 修复动作（Changes Applied）`：改动文件与原因
+5. `## 验证方法（How to Verify）` 与 `## Runbook`：复验步骤和复发排查顺序
+
 ---
 
 ## 4. 索引维护
@@ -198,6 +209,8 @@ references:
 
 当 `codebase-wiki/` 下文档发生变化（新增、重命名、删除）时，应更新侧边栏与顶部导航。根据项目使用的文档引擎选择对应方式。
 
+> 强约束：只要发生新增、重命名、删除，Agent 必须默认执行导航重建（无需等待用户额外提醒），并在交付说明中报告执行命令与结果。
+
 ### 7.1 VitePress
 
 #### 7.1.1 推荐：运行生成脚本
@@ -208,7 +221,7 @@ references:
 node <skill-dir>/scripts/regenerate-sidebar.mjs --root .
 ```
 
-该脚本会扫描 `codebase-wiki/architecture|discussion|reference|roadmap` 下的 Markdown（读取 frontmatter 的 `id` 与 `title`），重写 `.vitepress/sidebar.generated.mts`。`.vitepress/config.mts` 从该文件导入 `wikiNav` 与 `wikiSidebar`。
+该脚本会扫描 `codebase-wiki/architecture|discussion|issue|reference|roadmap` 下的 Markdown（读取 frontmatter 的 `id` 与 `title`），重写 `.vitepress/sidebar.generated.mts`。`.vitepress/config.mts` 从该文件导入 `wikiNav` 与 `wikiSidebar`。
 
 #### 7.1.2 手动维护（备选）
 
@@ -230,7 +243,7 @@ node <skill-dir>/scripts/regenerate-sidebar.mjs --root .
 node <skill-dir>/scripts/regenerate-navigation.mjs --root .
 ```
 
-该脚本会扫描 `codebase-wiki/architecture|discussion|reference|roadmap` 下的 Markdown（读取 frontmatter 的 `id`），重写 `codebase-wiki/docs.json` 中的 `navigation.groups`。
+该脚本会扫描 `codebase-wiki/architecture|discussion|issue|reference|roadmap` 下的 Markdown（读取 frontmatter 的 `id`），重写 `codebase-wiki/docs.json` 中的 `navigation.groups`。
 
 #### 7.2.2 手动维护（备选）
 
@@ -251,7 +264,7 @@ node <skill-dir>/scripts/regenerate-navigation.mjs --root .
 node <skill-dir>/scripts/regenerate-starlight-sidebar.mjs --root .
 ```
 
-该脚本会扫描 `src/content/docs/architecture|discussion|reference|roadmap` 下的 Markdown（读取 frontmatter 的 `id` 与 `title`），重写 `.starlight/sidebar.generated.mjs`。`astro.config.mjs` 从该文件导入 `starlightSidebar`。
+该脚本会扫描 `src/content/docs/architecture|discussion|issue|reference|roadmap` 下的 Markdown（读取 frontmatter 的 `id` 与 `title`），重写 `.starlight/sidebar.generated.mjs`。`astro.config.mjs` 从该文件导入 `starlightSidebar`。
 
 #### 7.3.2 手动维护（备选）
 
