@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSessionsStore, getSessionStore } from '@telegraph/stores'
 import type { AgentService, ChatConversation, ChatMessage } from './types'
 import { MockAgentService } from './agent-service'
@@ -20,10 +20,37 @@ export interface UseChatOptions {
 export function useChat({ agent }: UseChatOptions = {}) {
   const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
   const { sessions, activeSessionId, createSession, deleteSession, setActiveSession, renameSession } = useSessionsStore()
+  const [, forceUpdate] = useState({})
 
   useEffect(() => {
     agentRef.current = agent ?? new MockAgentService()
   }, [agent])
+
+  // Subscribe to active session store changes
+  useEffect(() => {
+    if (!activeSessionId) return
+
+    const store = getSessionStore(activeSessionId)
+    const unsubscribe = store.subscribe(() => {
+      forceUpdate({})
+    })
+
+    return unsubscribe
+  }, [activeSessionId])
+
+  // Subscribe to all session stores changes
+  useEffect(() => {
+    const unsubscribers = sessions.map((s) => {
+      const store = getSessionStore(s.id)
+      return store.subscribe(() => {
+        forceUpdate({})
+      })
+    })
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub())
+    }
+  }, [sessions])
 
   const active = useMemo<ChatConversation>(() => {
     if (!activeSessionId) {
