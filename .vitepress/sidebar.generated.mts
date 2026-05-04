@@ -19,6 +19,10 @@ export const wikiSidebar = {
         {
           "text": "A-003 Telegraph 性能与稳定性监控体系",
           "link": "/architecture/20260504-stability-and-performance-monitoring"
+        },
+        {
+          "text": "A-004 Multica 源码实现映射与 Telegraph「类 Multica」能力适配路径",
+          "link": "/architecture/20260504-multica-implementation-map-and-telegraph-adaptation"
         }
       ]
     }
@@ -26,7 +30,12 @@ export const wikiSidebar = {
   "/discussion/": [
     {
       "text": "技术讨论",
-      "items": []
+      "items": [
+        {
+          "text": "D-001 Multica 范式与 Pi / pi-subagents 生态下的 Telegraph 多智能体能力对比",
+          "link": "/discussion/20260504-multica-vs-pi-multi-agent-for-telegraph"
+        }
+      ]
     }
   ],
   "/issue/": [
@@ -49,7 +58,12 @@ export const wikiSidebar = {
   "/roadmap/": [
     {
       "text": "规划路线",
-      "items": []
+      "items": [
+        {
+          "text": "P-001 Telegraph 多智能体（类 Multica）分阶段路线图",
+          "link": "/roadmap/20260504-multi-agent-telegraph-roadmap"
+        }
+      ]
     }
   ]
 };
@@ -64,7 +78,15 @@ export const wikiNav = [
     "link": "/architecture/20260504-di-and-cross-platform-paradigm"
   },
   {
+    "text": "技术讨论",
+    "link": "/discussion/20260504-multica-vs-pi-multi-agent-for-telegraph"
+  },
+  {
     "text": "Issue 记录",
     "link": "/issue/20260504-chat-tailwind-not-applied-postmortem"
+  },
+  {
+    "text": "开发规划",
+    "link": "/roadmap/20260504-multi-agent-telegraph-roadmap"
   }
 ];

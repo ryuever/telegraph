@@ -17,6 +17,12 @@ references:
   - id: A-003
     rel: related-to
     file: ./20260504-stability-and-performance-monitoring.md
+  - id: D-001
+    rel: related-to
+    file: ../discussion/20260504-multica-vs-pi-multi-agent-for-telegraph.md
+  - id: A-004
+    rel: related-to
+    file: ./20260504-multica-implementation-map-and-telegraph-adaptation.md
 ---
 
 # Telegraph 多进程拓扑

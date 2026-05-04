@@ -45,12 +45,13 @@ features:
 | A-001 | [20260504-di-and-cross-platform-paradigm.md](./architecture/20260504-di-and-cross-platform-paradigm.md) | Telegraph DI 容器与多平台代码维护范式 | 剖析 `@x-oasis/di` 容器、`common/node/electron-main/browser` 跨平台目录分层与"同接口跨进程"的 RPC 代理范式，沉淀新增服务的开发规范。 |
 | A-002 | [20260504-multi-process-topology.md](./architecture/20260504-multi-process-topology.md) | Telegraph 多进程拓扑（main / daemon / shared / pagelet / preload / renderer） | 五大进程角色的职责定位、构建配置、启动顺序与端口握手；端口经纪人 + RPC 路由全貌。 |
 | A-003 | [20260504-stability-and-performance-monitoring.md](./architecture/20260504-stability-and-performance-monitoring.md) | Telegraph 性能与稳定性监控体系 | 七个监控维度（崩溃 / 性能 / 心跳 / 日志 / 诊断快照 / 端口健康 / 错误边界）展开，并标注代码层差距与改进项。 |
+| A-004 | [20260504-multica-implementation-map-and-telegraph-adaptation.md](./architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md) | Multica 源码实现映射与 Telegraph「类 Multica」能力适配路径 | 基于 multica server/daemon/execenv/pkg/agent/realtime 分层对照 Telegraph AgentHandler、PiAgent（pi-ai）与 daemon 进程；三条适配路径与模块映射表。 |
 
 ### discussion/ — 技术讨论
 
 | # | 文件 | 标题 | 概述 |
 |---|------|------|------|
-|  |  |  |  |
+| D-001 | [20260504-multica-vs-pi-multi-agent-for-telegraph.md](./discussion/20260504-multica-vs-pi-multi-agent-for-telegraph.md) | Multica 范式与 Pi / pi-subagents 生态下的 Telegraph 多智能体能力对比 | 从产品线形态、编排队列、角色与技能、运行时与观测性等维度对比 Multica 与 Pi（含 pi-subagents），并映射到 Telegraph Electron 多进程的集成取舍与能力缺口。 |
 
 ### issue/ — Issue 记录
 
@@ -68,4 +69,4 @@ features:
 
 | # | 文件 | 标题 | 概述 |
 |---|------|------|------|
-|  |  |  |  |
+| P-001 | [20260504-multi-agent-telegraph-roadmap.md](./roadmap/20260504-multi-agent-telegraph-roadmap.md) | Telegraph 多智能体（类 Multica）分阶段路线图 | 从 Run/事件契约、execenv 与 Backend 分叉、daemon 托管执行，到 pi-subagents 编排与可选协调平面/Multica 集成的分阶段清单与验收标准。 |
