@@ -123,13 +123,14 @@ export function useChat({ agent }: UseChatOptions = {}) {
         renameSession(currentSessionId, deriveTitle(trimmed))
       }
 
+      // Add user message to store
       store.addMessage(userMsg)
-      store.addMessage(assistantMsg)
 
       const controller = new AbortController()
       store.setStreaming(true, controller)
 
       try {
+        // Create snapshot with only user message for agent
         const snapshot: ChatConversation = {
           id: currentSessionId,
           title: store.getState().title,
@@ -137,6 +138,9 @@ export function useChat({ agent }: UseChatOptions = {}) {
           updatedAt: store.getState().updatedAt,
           messages: [...store.getState().messages],
         }
+
+        // Add assistant placeholder message after creating snapshot
+        store.addMessage(assistantMsg)
 
         await agentRef.current.send({
           conversation: snapshot,
