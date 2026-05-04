@@ -63,6 +63,7 @@ import { PerformanceTracker } from '@telegraph/services/log/common/performance'
 import { initCrashListener } from './helper/crash'
 import { initAboutInfo } from './helper/about'
 import { setupAgentHandler } from '@telegraph/services/agent/electron-main/AgentHandler'
+import { setupModelConfigHandler } from '@telegraph/services/model-config/electron-main/ModelConfig'
 
 export const TelegraphApplicationId = createId('telegraph-application')
 
@@ -125,6 +126,7 @@ class TelegraphApplication extends Disposable {
     // 监听 crash
     initCrashListener(this.logService)
     setupAgentHandler()
+    setupModelConfigHandler()
     this.acquirePortMain.initAcquirePort(
       this.sharedProcessMain,
       this.daemonProcessMain,

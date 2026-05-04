@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Toolbar } from '@telegraph/ui/components/Toolbar'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatMessages } from './ChatMessages'
@@ -12,6 +12,9 @@ import {
   loadSettings,
   saveSettings,
   toRuntimeSettings,
+  loadEnvModels,
+  mergeEnvModelsIntoSettings,
+  getDefaultModelFromEnv,
   type ChatModelSettings,
 } from './model-settings'
 import type { AgentService } from './types'
@@ -30,6 +33,43 @@ const SUGGESTIONS = [
 export function ChatPanel({ agent }: Props) {
   const [settings, setSettings] = useState<ChatModelSettings>(() => loadSettings())
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [isLoadingEnv, setIsLoadingEnv] = useState(true)
+
+  // Load and merge .env config on mount
+  useEffect(() => {
+    let isMounted = true
+
+    async function initEnvConfig() {
+      try {
+        const envModels = await loadEnvModels()
+        if (!isMounted) return
+
+        const currentSettings = loadSettings()
+        const mergedSettings = mergeEnvModelsIntoSettings(currentSettings, envModels)
+
+        // If no provider/model is set in localStorage, use the first env model as default
+        const defaultFromEnv = getDefaultModelFromEnv(envModels)
+        if (defaultFromEnv && !currentSettings.byProvider[currentSettings.provider]?.apiKey) {
+          mergedSettings.provider = defaultFromEnv.provider
+          mergedSettings.modelId = defaultFromEnv.modelId
+        }
+
+        setSettings(mergedSettings)
+        // Save the merged settings to localStorage for persistence
+        saveSettings(mergedSettings)
+      } catch (err) {
+        console.error('[ChatPanel] Failed to load env config:', err)
+      } finally {
+        if (isMounted) setIsLoadingEnv(false)
+      }
+    }
+
+    initEnvConfig()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Build a single agent service per settings tuple. PiAgentService has no
   // intrinsic state across `send` calls, so reconstructing it on settings

@@ -12,15 +12,6 @@ export type { AgentRuntimeSettings, ModelDescriptor }
 
 const STORAGE_KEY = 'telegraph.chat.modelSettings.v1'
 
-/**
- * Pre-seeded MiniMax key supplied by the user during the initial scaffolding
- * of this feature. Written to localStorage on first load only — once the user
- * opens settings and edits anything, their value wins. Wipe the key above to
- * re-seed.
- */
-const SEED_MINIMAX_KEY =
-  'sk-cp-J69E7LZrhfF2k-9UWBHMCIk1qsDgA2HuFd6eEEpOIzgcFfEAVg16obe5OPmZfurGJe6e_o1eaWdyuFiLtGWKR-laVaoairdt67_zFML4I6HPq-jRLEWSwX8'
-
 export interface PerProviderSettings {
   apiKey: string
   /** Only honored by `minimax-openai-compat`; pi-ai's first-class providers carry their own baseUrl. */
@@ -34,16 +25,117 @@ export interface ChatModelSettings {
   byProvider: Record<string, PerProviderSettings>
 }
 
+export interface EnvModelConfig {
+  provider: string
+  modelId: string
+  apiKey: string
+  baseUrl?: string
+  label?: string
+  isAvailable: boolean
+}
+
+export interface ModelConnectionStatus {
+  provider: string
+  modelId: string
+  connected: boolean
+  latency?: number
+  error?: string
+}
+
 export const DEFAULT_SETTINGS: ChatModelSettings = {
   provider: MINIMAX_CN_PROVIDER_ID,
   modelId: 'MiniMax-M2.7',
-  byProvider: {
-    // The same MiniMax key works against both the Anthropic-messages endpoint
-    // (first-class `minimax`) and the OpenAI-compatible escape hatch.
-    [MINIMAX_PROVIDER_ID]: { apiKey: SEED_MINIMAX_KEY },
-    [MINIMAX_CN_PROVIDER_ID]: { apiKey: SEED_MINIMAX_KEY },
-    [MINIMAX_OPENAI_COMPAT_PROVIDER_ID]: { apiKey: SEED_MINIMAX_KEY, baseUrl: MINIMAX_OPENAI_BASE_URL },
-  },
+  byProvider: {},
+}
+
+/**
+ * Load available models from .env via main process
+ */
+export async function loadEnvModels(): Promise<EnvModelConfig[]> {
+  if (typeof window === 'undefined') return []
+  try {
+    return await window.telegraph.modelConfig.getAvailableModels()
+  } catch (err) {
+    console.error('[ModelSettings] Failed to load env models:', err)
+    return []
+  }
+}
+
+/**
+ * Test connection to a specific model
+ */
+export async function testModelConnection(
+  provider: string,
+  modelId: string,
+  apiKey: string,
+  baseUrl?: string
+): Promise<ModelConnectionStatus> {
+  if (typeof window === 'undefined') {
+    return { provider, modelId, connected: false, error: 'Not in browser' }
+  }
+  try {
+    const result = await window.telegraph.modelConfig.testModel({
+      provider,
+      modelId,
+      apiKey,
+      baseUrl,
+    })
+    return {
+      provider: result.provider,
+      modelId: result.modelId,
+      connected: result.success,
+      latency: result.latency,
+      error: result.error,
+    }
+  } catch (err) {
+    return {
+      provider,
+      modelId,
+      connected: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
+ * Merge env models into settings - adds env models to byProvider if not already set
+ */
+export function mergeEnvModelsIntoSettings(
+  settings: ChatModelSettings,
+  envModels: EnvModelConfig[]
+): ChatModelSettings {
+  const byProvider = { ...settings.byProvider }
+
+  for (const envModel of envModels) {
+    // Only set if this provider doesn't already have a key set
+    if (!byProvider[envModel.provider]?.apiKey) {
+      byProvider[envModel.provider] = {
+        apiKey: envModel.apiKey,
+        baseUrl: envModel.baseUrl,
+      }
+    }
+  }
+
+  return {
+    ...settings,
+    byProvider,
+  }
+}
+
+/**
+ * Get the first available model from env config as default
+ */
+export function getDefaultModelFromEnv(envModels: EnvModelConfig[]): {
+  provider: string
+  modelId: string
+} | null {
+  if (envModels.length === 0) return null
+
+  const first = envModels[0]
+  return {
+    provider: first.provider,
+    modelId: first.modelId,
+  }
 }
 
 export function loadSettings(): ChatModelSettings {
@@ -51,7 +143,6 @@ export function loadSettings(): ChatModelSettings {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS))
       return DEFAULT_SETTINGS
     }
     const parsed = JSON.parse(raw) as Partial<ChatModelSettings>
@@ -93,3 +184,24 @@ export function findDescriptor(
 }
 
 export const CATALOG: ModelDescriptor[] = DEFAULT_MODEL_CATALOG
+
+/**
+ * Get all unique providers from the catalog
+ */
+export function getProviderOptions() {
+  const seen = new Set<string>()
+  const list: { id: string; label: string }[] = []
+  for (const m of CATALOG) {
+    if (seen.has(m.provider)) continue
+    seen.add(m.provider)
+    list.push({ id: m.provider, label: m.provider })
+  }
+  return list
+}
+
+/**
+ * Get models for a specific provider
+ */
+export function getModelOptions(provider: string) {
+  return CATALOG.filter(m => m.provider === provider)
+}

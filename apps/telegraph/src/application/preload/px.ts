@@ -139,6 +139,18 @@ const globals = {
       }
     },
   },
+
+  modelConfig: {
+    getConfig() {
+      return ipcRenderer.invoke('telegraph:model-config:get')
+    },
+    getAvailableModels() {
+      return ipcRenderer.invoke('telegraph:model-config:available')
+    },
+    testModel(config: { provider: string; modelId: string; apiKey: string; baseUrl?: string }) {
+      return ipcRenderer.invoke('telegraph:model-config:test', config)
+    },
+  },
 }
 
 // Use `contextBridge` APIs to expose globals to VSCode
