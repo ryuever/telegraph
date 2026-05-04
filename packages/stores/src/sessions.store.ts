@@ -12,9 +12,14 @@ const persistent = loadPersistentSessions()
 function getInitialState(): SessionsState {
   // If we have persistent data, use it
   if (persistent?.sessions && persistent.sessions.length > 0) {
+    const ids = new Set(persistent.sessions.map((s) => s.id))
+    let active = persistent.activeSessionId ?? persistent.sessions[0].id
+    if (!ids.has(active)) {
+      active = persistent.sessions[0].id
+    }
     return {
       sessions: persistent.sessions,
-      activeSessionId: persistent.activeSessionId ?? persistent.sessions[0].id,
+      activeSessionId: active,
     }
   }
 

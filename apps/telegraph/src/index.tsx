@@ -1,4 +1,4 @@
-import '@telegraph/ui/styles/globals.css'
+import './renderer.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Toolbar } from '@telegraph/ui/components/Toolbar'

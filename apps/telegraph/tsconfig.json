@@ -32,6 +32,7 @@
     "vite.main.config.ts",
     "vite.preload.config.ts",
     "vite.fork.config.ts",
+    "vite.config.ts",
     "vite.renderer.config.ts",
     "forge.config.ts"
   ],

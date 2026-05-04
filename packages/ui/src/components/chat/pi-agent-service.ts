@@ -17,8 +17,8 @@ export class PiAgentService implements AgentService {
   }
 
   async send({ conversation, onChunk, signal }: AgentSendOptions): Promise<void> {
-    const lastMessage = conversation.messages.at(-1)
-    if (!lastMessage || lastMessage.role !== 'user') {
+    const lastMessage = conversation.messages.filter(m => m.role === 'user').at(-1)
+    if (!lastMessage) {
       throw new Error('Last message must be from user')
     }
 

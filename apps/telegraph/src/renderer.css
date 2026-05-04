@@ -1,0 +1,15 @@
+/**
+ * Tailwind via PostCSS. Keep `@import` first.
+ * Use explicit globs so Forge's renderer dev server and standalone `vite` scan
+ * the same TS/TSX files in this monorepo.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../../../packages/ui/src/styles/tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@source "apps/telegraph/index.html";
+@source "apps/telegraph/src/**/*.{ts,tsx}";
+@source "packages/ui/src/**/*.{ts,tsx}";
+@source "packages/stores/src/**/*.{ts,tsx}";

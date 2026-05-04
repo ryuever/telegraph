@@ -47,7 +47,7 @@ features:
 
 | # | 文件 | 标题 | 概述 |
 |---|------|------|------|
-|  |  |  |  |
+| D-001 | [20260504-chat-tailwind-not-applied-postmortem.md](./discussion/20260504-chat-tailwind-not-applied-postmortem.md) | Chat 页面 Tailwind 未生效故障复盘 | 归档 2026-05-04 chat 页面“无样式”问题的现象、根因拆解、时间线、修复动作与复发排查清单。 |
 
 ### reference/ — 参考手册
 

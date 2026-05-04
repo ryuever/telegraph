@@ -26,7 +26,12 @@ export const wikiSidebar = {
   "/discussion/": [
     {
       "text": "技术讨论",
-      "items": []
+      "items": [
+        {
+          "text": "D-001 Chat 页面 Tailwind 未生效故障复盘",
+          "link": "/discussion/20260504-chat-tailwind-not-applied-postmortem"
+        }
+      ]
     }
   ],
   "/reference/": [
@@ -51,5 +56,9 @@ export const wikiNav = [
   {
     "text": "架构分析",
     "link": "/architecture/20260504-di-and-cross-platform-paradigm"
+  },
+  {
+    "text": "技术讨论",
+    "link": "/discussion/20260504-chat-tailwind-not-applied-postmortem"
   }
 ];

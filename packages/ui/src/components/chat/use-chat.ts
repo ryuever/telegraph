@@ -22,31 +22,24 @@ export function useChat({ agent }: UseChatOptions = {}) {
   const { sessions, activeSessionId, createSession, deleteSession, setActiveSession, renameSession } = useSessionsStore()
   const [updateTrigger, setUpdateTrigger] = useState(0)
 
+  const listTitle = useCallback(
+    (sessionId: string) => sessions.find((s) => s.id === sessionId)?.title ?? 'New chat',
+    [sessions]
+  )
+
   useEffect(() => {
     agentRef.current = agent ?? new MockAgentService()
   }, [agent])
 
-  // Subscribe to active session store changes
-  useEffect(() => {
-    if (!activeSessionId) return
-
-    const store = getSessionStore(activeSessionId)
-    const unsubscribe = store.subscribe(() => {
-      setUpdateTrigger((v) => v + 1)
-    })
-
-    return unsubscribe
-  }, [activeSessionId])
-
-  // Subscribe to all session stores changes
+  // Per-session message state lives in separate zustand stores; subscribe so
+  // React re-renders when any open session's messages stream or change.
   useEffect(() => {
     const unsubscribers = sessions.map((s) => {
-      const store = getSessionStore(s.id)
+      const store = getSessionStore(s.id, s.title)
       return store.subscribe(() => {
         setUpdateTrigger((v) => v + 1)
       })
     })
-
     return () => {
       unsubscribers.forEach((unsub) => unsub())
     }
@@ -57,7 +50,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
       return { id: '', title: '', createdAt: 0, updatedAt: 0, messages: [] }
     }
 
-    const store = getSessionStore(activeSessionId)
+    const store = getSessionStore(activeSessionId, listTitle(activeSessionId))
     const state = store.getState()
 
     return {
@@ -67,11 +60,11 @@ export function useChat({ agent }: UseChatOptions = {}) {
       updatedAt: state.updatedAt,
       messages: state.messages,
     }
-  }, [activeSessionId, updateTrigger])
+  }, [activeSessionId, listTitle, updateTrigger])
 
   const conversations = useMemo<ChatConversation[]>(() => {
     return sessions.map((s) => {
-      const store = getSessionStore(s.id)
+      const store = getSessionStore(s.id, s.title)
       const state = store.getState()
       return {
         id: s.id,
@@ -95,7 +88,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
         await new Promise((r) => setTimeout(r, 0))
       }
 
-      const store = getSessionStore(currentSessionId)
+      const store = getSessionStore(currentSessionId, listTitle(currentSessionId))
       let state = store.getState()
 
       if (state.isStreaming) return
@@ -174,14 +167,14 @@ export function useChat({ agent }: UseChatOptions = {}) {
         store.setStreaming(false)
       }
     },
-    [activeSessionId, createSession, renameSession]
+    [activeSessionId, createSession, listTitle, renameSession]
   )
 
   const stop = useCallback(() => {
     if (!activeSessionId) return
-    const store = getSessionStore(activeSessionId)
+    const store = getSessionStore(activeSessionId, listTitle(activeSessionId))
     store.stop()
-  }, [activeSessionId])
+  }, [activeSessionId, listTitle])
 
   const createConversation = useCallback(() => {
     createSession()
@@ -196,16 +189,18 @@ export function useChat({ agent }: UseChatOptions = {}) {
 
   const renameConversation = useCallback(
     (id: string, title: string) => {
-      renameSession(id, title || 'Untitled')
+      const next = title || 'Untitled'
+      renameSession(id, next)
+      getSessionStore(id, next).updateTitle(next)
     },
     [renameSession]
   )
 
   const isStreaming = useMemo(() => {
     if (!activeSessionId) return false
-    const store = getSessionStore(activeSessionId)
+    const store = getSessionStore(activeSessionId, listTitle(activeSessionId))
     return store.getState().isStreaming
-  }, [activeSessionId, updateTrigger])
+  }, [activeSessionId, listTitle, updateTrigger])
 
   return {
     conversations,

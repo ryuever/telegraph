@@ -2,6 +2,23 @@ import type { IpcRendererEvent } from 'electron'
 import { ipcRenderer, webFrame, contextBridge } from 'electron'
 // import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron'
 
+const listenerWrappers = new Map<
+  string,
+  WeakMap<
+    (event: IpcRendererEvent, ...args: any[]) => void,
+    (event: IpcRendererEvent, ...args: any[]) => void
+  >
+>()
+
+function getListenerWrapperMap(channel: string) {
+  let wrappers = listenerWrappers.get(channel)
+  if (!wrappers) {
+    wrappers = new WeakMap()
+    listenerWrappers.set(channel, wrappers)
+  }
+  return wrappers
+}
+
 // const url = new URL(window.location.href)
 // const { pathname } = url
 // const reg = /^\/?(\w+)([/?#].*)?$/
@@ -56,7 +73,7 @@ const globals = {
     on(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) {
       validateIPC(channel)
 
-      ipcRenderer.on(channel, (...args) => {
+      const wrapper = (...args: [IpcRendererEvent, ...any[]]) => {
         const ports = args[0].ports
         if (ports.length) {
           window.postMessage(
@@ -70,7 +87,10 @@ const globals = {
         } else {
           listener(...args)
         }
-      })
+      }
+
+      getListenerWrapperMap(channel).set(listener, wrapper)
+      ipcRenderer.on(channel, wrapper)
       return this
     },
 
@@ -85,7 +105,10 @@ const globals = {
     removeListener(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) {
       validateIPC(channel)
 
-      ipcRenderer.removeListener(channel, listener)
+      const wrappers = getListenerWrapperMap(channel)
+      const wrapper = wrappers.get(listener) ?? listener
+      ipcRenderer.removeListener(channel, wrapper)
+      wrappers.delete(listener)
 
       return this
     },
