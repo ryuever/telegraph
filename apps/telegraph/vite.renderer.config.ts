@@ -18,10 +18,11 @@ export default defineConfig(async () => {
         '@telegraph/services': resolve(__dirname, 'src/services'),
         '@telegraph/ui': resolve(__dirname, '../../packages/ui/src'),
         '@telegraph/agent': resolve(__dirname, '../../packages/agent/src'),
+        '@telegraph/stores': resolve(__dirname, '../../packages/stores/src'),
       },
     },
     optimizeDeps: {
-      exclude: ['@telegraph/ui', '@telegraph/agent'],
+      exclude: ['@telegraph/ui', '@telegraph/agent', '@telegraph/stores'],
     },
     server: {
       host: '127.0.0.1',

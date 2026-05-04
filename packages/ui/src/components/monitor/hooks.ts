@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { MONITOR_SNAPSHOT_CHANNEL } from '@telegraph/services/monitor/common/config'
-import type { MonitorSnapshot } from '@telegraph/services/monitor/common/types'
+import { MONITOR_SNAPSHOT_CHANNEL } from '../../../../apps/telegraph/src/services/monitor/common/config'
+import type { MonitorSnapshot } from '../../../../apps/telegraph/src/services/monitor/common/types'
 
 export function useMonitorSnapshots() {
   const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null)
