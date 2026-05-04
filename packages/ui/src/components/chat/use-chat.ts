@@ -1,18 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type {
-  AgentService,
-  ChatConversation,
-  ChatMessage,
-} from './types'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useSessionsStore, getSessionStore } from '@telegraph/stores'
+import type { AgentService, ChatConversation, ChatMessage } from './types'
 import { MockAgentService } from './agent-service'
 
 function uid(prefix = '') {
   return prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
-}
-
-function newConversation(title = 'New chat'): ChatConversation {
-  const now = Date.now()
-  return { id: uid('c_'), title, createdAt: now, updatedAt: now, messages: [] }
 }
 
 function deriveTitle(text: string) {
@@ -27,68 +19,60 @@ export interface UseChatOptions {
 
 export function useChat({ agent }: UseChatOptions = {}) {
   const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
-  const [conversations, setConversations] = useState<ChatConversation[]>(() => [newConversation()])
-  const [activeId, setActiveId] = useState<string>(() => conversations[0].id)
-  const [isStreaming, setIsStreaming] = useState(false)
-  const abortRef = useRef<AbortController | null>(null)
+  const { sessions, activeSessionId, createSession, deleteSession, setActiveSession, renameSession } = useSessionsStore()
 
-  // Sync agent prop changes to the ref so sendMessage always uses the latest agent
   useEffect(() => {
     agentRef.current = agent ?? new MockAgentService()
   }, [agent])
 
-  const active = useMemo(
-    () => conversations.find(c => c.id === activeId) ?? conversations[0],
-    [conversations, activeId]
-  )
+  const active = useMemo<ChatConversation>(() => {
+    if (!activeSessionId) {
+      return { id: '', title: '', createdAt: 0, updatedAt: 0, messages: [] }
+    }
 
-  const updateConversation = useCallback(
-    (id: string, updater: (c: ChatConversation) => ChatConversation) => {
-      setConversations(prev => prev.map(c => (c.id === id ? updater(c) : c)))
-    },
-    []
-  )
+    const store = getSessionStore(activeSessionId)
+    const state = store.getState()
 
-  const createConversation = useCallback(() => {
-    const c = newConversation()
-    setConversations(prev => [c, ...prev])
-    setActiveId(c.id)
-  }, [])
+    return {
+      id: activeSessionId,
+      title: state.title,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+      messages: state.messages,
+    }
+  }, [activeSessionId])
 
-  const deleteConversation = useCallback(
-    (id: string) => {
-      setConversations(prev => {
-        const next = prev.filter(c => c.id !== id)
-        if (next.length === 0) {
-          const fresh = newConversation()
-          setActiveId(fresh.id)
-          return [fresh]
-        }
-        if (id === activeId) setActiveId(next[0].id)
-        return next
-      })
-    },
-    [activeId]
-  )
-
-  const renameConversation = useCallback(
-    (id: string, title: string) => {
-      updateConversation(id, c => ({ ...c, title: title || 'Untitled', updatedAt: Date.now() }))
-    },
-    [updateConversation]
-  )
-
-  const stop = useCallback(() => {
-    abortRef.current?.abort()
-    abortRef.current = null
-  }, [])
+  const conversations = useMemo<ChatConversation[]>(() => {
+    return sessions.map((s) => {
+      const store = getSessionStore(s.id)
+      const state = store.getState()
+      return {
+        id: s.id,
+        title: state.title,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+        messages: state.messages,
+      }
+    })
+  }, [sessions])
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed || isStreaming) return
+      if (!trimmed) return
 
-      const conversationId = active.id
+      let currentSessionId = activeSessionId
+
+      if (!currentSessionId) {
+        currentSessionId = createSession()
+        await new Promise((r) => setTimeout(r, 0))
+      }
+
+      const store = getSessionStore(currentSessionId)
+      let state = store.getState()
+
+      if (state.isStreaming) return
+
       const userMsg: ChatMessage = {
         id: uid('m_'),
         role: 'user',
@@ -104,80 +88,94 @@ export function useChat({ agent }: UseChatOptions = {}) {
         status: 'streaming',
       }
 
-      // Title the conversation from the first user message.
-      updateConversation(conversationId, c => {
-        const isFirst = c.messages.length === 0
-        return {
-          ...c,
-          title: isFirst ? deriveTitle(trimmed) : c.title,
-          updatedAt: Date.now(),
-          messages: [...c.messages, userMsg, assistantMsg],
-        }
-      })
+      state = store.getState()
+      const isFirst = state.messages.length === 0
 
-      setIsStreaming(true)
+      if (isFirst) {
+        store.updateTitle(deriveTitle(trimmed))
+        renameSession(currentSessionId, deriveTitle(trimmed))
+      }
+
+      store.addMessage(userMsg)
+      store.addMessage(assistantMsg)
+
       const controller = new AbortController()
-      abortRef.current = controller
+      store.setStreaming(true, controller)
 
       try {
         const snapshot: ChatConversation = {
-          ...active,
-          messages: [...active.messages, userMsg],
+          id: currentSessionId,
+          title: store.getState().title,
+          createdAt: store.getState().createdAt,
+          updatedAt: store.getState().updatedAt,
+          messages: [...store.getState().messages],
         }
+
         await agentRef.current.send({
           conversation: snapshot,
           signal: controller.signal,
-          onChunk: delta => {
-            updateConversation(conversationId, c => ({
-              ...c,
-              updatedAt: Date.now(),
-              messages: c.messages.map(m =>
-                m.id === assistantMsg.id ? { ...m, content: m.content + delta } : m
-              ),
+          onChunk: (delta) => {
+            store.updateMessage(assistantMsg.id, (m) => ({
+              ...m,
+              content: m.content + delta,
             }))
           },
-          onToolCall: call => {
-            updateConversation(conversationId, c => ({
-              ...c,
-              updatedAt: Date.now(),
-              messages: c.messages.map(m =>
-                m.id === assistantMsg.id
-                  ? { ...m, toolCalls: [...(m.toolCalls ?? []), call] }
-                  : m
-              ),
+          onToolCall: (call) => {
+            store.updateMessage(assistantMsg.id, (m) => ({
+              ...m,
+              toolCalls: [...(m.toolCalls ?? []), call],
             }))
           },
         })
-        updateConversation(conversationId, c => ({
-          ...c,
-          messages: c.messages.map(m =>
-            m.id === assistantMsg.id ? { ...m, status: 'done' } : m
-          ),
+
+        store.updateMessage(assistantMsg.id, (m) => ({
+          ...m,
+          status: 'done',
         }))
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        updateConversation(conversationId, c => ({
-          ...c,
-          messages: c.messages.map(m =>
-            m.id === assistantMsg.id
-              ? { ...m, status: 'error', errorMessage: message }
-              : m
-          ),
+        store.updateMessage(assistantMsg.id, (m) => ({
+          ...m,
+          status: 'error',
+          errorMessage: message,
         }))
       } finally {
-        setIsStreaming(false)
-        abortRef.current = null
+        store.setStreaming(false)
       }
     },
-    [active, isStreaming, updateConversation]
+    [activeSessionId, createSession, renameSession]
+  )
+
+  const stop = useCallback(() => {
+    if (!activeSessionId) return
+    const store = getSessionStore(activeSessionId)
+    store.stop()
+  }, [activeSessionId])
+
+  const createConversation = useCallback(() => {
+    createSession()
+  }, [createSession])
+
+  const deleteConversation = useCallback(
+    (id: string) => {
+      deleteSession(id)
+    },
+    [deleteSession]
+  )
+
+  const renameConversation = useCallback(
+    (id: string, title: string) => {
+      renameSession(id, title || 'Untitled')
+    },
+    [renameSession]
   )
 
   return {
     conversations,
     active,
-    activeId,
-    isStreaming,
-    setActiveId,
+    activeId: activeSessionId || '',
+    isStreaming: activeSessionId ? getSessionStore(activeSessionId).getState().isStreaming : false,
+    setActiveId: setActiveSession,
     createConversation,
     deleteConversation,
     renameConversation,
