@@ -20,7 +20,7 @@ export interface UseChatOptions {
 export function useChat({ agent }: UseChatOptions = {}) {
   const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
   const { sessions, activeSessionId, createSession, deleteSession, setActiveSession, renameSession } = useSessionsStore()
-  const [, forceUpdate] = useState({})
+  const [updateTrigger, setUpdateTrigger] = useState(0)
 
   useEffect(() => {
     agentRef.current = agent ?? new MockAgentService()
@@ -32,7 +32,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
 
     const store = getSessionStore(activeSessionId)
     const unsubscribe = store.subscribe(() => {
-      forceUpdate({})
+      setUpdateTrigger((v) => v + 1)
     })
 
     return unsubscribe
@@ -43,7 +43,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
     const unsubscribers = sessions.map((s) => {
       const store = getSessionStore(s.id)
       return store.subscribe(() => {
-        forceUpdate({})
+        setUpdateTrigger((v) => v + 1)
       })
     })
 
@@ -67,7 +67,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
       updatedAt: state.updatedAt,
       messages: state.messages,
     }
-  }, [activeSessionId])
+  }, [activeSessionId, updateTrigger])
 
   const conversations = useMemo<ChatConversation[]>(() => {
     return sessions.map((s) => {
@@ -81,7 +81,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
         messages: state.messages,
       }
     })
-  }, [sessions])
+  }, [sessions, updateTrigger])
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -197,11 +197,17 @@ export function useChat({ agent }: UseChatOptions = {}) {
     [renameSession]
   )
 
+  const isStreaming = useMemo(() => {
+    if (!activeSessionId) return false
+    const store = getSessionStore(activeSessionId)
+    return store.getState().isStreaming
+  }, [activeSessionId, updateTrigger])
+
   return {
     conversations,
     active,
     activeId: activeSessionId || '',
-    isStreaming: activeSessionId ? getSessionStore(activeSessionId).getState().isStreaming : false,
+    isStreaming,
     setActiveId: setActiveSession,
     createConversation,
     deleteConversation,

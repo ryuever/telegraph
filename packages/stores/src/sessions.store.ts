@@ -9,67 +9,90 @@ function uid(prefix = '') {
 
 const persistent = loadPersistentSessions()
 
-export const useSessionsStore = create<SessionsStore>((set) => ({
-  sessions: persistent?.sessions ?? [],
-  activeSessionId: persistent?.activeSessionId ?? null,
+function getInitialState(): SessionsState {
+  // If we have persistent data, use it
+  if (persistent?.sessions && persistent.sessions.length > 0) {
+    return {
+      sessions: persistent.sessions,
+      activeSessionId: persistent.activeSessionId ?? persistent.sessions[0].id,
+    }
+  }
 
-  createSession: () => {
-    const id = uid('s_')
-    const now = Date.now()
+  // Otherwise, create a default session
+  const now = Date.now()
+  const defaultSessionId = uid('s_')
+  return {
+    sessions: [{ id: defaultSessionId, title: 'New chat', createdAt: now, updatedAt: now }],
+    activeSessionId: defaultSessionId,
+  }
+}
 
-    set((state) => {
-      const next: SessionsState = {
-        sessions: [{ id, title: 'New chat', createdAt: now, updatedAt: now }, ...state.sessions],
-        activeSessionId: id,
-      }
-      persistSessions(next)
-      return next
-    })
+export const useSessionsStore = create<SessionsStore>((set) => {
+  const initial = getInitialState()
+  persistSessions(initial)
 
-    return id
-  },
+  return {
+    sessions: initial.sessions,
+    activeSessionId: initial.activeSessionId,
 
-  deleteSession: (id: string) =>
-    set((state) => {
-      removeSessionStore(id)
+    createSession: () => {
+      const id = uid('s_')
+      const now = Date.now()
 
-      const next = state.sessions.filter((s) => s.id !== id)
-      let nextActive = state.activeSessionId
+      set((state) => {
+        const next: SessionsState = {
+          sessions: [{ id, title: 'New chat', createdAt: now, updatedAt: now }, ...state.sessions],
+          activeSessionId: id,
+        }
+        persistSessions(next)
+        return next
+      })
 
-      if (nextActive === id) {
-        nextActive = next.length > 0 ? next[0].id : null
-      }
+      return id
+    },
 
-      const result: SessionsState = {
-        sessions: next,
-        activeSessionId: nextActive,
-      }
+    deleteSession: (id: string) =>
+      set((state) => {
+        removeSessionStore(id)
 
-      persistSessions(result)
-      return result
-    }),
+        const next = state.sessions.filter((s) => s.id !== id)
+        let nextActive = state.activeSessionId
 
-  setActiveSession: (id: string) =>
-    set((state) => {
-      const result: SessionsState = { ...state, activeSessionId: id }
-      persistSessions(result)
-      return result
-    }),
+        if (nextActive === id) {
+          nextActive = next.length > 0 ? next[0].id : null
+        }
 
-  renameSession: (id: string, title: string) =>
-    set((state) => {
-      const result: SessionsState = {
-        sessions: state.sessions.map((s) => (s.id === id ? { ...s, title, updatedAt: Date.now() } : s)),
-        activeSessionId: state.activeSessionId,
-      }
-      persistSessions(result)
-      return result
-    }),
+        const result: SessionsState = {
+          sessions: next,
+          activeSessionId: nextActive,
+        }
 
-  loadSessions: (sessions) =>
-    set((state) => {
-      const result: SessionsState = { ...state, sessions }
-      persistSessions(result)
-      return result
-    }),
-}))
+        persistSessions(result)
+        return result
+      }),
+
+    setActiveSession: (id: string) =>
+      set((state) => {
+        const result: SessionsState = { ...state, activeSessionId: id }
+        persistSessions(result)
+        return result
+      }),
+
+    renameSession: (id: string, title: string) =>
+      set((state) => {
+        const result: SessionsState = {
+          sessions: state.sessions.map((s) => (s.id === id ? { ...s, title, updatedAt: Date.now() } : s)),
+          activeSessionId: state.activeSessionId,
+        }
+        persistSessions(result)
+        return result
+      }),
+
+    loadSessions: (sessions) =>
+      set((state) => {
+        const result: SessionsState = { ...state, sessions }
+        persistSessions(result)
+        return result
+      }),
+  }
+})
