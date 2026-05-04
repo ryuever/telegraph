@@ -33,6 +33,7 @@ export interface AgentSendOptions {
   conversation: ChatConversation
   onChunk: (delta: string) => void
   onToolCall?: (call: ChatToolCall) => void
+  onStatus?: (status: 'queued' | 'running' | 'completed' | 'failed') => void
   signal?: AbortSignal
 }
 

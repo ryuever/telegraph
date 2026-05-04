@@ -74,8 +74,8 @@ const globals = {
       validateIPC(channel)
 
       const wrapper = (...args: [IpcRendererEvent, ...any[]]) => {
-        const ports = args[0].ports
-        if (ports.length) {
+        const ports = args[0]?.ports
+        if (ports && ports.length > 0) {
           window.postMessage(
             {
               channel,
@@ -84,7 +84,8 @@ const globals = {
             '*',
             ports
           )
-        } else {
+        }
+        if (!ports?.length || channel.startsWith('telegraph:agent:')) {
           listener(...args)
         }
       }

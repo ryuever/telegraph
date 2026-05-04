@@ -1,5 +1,5 @@
-import { PiAgent } from '@telegraph/agent/PiAgent'
-import type { AgentRuntimeSettings, AgentTextMessage } from '@telegraph/agent/types'
+import { createAgentBackend } from '@telegraph/agent/backends/createAgentBackend'
+import type { AgentBackend, AgentRuntimeSettings, AgentTextMessage } from '@telegraph/agent/types'
 import type {
   HarnessOptions,
   HarnessRunHandlers,
@@ -20,12 +20,12 @@ import type {
  * needs, no more.
  */
 export class BaseHarness {
-  protected agent: PiAgent
+  protected agent: AgentBackend
   protected state: HarnessState
   protected tools: HarnessTool[]
 
   constructor(opts: HarnessOptions) {
-    this.agent = new PiAgent(opts.settings)
+    this.agent = createAgentBackend(opts.settings)
     this.state = {
       systemPrompt: opts.systemPrompt ?? 'You are a helpful assistant.',
       messages: [],

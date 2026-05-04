@@ -1,14 +1,17 @@
 import { ipcMain } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import type { ElectronMessagePortMainChannel } from '@x-oasis/async-call-rpc-electron'
 import type { AgentRuntimeSettings } from '@telegraph/agent/types'
-import type { IAgentStreamService } from '../common/types'
+import type { IAgentStreamService, RunAgentStreamResult } from '../common/types'
 import {
   AGENT_STREAM_CHANNEL,
+  AGENT_STREAM_DATA_CHANNEL,
   agentStreamServicePath,
 } from '@telegraph/services/agent/common/config'
 
 interface StreamRequest {
+  runId?: string
   message: string
   settings: AgentRuntimeSettings
 }
@@ -24,12 +27,34 @@ export function setupAgentHandler(daemonChannel: ElectronMessagePortMainChannel)
   }).createProxy() as unknown as IAgentStreamService
 
   try {
-    ipcMain.handle(AGENT_STREAM_CHANNEL, async (event, req: StreamRequest) => {
-      await daemonAgent.runStream({
-        webContentsId: event.sender.id,
-        message: req.message,
-        settings: req.settings,
-      })
+    ipcMain.handle(AGENT_STREAM_CHANNEL, async (event, req: StreamRequest): Promise<RunAgentStreamResult> => {
+      const runId = req.runId ?? randomUUID()
+      try {
+        return await daemonAgent.runStream({
+          webContentsId: event.sender.id,
+          runId,
+          message: req.message,
+          settings: req.settings,
+        })
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
+          type: 'run_failed',
+          runId,
+          status: 'failed',
+          error: `daemon_dispatch_failed: ${errorMsg}`,
+        })
+        event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
+          type: 'error',
+          runId,
+          error: `daemon_dispatch_failed: ${errorMsg}`,
+        })
+        return {
+          runId,
+          status: 'failed',
+          error: `daemon_dispatch_failed: ${errorMsg}`,
+        }
+      }
     })
   } catch (err) {
     console.error('[AgentHandler] Failed to register handler:', err)

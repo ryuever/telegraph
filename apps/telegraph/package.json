@@ -7,8 +7,13 @@
   "main": ".vite/build/index.js",
   "scripts": {
     "start": "electron-forge start --inspect-electron",
+    "prepackage": "node scripts/ensure-pi-runtime.mjs",
     "package": "electron-forge package",
+    "premake": "node scripts/ensure-pi-runtime.mjs",
     "make": "electron-forge make",
+    "prepare:pi-runtime": "node scripts/copy-pi-runtime.mjs",
+    "ensure:pi-runtime": "node scripts/ensure-pi-runtime.mjs",
+    "verify:pi-runtime": "node scripts/verify-pi-runtime.mjs",
     "lint": "eslint --fix --ext .ts,.tsx .",
     "dev": "vite --mode standalone"
   },
@@ -69,6 +74,7 @@
     "electron-store": "^8.2.0",
     "lucide-react": "^1.14.0",
     "node-fetch": "^2.7.0",
+    "pi-subagents": "^0.24.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "rxjs": "^7.8.2",

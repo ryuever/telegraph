@@ -1,0 +1,13 @@
+import type { AgentBackend, AgentRuntimeSettings } from '@telegraph/agent/types'
+import { PiAiBackend } from '@telegraph/agent/backends/PiAiBackend'
+import { PiCliBackend } from '@telegraph/agent/backends/PiCliBackend'
+
+export function createAgentBackend(settings: AgentRuntimeSettings): AgentBackend {
+  switch (settings.backend) {
+    case 'pi-cli':
+      return new PiCliBackend(settings)
+    case 'pi-ai':
+    default:
+      return new PiAiBackend(settings)
+  }
+}

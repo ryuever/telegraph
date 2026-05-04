@@ -1,0 +1,54 @@
+name: Package Telegraph
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/telegraph/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/telegraph-package.yml'
+
+jobs:
+  make:
+    name: make-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Pi CLI
+        run: npm install -g @mariozechner/pi-coding-agent
+
+      - name: Prepare bundled Pi runtime
+        run: pnpm --filter telegraph run prepare:pi-runtime
+
+      - name: Package app
+        run: pnpm --filter telegraph make
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegraph-make-${{ matrix.os }}
+          path: apps/telegraph/out/make/**
+          if-no-files-found: error

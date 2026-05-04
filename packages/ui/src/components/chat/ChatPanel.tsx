@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Toolbar } from '@telegraph/ui/components/Toolbar'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatMessages } from './ChatMessages'
@@ -6,6 +6,7 @@ import { ChatComposer } from './ChatComposer'
 import { ChatSettingsDialog } from './ChatSettingsDialog'
 import { ModelBadge } from './ModelBadge'
 import { useChat } from './use-chat'
+import { useSessionsStore } from '@telegraph/stores'
 import { MockAgentService } from './agent-service'
 import { PiAgentService } from './pi-agent-service'
 import {
@@ -95,14 +96,26 @@ export function ChatPanel({ agent }: Props) {
     stop,
   } = useChat({ agent: agentService })
 
-  const [draft, setDraft] = useState('')
-  const [collapsed, setCollapsed] = useState(false)
+  /** Subscribe directly so draft always tracks the real active session (avoids stale activeId vs. zustand). */
+  const composerSessionId = useSessionsStore(s => s.activeSessionId)
+  const composerKey = composerSessionId ?? ''
 
-  const handleSend = () => {
-    const text = draft
-    setDraft('')
-    void sendMessage(text)
-  }
+  /** Restored drafts when switching sidebar sessions (composer keeps live text locally). */
+  const [draftBySession, setDraftBySession] = useState<Record<string, string>>({})
+  const persistSessionDraft = useCallback((sessionId: string, text: string) => {
+    if (!sessionId) return
+    setDraftBySession(prev => ({ ...prev, [sessionId]: text }))
+  }, [])
+  const seedText = composerKey ? (draftBySession[composerKey] ?? '') : ''
+  const [composerRemountKey, setComposerRemountKey] = useState(0)
+
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      void sendMessage(text)
+    },
+    [sendMessage]
+  )
+  const [collapsed, setCollapsed] = useState(false)
 
   const handleSaveSettings = (next: ChatModelSettings) => {
     setSettings(next)
@@ -143,20 +156,26 @@ export function ChatPanel({ agent }: Props) {
           />
           <div className="min-h-0 flex-1">
             {active.messages.length === 0 ? (
-              <EmptyState
-                onSuggest={text => {
-                  setDraft('')
-                  void sendMessage(text)
-                }}
-              />
+            <EmptyState
+              onSuggest={text => {
+                const id = useSessionsStore.getState().activeSessionId
+                if (id) {
+                  setDraftBySession(prev => ({ ...prev, [id]: '' }))
+                  setComposerRemountKey(k => k + 1)
+                }
+                void sendMessage(text)
+              }}
+            />
             ) : (
               <ChatMessages messages={active.messages} isStreaming={isStreaming} />
             )}
           </div>
           <ChatComposer
-            value={draft}
-            onChange={setDraft}
-            onSend={handleSend}
+            key={`${composerKey}|${composerRemountKey}`}
+            sessionId={composerKey}
+            seedText={seedText}
+            onPersistSessionDraft={persistSessionDraft}
+            onSendMessage={handleSendMessage}
             onStop={stop}
             isStreaming={isStreaming}
           />

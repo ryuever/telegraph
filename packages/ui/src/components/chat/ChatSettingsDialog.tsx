@@ -133,6 +133,14 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
   }
 
   const setModel = (id: string) => setDraft(d => ({ ...d, modelId: id }))
+  const setBackend = (backend: ChatModelSettings['backend']) =>
+    setDraft(d => ({ ...d, backend }))
+  const setOrchestration = (orchestration: ChatModelSettings['orchestration']) =>
+    setDraft(d => ({ ...d, orchestration }))
+  const setOrchestrationPattern = (orchestrationPattern: ChatModelSettings['orchestrationPattern']) =>
+    setDraft(d => ({ ...d, orchestrationPattern }))
+  const setWorktreeIsolation = (worktreeIsolation: boolean) =>
+    setDraft(d => ({ ...d, worktreeIsolation }))
 
   const setApiKey = (key: string) =>
     setDraft(d => ({
@@ -276,6 +284,56 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
               <div className="mt-1.5 text-[11px] text-red-400">
                 错误: {currentStatus.error}
               </div>
+            )}
+          </Field>
+
+          <Field label="Execution backend">
+            <select
+              value={draft.backend}
+              onChange={e => setBackend(e.target.value as ChatModelSettings['backend'])}
+              className={selectClass}
+            >
+              <option value="pi-ai">pi-ai (in-process, default)</option>
+              <option value="pi-cli">pi CLI (daemon spawn)</option>
+            </select>
+          </Field>
+
+          <Field label="Orchestration mode">
+            <select
+              value={draft.orchestration}
+              onChange={e => setOrchestration(e.target.value as ChatModelSettings['orchestration'])}
+              className={selectClass}
+            >
+              <option value="none">none</option>
+              <option value="pi-subagents">pi-subagents</option>
+            </select>
+            {draft.backend === 'pi-cli' && draft.orchestration === 'pi-subagents' && (
+              <>
+                <div className="mt-2">
+                  <select
+                    value={draft.orchestrationPattern}
+                    onChange={e =>
+                      setOrchestrationPattern(e.target.value as ChatModelSettings['orchestrationPattern'])
+                    }
+                    className={selectClass}
+                  >
+                    <option value="chain">chain (scout to planner to worker to reviewer)</option>
+                    <option value="parallel">parallel (scout/planner/worker/reviewer)</option>
+                  </select>
+                </div>
+                <label className="mt-2 flex items-center gap-2 text-[11px] text-zinc-400">
+                  <input
+                    type="checkbox"
+                    checked={draft.worktreeIsolation}
+                    onChange={e => setWorktreeIsolation(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
+                  />
+                  Enable worktree isolation hint (recommended for parallel code edits)
+                </label>
+                <div className="mt-1.5 text-[11px] text-zinc-500">
+                  优先使用项目内置的 `pi-subagents` 扩展；若未找到才回退到本机安装。
+                </div>
+              </>
             )}
           </Field>
 

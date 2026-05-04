@@ -1,10 +1,13 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { cn } from '@telegraph/ui/lib/utils'
 
-interface Props {
-  value: string
-  onChange: (v: string) => void
-  onSend: () => void
+export interface ChatComposerProps {
+  /** Active session id (used for unmount persistence); empty disables input. */
+  sessionId: string
+  /** Initial / restored draft when this instance mounts (e.g. after sidebar switch). */
+  seedText: string
+  onPersistSessionDraft: (sessionId: string, text: string) => void
+  onSendMessage: (text: string) => void
   onStop: () => void
   isStreaming: boolean
   placeholder?: string
@@ -12,15 +15,31 @@ interface Props {
 
 const MAX_HEIGHT = 220
 
-export function ChatComposer({
-  value,
-  onChange,
-  onSend,
+/**
+ * Keeps the textarea text in local state so typing is not fighting parent re-renders
+ * when another sidebar session is streaming.
+ */
+export const ChatComposer = React.memo(function ChatComposer({
+  sessionId,
+  seedText,
+  onPersistSessionDraft,
+  onSendMessage,
   onStop,
   isStreaming,
   placeholder = 'Message the agent…  (⏎ to send, ⇧⏎ for newline)',
-}: Props) {
+}: ChatComposerProps) {
+  const [text, setText] = useState(seedText)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const textRef = useRef(text)
+  textRef.current = text
+
+  useEffect(() => {
+    return () => {
+      if (sessionId) {
+        onPersistSessionDraft(sessionId, textRef.current)
+      }
+    }
+  }, [sessionId, onPersistSessionDraft])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -29,16 +48,24 @@ export function ChatComposer({
     const next = Math.min(MAX_HEIGHT, el.scrollHeight)
     el.style.height = next + 'px'
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
-  }, [value])
+  }, [text])
+
+  const handleSend = () => {
+    const t = text.trim()
+    if (!t || isStreaming || !sessionId) return
+    onSendMessage(t)
+    setText('')
+    onPersistSessionDraft(sessionId, '')
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      onSend()
+      handleSend()
     }
   }
 
-  const canSend = value.trim().length > 0 && !isStreaming
+  const canSend = text.trim().length > 0 && !isStreaming && !!sessionId
 
   return (
     <div className="border-t border-zinc-800/80 bg-zinc-950/80 px-4 pb-4 pt-3">
@@ -51,12 +78,16 @@ export function ChatComposer({
         >
           <textarea
             ref={textareaRef}
-            value={value}
-            onChange={e => onChange(e.target.value)}
+            value={text}
+            readOnly={!sessionId}
+            onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             rows={1}
-            className="min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
+            className={cn(
+              'min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500',
+              !sessionId && 'opacity-50'
+            )}
           />
           {isStreaming ? (
             <button
@@ -72,7 +103,7 @@ export function ChatComposer({
           ) : (
             <button
               type="button"
-              onClick={onSend}
+              onClick={handleSend}
               disabled={!canSend}
               aria-label="Send message"
               className={cn(
@@ -103,4 +134,4 @@ export function ChatComposer({
       </div>
     </div>
   )
-}
+})

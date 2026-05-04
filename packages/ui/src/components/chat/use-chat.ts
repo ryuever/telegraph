@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSessionsStore, getSessionStore } from '@telegraph/stores'
 import type { AgentService, ChatConversation, ChatMessage } from './types'
 import { MockAgentService } from './agent-service'
@@ -19,6 +19,12 @@ export interface UseChatOptions {
 
 export function useChat({ agent }: UseChatOptions = {}) {
   const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
+  /**
+   * Per-session send queues: rapid double-send in one chat still runs in order, but
+   * another session can send while this one is streaming (global chain would block
+   * the new tab until the first run finished, leaving its message list empty).
+   */
+  const sendChainsRef = useRef<Map<string, Promise<unknown>>>(new Map())
   const { sessions, activeSessionId, createSession, deleteSession, setActiveSession, renameSession } = useSessionsStore()
   const [updateTrigger, setUpdateTrigger] = useState(0)
 
@@ -27,23 +33,34 @@ export function useChat({ agent }: UseChatOptions = {}) {
     [sessions]
   )
 
+  const sessionIdsKey = useMemo(() => sessions.map(s => s.id).join('\u0001'), [sessions])
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
+
+  const bumpUi = useCallback(() => {
+    setUpdateTrigger(v => v + 1)
+  }, [])
+
   useEffect(() => {
     agentRef.current = agent ?? new MockAgentService()
   }, [agent])
 
-  // Per-session message state lives in separate zustand stores; subscribe so
-  // React re-renders when any open session's messages stream or change.
-  useEffect(() => {
-    const unsubscribers = sessions.map((s) => {
+  // Subscribe per session message store. Depend only on session **ids** so `renameSession`
+  // (title-only) does not tear down listeners.
+  // Use direct setState (no rAF): coalescing + cancelAnimationFrame on effect cleanup
+  // could drop the only scheduled flush and skip updates after the first send.
+  useLayoutEffect(() => {
+    const list = sessionsRef.current
+    const unsubscribers = list.map(s => {
       const store = getSessionStore(s.id, s.title)
       return store.subscribe(() => {
-        setUpdateTrigger((v) => v + 1)
+        setUpdateTrigger(v => v + 1)
       })
     })
     return () => {
-      unsubscribers.forEach((unsub) => unsub())
+      unsubscribers.forEach(unsub => unsub())
     }
-  }, [sessions])
+  }, [sessionIdsKey])
 
   const active = useMemo<ChatConversation>(() => {
     if (!activeSessionId) {
@@ -81,93 +98,119 @@ export function useChat({ agent }: UseChatOptions = {}) {
       const trimmed = text.trim()
       if (!trimmed) return
 
-      let currentSessionId = activeSessionId
-
-      if (!currentSessionId) {
-        currentSessionId = createSession()
-        await new Promise((r) => setTimeout(r, 0))
+      // Lock the destination session at send time (not when the queued run eventually starts).
+      let targetSessionId = useSessionsStore.getState().activeSessionId
+      if (!targetSessionId) {
+        targetSessionId = createSession()
       }
 
-      const store = getSessionStore(currentSessionId, listTitle(currentSessionId))
-      let state = store.getState()
+      const run = async () => {
+        const store = getSessionStore(targetSessionId, listTitle(targetSessionId))
 
-      if (state.isStreaming) return
-
-      const userMsg: ChatMessage = {
-        id: uid('m_'),
-        role: 'user',
-        content: trimmed,
-        createdAt: Date.now(),
-        status: 'done',
-      }
-      const assistantMsg: ChatMessage = {
-        id: uid('m_'),
-        role: 'assistant',
-        content: '',
-        createdAt: Date.now(),
-        status: 'streaming',
-      }
-
-      state = store.getState()
-      const isFirst = state.messages.length === 0
-
-      if (isFirst) {
-        store.updateTitle(deriveTitle(trimmed))
-        renameSession(currentSessionId, deriveTitle(trimmed))
-      }
-
-      // Add user message to store
-      store.addMessage(userMsg)
-
-      const controller = new AbortController()
-      store.setStreaming(true, controller)
-
-      try {
-        // Create snapshot with only user message for agent
-        const snapshot: ChatConversation = {
-          id: currentSessionId,
-          title: store.getState().title,
-          createdAt: store.getState().createdAt,
-          updatedAt: store.getState().updatedAt,
-          messages: [...store.getState().messages],
+        const userMsg: ChatMessage = {
+          id: uid('m_'),
+          role: 'user',
+          content: trimmed,
+          createdAt: Date.now(),
+          status: 'done',
+        }
+        const assistantMsg: ChatMessage = {
+          id: uid('m_'),
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          status: 'streaming',
         }
 
-        // Add assistant placeholder message after creating snapshot
-        store.addMessage(assistantMsg)
+        const isFirst = store.getState().messages.length === 0
 
-        await agentRef.current.send({
-          conversation: snapshot,
-          signal: controller.signal,
-          onChunk: (delta) => {
-            store.updateMessage(assistantMsg.id, (m) => ({
-              ...m,
-              content: m.content + delta,
-            }))
-          },
-          onToolCall: (call) => {
-            store.updateMessage(assistantMsg.id, (m) => ({
-              ...m,
-              toolCalls: [...(m.toolCalls ?? []), call],
-            }))
-          },
-        })
+        // Add user message first so any zustand/React work from rename does not observe
+        // an empty thread on the first send of a new sidebar session.
+        store.addMessage(userMsg)
+        if (isFirst) {
+          store.updateTitle(deriveTitle(trimmed))
+          renameSession(targetSessionId, deriveTitle(trimmed))
+        }
+        bumpUi()
 
-        store.updateMessage(assistantMsg.id, (m) => ({
-          ...m,
-          status: 'done',
-        }))
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        store.updateMessage(assistantMsg.id, (m) => ({
-          ...m,
-          status: 'error',
-          errorMessage: message,
-        }))
-      } finally {
-        store.setStreaming(false)
+        const controller = new AbortController()
+        store.setStreaming(true, controller)
+
+        try {
+          // Create snapshot with only user message for agent
+          const snapshot: ChatConversation = {
+            id: targetSessionId,
+            title: store.getState().title,
+            createdAt: store.getState().createdAt,
+            updatedAt: store.getState().updatedAt,
+            messages: [...store.getState().messages],
+          }
+
+          // Add assistant placeholder message after creating snapshot
+          store.addMessage(assistantMsg)
+          bumpUi()
+
+          await agentRef.current.send({
+            conversation: snapshot,
+            signal: controller.signal,
+            onStatus: status => {
+              store.updateMessage(assistantMsg.id, m => {
+                // Daemon emits run_queued before run_started. Mapping queued -> pending
+                // downgrades optimistic "streaming" and leaves the UI stuck on "pending"
+                // if later IPC events are delayed (e.g. main/daemon RPC backpressure).
+                if (status === 'queued') {
+                  return { ...m, status: 'streaming' }
+                }
+                if (status === 'running') {
+                  return { ...m, status: 'streaming' }
+                }
+                if (status === 'completed') {
+                  return { ...m, status: 'done' }
+                }
+                if (status === 'failed') {
+                  return { ...m, status: 'error' }
+                }
+                return { ...m, status: 'error' }
+              })
+            },
+            onChunk: (delta) => {
+              store.updateMessage(assistantMsg.id, (m) => ({
+                ...m,
+                status: m.status === 'pending' ? 'streaming' : m.status,
+                content: m.content + delta,
+              }))
+            },
+            onToolCall: (call) => {
+              store.updateMessage(assistantMsg.id, (m) => ({
+                ...m,
+                toolCalls: [...(m.toolCalls ?? []), call],
+              }))
+            },
+          })
+
+          store.updateMessage(assistantMsg.id, (m) => ({
+            ...m,
+            status: 'done',
+          }))
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          store.updateMessage(assistantMsg.id, (m) => ({
+            ...m,
+            status: 'error',
+            errorMessage: message,
+          }))
+        } finally {
+          store.setStreaming(false)
+        }
       }
+
+      const sid = targetSessionId
+      const prev = sendChainsRef.current.get(sid) ?? Promise.resolve()
+      const next = prev.then(run)
+      sendChainsRef.current.set(sid, next.catch(() => {}))
+      await next
     },
-    [activeSessionId, createSession, listTitle, renameSession]
+    [bumpUi, createSession, listTitle, renameSession]
   )
 
   const stop = useCallback(() => {
@@ -182,6 +225,7 @@ export function useChat({ agent }: UseChatOptions = {}) {
 
   const deleteConversation = useCallback(
     (id: string) => {
+      sendChainsRef.current.delete(id)
       deleteSession(id)
     },
     [deleteSession]

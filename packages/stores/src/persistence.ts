@@ -4,6 +4,17 @@ const SESSIONS_KEY = 'telegraph:sessions'
 const ACTIVE_SESSION_KEY = 'telegraph:activeSessionId'
 const MESSAGES_KEY_PREFIX = 'telegraph:messages:'
 
+/** Older builds persisted assistant rows as `pending`; after restart that looks "stuck". */
+function sanitizeHydratedMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map(m => {
+    if (m.role !== 'assistant' || m.status !== 'pending') return m
+    if ((m.content ?? '').trim().length > 0) {
+      return { ...m, status: 'done' }
+    }
+    return { ...m, status: 'streaming' }
+  })
+}
+
 export function persistSessions(state: SessionsState) {
   try {
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(state.sessions))
@@ -41,7 +52,14 @@ export function persistSessionMessages(sessionId: string, messages: ChatMessage[
 export function loadPersistentMessages(sessionId: string): ChatMessage[] | null {
   try {
     const data = localStorage.getItem(`${MESSAGES_KEY_PREFIX}${sessionId}`)
-    return data ? JSON.parse(data) : null
+    if (!data) return null
+    const raw = JSON.parse(data) as ChatMessage[]
+    if (!Array.isArray(raw)) return null
+    const next = sanitizeHydratedMessages(raw)
+    if (JSON.stringify(next) !== JSON.stringify(raw)) {
+      persistSessionMessages(sessionId, next)
+    }
+    return next
   } catch (err) {
     console.error(`Failed to load persistent messages for session ${sessionId}:`, err)
     return null

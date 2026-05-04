@@ -38,6 +38,14 @@ export interface AgentRuntimeSettings {
   apiKey: string
   /** Optional override — only honored by providers whose Model definition reads it (currently MiniMax custom). */
   baseUrl?: string
+  /** Execution backend selector; defaults to 'pi-ai'. */
+  backend?: AgentBackendKind
+  /** Multi-agent orchestration mode (currently daemon-side for pi-cli). */
+  orchestration?: AgentOrchestrationMode
+  /** Multi-agent orchestration pattern used by pi-subagents mode. */
+  orchestrationPattern?: AgentOrchestrationPattern
+  /** Hint for parallel task workspace isolation in pi-subagents mode. */
+  worktreeIsolation?: boolean
 }
 
 export interface AgentStreamCallbacks {
@@ -56,6 +64,17 @@ export interface AgentSendInput {
   tools?: Tool[]
   signal?: AbortSignal
   callbacks?: AgentStreamCallbacks
+}
+
+export type AgentBackendKind = 'pi-ai' | 'pi-cli'
+export type AgentOrchestrationMode = 'none' | 'pi-subagents'
+export type AgentOrchestrationPattern = 'chain' | 'parallel'
+
+export interface AgentBackend {
+  readonly kind: AgentBackendKind
+  readonly currentSettings: AgentRuntimeSettings
+  withSettings(next: AgentRuntimeSettings): AgentBackend
+  send(input: AgentSendInput): Promise<Message>
 }
 
 export type AgentContext = Context

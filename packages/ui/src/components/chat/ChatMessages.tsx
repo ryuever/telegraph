@@ -52,7 +52,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
 }
 
 function AssistantMessage({ message }: { message: ChatMessage }) {
-  const isStreaming = message.status === 'streaming'
+  const isStreaming = message.status === 'streaming' || message.status === 'pending'
   const isError = message.status === 'error'
   const showCursor = isStreaming
   const showThinking = isStreaming && message.content.length === 0

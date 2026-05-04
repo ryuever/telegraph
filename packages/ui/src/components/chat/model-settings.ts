@@ -4,6 +4,8 @@ import {
   MINIMAX_OPENAI_BASE_URL,
   MINIMAX_OPENAI_COMPAT_PROVIDER_ID,
   MINIMAX_PROVIDER_ID,
+  type AgentBackendKind,
+  type AgentOrchestrationMode,
   type AgentRuntimeSettings,
   type ModelDescriptor,
 } from '@telegraph/agent'
@@ -21,6 +23,10 @@ export interface PerProviderSettings {
 export interface ChatModelSettings {
   provider: string
   modelId: string
+  backend: AgentBackendKind
+  orchestration: AgentOrchestrationMode
+  orchestrationPattern: 'chain' | 'parallel'
+  worktreeIsolation: boolean
   /** Per-provider creds keyed by provider id, so switching providers keeps each one's setup. */
   byProvider: Record<string, PerProviderSettings>
 }
@@ -45,6 +51,10 @@ export interface ModelConnectionStatus {
 export const DEFAULT_SETTINGS: ChatModelSettings = {
   provider: MINIMAX_CN_PROVIDER_ID,
   modelId: 'MiniMax-M2.7',
+  backend: 'pi-ai',
+  orchestration: 'none',
+  orchestrationPattern: 'chain',
+  worktreeIsolation: false,
   byProvider: {},
 }
 
@@ -149,6 +159,10 @@ export function loadSettings(): ChatModelSettings {
     return {
       provider: parsed.provider ?? DEFAULT_SETTINGS.provider,
       modelId: parsed.modelId ?? DEFAULT_SETTINGS.modelId,
+      backend: parsed.backend ?? DEFAULT_SETTINGS.backend,
+      orchestration: parsed.orchestration ?? DEFAULT_SETTINGS.orchestration,
+      orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
+      worktreeIsolation: parsed.worktreeIsolation ?? DEFAULT_SETTINGS.worktreeIsolation,
       byProvider: { ...DEFAULT_SETTINGS.byProvider, ...(parsed.byProvider ?? {}) },
     }
   } catch {
@@ -172,6 +186,10 @@ export function toRuntimeSettings(settings: ChatModelSettings): AgentRuntimeSett
     modelId: settings.modelId,
     apiKey: per.apiKey,
     baseUrl: per.baseUrl,
+    backend: settings.backend,
+    orchestration: settings.orchestration,
+    orchestrationPattern: settings.orchestrationPattern,
+    worktreeIsolation: settings.worktreeIsolation,
   }
 }
 

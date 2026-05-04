@@ -1,4 +1,7 @@
 export { PiAgent } from '@telegraph/agent/PiAgent'
+export { PiAiBackend } from '@telegraph/agent/backends/PiAiBackend'
+export { PiCliBackend } from '@telegraph/agent/backends/PiCliBackend'
+export { createAgentBackend } from '@telegraph/agent/backends/createAgentBackend'
 export { BaseHarness } from '@telegraph/agent/harness/BaseHarness'
 export {
   DEFAULT_MODEL_CATALOG,
@@ -10,6 +13,10 @@ export {
   resolveModel,
 } from '@telegraph/agent/providers/index'
 export type {
+  AgentBackend,
+  AgentBackendKind,
+  AgentOrchestrationMode,
+  AgentOrchestrationPattern,
   AgentMessage,
   AgentModel,
   AgentRole,
