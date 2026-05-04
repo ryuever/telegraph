@@ -15,7 +15,9 @@
       "@telegraph/core/*": ["../../apps/telegraph/src/core/*"],
       "@telegraph/services/*": ["../../apps/telegraph/src/services/*"],
       "@telegraph/agent": ["../agent/src/index.ts"],
-      "@telegraph/agent/*": ["../agent/src/*"]
+      "@telegraph/agent/*": ["../agent/src/*"],
+      "@telegraph/stores": ["../stores/src/index.ts"],
+      "@telegraph/stores/*": ["../stores/src/*"]
     }
   },
   "include": ["."],
