@@ -30,8 +30,10 @@ import {
 } from '@telegraph/services/monitor/common/config'
 import type { IMonitorBridge } from '@telegraph/services/monitor/common/types'
 import DaemonProcessNode, { DaemonProcessNodeId } from './DaemonProcessNode'
+import AgentStreamService, { AgentStreamServiceId } from '@telegraph/services/agent/node/AgentStreamService'
 
 export default new Registry(bind => {
+  bind(AgentStreamServiceId).to(AgentStreamService)
   bind(DaemonProcessNodeId).to(DaemonProcessNode)
   bind(ApplicationInfoId).to(ApplicationInfo)
   bind(DiagnosticsId).to(Diagnostics)

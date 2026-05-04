@@ -87,6 +87,8 @@ import { MainProcessUtils } from '@telegraph/services/main-process-util/electron
 import { MainProcessUtilsId } from '@telegraph/services/main-process-util/common/config'
 import { MonitorBridge } from '@telegraph/services/monitor/electron-main/MonitorBridge'
 import { MonitorBridgeId } from '@telegraph/services/monitor/common/config'
+import AgentStreamSink from '@telegraph/services/agent/electron-main/AgentStreamSink'
+import { AgentStreamSinkId } from '@telegraph/services/agent/common/config'
 
 export default new Registry(bind => {
   bind(ApplicationInfoId).to(ApplicationInfo)
@@ -144,4 +146,5 @@ export default new Registry(bind => {
   bind(AcquireProcessPortMainFactoryId).toParamsFactory(AcquireProcessPortMain)
   bind(FileSystemManagerId).to(FileSystemManager)
   bind(MonitorBridgeId).to(MonitorBridge)
+  bind(AgentStreamSinkId).to(AgentStreamSink)
 })

@@ -22,6 +22,7 @@ export default defineConfig({
       '@telegraph/application': resolve(__dirname, 'src/application'),
       '@telegraph/core': resolve(__dirname, 'src/core'),
       '@telegraph/services': resolve(__dirname, 'src/services'),
+      '@telegraph/agent': resolve(__dirname, '../../packages/agent/src'),
     },
   },
   build: {

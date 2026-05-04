@@ -63,6 +63,11 @@ import { PerformanceTracker } from '@telegraph/services/log/common/performance'
 import { initCrashListener } from './helper/crash'
 import { initAboutInfo } from './helper/about'
 import { setupAgentHandler } from '@telegraph/services/agent/electron-main/AgentHandler'
+import {
+  AgentStreamSinkId,
+  agentStreamSinkServicePath,
+} from '@telegraph/services/agent/common/config'
+import type AgentStreamSink from '@telegraph/services/agent/electron-main/AgentStreamSink'
 import { setupModelConfigHandler } from '@telegraph/services/model-config/electron-main/ModelConfig'
 
 export const TelegraphApplicationId = createId('telegraph-application')
@@ -93,7 +98,8 @@ class TelegraphApplication extends Disposable {
     @inject(AcquirePortId) private acquirePortMain: AcquirePortMain,
     @inject(FileSystemManagerId) private fileSystemManager: FileSystemManager,
     @inject(MainProcessUtilsId) private mainProcessUtils: MainProcessUtils,
-    @inject(MonitorBridgeId) private monitorBridge: MonitorBridge
+    @inject(MonitorBridgeId) private monitorBridge: MonitorBridge,
+    @inject(AgentStreamSinkId) private agentStreamSink: AgentStreamSink
   ) {
     super()
     this.performanceTracker = new PerformanceTracker(this.logService.trace.bind(this.logService))
@@ -125,7 +131,6 @@ class TelegraphApplication extends Disposable {
     initAboutInfo()
     // 监听 crash
     initCrashListener(this.logService)
-    setupAgentHandler()
     setupModelConfigHandler()
     this.acquirePortMain.initAcquirePort(
       this.sharedProcessMain,
@@ -141,9 +146,12 @@ class TelegraphApplication extends Disposable {
     this.sharedProcessMain.initialize(this.windowManager, this.daemonProcessMain)
     this.daemonProcessMain.initialize(this.windowManager, this.sharedProcessMain)
 
+    this.mainProcess.registerServiceHandler(agentStreamSinkServicePath, this.agentStreamSink)
+
     // 初始化shared process，包含storage service
     this.setupSharedProcessMain()
     this.setupDaemonProcessMain()
+    setupAgentHandler(this.mainProcess.getDaemonProcessChannel())
     this.performanceTracker.start(PerformanceStage.GetProfile)
     this.logService.info(ClientLaunchLog.GetUserProfile)
     // 监听登录成功

@@ -32,6 +32,10 @@ export default class MainProcess extends Disposable {
     return this.acquirePortMain.sharedProcessChannel
   }
 
+  getDaemonProcessChannel() {
+    return this.acquirePortMain.daemonProcessChannel
+  }
+
   registerServiceHandler(path: string, service: any) {
     this._serviceHost.registerServiceHandler(path, service)
   }

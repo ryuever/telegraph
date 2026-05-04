@@ -1,58 +1,35 @@
 import { ipcMain } from 'electron'
-import { PiAgent } from '@telegraph/agent'
-import type { AgentRuntimeSettings } from '@telegraph/agent'
-
-export const AGENT_STREAM_CHANNEL = 'telegraph:agent:stream'
-export const AGENT_STREAM_DATA_CHANNEL = 'telegraph:agent:stream:data'
+import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
+import type { ElectronMessagePortMainChannel } from '@x-oasis/async-call-rpc-electron'
+import type { AgentRuntimeSettings } from '@telegraph/agent/types'
+import type { IAgentStreamService } from '../common/types'
+import {
+  AGENT_STREAM_CHANNEL,
+  agentStreamServicePath,
+} from '@telegraph/services/agent/common/config'
 
 interface StreamRequest {
   message: string
   settings: AgentRuntimeSettings
 }
 
-export function setupAgentHandler() {
+/**
+ * Registers renderer IPC that forwards streaming agent work to the
+ * **daemon** utility-process (see A-002). Chunks return via
+ * {@link AgentStreamSink} on the main process.
+ */
+export function setupAgentHandler(daemonChannel: ElectronMessagePortMainChannel) {
+  const daemonAgent = new ProxyRPCClient(agentStreamServicePath, {
+    channel: daemonChannel,
+  }).createProxy() as unknown as IAgentStreamService
+
   try {
     ipcMain.handle(AGENT_STREAM_CHANNEL, async (event, req: StreamRequest) => {
-      const agent = new PiAgent(req.settings)
-      try {
-        await agent.send({
-          messages: [{ role: 'user', content: req.message }],
-          callbacks: {
-            onTextDelta: (text: string) => {
-              event.sender.send(AGENT_STREAM_DATA_CHANNEL, { type: 'text_delta', text })
-            },
-            onError: (reason: string, errorObj: any) => {
-              let errorMsg = ''
-              if (errorObj instanceof Error) {
-                errorMsg = errorObj.message
-              } else if (typeof errorObj === 'string') {
-                errorMsg = errorObj
-              } else if (errorObj && typeof errorObj === 'object') {
-                try {
-                  errorMsg = JSON.stringify(errorObj)
-                } catch {
-                  errorMsg = String(errorObj)
-                }
-              } else {
-                errorMsg = String(errorObj)
-              }
-              event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
-                type: 'error',
-                error: `${reason}: ${errorMsg}`,
-              })
-            },
-            onDone: () => {
-              event.sender.send(AGENT_STREAM_DATA_CHANNEL, { type: 'done' })
-            },
-          },
-        })
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error)
-        event.sender.send(AGENT_STREAM_DATA_CHANNEL, {
-          type: 'error',
-          error: msg || String(error),
-        })
-      }
+      await daemonAgent.runStream({
+        webContentsId: event.sender.id,
+        message: req.message,
+        settings: req.settings,
+      })
     })
   } catch (err) {
     console.error('[AgentHandler] Failed to register handler:', err)

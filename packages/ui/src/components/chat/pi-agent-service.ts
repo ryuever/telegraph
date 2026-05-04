@@ -5,9 +5,9 @@ const AGENT_STREAM_CHANNEL = 'telegraph:agent:stream'
 const AGENT_STREAM_DATA_CHANNEL = 'telegraph:agent:stream:data'
 
 /**
- * Adapter that proxies agent requests through IPC to the main process.
- * Translates ChatConversation → pi-ai message list and forwards the
- * stream's text deltas into `onChunk`.
+ * Adapter that sends agent requests over IPC to the main process, which
+ * forwards execution to the daemon utility-process; stream chunks are
+ * fanned back via the main process to this renderer.
  */
 export class PiAgentService implements AgentService {
   constructor(private settings: AgentRuntimeSettings) {}

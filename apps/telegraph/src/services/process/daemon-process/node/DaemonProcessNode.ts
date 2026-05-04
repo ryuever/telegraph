@@ -23,6 +23,8 @@ import { RPCServiceHost } from '@x-oasis/async-call-rpc'
 import { servicePath as StorageServicePath } from '@telegraph/services/storage/common/config'
 import { AssignPassingPortType } from '../../common/types'
 import { NodeProcess } from '../../node/NodeProcess'
+import AgentStreamService, { AgentStreamServiceId } from '@telegraph/services/agent/node/AgentStreamService'
+import { agentStreamServicePath } from '@telegraph/services/agent/common/config'
 
 export const DaemonProcessNodeId = createId('daemon-process')
 
@@ -36,11 +38,13 @@ export default class DaemonProcessNode extends NodeProcess {
     @inject(DiagnosticsId) private diagnostics: Diagnostics,
     @inject(WorkbenchClient) protected workbenchClient: Workbench,
     @inject(ProcessClientChannelId) private portManager: ProcessClientChannel,
-    @inject(ProcessPingClientFactoryId) private processPingClientFactory: IProcessPingClientFactory
+    @inject(ProcessPingClientFactoryId) private processPingClientFactory: IProcessPingClientFactory,
+    @inject(AgentStreamServiceId) private agentStream: AgentStreamService
   ) {
     super('daemon-process', workbenchClient)
     this.serviceHost = new RPCServiceHost()
     this.serviceHost.registerServiceHandler(DiagnosticsServicePath, this.diagnostics)
+    this.serviceHost.registerServiceHandler(agentStreamServicePath, this.agentStream)
   }
 
   start() {
