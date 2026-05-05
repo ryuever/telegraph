@@ -1,5 +1,7 @@
 import { createId, inject, injectable } from '@x-oasis/di'
-import { createAgentBackend } from '@telegraph/agent'
+import { createRuntime, RunLifecycleManager } from '@telegraph/agent'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent } from '@telegraph/runtime-contracts'
 import type {
   IAgentStreamSink,
   IAgentStreamService,
@@ -11,12 +13,11 @@ import { agentStreamSinkServicePath } from '@telegraph/services/agent/common/con
 import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import type { ProcessClientChannel } from '@telegraph/services/port-manager/node/ProcessClientChannel'
 import { ProcessClientChannelId } from '@telegraph/services/port-manager/node/ProcessClientChannel'
-import { runPiCliStream } from './runPiCliStream'
 import { AgentRunRegistry } from './AgentRunRegistry'
+import { legacyLlmTraceFromRuntimeEvent } from './runtimeEventForwarding'
+import { getExtensionRegistry } from '@telegraph/services/extensions/node/ExtensionRegistry'
 
 export const AgentStreamServiceId = createId('agent-stream-service')
-
-const PI_AI_DEFAULT_SYSTEM = 'You are a helpful assistant.'
 
 @injectable()
 export default class AgentStreamService implements IAgentStreamService {
@@ -41,7 +42,6 @@ export default class AgentStreamService implements IAgentStreamService {
 
   private async runStreamInternal(req: RunAgentStreamPayload): Promise<RunAgentStreamResult> {
     const sink = this.getSink()
-    const agent = createAgentBackend(req.settings)
     const { webContentsId, runId, message, sessionId: streamSessionId } = req
     const debugContext = {
       runId,
@@ -53,8 +53,11 @@ export default class AgentStreamService implements IAgentStreamService {
       hasApiKey: Boolean(req.settings.apiKey?.trim()),
     }
 
+    // Helper for pushing events to renderer
     const push = (chunk: Parameters<IAgentStreamSink['push']>[0]['chunk']) =>
       sink.push({ webContentsId, chunk })
+
+    // Non-blocking push (fire and forget)
     const safePush = (chunk: Parameters<IAgentStreamSink['push']>[0]['chunk'], stage: string) => {
       void push(chunk).catch(error => {
         const msg = error instanceof Error ? error.message : String(error)
@@ -64,6 +67,8 @@ export default class AgentStreamService implements IAgentStreamService {
         )
       })
     }
+
+    // Blocking push for critical lifecycle events
     const flushPush = async (
       chunk: Parameters<IAgentStreamSink['push']>[0]['chunk'],
       stage: string
@@ -78,164 +83,155 @@ export default class AgentStreamService implements IAgentStreamService {
         )
       }
     }
-    // const pushLlmTrace = (trace: LlmTracePayload) =>
-    //   push({ type: 'llm_trace', runId, sessionId: streamSessionId ?? '', trace })
+
     const safePushLlmTrace = (trace: LlmTracePayload) =>
       safePush({ type: 'llm_trace', runId, sessionId: streamSessionId ?? '', trace }, 'llm_trace')
-    let failed = false
-    let finalError = ''
+
+    const runStartedMs = Date.now()
+    const registry = getExtensionRegistry()
+    const blocked = registry.effectiveBlocklist(req.settings.extensionBlocklist)
+
+    // Check for blocklisted orchestration modes
+    if (req.settings.orchestration === 'pi-subagents' && blocked.has('pi-subagents')) {
+      const err =
+        'pi-subagents is blocklisted (Chat settings extension deny list or ~/.telegraph/extension-registry.json).'
+      console.warn(
+        '[AgentStreamService] orchestration blocked by policy',
+        JSON.stringify({ ...debugContext, blocked: [...blocked] })
+      )
+      safePush({ type: 'run_queued', runId, status: 'queued' }, 'run_queued')
+      safePush({ type: 'run_started', runId, status: 'running' }, 'run_started')
+      safePush({ type: 'run_failed', runId, status: 'failed', error: err }, 'run_failed')
+      safePush({ type: 'error', runId, error: err }, 'error')
+      this.runRegistry.markFailed(runId, err)
+      return { runId, status: 'failed', error: err }
+    }
+
+    // Initialize state management
+    const lifecycle = new RunLifecycleManager(runId)
     let textBuffer = ''
+
+    // Runtime event handler - unified for all runtimes
+    const handleRuntimeEvent = (ev: RuntimeEvent) => {
+      // Process through lifecycle manager (ensures no duplicate terminal events)
+      const processed = lifecycle.processRuntimeEvent(ev)
+      if (!processed) return // Duplicate terminal event, ignore
+
+      // Forward to renderer
+      safePush(
+        { type: 'runtime_event', runId, sessionId: streamSessionId ?? '', event: ev },
+        'runtime_event'
+      )
+
+      // Legacy trace conversion for backward compatibility
+      const legacy = legacyLlmTraceFromRuntimeEvent(ev)
+      if (legacy) {
+        safePushLlmTrace(legacy)
+      }
+
+      // Extract text deltas
+      if (ev.type === 'assistant_delta' && ev.text) {
+        textBuffer += ev.text
+        void push({ type: 'text_delta', runId, text: ev.text })
+      }
+
+      // Handle terminal states
+      if (ev.type === 'run_failed') {
+        const msg = `${ev.error.code}: ${ev.error.message}`
+        this.runRegistry.markFailed(runId, msg)
+        void push({ type: 'run_failed', runId, status: 'failed', error: msg })
+        void push({ type: 'error', runId, error: msg })
+      }
+
+      if (ev.type === 'run_completed') {
+        this.runRegistry.markCompleted(runId)
+        void flushPush({ type: 'run_completed', runId, status: 'completed' }, 'run_completed')
+        void flushPush({ type: 'done', runId }, 'done')
+      }
+    }
 
     try {
       console.info('[AgentStreamService] run accepted', JSON.stringify(debugContext))
       this.runRegistry.markQueued(runId, req.settings.backend, req.settings.orchestration)
-      console.info('[AgentStreamService] pushing run_queued', JSON.stringify(debugContext))
-      // Do not await early lifecycle pushes: awaiting sink RPC while the main process is
-      // stuck in ipc.invoke(runStream) can deadlock some MessagePort / RPC stacks, and
-      // the renderer would never get run_started / text_delta (assistant stuck "pending").
       safePush({ type: 'run_queued', runId, status: 'queued' }, 'run_queued')
-      console.info('[AgentStreamService] pushed run_queued', JSON.stringify(debugContext))
+
       this.runRegistry.markRunning(runId)
-      console.info('[AgentStreamService] pushing run_started', JSON.stringify(debugContext))
       safePush({ type: 'run_started', runId, status: 'running' }, 'run_started')
-      console.info('[AgentStreamService] pushed run_started', JSON.stringify(debugContext))
-      if (req.settings.backend === 'pi-cli') {
-        console.info('[AgentStreamService] entering pi-cli stream', JSON.stringify(debugContext))
-        await runPiCliStream({
-          runId,
-          message,
-          settings: req.settings,
-          onLlmTrace: safePushLlmTrace,
-          onTextDelta: (text: string) => {
-            textBuffer += text
-            void push({ type: 'text_delta', runId, text })
-          },
-          onError: (reason: string, errorObj: unknown) => {
-            failed = true
-            let errorMsg = ''
-            if (errorObj instanceof Error) {
-              errorMsg = errorObj.message
-            } else if (typeof errorObj === 'string') {
-              errorMsg = errorObj
-            } else if (errorObj && typeof errorObj === 'object') {
-              try {
-                errorMsg = JSON.stringify(errorObj)
-              } catch {
-                errorMsg = String(errorObj)
-              }
-            } else {
-              errorMsg = String(errorObj)
-            }
-            const error = `${reason}: ${errorMsg}`
-            finalError = error
-            console.error(
-              '[AgentStreamService] pi-cli run failed',
-              JSON.stringify({ ...debugContext, reason, error: errorMsg })
-            )
-            this.runRegistry.markFailed(runId, error)
-            void push({ type: 'run_failed', runId, status: 'failed', error })
-            // Legacy compatibility.
-            void push({ type: 'error', runId, error })
-          },
-          onDone: async () => {
-            if (failed) {
-              return
-            }
-            console.info('[AgentStreamService] pi-cli run completed', JSON.stringify(debugContext))
-            this.runRegistry.markCompleted(runId)
-            await flushPush({ type: 'run_completed', runId, status: 'completed' }, 'run_completed')
-            await flushPush({ type: 'done', runId }, 'done')
-          },
-        })
-      } else {
-        console.log('[AgentStreamService] sending pi-ai request', JSON.stringify(debugContext))
-        await agent.send({
-          messages: [{ role: 'user', content: message }],
-          onPiAiRequest: request =>
-            safePushLlmTrace({
-              kind: 'pi_ai_request',
-              context: request.context,
-              options: request.options,
-              systemPrompt: request.context.systemPrompt ?? PI_AI_DEFAULT_SYSTEM,
-              messages: request.context.messages as Array<{ role: string; content: string }>,
-              provider: req.settings.provider,
-              modelId: req.settings.modelId,
-            }),
-          onPiAiStreamEvent: ev =>
-            safePushLlmTrace({ kind: 'pi_ai_stream_event', event: ev }),
-          callbacks: {
-            onTextDelta: (text: string) => {
-              textBuffer += text
-              void push({ type: 'text_delta', runId, text })
-            },
-            onError: (reason: string, errorObj: unknown) => {
-              failed = true
-              let errorMsg = ''
-              if (errorObj instanceof Error) {
-                errorMsg = errorObj.message
-              } else if (typeof errorObj === 'string') {
-                errorMsg = errorObj
-              } else if (errorObj && typeof errorObj === 'object') {
-                try {
-                  errorMsg = JSON.stringify(errorObj)
-                } catch {
-                  errorMsg = String(errorObj)
-                }
-              } else {
-                errorMsg = String(errorObj)
-              }
-              const error = `${reason}: ${errorMsg}`
-              finalError = error
-              console.error(
-                '[AgentStreamService] pi-ai run failed',
-                JSON.stringify({ ...debugContext, reason, error: errorMsg })
-              )
-              this.runRegistry.markFailed(runId, error)
-              void push({ type: 'run_failed', runId, status: 'failed', error })
-              // Legacy compatibility.
-              void push({ type: 'error', runId, error })
-            },
-            onDone: () => {
-              if (failed) {
-                return
-              }
-              console.info('[AgentStreamService] pi-ai run completed', JSON.stringify(debugContext))
-              this.runRegistry.markCompleted(runId)
-              void push({ type: 'run_completed', runId, status: 'completed' })
-              // Legacy compatibility.
-              void push({ type: 'done', runId })
-            },
-          },
-        })
-      }
-      if (failed) {
-        return {
-          runId,
-          status: 'failed',
-          error: finalError || 'agent stream failed',
+
+      // Create runtime adapter based on settings
+      const runtime = createRuntime(req.settings)
+      lifecycle.markRunning()
+
+      console.info('[AgentStreamService] using runtime', JSON.stringify({ runId, runtimeId: runtime.id }))
+
+      // Stream all runtime events
+      for await (const ev of runtime.run({
+        runId,
+        sessionId: streamSessionId,
+        message,
+        settings: req.settings,
+      })) {
+        handleRuntimeEvent(ev)
+
+        // Early exit on terminal event
+        if (lifecycle.getState() === 'terminal') {
+          break
         }
       }
+
+      // Ensure we reached a terminal state
+      if (lifecycle.getState() !== 'terminal') {
+        const fallback = lifecycle.ensureTerminal({
+          code: 'stream_incomplete',
+          message: 'Runtime stream ended without terminal event',
+        })
+        handleRuntimeEvent(fallback)
+      }
+
+      const terminal = lifecycle.getTerminalEvent()
+      const status = terminal?.type === 'run_completed' ? 'completed' : 'failed'
+      const error = terminal?.type === 'run_failed' ? terminal.error.message : undefined
+
+      console.info(
+        '[telegraph.metrics] run_terminal',
+        JSON.stringify({
+          runId,
+          backend: debugContext.backend,
+          status,
+          durationMs: Date.now() - runStartedMs,
+        })
+      )
+
       return {
         runId,
-        status: 'completed',
+        status,
         text: textBuffer,
+        error,
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      failed = true
-      const errorMessage = msg || String(error)
       console.error(
         '[AgentStreamService] run crashed',
-        JSON.stringify({ ...debugContext, error: errorMessage })
+        JSON.stringify({ ...debugContext, error: msg })
       )
-      this.runRegistry.markFailed(runId, errorMessage)
-      safePush({ type: 'run_failed', runId, status: 'failed', error: errorMessage }, 'run_failed')
-      // Legacy compatibility.
-      safePush({ type: 'error', runId, error: errorMessage }, 'error')
+
+      // Ensure terminal state on crash
+      if (lifecycle.getState() !== 'terminal') {
+        const fallback = lifecycle.ensureTerminal({
+          code: 'runtime_crash',
+          message: msg,
+        })
+        handleRuntimeEvent(fallback)
+      }
+
+      this.runRegistry.markFailed(runId, msg)
+      safePush({ type: 'run_failed', runId, status: 'failed', error: msg }, 'run_failed')
+      safePush({ type: 'error', runId, error: msg }, 'error')
+
       return {
         runId,
         status: 'failed',
-        error: errorMessage,
+        error: msg,
       }
     }
   }

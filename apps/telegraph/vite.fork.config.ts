@@ -23,6 +23,7 @@ export default defineConfig({
       '@telegraph/core': resolve(__dirname, 'src/core'),
       '@telegraph/services': resolve(__dirname, 'src/services'),
       '@telegraph/agent': resolve(__dirname, '../../packages/agent/src'),
+      '@telegraph/runtime-contracts': resolve(__dirname, '../../packages/runtime-contracts/src/index.ts'),
     },
   },
   build: {

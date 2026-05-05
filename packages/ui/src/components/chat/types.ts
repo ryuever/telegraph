@@ -1,4 +1,10 @@
-import type { LlmTracePayload } from '@telegraph/services/agent/common/types'
+import type { LlmTracePayload as DaemonLlmTracePayload } from '@telegraph/services/agent/common/types'
+import type { RuntimeEvent } from '@telegraph/runtime-contracts'
+
+/** Renderer-side trace row payload (ensures `runtime_event` is visible to `tsc` in this package). */
+export type LlmTracePayload =
+  | DaemonLlmTracePayload
+  | { kind: 'runtime_event'; event: RuntimeEvent }
 
 export type ChatRole = 'user' | 'assistant' | 'system' | 'tool'
 
@@ -40,8 +46,6 @@ export interface AgentSendOptions {
   onLlmTrace?: (info: { sessionId: string; runId: string; trace: LlmTracePayload }) => void
   signal?: AbortSignal
 }
-
-export type { LlmTracePayload }
 
 export interface AgentService {
   /** Stream an assistant reply for the given conversation. Resolves when streaming completes. */

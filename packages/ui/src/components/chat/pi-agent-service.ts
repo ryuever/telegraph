@@ -1,4 +1,5 @@
 import type { AgentRuntimeSettings } from '@telegraph/agent'
+import type { RuntimeEvent } from '@telegraph/runtime-contracts'
 import type { AgentSendOptions, AgentService } from './types'
 
 const AGENT_STREAM_CHANNEL = 'telegraph:agent:stream'
@@ -122,6 +123,19 @@ export class PiAgentService implements AgentService {
             ? data.sessionId
             : conversation.id
         onLlmTrace?.({ runId, sessionId: sid, trace: data.trace })
+      } else if (data.type === 'runtime_event') {
+        const sid =
+          'sessionId' in data && typeof data.sessionId === 'string' && data.sessionId.length > 0
+            ? data.sessionId
+            : conversation.id
+        const ev = data.event
+        if (ev && typeof ev === 'object' && typeof (ev as { type?: string }).type === 'string') {
+          onLlmTrace?.({
+            runId,
+            sessionId: sid,
+            trace: { kind: 'runtime_event', event: ev as RuntimeEvent },
+          })
+        }
       }
     }
 

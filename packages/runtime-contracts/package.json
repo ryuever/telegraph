@@ -1,0 +1,17 @@
+{
+  "name": "@telegraph/runtime-contracts",
+  "version": "0.0.0",
+  "description": "Telegraph agent runtime contracts — RunInput, RuntimeEvent, tools, extensions (types only).",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

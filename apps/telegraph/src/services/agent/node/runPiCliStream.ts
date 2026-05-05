@@ -5,7 +5,11 @@ import { constants, existsSync } from 'node:fs'
 import { devNull, homedir, platform } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { AgentRuntimeSettings } from '@telegraph/agent/types'
+import type { RuntimeEvent } from '@telegraph/runtime-contracts'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@telegraph/runtime-contracts'
 import type { LlmTracePayload } from '../common/types'
+
+export const TELEGRAPH_PI_CLI_PRODUCER_VERSION = 'telegraph-pi-cli@0.0.0'
 
 type PiCliStreamCallbacks = {
   onTextDelta: (text: string) => void
@@ -20,6 +24,8 @@ type RunPiCliStreamInput = {
   signal?: AbortSignal
   /** Forward structured LLM / Pi JSON traces to the renderer. */
   onLlmTrace?: (trace: LlmTracePayload) => void
+  /** Phase 1: unified runtime events (non-blocking; do not await IPC from here). */
+  onRuntimeEvent?: (ev: RuntimeEvent) => void
 } & PiCliStreamCallbacks
 
 type PiStreamEvent = {
@@ -188,7 +194,13 @@ async function resolvePiSubagentsExtensionPath(): Promise<ResolvedPiSubagentsExt
     const pkg = require.resolve('pi-subagents/package.json')
     const localRoot = dirname(pkg)
     const localExtension = await resolveExtensionFromPackageRoot(localRoot)
-    if (localExtension) return { extensionPath: localExtension, packageRoot: localRoot }
+    if (localExtension) {
+      console.info(
+        '[telegraph.fallback] pi-subagents extension source=project_package',
+        JSON.stringify({ path: localExtension })
+      )
+      return { extensionPath: localExtension, packageRoot: localRoot }
+    }
   } catch {
     /* noop */
   }
@@ -197,6 +209,10 @@ async function resolvePiSubagentsExtensionPath(): Promise<ResolvedPiSubagentsExt
   try {
     await access(extDir, constants.F_OK)
     const extEntry = join(extDir, 'index.ts')
+    console.info(
+      '[telegraph.fallback] pi-subagents extension source=global_pi_extensions',
+      JSON.stringify({ path: extEntry })
+    )
     return { extensionPath: extEntry }
   } catch {
     // Fall back to package discovery for user-level/global installs.
@@ -450,12 +466,21 @@ export async function runPiCliStream({
   onError,
   onDone,
   onLlmTrace,
+  onRuntimeEvent,
 }: RunPiCliStreamInput): Promise<void> {
   if (!settings.apiKey?.trim()) {
     throw new Error(
       'pi-cli backend requires an API key from Chat settings (.env or per-provider key). No fallback to ~/.pi/agent/models.json is used.'
     )
   }
+  const schemaVersion = RUNTIME_CONTRACT_SCHEMA_VERSION
+  const producerVersion = TELEGRAPH_PI_CLI_PRODUCER_VERSION
+  const rid = runId ?? `run-${Date.now()}`
+  const requestId = `req-${rid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)}`
+  const emitRE = (ev: RuntimeEvent) => {
+    onRuntimeEvent?.(ev)
+  }
+
   const orchestration = settings.orchestration ?? 'none'
   let subagentExtensionPath: string | null = null
   if (orchestration === 'pi-subagents') {
@@ -493,6 +518,23 @@ export async function runPiCliStream({
     orchestration: settings.orchestration ?? 'none',
     pattern: settings.orchestrationPattern ?? null,
   })
+
+  emitRE({
+    type: 'model_request',
+    schemaVersion,
+    producerVersion,
+    runId: rid,
+    requestId,
+    payload: {
+      userMessage: message,
+      promptPassedToPi: args[args.length - 1] ?? '',
+      orchestration: settings.orchestration ?? 'none',
+      pattern: settings.orchestrationPattern ?? null,
+    },
+    raw: { argc: args.length },
+    ts: Date.now(),
+  })
+
   const piExecutable = resolvePiExecutable()
   const childEnv = buildPiChildEnv(settings)
   const redactedArgs = args.map((value, index, all) =>
@@ -526,6 +568,15 @@ export async function runPiCliStream({
       if (!text) return
       aggregatedFromPi += text
       onTextDelta(text)
+      emitRE({
+        type: 'assistant_delta',
+        schemaVersion,
+        producerVersion,
+        runId: rid,
+        requestId,
+        text,
+        ts: Date.now(),
+      })
     }
     /** Pi JSON stream signaled session end before process exited (common with extensions / -p). */
     let completionNotified = false
@@ -586,10 +637,16 @@ export async function runPiCliStream({
       }
       didError = true
       const tail = stderrTail(stderrAcc)
-      onError(
-        'pi_timeout',
-        `pi-cli did not finish within ${hardTimeoutMs}ms${tail ? `; stderr_tail: ${tail}` : ''}`
-      )
+      const msg = `pi-cli did not finish within ${hardTimeoutMs}ms${tail ? `; stderr_tail: ${tail}` : ''}`
+      emitRE({
+        type: 'run_failed',
+        schemaVersion,
+        producerVersion,
+        runId: rid,
+        error: { code: 'pi_timeout', message: msg },
+        ts: Date.now(),
+      })
+      onError('pi_timeout', msg)
       child.kill('SIGKILL')
     }, hardTimeoutMs)
     const stallWatchdog = setInterval(() => {
@@ -602,12 +659,18 @@ export async function runPiCliStream({
       }
       didError = true
       const tail = stderrTail(stderrAcc)
-      onError(
-        'pi_stalled',
-        `pi-cli produced no output for ${idleForMs}ms (stall timeout ${stallTimeoutMs}ms)${
-          tail ? `; stderr_tail: ${tail}` : ''
-        }`
-      )
+      const msg = `pi-cli produced no output for ${idleForMs}ms (stall timeout ${stallTimeoutMs}ms)${
+        tail ? `; stderr_tail: ${tail}` : ''
+      }`
+      emitRE({
+        type: 'run_failed',
+        schemaVersion,
+        producerVersion,
+        runId: rid,
+        error: { code: 'pi_stalled', message: msg },
+        ts: Date.now(),
+      })
+      onError('pi_stalled', msg)
       child.kill('SIGKILL')
     }, 1000)
 
@@ -632,7 +695,61 @@ export async function runPiCliStream({
       if (!evt?.type) return
 
       if (onLlmTrace && PI_LLM_TRACE_TYPES.has(evt.type)) {
-        onLlmTrace({ kind: 'pi_json_line', payload: clonePiEventForTrace(evt) })
+        const tracePayload = clonePiEventForTrace(evt)
+        onLlmTrace({ kind: 'pi_json_line', payload: tracePayload })
+        emitRE({
+          type: 'model_event',
+          schemaVersion,
+          producerVersion,
+          runId: rid,
+          requestId,
+          raw: tracePayload,
+          ts: Date.now(),
+        })
+      }
+
+      if (evt.type === 'tool_execution_start') {
+        const toolName =
+          typeof (evt as { toolName?: string }).toolName === 'string'
+            ? (evt as { toolName: string }).toolName
+            : 'pi_tool'
+        const callId =
+          typeof (evt as { executionId?: string }).executionId === 'string'
+            ? (evt as { executionId: string }).executionId
+            : `${toolName}-${Date.now()}`
+        emitRE({
+          type: 'tool_call',
+          schemaVersion,
+          producerVersion,
+          runId: rid,
+          callId,
+          toolName,
+          input: evt,
+          raw: evt,
+          ts: Date.now(),
+        })
+      }
+
+      if (evt.type === 'tool_execution_end') {
+        const toolName =
+          typeof (evt as { toolName?: string }).toolName === 'string'
+            ? (evt as { toolName: string }).toolName
+            : 'pi_tool'
+        const callId =
+          typeof (evt as { executionId?: string }).executionId === 'string'
+            ? (evt as { executionId: string }).executionId
+            : toolName
+        emitRE({
+          type: 'tool_result',
+          schemaVersion,
+          producerVersion,
+          runId: rid,
+          callId,
+          toolName,
+          output: evt,
+          raw: evt,
+          ts: Date.now(),
+        })
       }
 
       if (evt.type === 'message_update' && evt.assistantMessageEvent) {
@@ -668,6 +785,15 @@ export async function runPiCliStream({
             emitTextDelta(snapshot)
           }
         }
+        emitRE({
+          type: 'run_completed',
+          schemaVersion,
+          producerVersion,
+          runId: rid,
+          output: { assistantText: snapshot, messageCount: evt.messages?.length ?? 0 },
+          raw: evt,
+          ts: Date.now(),
+        })
         console.info(
           '[AgentStreamService] pi-cli agent_end (session complete)',
           JSON.stringify({ runId: runId ?? null })
@@ -683,13 +809,33 @@ export async function runPiCliStream({
 
       if (evt.type === 'error') {
         didError = true
-        onError('pi_error', parsePiMessage(evt.message))
+        const msg = parsePiMessage(evt.message)
+        emitRE({
+          type: 'run_failed',
+          schemaVersion,
+          producerVersion,
+          runId: rid,
+          error: { code: 'pi_cli_error', message: msg, details: evt },
+          raw: evt,
+          ts: Date.now(),
+        })
+        onError('pi_error', msg)
         return
       }
 
       if (evt.type === 'auto_retry_end' && evt.success === false) {
         didError = true
-        onError('pi_retry_exhausted', evt.finalError ?? 'pi exhausted automatic retries')
+        const msg = evt.finalError ?? 'pi exhausted automatic retries'
+        emitRE({
+          type: 'run_failed',
+          schemaVersion,
+          producerVersion,
+          runId: rid,
+          error: { code: 'pi_retry_exhausted', message: msg, details: evt },
+          raw: evt,
+          ts: Date.now(),
+        })
+        onError('pi_retry_exhausted', msg)
       }
     }
 
@@ -733,6 +879,14 @@ export async function runPiCliStream({
       clearTimeout(hardTimeout)
       clearInterval(stallWatchdog)
       signal?.removeEventListener('abort', abortHandler)
+      emitRE({
+        type: 'run_failed',
+        schemaVersion,
+        producerVersion,
+        runId: rid,
+        error: { code: 'pi_spawn_error', message: err.message, details: err },
+        ts: Date.now(),
+      })
       reject(err)
     })
 
@@ -752,7 +906,16 @@ export async function runPiCliStream({
           if (signal?.aborted) {
             if (!completionNotified) {
               didError = true
-              onError('aborted', 'execution cancelled')
+              const msg = 'execution cancelled'
+              emitRE({
+                type: 'run_failed',
+                schemaVersion,
+                producerVersion,
+                runId: rid,
+                error: { code: 'aborted', message: msg },
+                ts: Date.now(),
+              })
+              onError('aborted', msg)
             }
             resolve()
             return
@@ -770,6 +933,14 @@ export async function runPiCliStream({
                 orchestration: settings.orchestration ?? 'none',
               })
             )
+            emitRE({
+              type: 'run_failed',
+              schemaVersion,
+              producerVersion,
+              runId: rid,
+              error: { code: 'pi_exit', message: msg, details: { code } },
+              ts: Date.now(),
+            })
             onError('pi_exit', msg)
           }
           if (!didError && !completionNotified) {

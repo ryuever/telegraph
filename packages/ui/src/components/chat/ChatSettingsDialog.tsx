@@ -142,6 +142,15 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
   const setWorktreeIsolation = (worktreeIsolation: boolean) =>
     setDraft(d => ({ ...d, worktreeIsolation }))
 
+  const setExtensionBlocklistText = (raw: string) =>
+    setDraft(d => ({
+      ...d,
+      extensionBlocklist: raw
+        .split(/[,\n]+/)
+        .map(s => s.trim())
+        .filter(Boolean),
+    }))
+
   const setApiKey = (key: string) =>
     setDraft(d => ({
       ...d,
@@ -335,6 +344,21 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
                 </div>
               </>
             )}
+          </Field>
+
+          <Field
+            label="Extension blocklist"
+            hint="Comma-separated capability ids denied for runs (merged with ~/.telegraph/extension-registry.json). Example: pi-subagents"
+          >
+            <input
+              type="text"
+              value={draft.extensionBlocklist.join(', ')}
+              onChange={e => setExtensionBlocklistText(e.target.value)}
+              placeholder="pi-subagents"
+              className={inputClass}
+              autoComplete="off"
+              spellCheck={false}
+            />
           </Field>
 
           {/* API key */}

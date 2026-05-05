@@ -11,8 +11,14 @@
     "./harness/*": "./src/harness/*.ts",
     "./*": "./src/*.ts"
   },
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
   "dependencies": {
-    "@mariozechner/pi-ai": "^0.72.1"
+    "@mariozechner/pi-ai": "^0.72.1",
+    "@telegraph/runtime-contracts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

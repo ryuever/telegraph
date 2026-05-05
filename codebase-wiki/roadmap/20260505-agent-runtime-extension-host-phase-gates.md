@@ -192,6 +192,41 @@ flowchart TB
   Phase3ComplexExtSecurity --> Phase4InstallUiOps
 ```
 
+## Gate 评审记录（实施迭代）
+
+### Gate Review - Phase 0
+
+- Date: 2026-05-05
+- Decision: PASS（contracts 包与 golden 已合入；映射见 `packages/runtime-contracts/COMPATIBILITY.md`）
+
+### Gate Review - Phase 1
+
+- Date: 2026-05-05
+- Decision: CONDITIONAL_PASS
+- Scope: `streamPiAiRuntimeEvents` + pi-cli `onRuntimeEvent`；`AgentStreamService` 统一 `handleRuntimeEvent`；`runtime_event` IPC；Trace 按 `runId` 分组；双写 legacy `llm_trace`（pi-ai / pi-cli 策略见 `runtimeEventForwarding.ts`）
+- Follow-ups: 将 `PiCliBackend` / 旧 `PiAiBackend.send` 单路径完全收敛到 runtime 工厂；Trace 仅消费 `runtime_event` 的纯模式
+
+### Gate Review - Phase 2
+
+- Date: 2026-05-05
+- Decision: CONDITIONAL_PASS
+- Scope: `ExtensionRegistry`（`~/.telegraph/extension-registry.json`）；`piAiToolLikeToDefinition` / `jsonSchemaToolToDefinition`；pi-ai 内嵌 tool loop 沿用现有 pi-ai（契约层已就绪）
+- Follow-ups: UI 安装路径、持久化与 daemon 的 RPC 同步；第二类工具源（如 MCP）端到端接线
+
+### Gate Review - Phase 3
+
+- Date: 2026-05-05
+- Decision: CONDITIONAL_PASS
+- Scope: `extensionBlocklist` + registry `blocklist` 合并；`[telegraph.fallback]` pi-subagents 解析日志
+- Follow-ups: 固定 demo 脚本与恶意扩展演练用例入库；child run 顺序语义专项测试
+
+### Gate Review - Phase 4
+
+- Date: 2026-05-05
+- Decision: CONDITIONAL_PASS
+- Scope: Chat 设置中 extension blocklist 编辑；`[telegraph.metrics] run_terminal` 结构化日志
+- Follow-ups: Install/Update/Uninstall 全流程产品 UI；SLO 仪表板；自动升级/回滚剧本与版本矩阵文档
+
 ## 跨阶段硬性门禁（任何阶段都必须满足）
 
 - 任何协议调整都要附带兼容说明与迁移备注。

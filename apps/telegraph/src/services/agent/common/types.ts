@@ -1,4 +1,9 @@
 import type { AgentRuntimeSettings } from '@telegraph/agent/types'
+import type { RunInput, RuntimeEvent } from '@telegraph/runtime-contracts'
+
+export type { RunInput, RuntimeEvent }
+
+/** Phase 0+ contracts — legacy {@link AgentRunEvent} chunks coexist with `runtime_event` (Phase 1). */
 
 export type AgentRunStatus =
   | 'queued'
@@ -72,6 +77,11 @@ export type LlmTracePayload =
       /** Raw iterator event from `@mariozechner/pi-ai` stream. */
       event: unknown
     }
+  | {
+      kind: 'runtime_event'
+      /** Phase 1: canonical `RuntimeEvent` for Trace v2. */
+      event: RuntimeEvent
+    }
 
 export type AgentRunEvent =
   | { type: 'run_queued'; runId: string; status: 'queued' }
@@ -83,6 +93,7 @@ export type AgentRunEvent =
   | { type: 'error'; runId: string; error: string }
   | { type: 'done'; runId: string }
   | { type: 'llm_trace'; runId: string; sessionId: string; trace: LlmTracePayload }
+  | { type: 'runtime_event'; runId: string; sessionId: string; event: RuntimeEvent }
 
 export type AgentStreamChunk = AgentRunEvent
 

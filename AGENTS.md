@@ -21,6 +21,7 @@ Electron + React + Vite desktop app, organized as a pnpm monorepo modeled after 
 │       ├── tsconfig.json
 │       └── package.json                    # electron deps + start/package/make/dev/lint scripts
 ├── packages/
+│   ├── runtime-contracts/                  # @telegraph/runtime-contracts — RunInput / RuntimeEvent / tool & extension types
 │   └── ui/                                 # workspace package @telegraph/ui (shadcn-style)
 │       ├── src/
 │       │   ├── components/
@@ -58,6 +59,7 @@ Electron + React + Vite desktop app, organized as a pnpm monorepo modeled after 
 | `@telegraph/core/*`              | `apps/telegraph/src/core/*`                  | Same as above                                                           |
 | `@telegraph/services/*`          | `apps/telegraph/src/services/*`              | Same as above                                                           |
 | `@telegraph/ui/*`                | `packages/ui/src/*` (workspace + exports map)| App imports of UI, e.g. `@telegraph/ui/components/Toolbar`              |
+| `@telegraph/runtime-contracts`   | `packages/runtime-contracts/src/index.ts` (tsconfig paths + workspace) | `@telegraph/agent`, `apps/telegraph` |
 
 The three `@telegraph/{application,core,services}/*` subroots are explicit (not a single `@telegraph/*` wildcard) so they don't collide with the `@telegraph/ui` workspace package.
 
@@ -65,7 +67,7 @@ The three `@telegraph/{application,core,services}/*` subroots are explicit (not 
 
 | File                                       | Aliases declared                                                                           |
 |--------------------------------------------|--------------------------------------------------------------------------------------------|
-| `apps/telegraph/tsconfig.json`             | `@/*`, `@telegraph/{application,core,services}/*`, `@telegraph/ui/*`                       |
+| `apps/telegraph/tsconfig.json`             | `@/*`, `@telegraph/{application,core,services}/*`, `@telegraph/ui/*`, `@telegraph/runtime-contracts` |
 | `packages/ui/tsconfig.json`                | `@telegraph/ui/*` (self-reference), `@telegraph/{application,core,services}/*` (cross-pkg) |
 | `apps/telegraph/vite.{main,preload,fork}.config.ts` | `@telegraph/{application,core,services}` (no UI in these processes)               |
 | `apps/telegraph/vite.renderer.config.ts`   | `@`, `@telegraph/{application,core,services}` (NO `@telegraph/ui` — see below)             |

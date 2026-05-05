@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "lib": ["ES2022"],
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@telegraph/runtime-contracts/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

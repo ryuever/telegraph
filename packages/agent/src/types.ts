@@ -46,6 +46,11 @@ export interface AgentRuntimeSettings {
   orchestrationPattern?: AgentOrchestrationPattern
   /** Hint for parallel task workspace isolation in pi-subagents mode. */
   worktreeIsolation?: boolean
+  /**
+   * Extension capability ids denied for this run (renderer + optional daemon registry merge).
+   * Example: `['pi-subagents']` blocks pi-subagents orchestration paths.
+   */
+  extensionBlocklist?: string[]
 }
 
 export interface AgentStreamCallbacks {
@@ -70,7 +75,7 @@ export interface AgentSendInput {
   onPiAiStreamEvent?: (event: unknown) => void | Promise<void>
 }
 
-export type AgentBackendKind = 'pi-ai' | 'pi-cli'
+export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'langgraph' | 'vercel-ai'
 export type AgentOrchestrationMode = 'none' | 'pi-subagents'
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { cn } from '@telegraph/ui/lib/utils'
 import type { LlmTracePayload } from './types'
 import type { LlmTraceRow } from './llm-trace-store'
@@ -11,6 +11,15 @@ function formatJson(trace: LlmTracePayload): string {
   } catch {
     return String(trace)
   }
+}
+
+function runtimeEventBadgeClass(eventType: string): string {
+  if (eventType.startsWith('run_')) return 'bg-fuchsia-500/15 text-fuchsia-200'
+  if (eventType.startsWith('model_')) return 'bg-amber-500/15 text-amber-200'
+  if (eventType.startsWith('tool_')) return 'bg-cyan-500/15 text-cyan-200'
+  if (eventType.startsWith('step_') || eventType.includes('child_run')) return 'bg-lime-500/15 text-lime-200'
+  if (eventType === 'runtime_log') return 'bg-zinc-600/40 text-zinc-300'
+  return 'bg-slate-500/15 text-slate-200'
 }
 
 export function LlmTracePanel({
@@ -40,6 +49,16 @@ export function LlmTracePanel({
     el.scrollTop = el.scrollHeight
   }, [rows.length, open])
 
+  const rowsByRun = useMemo(() => {
+    const m = new Map<string, LlmTraceRow[]>()
+    for (const r of rows) {
+      const list = m.get(r.runId) ?? []
+      list.push(r)
+      m.set(r.runId, list)
+    }
+    return m
+  }, [rows])
+
   return (
     <aside
       className={cn(
@@ -55,8 +74,8 @@ export function LlmTracePanel({
           <div className="text-[12px] font-semibold tracking-tight text-zinc-100">LLM trace</div>
           <div className="truncate text-[10px] text-zinc-500">
             {scopeAllChats
-              ? 'All sidebar chats · Pi JSON · pi-ai stream'
-              : 'Active chat only · Pi JSON · pi-ai stream'}
+              ? 'All chats · legacy trace + RuntimeEvent (v1)'
+              : 'Active chat · legacy trace + RuntimeEvent (v1)'}
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -104,37 +123,57 @@ export function LlmTracePanel({
             </p>
           )
         ) : (
-          <ul className="flex flex-col gap-3">
-            {rows.map((row, i) => (
-              <li
-                key={`${row.sessionId}-${row.runId}-${row.ts}-${i}`}
-                className="rounded-lg border border-zinc-800/90 bg-zinc-900/40 p-2"
-              >
-                <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
-                  <span
-                    className={cn(
-                      'rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide',
-                      row.trace.kind === 'telegraph_turn_context' && 'bg-violet-500/15 text-violet-200',
-                      row.trace.kind === 'pi_cli_request' && 'bg-sky-500/15 text-sky-200',
-                      row.trace.kind === 'pi_json_line' && 'bg-emerald-500/15 text-emerald-200',
-                      row.trace.kind === 'pi_ai_request' && 'bg-amber-500/15 text-amber-200',
-                      row.trace.kind === 'pi_ai_stream_event' && 'bg-orange-500/15 text-orange-200'
-                    )}
-                  >
-                    {row.trace.kind}
-                  </span>
-                  <span className="font-mono text-zinc-600">{row.runId.slice(0, 8)}…</span>
-                  <span>{new Date(row.ts).toLocaleTimeString()}</span>
-                  {scopeAllChats && (
-                    <span className="rounded bg-zinc-800/90 px-1 font-mono text-[9px] text-zinc-400">
-                      {row.sessionId.slice(0, 12)}
-                      {row.sessionId.length > 12 ? '…' : ''}
-                    </span>
-                  )}
+          <ul className="flex flex-col gap-4">
+            {[...rowsByRun.entries()].map(([runId, runRows]) => (
+              <li key={runId} className="rounded-lg border border-zinc-800/70 bg-zinc-950/30 p-2">
+                <div className="mb-2 flex flex-wrap items-baseline gap-2 border-b border-zinc-800/60 pb-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Run</span>
+                  <span className="font-mono text-[11px] text-zinc-200">{runId.slice(0, 10)}…</span>
+                  <span className="text-[10px] text-zinc-500">{runRows.length} row{runRows.length === 1 ? '' : 's'}</span>
                 </div>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded border border-zinc-800/60 bg-zinc-950/80 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-300">
-                  {formatJson(row.trace)}
-                </pre>
+                <ul className="flex flex-col gap-2">
+                  {runRows.map((row, i) => {
+                    const tr = row.trace
+                    const isContract = tr.kind === 'runtime_event'
+                    let evType = ''
+                    if (isContract) {
+                      const ev = (tr as { kind: 'runtime_event'; event: { type?: string } }).event
+                      evType = typeof ev?.type === 'string' ? ev.type : ''
+                    }
+                    return (
+                      <li
+                        key={`${row.sessionId}-${row.runId}-${row.ts}-${i}`}
+                        className="rounded-md border border-zinc-800/80 bg-zinc-900/40 p-2"
+                      >
+                        <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+                          <span
+                            className={cn(
+                              'rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide',
+                              !isContract && row.trace.kind === 'telegraph_turn_context' && 'bg-violet-500/15 text-violet-200',
+                              !isContract && row.trace.kind === 'pi_cli_request' && 'bg-sky-500/15 text-sky-200',
+                              !isContract && row.trace.kind === 'pi_json_line' && 'bg-emerald-500/15 text-emerald-200',
+                              !isContract && row.trace.kind === 'pi_ai_request' && 'bg-amber-500/15 text-amber-200',
+                              !isContract && row.trace.kind === 'pi_ai_stream_event' && 'bg-orange-500/15 text-orange-200',
+                              isContract && runtimeEventBadgeClass(evType)
+                            )}
+                          >
+                            {isContract ? evType || 'runtime_event' : row.trace.kind}
+                          </span>
+                          <span>{new Date(row.ts).toLocaleTimeString()}</span>
+                          {scopeAllChats && (
+                            <span className="rounded bg-zinc-800/90 px-1 font-mono text-[9px] text-zinc-400">
+                              {row.sessionId.slice(0, 12)}
+                              {row.sessionId.length > 12 ? '…' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded border border-zinc-800/60 bg-zinc-950/80 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-300">
+                          {formatJson(row.trace)}
+                        </pre>
+                      </li>
+                    )
+                  })}
+                </ul>
               </li>
             ))}
           </ul>

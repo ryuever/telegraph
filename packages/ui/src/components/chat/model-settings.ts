@@ -27,6 +27,8 @@ export interface ChatModelSettings {
   orchestration: AgentOrchestrationMode
   orchestrationPattern: 'chain' | 'parallel'
   worktreeIsolation: boolean
+  /** Blocklisted extension capability ids (merged with `~/.telegraph/extension-registry.json`). */
+  extensionBlocklist: string[]
   /** Per-provider creds keyed by provider id, so switching providers keeps each one's setup. */
   byProvider: Record<string, PerProviderSettings>
 }
@@ -55,6 +57,7 @@ export const DEFAULT_SETTINGS: ChatModelSettings = {
   orchestration: 'none',
   orchestrationPattern: 'chain',
   worktreeIsolation: false,
+  extensionBlocklist: [],
   byProvider: {},
 }
 
@@ -163,6 +166,9 @@ export function loadSettings(): ChatModelSettings {
       orchestration: parsed.orchestration ?? DEFAULT_SETTINGS.orchestration,
       orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
       worktreeIsolation: parsed.worktreeIsolation ?? DEFAULT_SETTINGS.worktreeIsolation,
+      extensionBlocklist: Array.isArray(parsed.extensionBlocklist)
+        ? parsed.extensionBlocklist
+        : DEFAULT_SETTINGS.extensionBlocklist,
       byProvider: { ...DEFAULT_SETTINGS.byProvider, ...(parsed.byProvider ?? {}) },
     }
   } catch {
@@ -190,6 +196,8 @@ export function toRuntimeSettings(settings: ChatModelSettings): AgentRuntimeSett
     orchestration: settings.orchestration,
     orchestrationPattern: settings.orchestrationPattern,
     worktreeIsolation: settings.worktreeIsolation,
+    extensionBlocklist:
+      settings.extensionBlocklist.length > 0 ? [...settings.extensionBlocklist] : undefined,
   }
 }
 
