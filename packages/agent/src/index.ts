@@ -76,7 +76,8 @@ export { SessionStore, type SessionStoreConfig } from '@telegraph/agent/runtime/
 export { ToolRegistry, type ToolCallEvent, type ToolResultEvent, type ToolParameter, type ToolParameters } from '@telegraph/agent/runtime/toolExecution/ToolRegistry'
 export { ToolExecutor, type ToolCallInput } from '@telegraph/agent/runtime/toolExecution/ToolExecutor'
 export { ToolCallParser, type ParsedToolCall } from '@telegraph/agent/runtime/toolExecution/ToolCallParser'
-export { ExtensionRegistry, type LoadedExtension } from '@telegraph/agent/extensions/node'
+// Node.js-only exports (ExtensionRegistry, createExecutor) are intentionally excluded from main export
+// Import them from '@telegraph/agent/extensions/node' if needed in Node.js environments
 export {
   validateManifest,
   assertValidManifest,
@@ -90,7 +91,6 @@ export {
   type ExecutableType,
   type LLMHints,
 } from '@telegraph/agent/extensions/ExtensionManifest'
-export { createExecutor, type ToolExecutor as ExtensionToolExecutor } from '@telegraph/agent/extensions/node'
 export { SessionRepository, type StoredSession, type StoredMessage, SessionRepositoryMigration } from '@telegraph/agent/persistence/SessionRepository'
 export {
   DependencyGraph,
