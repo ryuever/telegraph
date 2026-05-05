@@ -29,6 +29,19 @@ references:
 
 本文是执行清单；设计推理与 Multica 源码对照见 [**A-004：Multica 源码实现映射与 Telegraph 适配路径**](../architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md)。范式取舍见 **D-001**。
 
+## 开始前必看（强建议，不阻塞）
+
+进入阶段 0 前，建议先阅读以下文档，统一边界与术语：
+
+- [A-005：Telegraph Agent Runtime 与 Extension Host 理论基础](../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md)  
+  - 对齐 runtime/extension host 的长期目标，避免路线图只停留在“多智能体编排”层面。
+- [A-004：Multica 源码实现映射与 Telegraph 适配路径](../architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md)  
+  - 理解当前代码映射基础与可复用能力。
+- [A-002：Telegraph 多进程拓扑](../architecture/20260504-multi-process-topology.md)  
+  - 明确 main/daemon/renderer 的职责边界。
+- [I-002：pi-ai 流式首包后卡住复盘](../issue/20260505-pi-ai-llm-trace-await-sink-deadlock.md)  
+  - 作为流式事件与回压设计的风险基线。
+
 ---
 
 ## 阶段 0：定标（1–2 次技术评审）
