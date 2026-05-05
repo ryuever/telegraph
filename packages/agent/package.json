@@ -10,7 +10,8 @@
     "./providers/*": "./src/providers/*.ts",
     "./backends/*": "./src/backends/*.ts",
     "./harness/*": "./src/harness/*.ts",
-    "./extensions/*": "./src/extensions/*.ts",
+    "./extensions/node": "./src/extensions/node/index.ts",
+    "./extensions/ExtensionManifest": "./src/extensions/ExtensionManifest.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {

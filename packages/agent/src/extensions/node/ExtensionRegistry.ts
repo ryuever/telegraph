@@ -1,7 +1,17 @@
 /**
  * ExtensionRegistry: Load, validate, and manage extensions
  * Integrates manifests with ToolRegistry for dynamic tool registration
+ * 
+ * ⚠️ This module is Node.js-only and cannot be imported in browser environments
  */
+
+if (typeof window !== 'undefined') {
+  throw new Error(
+    'ExtensionRegistry is a Node.js-only module and cannot be used in browser environments. ' +
+    'This error indicates incorrect module resolution. Ensure ExtensionRegistry is only imported ' +
+    'in Node.js contexts via @telegraph/agent/extensions/node'
+  );
+}
 
 import * as fs from 'fs';
 import * as path from 'path';

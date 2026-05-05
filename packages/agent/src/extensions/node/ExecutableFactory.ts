@@ -1,7 +1,17 @@
 /**
  * Executable Factory: Creates executor functions from ExecutableConfig
  * Supports node (dynamic import), python (subprocess), binary (subprocess), http (fetch)
+ * 
+ * ⚠️ This module is Node.js-only and cannot be imported in browser environments
  */
+
+if (typeof window !== 'undefined') {
+  throw new Error(
+    'ExecutableFactory is a Node.js-only module and cannot be used in browser environments. ' +
+    'This error indicates incorrect module resolution. Ensure ExecutableFactory is only imported ' +
+    'in Node.js contexts via @telegraph/agent/extensions/node'
+  );
+}
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
