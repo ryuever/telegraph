@@ -1,37 +1,55 @@
 import {
   DEFAULT_MODEL_CATALOG,
   MINIMAX_CN_PROVIDER_ID,
-  MINIMAX_OPENAI_BASE_URL,
-  MINIMAX_OPENAI_COMPAT_PROVIDER_ID,
-  MINIMAX_PROVIDER_ID,
   type AgentBackendKind,
   type AgentOrchestrationMode,
+  type AgentOrchestrationPattern,
   type AgentRuntimeSettings,
   type ModelDescriptor,
 } from '@telegraph/agent'
 
 export type { AgentRuntimeSettings, ModelDescriptor }
 
-const STORAGE_KEY = 'telegraph.chat.modelSettings.v1'
+// ---------------------------------------------------------------------------
+// Storage keys
+// ---------------------------------------------------------------------------
 
-export interface PerProviderSettings {
-  apiKey: string
-  /** Only honored by `minimax-openai-compat`; pi-ai's first-class providers carry their own baseUrl. */
-  baseUrl?: string
-}
+const STORAGE_KEY = 'telegraph.chat.modelSettings.v2'
 
-export interface ChatModelSettings {
+// ---------------------------------------------------------------------------
+// Separated settings concerns
+// ---------------------------------------------------------------------------
+
+/** Which provider + model to use. */
+export interface ModelSelection {
   provider: string
   modelId: string
+  /** Execution backend selector. */
   backend: AgentBackendKind
+}
+
+/** Multi-agent orchestration configuration. */
+export interface OrchestrationSettings {
   orchestration: AgentOrchestrationMode
-  orchestrationPattern: 'chain' | 'parallel'
+  orchestrationPattern: AgentOrchestrationPattern
   worktreeIsolation: boolean
+}
+
+/** Extension-level overrides. */
+export interface ExtensionSettings {
   /** Blocklisted extension capability ids (merged with `~/.telegraph/extension-registry.json`). */
   extensionBlocklist: string[]
-  /** Per-provider creds keyed by provider id, so switching providers keeps each one's setup. */
-  byProvider: Record<string, PerProviderSettings>
 }
+
+/** Unified settings stored in localStorage — composed from the three concerns above. */
+export interface ChatModelSettings
+  extends ModelSelection,
+    OrchestrationSettings,
+    ExtensionSettings {}
+
+// ---------------------------------------------------------------------------
+// Env model types (read-only from main process .env)
+// ---------------------------------------------------------------------------
 
 export interface EnvModelConfig {
   provider: string
@@ -50,16 +68,35 @@ export interface ModelConnectionStatus {
   error?: string
 }
 
-export const DEFAULT_SETTINGS: ChatModelSettings = {
+// ---------------------------------------------------------------------------
+// Defaults
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_MODEL_SELECTION: ModelSelection = {
   provider: MINIMAX_CN_PROVIDER_ID,
   modelId: 'MiniMax-M2.7',
   backend: 'pi-ai',
+}
+
+export const DEFAULT_ORCHESTRATION: OrchestrationSettings = {
   orchestration: 'none',
   orchestrationPattern: 'chain',
   worktreeIsolation: false,
-  extensionBlocklist: [],
-  byProvider: {},
 }
+
+export const DEFAULT_EXTENSION: ExtensionSettings = {
+  extensionBlocklist: [],
+}
+
+export const DEFAULT_SETTINGS: ChatModelSettings = {
+  ...DEFAULT_MODEL_SELECTION,
+  ...DEFAULT_ORCHESTRATION,
+  ...DEFAULT_EXTENSION,
+}
+
+// ---------------------------------------------------------------------------
+// Env model helpers (credentials managed by main process, not renderer)
+// ---------------------------------------------------------------------------
 
 /**
  * Load available models from .env via main process
@@ -75,7 +112,7 @@ export async function loadEnvModels(): Promise<EnvModelConfig[]> {
 }
 
 /**
- * Test connection to a specific model
+ * Test connection to a specific model (delegates to main process which holds the key)
  */
 export async function testModelConnection(
   provider: string,
@@ -111,65 +148,40 @@ export async function testModelConnection(
 }
 
 /**
- * Merge env models into settings - adds env models to byProvider if not already set
- */
-export function mergeEnvModelsIntoSettings(
-  settings: ChatModelSettings,
-  envModels: EnvModelConfig[]
-): ChatModelSettings {
-  const byProvider = { ...settings.byProvider }
-
-  for (const envModel of envModels) {
-    // Only set if this provider doesn't already have a key set
-    if (!byProvider[envModel.provider]?.apiKey) {
-      byProvider[envModel.provider] = {
-        apiKey: envModel.apiKey,
-        baseUrl: envModel.baseUrl,
-      }
-    }
-  }
-
-  return {
-    ...settings,
-    byProvider,
-  }
-}
-
-/**
- * Get the first available model from env config as default
+ * Pick the first available model from env config as default selection.
  */
 export function getDefaultModelFromEnv(envModels: EnvModelConfig[]): {
   provider: string
   modelId: string
 } | null {
   if (envModels.length === 0) return null
-
   const first = envModels[0]
-  return {
-    provider: first.provider,
-    modelId: first.modelId,
-  }
+  return { provider: first.provider, modelId: first.modelId }
 }
+
+// ---------------------------------------------------------------------------
+// Persistence
+// ---------------------------------------------------------------------------
 
 export function loadSettings(): ChatModelSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      return DEFAULT_SETTINGS
-    }
+    if (!raw) return DEFAULT_SETTINGS
     const parsed = JSON.parse(raw) as Partial<ChatModelSettings>
     return {
+      // ModelSelection
       provider: parsed.provider ?? DEFAULT_SETTINGS.provider,
       modelId: parsed.modelId ?? DEFAULT_SETTINGS.modelId,
       backend: parsed.backend ?? DEFAULT_SETTINGS.backend,
+      // OrchestrationSettings
       orchestration: parsed.orchestration ?? DEFAULT_SETTINGS.orchestration,
       orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
       worktreeIsolation: parsed.worktreeIsolation ?? DEFAULT_SETTINGS.worktreeIsolation,
+      // ExtensionSettings
       extensionBlocklist: Array.isArray(parsed.extensionBlocklist)
         ? parsed.extensionBlocklist
         : DEFAULT_SETTINGS.extensionBlocklist,
-      byProvider: { ...DEFAULT_SETTINGS.byProvider, ...(parsed.byProvider ?? {}) },
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -185,13 +197,33 @@ export function saveSettings(settings: ChatModelSettings) {
   }
 }
 
-export function toRuntimeSettings(settings: ChatModelSettings): AgentRuntimeSettings {
-  const per = settings.byProvider[settings.provider] ?? { apiKey: '' }
+// ---------------------------------------------------------------------------
+// Conversion to runtime settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Build `AgentRuntimeSettings` consumed by the main-process agent service.
+ *
+ * API key / baseUrl are **not** included — the main process resolves credentials
+ * from its own env / secure store. The renderer only communicates the selection.
+ */
+export function toRuntimeSettings(
+  settings: ChatModelSettings,
+  envModels: EnvModelConfig[] = []
+): AgentRuntimeSettings {
+  // Look up credentials from env models (sourced from main process)
+  const envModel = envModels.find(
+    m => m.provider === settings.provider && m.modelId === settings.modelId
+  )
+  // Fallback: try matching just provider
+  const envProviderFallback = envModels.find(m => m.provider === settings.provider)
+  const env = envModel ?? envProviderFallback
+
   return {
     provider: settings.provider,
     modelId: settings.modelId,
-    apiKey: per.apiKey,
-    baseUrl: per.baseUrl,
+    apiKey: env?.apiKey ?? '',
+    baseUrl: env?.baseUrl,
     backend: settings.backend,
     orchestration: settings.orchestration,
     orchestrationPattern: settings.orchestrationPattern,
@@ -200,6 +232,10 @@ export function toRuntimeSettings(settings: ChatModelSettings): AgentRuntimeSett
       settings.extensionBlocklist.length > 0 ? [...settings.extensionBlocklist] : undefined,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Catalog helpers
+// ---------------------------------------------------------------------------
 
 export function findDescriptor(
   catalog: ModelDescriptor[],

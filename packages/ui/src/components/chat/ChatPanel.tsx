@@ -21,9 +21,9 @@ import {
   saveSettings,
   toRuntimeSettings,
   loadEnvModels,
-  mergeEnvModelsIntoSettings,
   getDefaultModelFromEnv,
   type ChatModelSettings,
+  type EnvModelConfig,
 } from './model-settings'
 import type { AgentService, LlmTracePayload } from './types'
 
@@ -50,6 +50,7 @@ const SUGGESTIONS = [
 
 export function ChatPanel({ agent }: Props) {
   const [settings, setSettings] = useState<ChatModelSettings>(() => loadSettings())
+  const [envModels, setEnvModels] = useState<EnvModelConfig[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isLoadingEnv, setIsLoadingEnv] = useState(true)
   const [tracePanelOpen, setTracePanelOpenInner] = useState(readLlmTraceOpenFromStorage)
@@ -80,22 +81,25 @@ export function ChatPanel({ agent }: Props) {
 
     async function initEnvConfig() {
       try {
-        const envModels = await loadEnvModels()
+        const models = await loadEnvModels()
         if (!isMounted) return
 
+        setEnvModels(models)
         const currentSettings = loadSettings()
-        const mergedSettings = mergeEnvModelsIntoSettings(currentSettings, envModels)
 
-        // If no provider/model is set in localStorage, use the first env model as default
-        const defaultFromEnv = getDefaultModelFromEnv(envModels)
-        if (defaultFromEnv && !currentSettings.byProvider[currentSettings.provider]?.apiKey) {
-          mergedSettings.provider = defaultFromEnv.provider
-          mergedSettings.modelId = defaultFromEnv.modelId
+        // If no env model matches the current provider, use the first env model as default
+        const defaultFromEnv = getDefaultModelFromEnv(models)
+        if (defaultFromEnv && !models.some(m => m.provider === currentSettings.provider)) {
+          const updated = {
+            ...currentSettings,
+            provider: defaultFromEnv.provider,
+            modelId: defaultFromEnv.modelId,
+          }
+          setSettings(updated)
+          saveSettings(updated)
+        } else {
+          setSettings(currentSettings)
         }
-
-        setSettings(mergedSettings)
-        // Save the merged settings to localStorage for persistence
-        saveSettings(mergedSettings)
       } catch (err) {
         console.error('[ChatPanel] Failed to load env config:', err)
       } finally {
@@ -116,10 +120,10 @@ export function ChatPanel({ agent }: Props) {
   // and no API key is configured.
   const agentService = useMemo<AgentService>(() => {
     if (agent) return agent
-    const runtime = toRuntimeSettings(settings)
+    const runtime = toRuntimeSettings(settings, envModels)
     if (!runtime.apiKey) return new MockAgentService()
     return new PiAgentService(runtime)
-  }, [agent, settings])
+  }, [agent, settings, envModels])
 
   const {
     conversations,
