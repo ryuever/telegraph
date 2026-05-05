@@ -4,6 +4,9 @@ import type { AgentSendOptions, AgentService } from './types'
 const AGENT_STREAM_CHANNEL = 'telegraph:agent:stream'
 const AGENT_STREAM_DATA_CHANNEL = 'telegraph:agent:stream:data'
 
+/** Late stream chunks can arrive after invoke resolves; detach listener slightly later so `llm_trace` is not dropped. */
+const IPC_STREAM_DETACH_MS = 1500
+
 type InvokeRunResult = {
   runId: string
   status: 'completed' | 'failed'
@@ -31,7 +34,7 @@ export class PiAgentService implements AgentService {
     this.settings = next
   }
 
-  async send({ conversation, onChunk, onStatus, signal }: AgentSendOptions): Promise<void> {
+  async send({ conversation, onChunk, onStatus, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
     const lastMessage = conversation.messages.filter(m => m.role === 'user').at(-1)
     if (!lastMessage) {
       throw new Error('Last message must be from user')
@@ -45,6 +48,26 @@ export class PiAgentService implements AgentService {
     }
 
     const runId = globalThis.crypto.randomUUID()
+    onLlmTrace?.({
+      runId,
+      sessionId: conversation.id,
+      trace: {
+        kind: 'telegraph_turn_context',
+        messages: conversation.messages.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          status: m.status,
+        })),
+        runtimeSettingsSummary: {
+          provider: this.settings.provider,
+          modelId: this.settings.modelId,
+          backend: this.settings.backend ?? 'pi-ai',
+          orchestration: this.settings.orchestration ?? 'none',
+          pattern: this.settings.orchestrationPattern ?? null,
+        },
+      },
+    })
     let error: Error | null = null
     let terminalEventReceived = false
     let resolveDone: (() => void) | null = null
@@ -72,7 +95,8 @@ export class PiAgentService implements AgentService {
 
     const listener = (_event: any, data: any) => {
       if (signal?.aborted) return
-      if (data?.runId && data.runId !== runId) return
+      // Require exact runId — payloads without runId must not advance terminal state (stderr JSON noise, etc.).
+      if (!data || typeof data !== 'object' || data.runId !== runId) return
       if (data.type === 'run_queued') {
         onStatus?.('queued')
       } else if (data.type === 'run_started') {
@@ -92,6 +116,12 @@ export class PiAgentService implements AgentService {
         onStatus?.('failed')
         error = new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
         finishOnce(error)
+      } else if (data.type === 'llm_trace') {
+        const sid =
+          'sessionId' in data && typeof data.sessionId === 'string' && data.sessionId.length > 0
+            ? data.sessionId
+            : conversation.id
+        onLlmTrace?.({ runId, sessionId: sid, trace: data.trace })
       }
     }
 
@@ -107,6 +137,7 @@ export class PiAgentService implements AgentService {
           message: lastMessage.content,
           settings: this.settings,
           runId,
+          sessionId: conversation.id,
         }),
         new Promise<never>((_, reject) => {
           setTimeout(() => {
@@ -141,7 +172,11 @@ export class PiAgentService implements AgentService {
       if (error) throw error
     } finally {
       signal?.removeEventListener('abort', abortHandler)
-      ipc.removeListener(AGENT_STREAM_DATA_CHANNEL, listener)
+      const ipcRef = ipc
+      const listenerRef = listener
+      setTimeout(() => {
+        ipcRef.removeListener(AGENT_STREAM_DATA_CHANNEL, listenerRef)
+      }, IPC_STREAM_DETACH_MS)
     }
   }
 }

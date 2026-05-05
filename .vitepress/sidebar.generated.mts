@@ -23,6 +23,10 @@ export const wikiSidebar = {
         {
           "text": "A-004 Multica 源码实现映射与 Telegraph「类 Multica」能力适配路径",
           "link": "/architecture/20260504-multica-implementation-map-and-telegraph-adaptation"
+        },
+        {
+          "text": "A-005 Telegraph Agent Runtime 与 Extension Host 理论基础",
+          "link": "/architecture/20260505-telegraph-agent-runtime-extension-host-theory"
         }
       ]
     }
@@ -45,6 +49,10 @@ export const wikiSidebar = {
         {
           "text": "I-001 Chat 页面 Tailwind 未生效故障复盘",
           "link": "/issue/20260504-chat-tailwind-not-applied-postmortem"
+        },
+        {
+          "text": "I-002 pi-ai 流式首包后卡住与助手长期 pending（llm_trace await sink 死锁）",
+          "link": "/issue/20260505-pi-ai-llm-trace-await-sink-deadlock"
         }
       ]
     }

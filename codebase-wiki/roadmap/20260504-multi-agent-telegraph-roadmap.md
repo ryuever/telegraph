@@ -6,7 +6,7 @@ description: >
   到 daemon 托管执行、目录隔离、会话恢复与可选 Pi CLI/pi-subagents，再到协调平面扩展或 Multica 集成。
 category: roadmap
 created: 2026-05-04
-updated: 2026-05-04
+updated: 2026-05-05
 tags:
   - telegraph
   - multi-agent
@@ -20,6 +20,9 @@ references:
   - id: D-001
     rel: related-to
     file: ../discussion/20260504-multica-vs-pi-multi-agent-for-telegraph.md
+  - id: A-005
+    rel: extended-by
+    file: ../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md
 ---
 
 # Telegraph 多智能体（类 Multica）分阶段路线图

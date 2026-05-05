@@ -1,10 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Toolbar } from '@telegraph/ui/components/Toolbar'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatMessages } from './ChatMessages'
 import { ChatComposer } from './ChatComposer'
 import { ChatSettingsDialog } from './ChatSettingsDialog'
 import { ModelBadge } from './ModelBadge'
+import { LlmTracePanel } from './LlmTracePanel'
+import {
+  appendLlmTraceRow,
+  clearLlmTraceRowsForSession,
+  getLlmTraceRowsSnapshot,
+  subscribeLlmTraceRows,
+} from './llm-trace-store'
 import { useChat } from './use-chat'
 import { useSessionsStore } from '@telegraph/stores'
 import { MockAgentService } from './agent-service'
@@ -18,10 +25,20 @@ import {
   getDefaultModelFromEnv,
   type ChatModelSettings,
 } from './model-settings'
-import type { AgentService } from './types'
+import type { AgentService, LlmTracePayload } from './types'
 
 interface Props {
   agent?: AgentService
+}
+
+const LLM_TRACE_OPEN_KEY = 'telegraph:chat:llmTraceOpen'
+
+function readLlmTraceOpenFromStorage(): boolean {
+  try {
+    return sessionStorage.getItem(LLM_TRACE_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
 const SUGGESTIONS = [
@@ -35,6 +52,27 @@ export function ChatPanel({ agent }: Props) {
   const [settings, setSettings] = useState<ChatModelSettings>(() => loadSettings())
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isLoadingEnv, setIsLoadingEnv] = useState(true)
+  const [tracePanelOpen, setTracePanelOpenInner] = useState(readLlmTraceOpenFromStorage)
+
+  const setTracePanelOpen = useCallback((next: React.SetStateAction<boolean>) => {
+    setTracePanelOpenInner(prev => {
+      const resolved = typeof next === 'function' ? next(prev) : next
+      try {
+        sessionStorage.setItem(LLM_TRACE_OPEN_KEY, resolved ? '1' : '0')
+      } catch {
+        /* noop */
+      }
+      return resolved
+    })
+  }, [])
+  /** Include every sidebar chat in the trace list (otherwise only the active conversation). */
+  const [traceScopeAllChats, setTraceScopeAllChats] = useState(true)
+
+  const traceRows = useSyncExternalStore(subscribeLlmTraceRows, getLlmTraceRowsSnapshot, getLlmTraceRowsSnapshot)
+
+  const appendLlmTrace = useCallback((info: { sessionId: string; runId: string; trace: LlmTracePayload }) => {
+    appendLlmTraceRow({ ...info, ts: Date.now() })
+  }, [])
 
   // Load and merge .env config on mount
   useEffect(() => {
@@ -94,7 +132,17 @@ export function ChatPanel({ agent }: Props) {
     renameConversation,
     sendMessage,
     stop,
-  } = useChat({ agent: agentService })
+  } = useChat({ agent: agentService, onLlmTrace: appendLlmTrace })
+
+  const displayedTraceRows = useMemo(
+    () =>
+      traceScopeAllChats ? traceRows : traceRows.filter(r => r.sessionId === activeId),
+    [traceScopeAllChats, traceRows, activeId]
+  )
+
+  const clearVisibleTraces = useCallback(() => {
+    clearLlmTraceRowsForSession(activeId)
+  }, [activeId])
 
   /** Subscribe directly so draft always tracks the real active session (avoids stale activeId vs. zustand). */
   const composerSessionId = useSessionsStore(s => s.activeSessionId)
@@ -145,41 +193,54 @@ export function ChatPanel({ agent }: Props) {
           onToggleCollapse={() => setCollapsed(c => !c)}
         />
 
-        <main className="flex min-w-0 flex-1 flex-col">
-          <Header
-            title={active.title}
-            messageCount={active.messages.length}
-            isStreaming={isStreaming}
-            provider={settings.provider}
-            modelId={settings.modelId}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-          <div className="min-h-0 flex-1">
-            {active.messages.length === 0 ? (
-            <EmptyState
-              onSuggest={text => {
-                const id = useSessionsStore.getState().activeSessionId
-                if (id) {
-                  setDraftBySession(prev => ({ ...prev, [id]: '' }))
-                  setComposerRemountKey(k => k + 1)
-                }
-                void sendMessage(text)
-              }}
+        <div className="flex min-h-0 min-w-0 flex-1">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <Header
+              title={active.title}
+              messageCount={active.messages.length}
+              isStreaming={isStreaming}
+              provider={settings.provider}
+              modelId={settings.modelId}
+              tracePanelOpen={tracePanelOpen}
+              onToggleTracePanel={() => setTracePanelOpen(o => !o)}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
-            ) : (
-              <ChatMessages messages={active.messages} isStreaming={isStreaming} />
-            )}
-          </div>
-          <ChatComposer
-            key={`${composerKey}|${composerRemountKey}`}
-            sessionId={composerKey}
-            seedText={seedText}
-            onPersistSessionDraft={persistSessionDraft}
-            onSendMessage={handleSendMessage}
-            onStop={stop}
-            isStreaming={isStreaming}
+            <div className="min-h-0 flex-1">
+              {active.messages.length === 0 ? (
+              <EmptyState
+                onSuggest={text => {
+                  const id = useSessionsStore.getState().activeSessionId
+                  if (id) {
+                    setDraftBySession(prev => ({ ...prev, [id]: '' }))
+                    setComposerRemountKey(k => k + 1)
+                  }
+                  void sendMessage(text)
+                }}
+              />
+              ) : (
+                <ChatMessages messages={active.messages} isStreaming={isStreaming} />
+              )}
+            </div>
+            <ChatComposer
+              key={`${composerKey}|${composerRemountKey}`}
+              sessionId={composerKey}
+              seedText={seedText}
+              onPersistSessionDraft={persistSessionDraft}
+              onSendMessage={handleSendMessage}
+              onStop={stop}
+              isStreaming={isStreaming}
+            />
+          </main>
+          <LlmTracePanel
+            open={tracePanelOpen}
+            rows={displayedTraceRows}
+            storedTraceRowCount={traceRows.length}
+            scopeAllChats={traceScopeAllChats}
+            onScopeAllChatsChange={setTraceScopeAllChats}
+            onClear={clearVisibleTraces}
+            onClose={() => setTracePanelOpen(false)}
           />
-        </main>
+        </div>
       </div>
 
       <ChatSettingsDialog
@@ -198,6 +259,8 @@ function Header({
   isStreaming,
   provider,
   modelId,
+  tracePanelOpen,
+  onToggleTracePanel,
   onOpenSettings,
 }: {
   title: string
@@ -205,6 +268,8 @@ function Header({
   isStreaming: boolean
   provider: string
   modelId: string
+  tracePanelOpen: boolean
+  onToggleTracePanel: () => void
   onOpenSettings: () => void
 }) {
   return (
@@ -220,6 +285,18 @@ function Header({
         </span>
       </div>
       <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+        <button
+          type="button"
+          onClick={onToggleTracePanel}
+          className={
+            tracePanelOpen
+              ? 'rounded-full border border-violet-500/50 bg-violet-500/15 px-2.5 py-0.5 text-violet-200'
+              : 'rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-0.5 text-zinc-300 hover:border-zinc-600'
+          }
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          LLM trace
+        </button>
         <span
           className={
             isStreaming

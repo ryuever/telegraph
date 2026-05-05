@@ -7,7 +7,7 @@ description: >
   构建配置、启动顺序与端口握手机制，明确各进程之间的 IPC 拓扑与服务路由。
 category: architecture
 created: 2026-05-04
-updated: 2026-05-04
+updated: 2026-05-05
 tags: [process, ipc, electron, utility-process, message-port, port-broker]
 status: final
 references:
@@ -23,6 +23,9 @@ references:
   - id: A-004
     rel: related-to
     file: ./20260504-multica-implementation-map-and-telegraph-adaptation.md
+  - id: I-002
+    rel: related-to
+    file: ../issue/20260505-pi-ai-llm-trace-await-sink-deadlock.md
 ---
 
 # Telegraph 多进程拓扑
@@ -60,7 +63,7 @@ references:
                               connectId = `${fromId}:${fromType}:${toType}`
 ```
 
-按 [`channel.README`](../../apps/telegraph/src/services/process/channel.README) 中的简化描述：
+按 `apps/telegraph/src/services/process/channel.README` 中的简化描述：
 
 ```
 (server)           (client)

@@ -14,6 +14,7 @@ interface StreamRequest {
   runId?: string
   message: string
   settings: AgentRuntimeSettings
+  sessionId?: string
 }
 
 /**
@@ -33,6 +34,7 @@ export function setupAgentHandler(daemonChannel: ElectronMessagePortMainChannel)
         return await daemonAgent.runStream({
           webContentsId: event.sender.id,
           runId,
+          sessionId: req.sessionId ?? '',
           message: req.message,
           settings: req.settings,
         })

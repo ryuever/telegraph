@@ -4,14 +4,16 @@ const SESSIONS_KEY = 'telegraph:sessions'
 const ACTIVE_SESSION_KEY = 'telegraph:activeSessionId'
 const MESSAGES_KEY_PREFIX = 'telegraph:messages:'
 
-/** Older builds persisted assistant rows as `pending`; after restart that looks "stuck". */
+/**
+ * Persisted threads are always loaded cold: `pending` / `streaming` assistant rows are stale
+ * (e.g. ipc race before status flush, or crash mid-run). Normalize so the UI does not stick on
+ * loading and localStorage does not keep bogus `streaming` forever.
+ */
 function sanitizeHydratedMessages(messages: ChatMessage[]): ChatMessage[] {
   return messages.map(m => {
-    if (m.role !== 'assistant' || m.status !== 'pending') return m
-    if ((m.content ?? '').trim().length > 0) {
-      return { ...m, status: 'done' }
-    }
-    return { ...m, status: 'streaming' }
+    if (m.role !== 'assistant') return m
+    if (m.status !== 'pending' && m.status !== 'streaming') return m
+    return { ...m, status: 'done' }
   })
 }
 

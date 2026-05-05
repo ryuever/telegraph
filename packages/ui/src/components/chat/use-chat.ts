@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSessionsStore, getSessionStore } from '@telegraph/stores'
-import type { AgentService, ChatConversation, ChatMessage } from './types'
+import type { AgentService, ChatConversation, ChatMessage, LlmTracePayload } from './types'
 import { MockAgentService } from './agent-service'
 
 function uid(prefix = '') {
@@ -15,10 +15,13 @@ function deriveTitle(text: string) {
 
 export interface UseChatOptions {
   agent?: AgentService
+  /** Structured LLM / Pi traces for the active chat session (both renderer context and daemon stream). */
+  onLlmTrace?: (info: { sessionId: string; runId: string; trace: LlmTracePayload }) => void
 }
 
-export function useChat({ agent }: UseChatOptions = {}) {
+export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
   const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
+  const onLlmTraceRef = useRef(onLlmTrace)
   /**
    * Per-session send queues: rapid double-send in one chat still runs in order, but
    * another session can send while this one is streaming (global chain would block
@@ -44,6 +47,10 @@ export function useChat({ agent }: UseChatOptions = {}) {
   useEffect(() => {
     agentRef.current = agent ?? new MockAgentService()
   }, [agent])
+
+  useEffect(() => {
+    onLlmTraceRef.current = onLlmTrace
+  }, [onLlmTrace])
 
   // Subscribe per session message store. Depend only on session **ids** so `renameSession`
   // (title-only) does not tear down listeners.
@@ -186,6 +193,12 @@ export function useChat({ agent }: UseChatOptions = {}) {
                 toolCalls: [...(m.toolCalls ?? []), call],
               }))
             },
+            onLlmTrace: info =>
+              onLlmTraceRef.current?.({
+                sessionId: info.sessionId || targetSessionId,
+                runId: info.runId,
+                trace: info.trace,
+              }),
           })
 
           store.updateMessage(assistantMsg.id, (m) => ({
@@ -201,6 +214,11 @@ export function useChat({ agent }: UseChatOptions = {}) {
           }))
         } finally {
           store.setStreaming(false)
+          // IPC / stream races (e.g. late terminal events vs invoke) must not leave a live placeholder row.
+          store.updateMessage(assistantMsg.id, m => {
+            if (m.status !== 'streaming' && m.status !== 'pending') return m
+            return { ...m, status: 'done' }
+          })
         }
       }
 

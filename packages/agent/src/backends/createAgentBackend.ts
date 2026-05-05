@@ -3,6 +3,9 @@ import { PiAiBackend } from '@telegraph/agent/backends/PiAiBackend'
 import { PiCliBackend } from '@telegraph/agent/backends/PiCliBackend'
 
 export function createAgentBackend(settings: AgentRuntimeSettings): AgentBackend {
+
+  console.log('createAgentBackend', settings)
+  
   switch (settings.backend) {
     case 'pi-cli':
       return new PiCliBackend(settings)

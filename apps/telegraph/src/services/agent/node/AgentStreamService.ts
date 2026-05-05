@@ -3,6 +3,7 @@ import { createAgentBackend } from '@telegraph/agent'
 import type {
   IAgentStreamSink,
   IAgentStreamService,
+  LlmTracePayload,
   RunAgentStreamPayload,
   RunAgentStreamResult,
 } from '../common/types'
@@ -14,6 +15,8 @@ import { runPiCliStream } from './runPiCliStream'
 import { AgentRunRegistry } from './AgentRunRegistry'
 
 export const AgentStreamServiceId = createId('agent-stream-service')
+
+const PI_AI_DEFAULT_SYSTEM = 'You are a helpful assistant.'
 
 @injectable()
 export default class AgentStreamService implements IAgentStreamService {
@@ -39,7 +42,7 @@ export default class AgentStreamService implements IAgentStreamService {
   private async runStreamInternal(req: RunAgentStreamPayload): Promise<RunAgentStreamResult> {
     const sink = this.getSink()
     const agent = createAgentBackend(req.settings)
-    const { webContentsId, runId, message } = req
+    const { webContentsId, runId, message, sessionId: streamSessionId } = req
     const debugContext = {
       runId,
       backend: req.settings.backend ?? 'pi-ai',
@@ -75,6 +78,10 @@ export default class AgentStreamService implements IAgentStreamService {
         )
       }
     }
+    // const pushLlmTrace = (trace: LlmTracePayload) =>
+    //   push({ type: 'llm_trace', runId, sessionId: streamSessionId ?? '', trace })
+    const safePushLlmTrace = (trace: LlmTracePayload) =>
+      safePush({ type: 'llm_trace', runId, sessionId: streamSessionId ?? '', trace }, 'llm_trace')
     let failed = false
     let finalError = ''
     let textBuffer = ''
@@ -98,6 +105,7 @@ export default class AgentStreamService implements IAgentStreamService {
           runId,
           message,
           settings: req.settings,
+          onLlmTrace: safePushLlmTrace,
           onTextDelta: (text: string) => {
             textBuffer += text
             void push({ type: 'text_delta', runId, text })
@@ -140,8 +148,21 @@ export default class AgentStreamService implements IAgentStreamService {
           },
         })
       } else {
+        console.log('[AgentStreamService] sending pi-ai request', JSON.stringify(debugContext))
         await agent.send({
           messages: [{ role: 'user', content: message }],
+          onPiAiRequest: request =>
+            safePushLlmTrace({
+              kind: 'pi_ai_request',
+              context: request.context,
+              options: request.options,
+              systemPrompt: request.context.systemPrompt ?? PI_AI_DEFAULT_SYSTEM,
+              messages: request.context.messages as Array<{ role: string; content: string }>,
+              provider: req.settings.provider,
+              modelId: req.settings.modelId,
+            }),
+          onPiAiStreamEvent: ev =>
+            safePushLlmTrace({ kind: 'pi_ai_stream_event', event: ev }),
           callbacks: {
             onTextDelta: (text: string) => {
               textBuffer += text

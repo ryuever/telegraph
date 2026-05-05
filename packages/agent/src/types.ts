@@ -64,6 +64,10 @@ export interface AgentSendInput {
   tools?: Tool[]
   signal?: AbortSignal
   callbacks?: AgentStreamCallbacks
+  /** Exact pi-ai request context/options prepared immediately before `stream()`. */
+  onPiAiRequest?: (request: { context: Context; options: { hasApiKey: boolean; signal: boolean } }) => void | Promise<void>
+  /** Raw pi-ai stream events (`text_delta`, `toolcall_*`, `done`, …) for debugging / UI trace. */
+  onPiAiStreamEvent?: (event: unknown) => void | Promise<void>
 }
 
 export type AgentBackendKind = 'pi-ai' | 'pi-cli'

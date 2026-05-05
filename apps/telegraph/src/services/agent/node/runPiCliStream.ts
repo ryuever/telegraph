@@ -5,6 +5,7 @@ import { constants, existsSync } from 'node:fs'
 import { devNull, homedir, platform } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { AgentRuntimeSettings } from '@telegraph/agent/types'
+import type { LlmTracePayload } from '../common/types'
 
 type PiCliStreamCallbacks = {
   onTextDelta: (text: string) => void
@@ -17,10 +18,13 @@ type RunPiCliStreamInput = {
   message: string
   settings: AgentRuntimeSettings
   signal?: AbortSignal
+  /** Forward structured LLM / Pi JSON traces to the renderer. */
+  onLlmTrace?: (trace: LlmTracePayload) => void
 } & PiCliStreamCallbacks
 
 type PiStreamEvent = {
   type?: string
+  messages?: unknown[]
   assistantMessageEvent?: {
     type?: string
     delta?: string
@@ -28,6 +32,96 @@ type PiStreamEvent = {
   message?: unknown
   success?: boolean
   finalError?: string
+}
+
+/** Pi `--mode json` event types surfaced in the chat LLM trace panel (tool/compaction omitted by default). */
+const PI_LLM_TRACE_TYPES = new Set([
+  'session',
+  'agent_start',
+  'agent_end',
+  'turn_start',
+  'turn_end',
+  'message_start',
+  'message_update',
+  'message_end',
+  'tool_execution_start',
+  'tool_execution_update',
+  'tool_execution_end',
+  'error',
+  'auto_retry_start',
+  'auto_retry_end',
+])
+
+function clonePiEventForTrace(evt: PiStreamEvent): unknown {
+  if (evt.type === 'message_update' && evt.assistantMessageEvent) {
+    const ame = evt.assistantMessageEvent
+    const d = ame.delta
+    if (typeof d === 'string' && d.length > 6000) {
+      return {
+        ...evt,
+        assistantMessageEvent: {
+          ...ame,
+          delta: `${d.slice(0, 6000)}… (+${d.length - 6000} chars truncated)`,
+        },
+      }
+    }
+  }
+  if (evt.type === 'agent_end' && Array.isArray(evt.messages)) {
+    try {
+      const s = JSON.stringify(evt.messages)
+      if (s.length > 180_000) {
+        return {
+          type: 'agent_end',
+          messagesTruncated: true,
+          messagesJsonChars: s.length,
+          preview: `${s.slice(0, 180_000)}…`,
+        }
+      }
+    } catch {
+      return { type: 'agent_end', note: 'messages not serializable for trace' }
+    }
+  }
+  return evt
+}
+
+const DEBUG_PI_JSON =
+  process.env.TELEGRAPH_PI_JSON_DEBUG === '1' || /^true$/i.test(process.env.TELEGRAPH_PI_JSON_DEBUG ?? '')
+
+/** Best-effort plain text from Pi `AgentMessage.content` (text blocks vary by `@mariozechner/pi-ai` / model). */
+function flattenAssistantContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue
+    const b = block as Record<string, unknown>
+    if (typeof b.text === 'string') {
+      parts.push(b.text)
+      continue
+    }
+    if (b.type === 'text' && typeof b.content === 'string') {
+      parts.push(b.content)
+    }
+  }
+  return parts.join('')
+}
+
+function assistantPlainFromMessagePayload(message: unknown): string {
+  if (!message || typeof message !== 'object') return ''
+  if ((message as { role?: string }).role !== 'assistant') return ''
+  return flattenAssistantContent((message as { content?: unknown }).content)
+}
+
+/** Last assistant plain text from Pi `agent_end.messages` when deltas were skipped (e.g. some tool/multi-agent paths). */
+function lastAssistantPlainTextFromMessages(messages: unknown[] | undefined): string {
+  if (!Array.isArray(messages) || messages.length === 0) return ''
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i]
+    if (!m || typeof m !== 'object') continue
+    if ((m as { role?: string }).role !== 'assistant') continue
+    return flattenAssistantContent((m as { content?: unknown }).content)
+  }
+  return ''
 }
 
 type ResolvedPiSubagentsExtension = {
@@ -355,6 +449,7 @@ export async function runPiCliStream({
   onTextDelta,
   onError,
   onDone,
+  onLlmTrace,
 }: RunPiCliStreamInput): Promise<void> {
   if (!settings.apiKey?.trim()) {
     throw new Error(
@@ -389,6 +484,15 @@ export async function runPiCliStream({
   }
 
   const args = buildPiArgs(message, settings, subagentExtensionPath ?? undefined)
+  onLlmTrace?.({
+    kind: 'pi_cli_request',
+    userMessage: message,
+    promptPassedToPi: args[args.length - 1] ?? '',
+    provider: settings.provider,
+    modelId: settings.modelId,
+    orchestration: settings.orchestration ?? 'none',
+    pattern: settings.orchestrationPattern ?? null,
+  })
   const piExecutable = resolvePiExecutable()
   const childEnv = buildPiChildEnv(settings)
   const redactedArgs = args.map((value, index, all) =>
@@ -416,6 +520,13 @@ export async function runPiCliStream({
     })
 
     let didError = false
+    /** Bytes emitted via Pi stream deltas (used to reconcile `agent_end.messages`). */
+    let aggregatedFromPi = ''
+    const emitTextDelta = (text: string) => {
+      if (!text) return
+      aggregatedFromPi += text
+      onTextDelta(text)
+    }
     /** Pi JSON stream signaled session end before process exited (common with extensions / -p). */
     let completionNotified = false
     let lingerKill: NodeJS.Timeout | null = null
@@ -506,6 +617,11 @@ export async function runPiCliStream({
     signal?.addEventListener('abort', abortHandler, { once: true })
 
     const dispatchPiStreamLine = (line: string) => {
+      if (DEBUG_PI_JSON && line.trim().length > 0) {
+        const cap = 16_384
+        const out = line.length > cap ? `${line.slice(0, cap)}…` : line
+        console.info('[pi-cli json line]', JSON.stringify({ runId: runId ?? null, line: out }))
+      }
       let evt: PiStreamEvent | null = null
       try {
         evt = JSON.parse(line) as PiStreamEvent
@@ -515,10 +631,27 @@ export async function runPiCliStream({
       lastActivityMs = Date.now()
       if (!evt?.type) return
 
+      if (onLlmTrace && PI_LLM_TRACE_TYPES.has(evt.type)) {
+        onLlmTrace({ kind: 'pi_json_line', payload: clonePiEventForTrace(evt) })
+      }
+
       if (evt.type === 'message_update' && evt.assistantMessageEvent) {
         const d = evt.assistantMessageEvent.delta
         if (typeof d === 'string' && d.length > 0) {
-          onTextDelta(d)
+          emitTextDelta(d)
+        }
+        return
+      }
+
+      // Full assistant snapshot when Pi closes the message (often carries text when deltas were sparse).
+      if (evt.type === 'message_end' && evt.message) {
+        const full = assistantPlainFromMessagePayload(evt.message)
+        if (full.length > aggregatedFromPi.length) {
+          if (full.startsWith(aggregatedFromPi)) {
+            emitTextDelta(full.slice(aggregatedFromPi.length))
+          } else if (aggregatedFromPi.length === 0) {
+            emitTextDelta(full)
+          }
         }
         return
       }
@@ -527,6 +660,14 @@ export async function runPiCliStream({
       // (see pi-mono packages/coding-agent/docs/json.md). Without this, ipc.invoke can hang
       // until the renderer invoke_timeout (e.g. parallel pi-subagents).
       if (evt.type === 'agent_end') {
+        const snapshot = lastAssistantPlainTextFromMessages(evt.messages)
+        if (snapshot.length > aggregatedFromPi.length) {
+          if (snapshot.startsWith(aggregatedFromPi)) {
+            emitTextDelta(snapshot.slice(aggregatedFromPi.length))
+          } else if (aggregatedFromPi.length === 0) {
+            emitTextDelta(snapshot)
+          }
+        }
         console.info(
           '[AgentStreamService] pi-cli agent_end (session complete)',
           JSON.stringify({ runId: runId ?? null })

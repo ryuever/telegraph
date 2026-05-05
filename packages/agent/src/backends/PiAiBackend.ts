@@ -19,7 +19,9 @@ export class PiAiBackend implements AgentBackend {
   }
 
   async send(input: AgentSendInput): Promise<Message> {
+    console.log('send ', input)
     const model = resolveModel(this.settings)
+    console.log('send model', model)
 
     const context: Context = {
       systemPrompt: input.systemPrompt ?? 'You are a helpful assistant.',
@@ -30,6 +32,16 @@ export class PiAiBackend implements AgentBackend {
     const cb = input.callbacks ?? {}
     cb.onStart?.()
 
+    await input.onPiAiRequest?.({
+      context,
+      options: {
+        hasApiKey: Boolean(this.settings.apiKey?.trim()),
+        signal: Boolean(input.signal),
+      },
+    })
+
+    console.log('context', context)
+
     const s = stream(model, context, {
       apiKey: this.settings.apiKey,
       signal: input.signal,
@@ -37,7 +49,9 @@ export class PiAiBackend implements AgentBackend {
 
     try {
       for await (const event of s as AsyncIterable<any>) {
+        console.log('stream event', event)
         if (input.signal?.aborted) break
+        await input.onPiAiStreamEvent?.(event)
         switch (event.type) {
           case 'text_delta':
             cb.onTextDelta?.(event.delta)
