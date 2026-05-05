@@ -7,7 +7,7 @@ import { describe, it, beforeEach } from 'node:test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ExtensionRegistry } from '../ExtensionRegistry';
+import { ExtensionRegistry } from './ExtensionRegistry';
 import { ToolRegistry } from '../../runtime/toolExecution/ToolRegistry';
 import type { ExtensionManifest } from '../ExtensionManifest';
 
@@ -245,9 +245,9 @@ describe('ExtensionRegistry', () => {
     // Get all tools
     const allTools = extensionRegistry.getAllTools();
     assert.strictEqual(allTools.length, 3);
-    assert.strictEqual(allTools.some(t => t.id === 'tool-1a'), true);
-    assert.strictEqual(allTools.some(t => t.id === 'tool-2a'), true);
-    assert.strictEqual(allTools.some(t => t.id === 'tool-2b'), true);
+    assert.strictEqual(allTools.some((t: any) => t.id === 'tool-1a'), true);
+    assert.strictEqual(allTools.some((t: any) => t.id === 'tool-2a'), true);
+    assert.strictEqual(allTools.some((t: any) => t.id === 'tool-2b'), true);
   });
 
   it('should handle retry policy configuration', async () => {

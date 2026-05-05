@@ -9,6 +9,7 @@
     "./providers/*": "./src/providers/*.ts",
     "./backends/*": "./src/backends/*.ts",
     "./harness/*": "./src/harness/*.ts",
+    "./extensions/*": "./src/extensions/*.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {

@@ -5,9 +5,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ToolRegistry, ToolDefinition as RegistryToolDefinition } from '../runtime/toolExecution/ToolRegistry';
-import type { ExtensionManifest, ToolDefinition as ManifestToolDefinition } from './ExtensionManifest';
-import { assertValidManifest } from './ExtensionManifest';
+import type { ToolRegistry, ToolDefinition as RegistryToolDefinition } from '../../runtime/toolExecution/ToolRegistry';
+import type { ExtensionManifest, ToolDefinition as ManifestToolDefinition } from '../ExtensionManifest';
+import { assertValidManifest } from '../ExtensionManifest';
 import { createExecutor, type ToolExecutor } from './ExecutableFactory';
 
 export interface LoadedExtension {

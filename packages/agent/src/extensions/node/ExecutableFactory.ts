@@ -6,7 +6,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { resolve } from 'path';
-import type { ExecutableConfig } from './ExtensionManifest';
+import type { ExecutableConfig } from '../ExtensionManifest';
 
 const execFileAsync = promisify(execFile);
 
