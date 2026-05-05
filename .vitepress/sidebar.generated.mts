@@ -27,6 +27,10 @@ export const wikiSidebar = {
         {
           "text": "A-005 Telegraph Agent Runtime 与 Extension Host 理论基础",
           "link": "/architecture/20260505-telegraph-agent-runtime-extension-host-theory"
+        },
+        {
+          "text": "A-006 Chat 消息到 LLM 数据流（当前架构）",
+          "link": "/architecture/20260505-chat-to-llm-data-flow"
         }
       ]
     }
@@ -38,6 +42,10 @@ export const wikiSidebar = {
         {
           "text": "D-001 Multica 范式与 Pi / pi-subagents 生态下的 Telegraph 多智能体能力对比",
           "link": "/discussion/20260504-multica-vs-pi-multi-agent-for-telegraph"
+        },
+        {
+          "text": "D-002 IPC 与 Trace 通道分离策略",
+          "link": "/discussion/20260505-ipc-trace-channel-separation"
         }
       ]
     }
@@ -53,6 +61,10 @@ export const wikiSidebar = {
         {
           "text": "I-002 pi-ai 流式首包后卡住与助手长期 pending（llm_trace await sink 死锁）",
           "link": "/issue/20260505-pi-ai-llm-trace-await-sink-deadlock"
+        },
+        {
+          "text": "I-003 Agent Runtime Abstraction - Phase 1 Implementation Debt & Optimization",
+          "link": "/issue/20260505-agent-runtime-abstraction-phase1-debt"
         }
       ]
     }
@@ -70,6 +82,10 @@ export const wikiSidebar = {
         {
           "text": "P-001 Telegraph 多智能体（类 Multica）分阶段路线图",
           "link": "/roadmap/20260504-multi-agent-telegraph-roadmap"
+        },
+        {
+          "text": "P-002 Telegraph Agent Runtime / Extension Host 实施 Phase-Gate 模板",
+          "link": "/roadmap/20260505-agent-runtime-extension-host-phase-gates"
         }
       ]
     }

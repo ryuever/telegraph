@@ -1,8 +1,3 @@
-export { PiAgent } from '@telegraph/agent/PiAgent'
-export { PiAiBackend } from '@telegraph/agent/backends/PiAiBackend'
-export { PiCliBackend } from '@telegraph/agent/backends/PiCliBackend'
-export { createAgentBackend } from '@telegraph/agent/backends/createAgentBackend'
-export { BaseHarness } from '@telegraph/agent/harness/BaseHarness'
 export {
   DEFAULT_MODEL_CATALOG,
   MINIMAX_PROVIDER_ID,
@@ -13,7 +8,6 @@ export {
   resolveModel,
 } from '@telegraph/agent/providers/index'
 export type {
-  AgentBackend,
   AgentBackendKind,
   AgentOrchestrationMode,
   AgentOrchestrationPattern,
@@ -27,13 +21,6 @@ export type {
   AgentTool,
   ModelDescriptor,
 } from '@telegraph/agent/types'
-export type {
-  HarnessOptions,
-  HarnessRunHandlers,
-  HarnessRunInput,
-  HarnessState,
-  HarnessTool,
-} from '@telegraph/agent/harness/types'
 export type {
   AgentRuntime,
   RunInput,
