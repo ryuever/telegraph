@@ -49,8 +49,8 @@ async function createNodeExecutor(
 
   try {
     // Try dynamic import first (ESM)
-    // @vite-ignore - module path is dynamic and resolved at runtime
-    const module = await import(modulePath);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const module = await import(/* @vite-ignore */ modulePath);
     handlerFn = module[config.handler];
 
     if (typeof handlerFn !== 'function') {
