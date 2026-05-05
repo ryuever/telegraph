@@ -12,20 +12,29 @@ import type { AgentRuntimeSettings } from '@telegraph/agent/types'
  * Supports:
  * - pi-ai: LLM-only streaming (in-process)
  * - pi-embedded: Pi-AI with embedded tool loop
+ * - pi-subagents: Embedded subagent orchestrator (chain/parallel via pi-ai)
  * - langgraph: LangGraph state machine framework
- * 
- * Future roadmap:
- * - Vercel AI SDK adapter
- * - Mastra agents adapter
+ * - vercel-ai: Vercel AI SDK adapter
  * 
  * NOTE: pi-cli (spawned process) is deprecated and removed from the runtime adapter pattern.
  * It was a temporary compatibility layer. Going forward, all execution happens in-process.
+ * 
+ * NOTE: PiSubagentsRuntime is loaded lazily to avoid pulling node:fs into the renderer bundle.
  * 
  * @param settings Runtime configuration
  * @returns RuntimeExecutor instance ready to execute runs
  */
 export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings): RuntimeExecutor {
-  const backend = (settings as AgentRuntimeSettings).backend ?? 'pi-ai'
+  const agentSettings = settings as AgentRuntimeSettings
+  const backend = agentSettings.backend ?? 'pi-ai'
+  
+  // Orchestration mode takes precedence over backend selection
+  if (agentSettings.orchestration === 'pi-subagents' || backend === 'pi-subagents') {
+    // Lazy require to avoid pulling node:fs into the renderer bundle.
+    // This code path only executes in the daemon (Node.js) process.
+    const { PiSubagentsRuntime } = require('@telegraph/agent/runtime/piSubagents/PiSubagentsRuntime') as typeof import('@telegraph/agent/runtime/piSubagents/PiSubagentsRuntime')
+    return new PiSubagentsRuntime()
+  }
   
   if (backend === 'pi-embedded') {
     return new PiEmbeddedRuntime()
@@ -43,7 +52,7 @@ export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings):
     return new PiAiRuntime()
   }
   
-  throw new Error(`[createRuntime] Unknown backend: '${backend}'. Supported: 'pi-ai', 'pi-embedded', 'langgraph', 'vercel-ai'`)
+  throw new Error(`[createRuntime] Unknown backend: '${backend}'. Supported: 'pi-ai', 'pi-embedded', 'pi-subagents', 'langgraph', 'vercel-ai'`)
 }
 
 /**

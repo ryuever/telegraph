@@ -96,6 +96,22 @@ export {
   type PermissionCheckResult,
   type PermissionLevel,
 } from '@telegraph/agent/runtime/toolCoordination/PermissionValidator'
+// Node.js-only pi-subagents exports (PiSubagentsRuntime, orchestrate, discoverAgents, etc.)
+// are intentionally excluded from main export to avoid bundling node:fs into the renderer.
+// Import from '@telegraph/agent/runtime/piSubagents/index' in Node.js environments.
+export {
+  TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION,
+} from '@telegraph/agent/runtime/piSubagents/constants'
+export type {
+  SubagentDefinition,
+  SubagentScope,
+  SubagentOverrides,
+  SubagentExecutionMode,
+  SubagentOrchestratorInput,
+  SubagentChainStep,
+  SubagentParallelTask,
+  SubagentChildResult,
+} from '@telegraph/agent/runtime/piSubagents/types'
 export {
   ExecutionTimeline,
   type TimelineEntry,

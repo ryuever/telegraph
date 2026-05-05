@@ -46,6 +46,14 @@ export const wikiSidebar = {
         {
           "text": "D-002 IPC 与 Trace 通道分离策略",
           "link": "/discussion/20260505-ipc-trace-channel-separation"
+        },
+        {
+          "text": "D-002 Flue 框架的 PI 集成模式与 Role/Connector 机制分析",
+          "link": "/discussion/20260506-flue-pi-integration-analysis"
+        },
+        {
+          "text": "D-003 Spawn CLI 与 Embed Orchestra 两种 Agent 调用模式对比",
+          "link": "/discussion/20260506-spawn-cli-vs-embed-orchestra-agent-invocation"
         }
       ]
     }
