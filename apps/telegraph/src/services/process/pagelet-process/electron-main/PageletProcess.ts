@@ -54,6 +54,12 @@ export default class PageletProcess extends Disposable {
     super()
     this._projectName = projectName
     this._windowManager = windowManager
+
+    this.registerDisposable({
+      dispose: () => {
+        this.utilityProcess?.process?.kill()
+      },
+    })
   }
 
   assignPassingPort(
@@ -68,6 +74,41 @@ export default class PageletProcess extends Disposable {
 
   disconnectPassingPort(connectId: string) {
     this.portManager.disconnectPassingPort(connectId)
+  }
+
+  handleProcessDisposed() {
+    this.portManager.handleProcessDisposed()
+  }
+
+  handleResumeConnection() {
+    this._createUtilityProcess()
+    this.portManager.updateAcquirePortListener(this.utilityProcess.process!)
+
+    this.portManager.resumeConnection()
+  }
+
+  private _createUtilityProcess() {
+    this.utilityProcess = this.utilityProcessFactory()
+
+    this.utilityProcess.start({
+      id: this._projectName,
+      projectName: this._projectName,
+      serviceName: `${this._projectName}-pagelet-process`,
+      ppid: process.pid,
+      entry: this.fileAccess.asFileUri('@build/pagelet-process-bootstrap.js').fsPath,
+    })
+
+    this.portManager = this.acquireProcessPortMainFactory(
+      'pagelet-process',
+      this._projectName,
+      AssignPassingPortType.PageletProcess,
+      this.sharedProcessMain,
+      this.daemonProcessMain,
+      this.mainProcess,
+      this._windowManager
+    )
+
+    this.portManager.initAcquirePortListener(this.utilityProcess.process!)
   }
 
   createUtilityProcess(props: Partial<IUtilityProcessConfig> = {}) {

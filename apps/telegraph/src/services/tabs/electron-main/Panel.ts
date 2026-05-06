@@ -83,6 +83,10 @@ export default class Panel extends Disposable {
     this._browserWindow = props.browserWindow
     this._id = `${this._browserWindow.id}_${buildId('panel', this.projectName)}`
 
+    if (props.fullscreen) {
+      this._panelPos = { left: 0, top: 0 }
+    }
+
     const [width, height] = this.window.getContentSize()
 
     this._dimension = this.resolveDimension({

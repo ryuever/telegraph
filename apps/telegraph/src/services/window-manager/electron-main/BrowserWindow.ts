@@ -50,6 +50,11 @@ export class BrowserWindow extends BaseWindow {
     const { workbench, ...rest } = options || {}
     super(rest, _logService, _fileAccess)
     this.workbench = workbench
+
+    // 窗口关闭时清理所有 panel 和 cached pagelet process
+    this.onWindowDidCloseHandler(() => {
+      this.disposeAllPanels()
+    })
   }
 
   get id() {
@@ -102,6 +107,20 @@ export class BrowserWindow extends BaseWindow {
 
   killPageletProcess() {}
 
+  private disposeAllPanels() {
+    // dispose 所有 panel（会级联 dispose pagelet → removeBrowserView + destroy webContents）
+    const panels = this.panelsStack.splice(0)
+    for (const stack of panels) {
+      stack.panel.disposePanel()
+    }
+
+    // kill 所有 cached pagelet process
+    for (const [name, pageletProcess] of this.cachedPageletProcessMap) {
+      pageletProcess.dispose()
+    }
+    this.cachedPageletProcessMap.clear()
+  }
+
   findPageletProcess(pageletId: string) {
     const pagelet = this.findPagelet(pageletId)
     if (pagelet) return pagelet.pageletProcess
@@ -140,7 +159,7 @@ export class BrowserWindow extends BaseWindow {
   }
 
   createPanel(props: CreatePanelProps) {
-    const { projectName } = props
+    const { projectName, fullscreen } = props
     const index = this.panelsStack.findIndex(stack => stack.projectName === projectName)
     if (index !== -1) {
       const stack = this.panelsStack[index]
@@ -159,6 +178,7 @@ export class BrowserWindow extends BaseWindow {
       projectName,
       workbench: this.workbench,
       browserWindow: this,
+      fullscreen,
     })
 
     panel.addPagelet({ projectName })

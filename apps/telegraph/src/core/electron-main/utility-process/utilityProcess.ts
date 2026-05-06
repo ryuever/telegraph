@@ -23,7 +23,7 @@ export type IUtilityProcessFactory = () => UtilityProcess
 
 @injectable()
 export default class UtilityProcess extends Disposable {
-  private _name: string
+  private _name?: string
 
   private _process: ElectronUtilityProcess | undefined = undefined
 
@@ -31,7 +31,7 @@ export default class UtilityProcess extends Disposable {
     name: 'utility-process',
   })
 
-  private _pid: number
+  private _pid?: number
 
   private onSpawnEvent = this._emitter.register('onSpawn')
 

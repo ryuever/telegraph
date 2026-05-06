@@ -31,6 +31,10 @@ export const wikiSidebar = {
         {
           "text": "A-006 Chat 消息到 LLM 数据流（当前架构）",
           "link": "/architecture/20260505-chat-to-llm-data-flow"
+        },
+        {
+          "text": "A-007 Pagelet Process 通信架构与 Daemon 直连",
+          "link": "/architecture/20260506-pagelet-process-communication"
         }
       ]
     }

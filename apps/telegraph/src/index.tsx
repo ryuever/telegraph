@@ -41,6 +41,25 @@ const MonitorIcon = () => (
   </svg>
 )
 
+function useHashRoute() {
+  const get = () => (typeof window !== 'undefined' ? window.location.hash : '')
+  const [hash, setHash] = React.useState(get)
+  React.useEffect(() => {
+    const onChange = () => setHash(get())
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return hash
+}
+
+function PageContent() {
+  const hash = useHashRoute()
+  if (hash.includes('/monitor')) return <MonitorPanel />
+  if (hash.includes('/chat')) return <ChatPanel />
+  if (hash.includes('/design')) return <DesignPanel />
+  return <HomePage />
+}
+
 function Sidebar() {
   const hash = useHashRoute()
   const current = hash.includes('/design')
@@ -89,7 +108,6 @@ function HomePage() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6">
       <div className="flex flex-col items-center gap-6">
-        {/* Logo */}
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 2L11 13" />
@@ -100,7 +118,6 @@ function HomePage() {
           <h1 className="text-xl font-medium text-foreground tracking-tight">Telegraph</h1>
           <p className="mt-2 text-sm text-muted-foreground">AI-powered design & development</p>
         </div>
-        {/* Quick actions */}
         <div className="mt-4 flex gap-3">
           <a
             href="#/design"
@@ -120,26 +137,43 @@ function HomePage() {
   )
 }
 
-function useHashRoute() {
-  const get = () => (typeof window !== 'undefined' ? window.location.hash : '')
-  const [hash, setHash] = React.useState(get)
-  React.useEffect(() => {
-    const onChange = () => setHash(get())
-    window.addEventListener('hashchange', onChange)
-    return () => window.removeEventListener('hashchange', onChange)
-  }, [])
-  return hash
+function getRendererProcessId(): string | null {
+  // production: 参数在 window.location.search 中
+  const searchParams = new URLSearchParams(window.location.search)
+  const fromSearch = searchParams.get('TELEGRAPH_PAGELET_RENDERER_PROCESS_ID')
+  if (fromSearch) return fromSearch
+
+  // dev: URL 形如 http://localhost:5173/#/index.monitor.html?KEY=value
+  // 参数在 hash 的 ? 后面，不在 location.search 中
+  const hash = window.location.hash
+  const hashQueryIndex = hash.indexOf('?')
+  if (hashQueryIndex !== -1) {
+    const hashParams = new URLSearchParams(hash.slice(hashQueryIndex + 1))
+    return hashParams.get('TELEGRAPH_PAGELET_RENDERER_PROCESS_ID')
+  }
+
+  return null
 }
 
-function PageContent() {
-  const hash = useHashRoute()
-  if (hash.includes('/monitor')) return <MonitorPanel />
-  if (hash.includes('/chat')) return <ChatPanel />
-  if (hash.includes('/design')) return <DesignPanel />
-  return <HomePage />
-}
+// 在模块加载时立即计算，避免 React 渲染过程中的延迟
+const RENDERER_PROCESS_ID = getRendererProcessId()
 
 function Root() {
+  const appId = RENDERER_PROCESS_ID
+
+  // Pagelet BrowserView 的 ID 包含 'pagelet.' 模式（如 window.2_panel.monitor_pagelet.monitor）
+  // 此时只渲染面板内容，不需要 Sidebar
+  const isPageletView = appId && appId.includes('pagelet.')
+
+  if (isPageletView) {
+    return (
+      <div className="h-screen bg-background">
+        <PageContent />
+      </div>
+    )
+  }
+
+  // 主窗口、登录页、辅助窗口等：带 Sidebar
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />

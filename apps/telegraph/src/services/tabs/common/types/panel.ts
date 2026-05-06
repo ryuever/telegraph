@@ -18,6 +18,8 @@ export type PanelProps = {
   projectName: string
   workbench: Workbench
   browserWindow: BrowserWindow
+  /** 当为 true 时，BrowserView 占满整个窗口（不预留侧边栏偏移） */
+  fullscreen?: boolean
 }
 
 export type PanelType = {

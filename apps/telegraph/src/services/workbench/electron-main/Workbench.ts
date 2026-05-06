@@ -95,6 +95,16 @@ export class Workbench extends Disposable implements IWorkbench {
 
   // temp setting, will read from config file in the future
   getPageletConfigs(): BrowserViewConfig[] {
-    return this.projects.getLoadConfigs()
+    const builtinConfigs: BrowserViewConfig[] = [
+      {
+        projectName: 'monitor',
+        loadURL: '/monitor',
+        openDevTools: false,
+        webPreferences: {
+          preload: this.fileAccess.asFileUri('@build/preload.js').fsPath,
+        },
+      },
+    ]
+    return [...builtinConfigs, ...this.projects.getLoadConfigs()]
   }
 }

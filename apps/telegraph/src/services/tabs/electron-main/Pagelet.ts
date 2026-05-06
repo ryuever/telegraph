@@ -181,7 +181,7 @@ export default class Pagelet extends Disposable {
     this.setBounds(this._dimension)
     this.window.addBrowserView(this._view)
 
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) this._view.webContents.openDevTools()
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL && this.browserViewConfig.openDevTools !== false) this._view.webContents.openDevTools()
 
     this.onDidCreatedEvent.fire()
 

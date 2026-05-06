@@ -109,11 +109,15 @@ export class WindowManager extends Disposable {
 
     this.registerDisposable(
       monitorWindow.onDidWindowCreated(() => {
-        monitorWindow.window.loadURL(
-          ...this.fileAccess.asLoadURL(
-            `/monitor?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=monitor-window-app`
-          )
-        )
+        // 通过 Panel/Pagelet 机制创建 BrowserView + PageletProcess
+        // fullscreen=true 让 BrowserView 占满窗口（无侧边栏偏移）
+        monitorWindow.createPanel({ projectName: 'monitor', fullscreen: true })
+
+        // BrowserWindow 自身不加载 URL（内容在 BrowserView 中），
+        // ready-to-show 可能不会触发，需要手动显示窗口
+        if (!monitorWindow.window.isVisible()) {
+          monitorWindow.window.show()
+        }
       })
     )
 
@@ -148,7 +152,7 @@ export class WindowManager extends Disposable {
     window?.createDisposablePanel(rest)
   }
 
-  createPanel(props: { windowId?: string; projectName: string }) {
+  createPanel(props: { windowId?: string; projectName: string; fullscreen?: boolean }) {
     const { windowId, ...rest } = props
     let window = this.getWindow(windowId ?? '')
     if (!windowId) window = this.mainWindow

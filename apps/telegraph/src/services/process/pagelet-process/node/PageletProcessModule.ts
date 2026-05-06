@@ -17,6 +17,12 @@ import {
 import { ProxyRPCClient } from '@x-oasis/async-call-rpc'
 import type { IWorkbenchProsify } from '@telegraph/services/workbench/common/types'
 
+import {
+  MonitorBridgeClient,
+  monitorServicePath,
+} from '@telegraph/services/monitor/common/config'
+import type { IMonitorBridge } from '@telegraph/services/monitor/common/types'
+
 import { CommonNodeLogger } from '@telegraph/services/log/node/nodeLogger'
 import ApplicationInfo, { ApplicationInfoId } from '@telegraph/services/application-info/node'
 import PageletProcessNode, { PageletProcessNodeId } from './PageletProcessNode'
@@ -45,5 +51,12 @@ export default new Registry(bind => {
     return new ProxyRPCClient(workspaceServicePath, {
       channel: channelClient.mainProcessChannelProtocol,
     }).createProxy<IWorkbenchProsify>()
+  })
+  bind(MonitorBridgeClient).toDynamicValue(({ container }) => {
+    const channelClient = container.get(ProcessClientChannelId)
+
+    return new ProxyRPCClient(monitorServicePath, {
+      channel: channelClient.daemonProcessChannelProtocol,
+    }).createProxy() as unknown as IMonitorBridge
   })
 })

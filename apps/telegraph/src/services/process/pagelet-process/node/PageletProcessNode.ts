@@ -48,6 +48,7 @@ export default class PageletProcessNode extends NodeProcess {
       serviceHost: this.serviceHost,
     })
     this.portManager.acquireSharedPort()
+    this.portManager.acquireDaemonPort()
     this.processPingClientFactory({
       processName,
       process,
