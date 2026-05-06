@@ -48,7 +48,7 @@ features:
 | A-004 | [20260504-multica-implementation-map-and-telegraph-adaptation.md](./architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md) | Multica 源码实现映射与 Telegraph「类 Multica」能力适配路径 | 基于 multica server/daemon/execenv/pkg/agent/realtime 分层对照 Telegraph AgentHandler、PiAgent（pi-ai）与 daemon 进程；三条适配路径与模块映射表。 |
 | A-005 | [20260505-telegraph-agent-runtime-extension-host-theory.md](./architecture/20260505-telegraph-agent-runtime-extension-host-theory.md) | Telegraph Agent Runtime 与 Extension Host 理论基础 | 将 Telegraph 从 Pi GUI/CLI wrapper 提升为通用 agent runtime host 与 extension host，定义 Run、RuntimeEvent、Tool、Extension、Hook、Trace、Workflow Pattern 等长期抽象。 |
 | A-006 | [20260505-chat-to-llm-data-flow.md](./architecture/20260505-chat-to-llm-data-flow.md) | Chat 消息到 LLM 数据流（当前架构） | 从用户输入到 LLM 返回的五层调用链（renderer → main → daemon → runtime → pi-ai）、IPC/RPC 通道设计、RuntimeEvent 统一事件协议与响应回流路径。 |
-| A-007 | [20260506-pagelet-process-communication.md](./architecture/20260506-pagelet-process-communication.md) | Pagelet Process 通信架构与 Daemon 直连 | pagelet process 通过 MessagePort 与 daemon/shared 建立直连通道的端口获取、Resume 机制、Monitor 数据流与新增 pagelet 功能开发指南。 |
+| A-007 | [20260506-pagelet-process-communication.md](./architecture/20260506-pagelet-process-communication.md) | Telegraph 多进程架构全貌 | 完整多进程架构文档：进程拓扑、Panel/Pagelet/PageletProcess 三层机制、侧边栏 IPC 面板切换（Chat/Design/Home）、MessagePort 通信、Resume 断线重连、Monitor 改造案例与踩坑记录、生命周期管理。 |
 
 ### discussion/ — 技术讨论
 
