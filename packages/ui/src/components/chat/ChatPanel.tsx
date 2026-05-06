@@ -175,7 +175,7 @@ export function ChatPanel({ agent }: Props) {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-full w-full flex-col bg-zinc-950 text-zinc-100">
       <Toolbar>
         <div
           className="text-[11px] font-medium tracking-tight text-zinc-300"

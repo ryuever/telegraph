@@ -26,7 +26,7 @@ export function MonitorPanel() {
   const memSeries = useMemo(() => history.map(h => h.totals.memory), [history])
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-full w-full flex-col bg-zinc-950 text-zinc-100">
       <Toolbar>
         <SegmentedTabs value={tab} onChange={setTab} />
       </Toolbar>

@@ -1,9 +1,10 @@
 import './renderer.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { Toolbar } from '@telegraph/ui/components/Toolbar'
+
 import { MonitorPanel } from '@telegraph/ui/components/monitor/MonitorPanel'
 import { ChatPanel } from '@telegraph/ui/components/chat/ChatPanel'
+import { DesignPanel } from '@telegraph/ui/components/design/DesignPanel'
 
 declare global {
   interface Window {
@@ -11,61 +12,112 @@ declare global {
   }
 }
 
-function App() {
-  const hasBridge = typeof window !== 'undefined' && !!window.telegraph
-  const bridgeKeys = hasBridge ? Object.keys(window.telegraph) : []
+const HomeIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+)
+
+const DesignIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 9h18" />
+    <path d="M9 21V9" />
+  </svg>
+)
+
+const ChatIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
+const MonitorIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <line x1="8" y1="21" x2="16" y2="21" />
+    <line x1="12" y1="17" x2="12" y2="21" />
+  </svg>
+)
+
+function Sidebar() {
+  const hash = useHashRoute()
+  const current = hash.includes('/design')
+    ? 'design'
+    : hash.includes('/chat')
+      ? 'chat'
+      : hash.includes('/monitor')
+        ? 'monitor'
+        : 'home'
+
+  const links = [
+    { key: 'home', href: '#/', label: 'Home', icon: HomeIcon },
+    { key: 'design', href: '#/design', label: 'Design', icon: DesignIcon },
+    { key: 'chat', href: '#/chat', label: 'Chat', icon: ChatIcon },
+    { key: 'monitor', href: '#/monitor', label: 'Monitor', icon: MonitorIcon },
+  ]
 
   return (
     <div
-      style={{
-        height: '100vh',
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      }}
+      className="flex w-16 shrink-0 flex-col items-center border-r border-border bg-zinc-950/60 pt-10 gap-2"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <Toolbar />
-      <div style={{ flex: 1, padding: '40px', textAlign: 'center' }}>
-        <h1>🚀 Telegraph</h1>
-        <p style={{ fontSize: 18, marginTop: 20 }}>Electron App Started Successfully!</p>
-        <div style={{ marginTop: 40, fontSize: 14, opacity: 0.85 }}>
-          <p>Built with:</p>
-          <p>⚛️ React • ⚡ Vite • 🔌 Electron • 📦 x-oasis</p>
-        </div>
-        <div
-          style={{
-            marginTop: 32,
-            padding: '12px 18px',
-            background: hasBridge ? 'rgba(0,200,80,0.25)' : 'rgba(220,80,80,0.25)',
-            borderRadius: 8,
-            display: 'inline-block',
-            fontSize: 13,
-          }}
+      {links.map((link) => (
+        <a
+          key={link.key}
+          href={link.href}
+          title={link.label}
+          className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+            current === link.key
+              ? 'bg-accent text-accent-foreground'
+              : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+          }`}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          preload bridge: {hasBridge ? `OK (${bridgeKeys.join(', ')})` : 'NOT EXPOSED'}
+          <link.icon />
+          <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md opacity-0 transition-opacity group-hover:opacity-100">
+            {link.label}
+          </span>
+        </a>
+      ))}
+    </div>
+  )
+}
+
+function HomePage() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6">
+      <div className="flex flex-col items-center gap-6">
+        {/* Logo */}
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 2L11 13" />
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+          </svg>
         </div>
-        <div style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <a href="#/chat" style={routeLinkStyle}>
-            Open Chat →
+        <div className="text-center">
+          <h1 className="text-xl font-medium text-foreground tracking-tight">Telegraph</h1>
+          <p className="mt-2 text-sm text-muted-foreground">AI-powered design & development</p>
+        </div>
+        {/* Quick actions */}
+        <div className="mt-4 flex gap-3">
+          <a
+            href="#/design"
+            className="rounded-lg border border-border bg-card px-4 py-2.5 text-sm text-foreground shadow-sm transition-colors hover:bg-accent"
+          >
+            开始设计
           </a>
-          <a href="#/monitor" style={routeLinkStyle}>
-            Open Monitor →
+          <a
+            href="#/chat"
+            className="rounded-lg border border-border bg-card px-4 py-2.5 text-sm text-foreground shadow-sm transition-colors hover:bg-accent"
+          >
+            打开对话
           </a>
         </div>
       </div>
     </div>
   )
-}
-
-const routeLinkStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  borderRadius: 8,
-  background: 'rgba(255,255,255,0.12)',
-  color: 'white',
-  fontSize: 13,
-  textDecoration: 'none',
-  border: '1px solid rgba(255,255,255,0.18)',
 }
 
 function useHashRoute() {
@@ -79,11 +131,23 @@ function useHashRoute() {
   return hash
 }
 
-function Root() {
+function PageContent() {
   const hash = useHashRoute()
   if (hash.includes('/monitor')) return <MonitorPanel />
   if (hash.includes('/chat')) return <ChatPanel />
-  return <App />
+  if (hash.includes('/design')) return <DesignPanel />
+  return <HomePage />
+}
+
+function Root() {
+  return (
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      <div className="flex-1 overflow-hidden">
+        <PageContent />
+      </div>
+    </div>
+  )
 }
 
 document.documentElement.classList.add('dark')
