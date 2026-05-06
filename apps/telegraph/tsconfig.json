@@ -26,7 +26,10 @@
       "@telegraph/agent": ["../../packages/agent/src/index.ts"],
       "@telegraph/agent/*": ["../../packages/agent/src/*"],
       "@telegraph/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
-      "@telegraph/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"]
+      "@telegraph/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"],
+      "@chat/*": ["../../apps/chat/src/*"],
+      "@design/*": ["../../apps/design/src/*"],
+      "@monitor/*": ["../../apps/monitor/src/*"]
     }
   },
   "include": [

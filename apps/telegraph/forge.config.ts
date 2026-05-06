@@ -39,6 +39,18 @@ const config: ForgeConfig = {
           entry: 'src/services/process/pagelet-process/node/pagelet-process-bootstrap.ts',
           config: 'vite.fork.config.ts',
         },
+        {
+          entry: 'src/services/process/pagelet-process/node/chat-pagelet-entry.ts',
+          config: 'vite.fork.config.ts',
+        },
+        {
+          entry: 'src/services/process/pagelet-process/node/design-pagelet-entry.ts',
+          config: 'vite.fork.config.ts',
+        },
+        {
+          entry: 'src/services/process/pagelet-process/node/monitor-pagelet-entry.ts',
+          config: 'vite.fork.config.ts',
+        },
       ],
       renderer: [
         {

@@ -102,6 +102,7 @@ export class Workbench extends Disposable implements IWorkbench {
         loadURL: '/monitor',
         openDevTools: false,
         webPreferences: { preload },
+        amdEntry: this.fileAccess.asFileUri('@build/monitor-pagelet-entry.js').fsPath,
       },
       {
         projectName: 'chat',

@@ -1,24 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
-import { MONITOR_SNAPSHOT_CHANNEL } from '../../../../../apps/telegraph/src/services/monitor/common/config'
 import type { MonitorSnapshot } from '../../../../../apps/telegraph/src/services/monitor/common/types'
+
+const MONITOR_SERVICE_PATH = '/services/monitor'
+
+interface MonitorService {
+  getSnapshot(): Promise<MonitorSnapshot>
+  getMainPid(): Promise<number>
+}
 
 export function useMonitorSnapshots() {
   const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
+  const serviceRef = useRef<MonitorService | null>(null)
 
-  useEffect(() => {
-    const bridge = (window as any).telegraph?.ipcRenderer
-    if (!bridge?.on) return
-
-    const listener = (_event: unknown, payload: MonitorSnapshot) => {
-      setSnapshot(payload)
-      setUpdatedAt(Date.now())
+useEffect(() => {
+    const createProxy = (): MonitorService | null => {
+      // 优先从 window.telegraph 获取，否则从 __telegraphDebug 获取
+      const debug = (window as any).__telegraphDebug
+      const fn = (window as any).telegraph?.createServiceProxy ?? debug?.createServiceProxy
+      if (!fn) {
+        console.warn('[useMonitorSnapshots] createServiceProxy not available')
+        return null
+      }
+      
+      try {
+        return fn('monitor', MONITOR_SERVICE_PATH) as MonitorService
+      } catch (err) {
+        console.error('[useMonitorSnapshots] Failed to create service proxy:', err)
+        return null
+      }
     }
 
-    bridge.on(MONITOR_SNAPSHOT_CHANNEL, listener)
-    return () => {
-      bridge.removeListener?.(MONITOR_SNAPSHOT_CHANNEL, listener)
+    serviceRef.current = createProxy()
+
+    const fetchSnapshot = async () => {
+      if (!serviceRef.current) {
+        serviceRef.current = createProxy()
+      }
+      
+      try {
+        const snap = await serviceRef.current?.getSnapshot()
+        if (snap) {
+          setSnapshot(snap)
+          setUpdatedAt(Date.now())
+        }
+      } catch (err) {
+        console.error('[useMonitorSnapshots] Failed to get snapshot:', err)
+      }
     }
+
+    fetchSnapshot()
+    const interval = setInterval(fetchSnapshot, 1000)
+
+    return () => clearInterval(interval)
   }, [])
 
   return { snapshot, updatedAt }
