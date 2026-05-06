@@ -63,4 +63,19 @@ export default class PageletProcessNode extends NodeProcess {
     this.serviceHost.registerServiceHandler(pageletProcessServicePath, this)
     this.serviceHost.registerServiceHandler(LogServicePath, this.logService)
   }
+
+  /**
+   * 验证 renderer ↔ PageletProcess 的 MessagePort 通信是否正常。
+   * renderer 侧通过 pageletChannelProtocol 调用此方法。
+   */
+  ping(payload?: { ts: number }): { pong: true; processId: string; projectName: string; ts: number; receivedTs?: number } {
+    console.info(`[PageletProcessNode] ping received from renderer`, payload)
+    return {
+      pong: true,
+      processId,
+      projectName: this.projectName,
+      ts: Date.now(),
+      receivedTs: payload?.ts,
+    }
+  }
 }

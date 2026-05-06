@@ -220,6 +220,13 @@ class TelegraphApplication extends Disposable {
         this.logService.info(ClientLaunchLog.AppEnd)
         this.performanceTracker.end(PerformanceStage.LoadMainPage)
         this.performanceTracker.end(PerformanceStage.AppLaunch)
+
+        // chat/design 面板已在主 renderer 内渲染，无需预热 BrowserView。
+        // 但需要预创建对应的 PageletProcess（UtilityProcess），
+        // 确保 renderer 侧 PageletClientChannel 建立 MessagePort 时进程已就绪。
+        setTimeout(() => {
+          this.warmupInlinePageletProcesses()
+        }, 2000)
       })
     )
   }
@@ -247,6 +254,20 @@ class TelegraphApplication extends Disposable {
   registerListener() {
     this.registerDisposable(this.onWillQuitEvent(this.onWillQuit.bind(this)))
     this.registerDisposable(this.onWindowAllClosedEvent(this.onWindowAllClosed.bind(this)))
+  }
+
+  /**
+   * 预创建 inline panel（chat/design）的 PageletProcess（UtilityProcess），
+   * 确保 renderer 侧 PageletClientChannel 建立 MessagePort 连接时进程已就绪。
+   */
+  private warmupInlinePageletProcesses() {
+    const mainWindow = this.windowManager.getMainWindow()
+    if (!mainWindow) return
+    const inlinePanels = ['chat', 'design']
+    for (const projectName of inlinePanels) {
+      this.logService.info(`Warmup: pre-creating PageletProcess for inline panel "${projectName}"`)
+      mainWindow.ensurePageletProcess(projectName, this.workbench)
+    }
   }
 
   setupSharedProcessMain() {

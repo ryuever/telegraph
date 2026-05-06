@@ -57,6 +57,7 @@ features:
 | D-001 | [20260504-multica-vs-pi-multi-agent-for-telegraph.md](./discussion/20260504-multica-vs-pi-multi-agent-for-telegraph.md) | Multica 范式与 Pi / pi-subagents 生态下的 Telegraph 多智能体能力对比 | 从产品线形态、编排队列、角色与技能、运行时与观测性等维度对比 Multica 与 Pi（含 pi-subagents），并映射到 Telegraph Electron 多进程的集成取舍与能力缺口。 |
 | D-002 | [20260506-flue-pi-integration-analysis.md](./discussion/20260506-flue-pi-integration-analysis.md) | Flue 框架的 PI 集成模式与 Role/Connector 机制分析 | 分析 Flue（withastro/flue）如何集成 PI（pi-agent-core + pi-ai）作为嵌入式运行时，详细阐述 Role 角色指令系统和 Connector 第三方服务适配机制，并探讨对 Telegraph 的借鉴价值。 |
 | D-003 | [20260506-spawn-cli-vs-embed-orchestra-agent-invocation.md](./discussion/20260506-spawn-cli-vs-embed-orchestra-agent-invocation.md) | Spawn CLI 与 Embed Orchestra 两种 Agent 调用模式对比 | 以 open-design（spawn CLI）和 Telegraph（embed orchestra）为实例，对比两种宿主应用集成 AI agent 的架构范式的优缺点与适用场景。 |
+| D-004 | [20260506-electron-multi-renderer-vs-single-renderer.md](./discussion/20260506-electron-multi-renderer-vs-single-renderer.md) | Electron 多 Renderer vs 单 Renderer 面板架构调研与迁移方案 | 调研 VS Code、Slack、Discord 等主流应用架构，分析 Telegraph 从 BrowserView 多 renderer 迁移到单 renderer 的可行性、影响面与实施路径。 |
 
 ### issue/ — Issue 记录
 

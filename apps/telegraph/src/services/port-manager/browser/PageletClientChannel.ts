@@ -2,6 +2,7 @@ import { createId } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
 import { ProxyRPCClient, RPCServiceHost } from '@x-oasis/async-call-rpc'
 import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron'
+import { PortAwareIPCRendererChannel } from './PortAwareIPCRendererChannel'
 import { RPCMessageChannel } from '@x-oasis/async-call-rpc-web'
 import {
   acquirePortMainServicePath,
@@ -36,6 +37,8 @@ export class PageletClientChannel extends Disposable {
 
   private serviceHost: RPCServiceHost
 
+  private _isInlinePanel: boolean
+
   private _portChannel: IPCRendererChannel
 
   private messageChannelPairs = new Map<string, MessageChannelPair>()
@@ -50,21 +53,29 @@ export class PageletClientChannel extends Disposable {
 
   private _mainProcessChannelProtocol: RPCMessageChannel
 
-  constructor(logService: LogService) {
+  constructor(logService: LogService, pageletRendererProcessId?: string) {
     super()
 
     this.logService = logService
 
-    const hashLocation = window.location.hash
-    let search = window.location.search
+    if (pageletRendererProcessId) {
+      // inline panel 模式：直接使用传入的 ID
+      this._pageletRendererProcessId = pageletRendererProcessId
+      this._isInlinePanel = true
+    } else {
+      // 传统 BrowserView 模式：从 URL 参数获取
+      this._isInlinePanel = false
+      const hashLocation = window.location.hash
+      let search = window.location.search
 
-    if (!search && hashLocation) {
-      const parts = hashLocation.split('#')[1].split('?')
-      search = parts[1]
+      if (!search && hashLocation) {
+        const parts = hashLocation.split('#')[1].split('?')
+        search = parts[1]
+      }
+
+      const urlParams = new URLSearchParams(search)
+      this._pageletRendererProcessId = urlParams.get(TELEGRAPH_PAGELET_RENDERER_PROCESS_ID)!
     }
-
-    const urlParams = new URLSearchParams(search)
-    this._pageletRendererProcessId = urlParams.get(TELEGRAPH_PAGELET_RENDERER_PROCESS_ID)!
     this.id = this.pageletRendererProcessId
     this.type = AssignPassingPortType.PageletRenderer
 
@@ -118,7 +129,11 @@ export class PageletClientChannel extends Disposable {
 
     this._projectName = projectName
 
-    this._portChannel = new IPCRendererChannel({
+    // inline panel 使用 PortAwareIPCRendererChannel 以正确处理
+    // contextIsolation 下 preload bridge 转发的 MessagePort
+    const ChannelClass = this._isInlinePanel ? PortAwareIPCRendererChannel : IPCRendererChannel
+
+    this._portChannel = new ChannelClass({
       channelName: 'acquire-port',
       projectName,
       description: masterProcessName,
@@ -144,7 +159,8 @@ export class PageletClientChannel extends Disposable {
   }
 
   initAssignPassingPortListener() {
-    const channel = new IPCRendererChannel({
+    const ChannelClass = this._isInlinePanel ? PortAwareIPCRendererChannel : IPCRendererChannel
+    const channel = new ChannelClass({
       channelName: `${this.id}-assign-passing-port`,
       projectName: this._projectName,
       description: this.id,
@@ -159,6 +175,7 @@ export class PageletClientChannel extends Disposable {
       fromType: this.type,
       toType,
     })
+    console.log(`[PageletClientChannel] acquirePort: connectId=${connectId}, isInline=${this._isInlinePanel}`)
     this.logService.info(`acquire port, connectId: ${connectId}`)
 
     const port = (await this._portChannelRPCClient.acquirePageletRendererPort({

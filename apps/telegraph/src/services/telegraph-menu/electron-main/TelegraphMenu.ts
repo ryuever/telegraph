@@ -5,7 +5,7 @@ import type { Workbench } from '@telegraph/services/workbench/electron-main/Work
 import { WorkbenchId } from '@telegraph/services/workbench/electron-main/Workbench'
 import type { MonitorBridge } from '@telegraph/services/monitor/electron-main/MonitorBridge'
 import { MonitorBridgeId } from '@telegraph/services/monitor/common/config'
-import { app, Menu, shell } from 'electron'
+import { app, BrowserWindow, Menu, shell, webContents } from 'electron'
 
 export const TelegraphMenuId = createId('telegraph-menu')
 
@@ -81,7 +81,19 @@ export class TelegraphMenu extends Disposable {
           { type: 'separator' },
           { role: 'reload' },
           { role: 'forceReload' },
-          { role: 'toggleDevTools' },
+          {
+            label: 'Toggle Developer Tools',
+            accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I',
+            click: () => {
+              const focused = webContents.getFocusedWebContents()
+              if (focused) {
+                focused.toggleDevTools()
+              } else {
+                const win = BrowserWindow.getFocusedWindow()
+                win?.webContents.toggleDevTools()
+              }
+            },
+          },
           { type: 'separator' },
           { role: 'resetZoom' },
           { role: 'zoomIn' },

@@ -157,6 +157,7 @@ export default class Panel extends Disposable {
 
   setToBackground() {
     this.logService.info(`${this.projectName} ${PanelLog.PanelToBackground}`)
+    this._pagelets.forEach(pagelet => pagelet.setToBackground())
     this.onDoSetToBackgroundEvent.fire()
   }
 

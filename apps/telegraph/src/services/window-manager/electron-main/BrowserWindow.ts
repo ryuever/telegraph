@@ -14,6 +14,8 @@ import type { Workbench } from '@telegraph/services/workbench/electron-main/Work
 import type Pagelet from '@telegraph/services/tabs/electron-main/Pagelet'
 import { buildId } from '@x-oasis/id'
 import type PageletProcess from '@telegraph/services/process/pagelet-process/electron-main/PageletProcess'
+import { PageletProcessFactoryId } from '@telegraph/services/process/pagelet-process/electron-main/PageletProcess'
+import type { IPageletProcessFactory } from '@telegraph/services/process/pagelet-process/electron-main/PageletProcess'
 import { BaseWindowLog } from '@telegraph/services/log/common/constants'
 import BaseWindow from './BaseWindow'
 
@@ -34,6 +36,12 @@ export class BrowserWindow extends BaseWindow {
    */
   private cachedPageletProcessMap = new Map<string, PageletProcess>()
 
+  /**
+   * inline panel（主 renderer 中渲染的面板）的 PageletProcess 映射
+   * key: virtualPageletId（如 `inline-panel.chat`）
+   */
+  private _inlinePageletProcessMap = new Map<string, PageletProcess>()
+
   private _emitter = new Emitter({ name: 'browser-window' })
 
   private onDidPanelCreatedEvent = this._emitter.register('on-did-panel-created')
@@ -45,7 +53,8 @@ export class BrowserWindow extends BaseWindow {
     @inject(LogServiceId) private _logService: LogService,
     @inject(FileAccessId) private _fileAccess: FileAccess,
     @inject(PanelFactoryId) private panelFactory: IPanelFactory,
-    @inject(DisposablePanelFactoryId) private disposablePanelFactory: IDisposablePanelFactory
+    @inject(DisposablePanelFactoryId) private disposablePanelFactory: IDisposablePanelFactory,
+    @inject(PageletProcessFactoryId) private pageletProcessFactory: IPageletProcessFactory
   ) {
     const { workbench, ...rest } = options || {}
     super(rest, _logService, _fileAccess)
@@ -107,6 +116,55 @@ export class BrowserWindow extends BaseWindow {
 
   killPageletProcess() {}
 
+  /**
+   * inline panel 的 amdEntry 映射。
+   * 构建产物命名规则：{projectName}-pagelet-entry.js
+   */
+  private static INLINE_AMD_ENTRIES: Record<string, string> = {
+    chat: 'chat-pagelet-entry.js',
+    design: 'design-pagelet-entry.js',
+  }
+
+  /**
+   * 为 inline panel（在主 renderer 中渲染的面板）创建 PageletProcess，
+   * 不创建 BrowserView。PageletProcess 通过 cachedPageletProcessMap 复用。
+   *
+   * 面板 UI 在主 renderer 内作为 React 组件渲染，
+   * 但数据处理层仍有独立的 UtilityProcess 通过 MessagePort 通信。
+   */
+  ensurePageletProcess(projectName: string, workbench: Workbench) {
+    // 已有缓存的 PageletProcess，直接复用
+    if (this.cachedPageletProcessMap.has(projectName)) {
+      return this.cachedPageletProcessMap.get(projectName)!
+    }
+
+    const pageletProcess = this.pageletProcessFactory(
+      projectName,
+      workbench.windowManager
+    )
+
+    // 使用 inline panel 的虚拟 ID（与主 renderer 中 PageletClientChannel 的 ID 对应）
+    const virtualPageletId = `inline-panel.${projectName}`
+
+    // 解析 amdEntry 路径：加载对应 app 的业务逻辑到 PageletProcess 中
+    const amdEntryFile = BrowserWindow.INLINE_AMD_ENTRIES[projectName]
+    const amdEntry = amdEntryFile
+      ? this._fileAccess.asFileUri(`@build/${amdEntryFile}`).fsPath
+      : undefined
+
+    pageletProcess.createUtilityProcess({
+      id: virtualPageletId,
+      amdEntry,
+    })
+
+    this.cachedPageletProcessMap.set(projectName, pageletProcess)
+
+    // 在 inlinePageletProcessMap 中也记录，方便 findPageletProcess 查找
+    this._inlinePageletProcessMap.set(virtualPageletId, pageletProcess)
+
+    return pageletProcess
+  }
+
   private disposeAllPanels() {
     // dispose 所有 panel（会级联 dispose pagelet → removeBrowserView + destroy webContents）
     const panels = this.panelsStack.splice(0)
@@ -119,9 +177,20 @@ export class BrowserWindow extends BaseWindow {
       pageletProcess.dispose()
     }
     this.cachedPageletProcessMap.clear()
+
+    // 清理 inline panel 的 PageletProcess
+    for (const [, pageletProcess] of this._inlinePageletProcessMap) {
+      pageletProcess.dispose()
+    }
+    this._inlinePageletProcessMap.clear()
   }
 
   findPageletProcess(pageletId: string) {
+    // 先从 inline panel 的 PageletProcess 中查找
+    const inlineProcess = this._inlinePageletProcessMap.get(pageletId)
+    if (inlineProcess) return inlineProcess
+
+    // 再从传统 BrowserView pagelet 中查找
     const pagelet = this.findPagelet(pageletId)
     if (pagelet) return pagelet.pageletProcess
   }
@@ -177,6 +246,7 @@ export class BrowserWindow extends BaseWindow {
       }
       return
     }
+    const currentPanel = this.getCurrentTopPanelStack()?.panel
     const panel = this.panelFactory({
       projectName,
       workbench: this.workbench,
@@ -188,6 +258,11 @@ export class BrowserWindow extends BaseWindow {
     const stack = { projectName, panel }
     this.panelsStack.push(stack)
 
+    // 将之前的 top panel 切到后台（启用节流）
+    if (currentPanel) {
+      currentPanel.setToBackground()
+    }
+
     this.onDidPanelCreatedHandler(stack)
   }
 
@@ -197,6 +272,7 @@ export class BrowserWindow extends BaseWindow {
    */
   hideAllPanelViews() {
     for (const stack of this.panelsStack) {
+      stack.panel.setToBackground()
       for (const pagelet of stack.panel.pagelets) {
         pagelet.setBounds({ x: 0, y: 0, width: 0, height: 0 })
       }

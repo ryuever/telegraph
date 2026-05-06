@@ -134,9 +134,22 @@ export default class Pagelet extends Disposable {
   setToTop() {
     this.logService.info(`${this.projectName} ${PageletLog.PageletSetTop}`)
     this.onWillSetToTopEvent.fire()
-    if (this._view) this.window.setTopBrowserView(this._view)
+    if (this._view) {
+      // 恢复后台节流的渲染
+      this._view.webContents.setBackgroundThrottling(false)
+      this.window.setTopBrowserView(this._view)
+    }
     this.logService.info(`${this.projectName} ${PageletLog.PageletDidSetTop}`)
     this.onDidSetToTopEvent.fire()
+  }
+
+  /**
+   * 面板切到后台时启用节流，降低 CPU 和内存占用。
+   */
+  setToBackground() {
+    if (this._view) {
+      this._view.webContents.setBackgroundThrottling(true)
+    }
   }
 
   setBounds(dimension: Dimension) {

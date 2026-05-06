@@ -21,6 +21,13 @@ const MONITOR_WINDOW_HEIGHT = 760
 const MONITOR_WINDOW_MIN_WIDTH = 480
 const MONITOR_WINDOW_MIN_HEIGHT = 520
 
+/**
+ * 主 renderer 内直接渲染的面板（不创建 BrowserView，但仍创建 PageletProcess）。
+ * 这些面板的 UI 在主窗口 renderer 中作为 React 组件渲染，
+ * 数据处理层仍有独立的 UtilityProcess 通过 MessagePort 通信。
+ */
+const INLINE_PANELS = new Set(['chat', 'design'])
+
 @injectable()
 export class WindowManager extends Disposable {
   private workbench: Workbench
@@ -52,12 +59,20 @@ export class WindowManager extends Disposable {
 
   /**
    * 注册侧边栏面板切换 IPC handler。
-   * renderer 发送 projectName，main process 创建/切换对应 Panel，
-   * 或在 projectName 为 'home' 时隐藏所有 BrowserView 显示主页。
+   *
+   * - home: 隐藏所有 BrowserView，主 renderer 内容可见
+   * - chat/design (inline panels): 不创建 BrowserView（UI 在主 renderer 中渲染），
+   *   但确保对应的 PageletProcess 已创建（数据处理层独立进程）
+   * - 其他: 创建 BrowserView + PageletProcess（传统模式，如外部插件）
    */
   private registerSwitchPanelHandler() {
     ipcMain.handle(SWITCH_PANEL_CHANNEL, (_event, projectName: string) => {
       if (projectName === 'home') {
+        this.mainWindow?.hideAllPanelViews()
+      } else if (INLINE_PANELS.has(projectName)) {
+        // Inline panel: 无需 BrowserView，只需确保 PageletProcess 存在
+        this.mainWindow?.ensurePageletProcess(projectName, this.workbench)
+        // 隐藏其他 BrowserView（如果有的话）
         this.mainWindow?.hideAllPanelViews()
       } else {
         this.mainWindow?.createPanel({ projectName })
