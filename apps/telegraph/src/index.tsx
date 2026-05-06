@@ -33,14 +33,6 @@ const ChatIcon = () => (
   </svg>
 )
 
-const MonitorIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="3" width="20" height="14" rx="2" />
-    <line x1="8" y1="21" x2="16" y2="21" />
-    <line x1="12" y1="17" x2="12" y2="21" />
-  </svg>
-)
-
 function useHashRoute() {
   const get = () => (typeof window !== 'undefined' ? window.location.hash : '')
   const [hash, setHash] = React.useState(get)
@@ -52,7 +44,11 @@ function useHashRoute() {
   return hash
 }
 
-function PageContent() {
+/**
+ * Pagelet BrowserView 中的页面内容，通过 hash 路由渲染对应组件。
+ * 主窗口 renderer 不使用此组件（直接渲染 HomePage）。
+ */
+function PageletContent() {
   const hash = useHashRoute()
   if (hash.includes('/monitor')) return <MonitorPanel />
   if (hash.includes('/chat')) return <ChatPanel />
@@ -61,21 +57,18 @@ function PageContent() {
 }
 
 function Sidebar() {
-  const hash = useHashRoute()
-  const current = hash.includes('/design')
-    ? 'design'
-    : hash.includes('/chat')
-      ? 'chat'
-      : hash.includes('/monitor')
-        ? 'monitor'
-        : 'home'
+  const [current, setCurrent] = React.useState('home')
 
   const links = [
-    { key: 'home', href: '#/', label: 'Home', icon: HomeIcon },
-    { key: 'design', href: '#/design', label: 'Design', icon: DesignIcon },
-    { key: 'chat', href: '#/chat', label: 'Chat', icon: ChatIcon },
-    { key: 'monitor', href: '#/monitor', label: 'Monitor', icon: MonitorIcon },
+    { key: 'home', label: 'Home', icon: HomeIcon },
+    { key: 'design', label: 'Design', icon: DesignIcon },
+    { key: 'chat', label: 'Chat', icon: ChatIcon },
   ]
+
+  const handleSwitch = (key: string) => {
+    setCurrent(key)
+    window.telegraph?.ipcRenderer?.invoke('telegraph:switch-panel', key)
+  }
 
   return (
     <div
@@ -83,9 +76,9 @@ function Sidebar() {
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {links.map((link) => (
-        <a
+        <button
           key={link.key}
-          href={link.href}
+          onClick={() => handleSwitch(link.key)}
           title={link.label}
           className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
             current === link.key
@@ -98,7 +91,7 @@ function Sidebar() {
           <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md opacity-0 transition-opacity group-hover:opacity-100">
             {link.label}
           </span>
-        </a>
+        </button>
       ))}
     </div>
   )
@@ -119,18 +112,18 @@ function HomePage() {
           <p className="mt-2 text-sm text-muted-foreground">AI-powered design & development</p>
         </div>
         <div className="mt-4 flex gap-3">
-          <a
-            href="#/design"
+          <button
+            onClick={() => window.telegraph?.ipcRenderer?.invoke('telegraph:switch-panel', 'design')}
             className="rounded-lg border border-border bg-card px-4 py-2.5 text-sm text-foreground shadow-sm transition-colors hover:bg-accent"
           >
             开始设计
-          </a>
-          <a
-            href="#/chat"
+          </button>
+          <button
+            onClick={() => window.telegraph?.ipcRenderer?.invoke('telegraph:switch-panel', 'chat')}
             className="rounded-lg border border-border bg-card px-4 py-2.5 text-sm text-foreground shadow-sm transition-colors hover:bg-accent"
           >
             打开对话
-          </a>
+          </button>
         </div>
       </div>
     </div>
@@ -168,17 +161,18 @@ function Root() {
   if (isPageletView) {
     return (
       <div className="h-screen bg-background">
-        <PageContent />
+        <PageletContent />
       </div>
     )
   }
 
-  // 主窗口、登录页、辅助窗口等：带 Sidebar
+  // 主窗口、登录页、辅助窗口等：带 Sidebar + Home 页面
+  // Chat/Design 由独立 BrowserView 覆盖在上层渲染
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 overflow-hidden">
-        <PageContent />
+        <HomePage />
       </div>
     </div>
   )

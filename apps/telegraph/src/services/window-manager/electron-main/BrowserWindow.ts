@@ -163,13 +163,16 @@ export class BrowserWindow extends BaseWindow {
     const index = this.panelsStack.findIndex(stack => stack.projectName === projectName)
     if (index !== -1) {
       const stack = this.panelsStack[index]
-      if (index === this.panelsStack.length - 1) return
       const currentPanel = this.getCurrentTopPanelStack()?.panel
-      this.panelsStack.splice(index, 1)
-      this.panelsStack.push(stack)
+      if (index !== this.panelsStack.length - 1) {
+        this.panelsStack.splice(index, 1)
+        this.panelsStack.push(stack)
+      }
       const panel = stack.panel
       panel.setToTop()
-      if (currentPanel) {
+      // 恢复 BrowserView 的尺寸（可能被 hideAllPanelViews 置零）
+      panel.updatePageletDimension()
+      if (currentPanel && currentPanel !== panel) {
         currentPanel.setToBackground()
       }
       return
@@ -186,6 +189,18 @@ export class BrowserWindow extends BaseWindow {
     this.panelsStack.push(stack)
 
     this.onDidPanelCreatedHandler(stack)
+  }
+
+  /**
+   * 隐藏所有 panel 的 BrowserView（将 bounds 置零），
+   * 使主窗口 renderer 自身的内容（如 Home 页面）可见。
+   */
+  hideAllPanelViews() {
+    for (const stack of this.panelsStack) {
+      for (const pagelet of stack.panel.pagelets) {
+        pagelet.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+      }
+    }
   }
 
   isPanelOnTop(panel: Panel) {

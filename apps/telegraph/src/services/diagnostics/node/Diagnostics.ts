@@ -61,14 +61,6 @@ class Diagnostics extends Disposable {
       totalCPU += formatInfo.cpu
       formatInfos.push(formatInfo)
     }
-    this.logService.trace(TrackerEvent.TelegraphStabilityValues, {
-      scene: TrackerScene.AppUsedMemory,
-      value: +totalMemory.toFixed(2),
-    })
-    this.logService.trace(TrackerEvent.TelegraphStabilityValues, {
-      scene: TrackerScene.AppUsedCPU,
-      value: +totalCPU.toFixed(2),
-    })
     return {
       processes: formatInfos,
       totals: {

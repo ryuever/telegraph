@@ -1,6 +1,7 @@
 import { inject, injectable, createId } from '@x-oasis/di'
 import { Disposable } from '@x-oasis/disposable'
 import { Event } from '@x-oasis/emitter'
+import { ipcMain } from 'electron'
 import type { Workbench } from '@telegraph/services/workbench/electron-main/Workbench'
 import type PageletProcess from '@telegraph/services/process/pagelet-process/electron-main/PageletProcess'
 import { buildId } from '@x-oasis/id'
@@ -9,6 +10,7 @@ import { LogServiceId } from '@telegraph/services/log/common/log'
 import type { FileAccess } from '@telegraph/services/file-access/electron-main/FileAccess'
 import { FileAccessId } from '@telegraph/services/file-access/electron-main/FileAccess'
 import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@telegraph/core/node/process/env'
+import { SWITCH_PANEL_CHANNEL } from '../common/channels'
 import { BrowserWindowFactoryId } from './BrowserWindow'
 import type { IBrowserWindowFactory, BrowserWindow } from './BrowserWindow'
 
@@ -45,6 +47,22 @@ export class WindowManager extends Disposable {
 
   initialize(workbench: Workbench) {
     this.workbench = workbench
+    this.registerSwitchPanelHandler()
+  }
+
+  /**
+   * 注册侧边栏面板切换 IPC handler。
+   * renderer 发送 projectName，main process 创建/切换对应 Panel，
+   * 或在 projectName 为 'home' 时隐藏所有 BrowserView 显示主页。
+   */
+  private registerSwitchPanelHandler() {
+    ipcMain.handle(SWITCH_PANEL_CHANNEL, (_event, projectName: string) => {
+      if (projectName === 'home') {
+        this.mainWindow?.hideAllPanelViews()
+      } else {
+        this.mainWindow?.createPanel({ projectName })
+      }
+    })
   }
 
   createMainWindow() {
