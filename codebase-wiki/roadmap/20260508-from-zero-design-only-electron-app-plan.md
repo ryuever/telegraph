@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; Phase 5 doc/cleanup + x-oasis sub-path split + multi-arg RPC fix landed (P5.6); runtime smoke test pending user TTY run
+**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; Phase 5 doc/cleanup + x-oasis sub-path split + multi-arg RPC fix (P5.6) + activateConnection race fix (P5.7) landed; runtime smoke test of P5.7 pending user TTY run
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -819,12 +819,14 @@ design utility 日志写出 `design utility ready`。
 
 P5.5 的烟囱跑前发现两个上游问题，必须先在 x-oasis 解决再回到 telegraph：
 
-1. **multi-arg RPC bug**（async-call-rpc）
-   - `middlewares/handleRequest.ts` 中 Promise/Subscription 分支调 `handler(args)`，把整个 args 数组当成单个参数传进 user handler。
-   - `OrchestratorInspectorService.requestConnect(fromId, toId)` 在 utility 侧收到 `args = [fromId, toId]`，然后 `requestConnect([fromId, toId])` → `connect(undefined, undefined)` → `Unknown participant: "undefined"`。
-   - `test/test.spec.ts:426` 的 `expect(handler).toHaveBeenCalledWith('arg1', 'arg2')` 已经预期 spread 行为——这本来就是 latent bug。
-   - **修法**：按 RequestType 区分，Promise/Subscription 走 `handler(...args)`；TransferableArgs* 保留 `handler(args)` 单参（语义就是单个 ports 参数）。
-   - **回归**：electron-rpc baseline `22 fail / 51 pass` → 修后 `22 fail / 51 pass`，0 regression（剩余 22 fail 是 sync vs async race，与 spread 无关）。
+1. **multi-arg RPC bug**（async-call-rpc，**两轮修才彻底**）
+   - **第一轮**（spread 修）：`middlewares/handleRequest.ts` 中 Promise/Subscription 分支调 `handler(args)`，把整个 args 数组当成单个参数。改 `handler(...args)`。
+   - **第二轮**（receive-side decode 修）：第一轮跑后真实 `requestConnect(fromId, toId)` 仍然失败成 `Unknown participant: "undefined"`。深挖发现 receive 端 `handleRequest.ts:84` 写的 `let args = body[0]` 取错——sender (`prepareRequestData.ts`) 写入 `data = [header, body]` 而 `body = params`（数组），receive 应直接 `args = body`。第一轮的 spread 修对了一半但 args 已被预先取掉首元素，多 arg 永远 undefined。
+   - 修法：`let args: any = body`；下游 spread 自然处理。
+   - **历史 fixture 错**：`test/test.spec.ts:418` 写 `[['arg1','arg2']]` 双层包裹，是按旧 receiver `body[0]` 语义反推的，与真实 sender wire shape 不符。修正成单层 `['arg1','arg2']`。
+   - **新 spec**：`multi-arg-promise-request.spec.ts` 4 tests 覆盖 `prepareNormalData` wire-shape + 0/2/3 arg handler + null arg。
+   - **strict 副产物**：把 `args` 类型放宽到 `any` 后，`AbstractChannelProtocol.applyOnMessage/SendMiddleware` 的 `[].concat(fns)` 在 telegraph 这边走 link-to-source 的 strict typecheck 时炸成 `ConcatArray<never>`。同时 telegraph P5.7 引入 `electron-browser` 子路径深 import 又激活了几处类似 latent strict 错（`_service`、`channel` 未初始化、`prepareRequestData` 也有同款 `[].concat`、handleRequest 末尾 `[].concat(response)`）。一并改成 `Array.isArray(x) ? x : [x]` + 必要的 `!` definite assignment。
+   - **回归**：async-call-rpc baseline `6 fail / 262 pass` → 修后 `6 fail / 262 pass`，0 regression（剩余 6 fail 是 transferable-args sync race，与 fix 无关）。
 
 2. **renderer bundle 不能拉 `electron`**（async-call-rpc-electron）
    - 老的 root barrel 同时 re-export `IPCMainChannel`/`ElectronMessagePortMainChannel`/… 这些 main 进程模块。renderer 通过 `import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron'` 时，bundler 还是会爬到 main 模块的 `import { ipcMain } from 'electron'`，触发 `__dirname is not defined` 之类的崩溃。
@@ -839,7 +841,23 @@ P5.5 的烟囱跑前发现两个上游问题，必须先在 x-oasis 解决再回
      - 删 `electron-stub.ts`、`vite.renderer.config.ts` 里的 `electron` alias 与 `optimizeDeps.exclude`。
      - 两个 `tsconfig.json` 加子路径 paths 条目，分别指向 `dist/src/electron-{browser,main}/index.d.ts`。
    - **回归**：electron-rpc baseline `22 fail / 51 pass` → 拆分后 `22 fail / 51 pass`，0 regression。telegraph `pnpm -r typecheck` ✅ `pnpm -r lint` ✅ `pnpm --filter telegraph package` ✅（三个 vite entries 都干净 build）。
-   - **意义**：renderer 不再需要 alias `electron`；channel 类的进程归属由 import 子路径直接表达，违例（renderer import `/electron-main`）会立刻在 type/runtime 层报错。
+    - **意义**：renderer 不再需要 alias `electron`；channel 类的进程归属由 import 子路径直接表达，违例（renderer import `/electron-main`）会立刻在 type/runtime 层报错。
+
+**P5.7 — `activateConnection` lazy-install race**
+
+P5.6 修完 multi-arg + sub-path 后，用户实测仍然报：第一次点 Connect 偶发 `Method not found`，再点一次出 connectionId。
+
+- **现象**：`inspector.requestConnect()` reject 成 `Method not found`；过一会重试就好；之后点 Ping 总是成功。
+- **链路追踪**：
+  1. renderer 点 Connect → `inspector.requestConnect(fromId, toId)` 走 cp channel → main。
+  2. main 端 `OrchestratorInspectorService.requestConnect → AppOrchestrator.connect → activateParticipant`。
+  3. `activateParticipant` 调 `info.channel.makeRequest(ORCHESTRATOR_SERVICE_PATH, 'activateConnection', port)` 反向打回 renderer 的同一条 cp channel，并 `await` 它的 ack。
+  4. renderer 的 cp channel 上**没有任何 RPCService 注册** `ORCHESTRATOR_SERVICE_PATH`（inspector 只挂了 `ProxyRPCClient`，那是 client 不是 server）。
+  5. `handleRequest.ts:152` else 分支命中 → 回 `-32601 Method not found` → main 的 await reject → `inspector.requestConnect` reject。
+- **为什么后续会"好"**：renderer 端 `awaitDirectChannelClient(DESIGN_SERVICE_PATH)` 内部用 `registerOrchestratorHandler(channel, ...)` 在 channel 上挂 RPCService 服务 `ORCHESTRATOR_SERVICE_PATH`。但这个调用过去**只在用户点 Ping 时才执行**（lazy install）——所以第一次 Connect 永远赶在 install 之前，第二次因为前一次 reject 已让 React 重新可点，且如果用户先点了 Ping handler 就装上了。
+- **修法**：把 `registerOrchestratorHandler` 的调用从 `directChannelClient.installHandlerOnce`（lazy）搬到 `RendererCpClient.getRendererCpChannel`（channel 创建即装），handler 委派给一个新导出的 `dispatchActivatedPort` 让 `directChannelClient` 仍然管 servicePath → pending promise 的路由。这样 channel 一旦存在，`activateConnection` 永远有处可落，无论用户点 Connect 还是 Ping 在前。
+- **不引入 D-006 新 gap**：方案不依赖任何 x-oasis 改动，纯 telegraph 侧 wiring 调整。多 direct-channel 场景（D-006 Gap 1）继续用 `lastServicePath` cursor，等 Gap 1 把 servicePath 写进 activation payload 后再换。
+- **回归验证**：`pnpm -r typecheck` ✅、`pnpm --filter telegraph package` ✅。运行时验证待用户 TTY `pnpm start` 复测——预期：第一次冷启动点 Connect 立刻成功，无需"过一会"。
 
 ---
 
