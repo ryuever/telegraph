@@ -54,6 +54,10 @@ export class DaemonProcess implements IDaemonProcess {
       stdio: 'inherit',
     });
 
+    this.log.info(
+      `DaemonProcess fork() returned — process launched (async), pid=${String(this.process.pid ?? 'unknown')}`,
+    );
+
     this.channel = new ElectronUtilityProcessChannel({
       process: this.process,
       description: `${DAEMON_PARTICIPANT_ID}-cp`,
@@ -72,7 +76,7 @@ export class DaemonProcess implements IDaemonProcess {
     });
 
     this.log.info(
-      `DaemonProcess ready — pid=${String(this.process.pid ?? 'unknown')} participant=${DAEMON_PARTICIPANT_ID}`,
+      `DaemonProcess ready — participant=${DAEMON_PARTICIPANT_ID} registered with orchestrator`,
     );
   }
 

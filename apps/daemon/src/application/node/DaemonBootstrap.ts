@@ -49,6 +49,11 @@ export class DaemonBootstrap implements IDaemonBootstrap {
     }
     this.started = true;
 
+    dlog(`[DEBUG] process.type: ${String((process as any).type)}`);
+    dlog(`[DEBUG] ELECTRON_RUN_AS_NODE: ${String(process.env.ELECTRON_RUN_AS_NODE)}`);
+    dlog(`[DEBUG] process.parentPort type: ${typeof process.parentPort}, value: ${String(process.parentPort)}`);
+    dlog(`[DEBUG] process.versions.electron: ${String((process.versions as any).electron)}`);
+
     const electronParentPort = process.parentPort as unknown;
     if (electronParentPort === undefined) {
       throw new Error('[DaemonBootstrap] process.parentPort is undefined — not running inside utilityProcess?');

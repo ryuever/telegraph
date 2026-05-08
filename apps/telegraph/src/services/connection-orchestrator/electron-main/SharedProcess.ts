@@ -54,6 +54,10 @@ export class SharedProcess implements ISharedProcess {
       stdio: 'inherit',
     });
 
+    this.log.info(
+      `SharedProcess fork() returned — process launched (async), pid=${String(this.process.pid ?? 'unknown')}`,
+    );
+
     this.channel = new ElectronUtilityProcessChannel({
       process: this.process,
       description: `${SHARED_PARTICIPANT_ID}-cp`,
@@ -72,7 +76,7 @@ export class SharedProcess implements ISharedProcess {
     });
 
     this.log.info(
-      `SharedProcess ready — pid=${String(this.process.pid ?? 'unknown')} participant=${SHARED_PARTICIPANT_ID}`,
+      `SharedProcess ready — participant=${SHARED_PARTICIPANT_ID} registered with orchestrator`,
     );
   }
 
