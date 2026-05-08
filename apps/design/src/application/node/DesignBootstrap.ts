@@ -12,7 +12,7 @@
 // in Phase 4. Phase 3 is "spawn + handshake survives 5s without exit".
 import { createId, inject, injectable } from '@x-oasis/di';
 
-import type { ParentPort } from '@x-oasis/async-call-rpc-electron';
+import type { ParentPort } from '@x-oasis/async-call-rpc-electron/electron-main';
 
 import {
   UtilityCpClient,

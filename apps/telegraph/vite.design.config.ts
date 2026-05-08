@@ -27,7 +27,21 @@ export default defineConfig({
     },
   },
   build: {
-    // Forge writes outputs under .vite/build/<name>/index.js per build entry.
+    // Forge's base config sets a single `outDir: '.vite/build'` for ALL build
+    // entries (see node_modules/@electron-forge/plugin-vite/.../vite.base.config.js
+    // — there's even a `// 🚧 Multiple builds may conflict.` comment in there).
+    // Without an explicit per-build override, multiple build entries either
+    // share `.vite/build/<entry-basename>.js` (clobbering each other when the
+    // basenames match — both this entry and `src/application/main.ts` would
+    // emit `main.js`) or one of them silently produces nothing.
+    //
+    // Pin design utility's output to a dedicated subdir so:
+    //   - main bundle stays at .vite/build/index.js (per vite.main.config.ts)
+    //   - design utility lands at .vite/build/design_utility/index.js
+    //   - DesignPageletProcess.resolveEntryPath() keeps using
+    //     `join(__dirname, 'design_utility', 'index.js')` (since main bundle
+    //     also lives in .vite/build/, that relative path is stable).
+    outDir: '.vite/build/design_utility',
     rollupOptions: {
       external: [...nodeBuiltins, 'electron'],
       output: {

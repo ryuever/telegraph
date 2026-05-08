@@ -12,7 +12,7 @@
 // Phase 2 the main↔renderer cp channel doubles as the renderer-side
 // participant channel so the orchestrator can later push activated ports to
 // the renderer via the same transport.
-import { IPCMainChannel } from '@x-oasis/async-call-rpc-electron';
+import { IPCMainChannel } from '@x-oasis/async-call-rpc-electron/electron-main';
 import { RPCServiceHost } from '@x-oasis/async-call-rpc';
 
 import { createId, inject, injectable } from '@x-oasis/di';

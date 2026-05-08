@@ -22,6 +22,12 @@ export default defineConfig(({ command }) => ({
       // matches the path mapping in apps/design/tsconfig.json so the
       // typecheck and the runtime build agree.
       '@design': resolve(__dirname, '../design/src'),
+      // Phase 5 (sub-path split) — renderer code now imports from
+      // `@x-oasis/async-call-rpc-electron/electron-browser`, which is
+      // guaranteed to contain *zero* `electron` runtime imports (only
+      // type-only references that TypeScript erases). That removes the
+      // need for the previous `electron` → empty-stub alias and the
+      // matching `optimizeDeps.exclude: ['electron']` workaround.
     },
   },
   server: {

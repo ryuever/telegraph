@@ -28,7 +28,7 @@ import { utilityProcess } from 'electron';
 import type { UtilityProcess } from 'electron';
 import { join } from 'node:path';
 
-import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron';
+import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron/electron-main';
 
 import { createId, inject, injectable } from '@x-oasis/di';
 

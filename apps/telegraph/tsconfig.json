@@ -38,6 +38,23 @@
       "@x-oasis/async-call-rpc-electron": [
         "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
       ],
+      // Phase 5 — sub-path entries for the split bundle. `electron-browser` is
+      // the renderer-safe surface (zero electron runtime imports), used by
+      // browser/RendererCpClient.ts + browser/directChannelClient.ts. This
+      // lets the renderer bundle skip aliasing the `electron` package
+      // entirely (no more electron-stub.ts).
+      "@x-oasis/async-call-rpc-electron/electron-browser": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-browser/index.d.ts"
+      ],
+      // `electron-main` carries the main + utility process channels +
+      // ElectronConnectionOrchestrator. Imported by electron-main/* + node/*
+      // (utility processes also import from this sub-path because the helper
+      // `registerOrchestratorHandler` is re-exported here for utility code
+      // that wants a single sub-path for *all* its connection-orchestrator
+      // needs).
+      "@x-oasis/async-call-rpc-electron/electron-main": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-main/index.d.ts"
+      ],
       "@x-oasis/async-call-rpc-web": [
         "../../../../../red/x-oasis/packages/async/async-call-rpc-web/dist/src/index.d.ts"
       ],

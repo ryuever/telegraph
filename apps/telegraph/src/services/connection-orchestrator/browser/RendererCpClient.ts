@@ -9,7 +9,7 @@
 // boot a DI container in Phase 2; this module exposes a tiny module-scoped
 // singleton instead. If renderer-side DI shows up later, dropping `@injectable`
 // on this class is a one-line change.
-import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron';
+import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron/electron-browser';
 import type { IpcRenderer } from 'electron';
 
 import {

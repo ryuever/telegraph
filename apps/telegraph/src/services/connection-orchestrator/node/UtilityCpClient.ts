@@ -24,10 +24,10 @@ import {
   ElectronMessagePortMainChannel,
   ElectronUtilityProcessChannel,
   registerOrchestratorHandler,
-} from '@x-oasis/async-call-rpc-electron';
+} from '@x-oasis/async-call-rpc-electron/electron-main';
 import { RPCServiceHost } from '@x-oasis/async-call-rpc';
 
-import type { ParentPort } from '@x-oasis/async-call-rpc-electron';
+import type { ParentPort } from '@x-oasis/async-call-rpc-electron/electron-main';
 import type { MessagePortMain } from 'electron';
 
 export interface UtilityCpClientOptions {

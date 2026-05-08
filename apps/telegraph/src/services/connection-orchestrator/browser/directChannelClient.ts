@@ -20,7 +20,7 @@
 // `registerOrchestratorHandler` calls `service.setChannel`, which would
 // clobber a previous registration — installing once avoids that footgun).
 import { ProxyRPCClient } from '@x-oasis/async-call-rpc';
-import { registerOrchestratorHandler } from '@x-oasis/async-call-rpc-electron';
+import { registerOrchestratorHandler } from '@x-oasis/async-call-rpc-electron/electron-browser';
 import { RPCMessageChannel } from '@x-oasis/async-call-rpc-web';
 
 import { getRendererCpChannel } from './RendererCpClient';

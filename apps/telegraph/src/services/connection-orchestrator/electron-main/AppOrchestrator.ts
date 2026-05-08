@@ -14,7 +14,7 @@
 import {
   ElectronConnectionOrchestrator,
   type IPCMainChannel,
-} from '@x-oasis/async-call-rpc-electron';
+} from '@x-oasis/async-call-rpc-electron/electron-main';
 import type {
   AbstractChannelProtocol,
   ConnectionOrchestratorConfig,
