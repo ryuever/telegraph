@@ -9,7 +9,7 @@ category: discussion
 created: 2026-05-08
 updated: 2026-05-08
 tags: [x-oasis, async-call-rpc, orchestrator, capability-gap, electron, telegraph]
-status: draft
+status: partial-implemented
 references:
   - id: P-003
     rel: derived-from
@@ -72,7 +72,12 @@ class BaseConnectionOrchestrator {
 
 **telegraph 阻塞**：Phase 8 进程重启重连用例。
 
-### Gap 2 — `activateTimeoutMs` + 首连重试可配
+### Gap 2 — `activateTimeoutMs` + 首连重试可配 ✅ 已落地（x-oasis `2dd835e`）
+
+**实现**：`BaseConnectionOrchestrator.connect()` 三参重载支持 `ConnectOptions { activateTimeoutMs }`，
+默认 30s；超时 reject `TimeoutError` 并回 IDLE。`retryOnInitialFailure` 字段已在
+`ConnectOptions` 类型里预留（接 `ConnectionPolicy.retryOnInitialFailure`），等 Phase 4 实战需要时再接策略。
+向后兼容：旧两参签名保留。详见 telegraph roadmap Phase 2.5 完成记录。
 
 **问题**：`example` 中 `await Promise.all([activate])` 在 utility 还没 ready 时**无限挂**。
 没有超时也没有首连重试策略；生产环境一旦 utility 启动慢就死锁。
@@ -97,7 +102,15 @@ class BaseConnectionOrchestrator {
 **telegraph 阻塞**：Phase 4 design utility 启动握手序列；
 production 环境 utility cold start 可能 > 5s。
 
-### Gap 3 — channel 断开自动调用 `handleParticipantLost`
+### Gap 3 — channel 断开自动调用 `handleParticipantLost` ✅ 已落地（x-oasis `2dd835e`）
+
+**实现**：在 `BaseConnectionOrchestrator.registerParticipant()` 内部 subscribe
+`channel.onDidDisconnected → handleParticipantLost(id, 'channel disconnected')`，
+所有 Electron 子类（webContents/utility/preload）天然适用。`handleParticipantLost`
+真实签名是 `(id, reason: string)` —— 必填两参，下方草案的 `(id, err?)` 不准。
+通过 `_participantDisconnectCleanups: Map<string, () => void>` 在重新注册同 id /
+unregister 时清旧订阅；闭包 guard `participants.get(id)?.channel === channel`
+防 stale。详见 telegraph roadmap Phase 2.5 完成记录。
 
 **问题**：现状要业务侧监听底层 channel 的 close / error 事件，再手动调
 `orchestrator.handleParticipantLost(id)`。

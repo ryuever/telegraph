@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 complete; awaiting review before Phase 2.5 (x-oasis upstream gap fixes)
+**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 complete (Gap 2 + Gap 3 in x-oasis upstream); proceeding to Phase 3
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -626,6 +626,35 @@ renderer 入口（`apps/telegraph/src/index.tsx`）：替换 Phase 1 "Hello Tele
 
 > Gap 1（`replaceParticipantChannel`）按 D-006 §5 是 Phase 8 才阻塞，本阶段不做；
 > 但要在 `BaseConnectionOrchestrator` 留好 hook 点，避免 Phase 6+ 改动过大。
+
+**完成记录（2026-05-08）** — x-oasis 仓 commit `2dd835e`，分支
+`telegraph-phase-2.5-orchestrator-gaps`。
+
+实际落地：
+- **Gap 2** — `BaseConnectionOrchestrator.connect()` 三参重载
+  `connect(a: ConnectionConfig | string, b?: ConnectOptions | string, c?: ConnectOptions)`，
+  新增 `ConnectOptions { activateTimeoutMs?: number }`（导出在 `orchestrator/index.ts` 与
+  `orchestrator/types.ts`）。`_doConnect()` 内部用 `_withActivationTimeout()` 包 setTimeout race，
+  默认 `DEFAULT_ACTIVATE_TIMEOUT_MS = 30_000`；超时 reject `TimeoutError` 并把状态回 IDLE。
+- **Gap 3** — `registerParticipant()` 内部维护
+  `_participantDisconnectCleanups: Map<string, () => void>`，自动 `subscribe(channel.onDidDisconnected,
+  () => handleParticipantLost(id, 'channel disconnected'))`，并在重新注册同 id 时先 dispose 旧订阅；
+  闭包内 guard `participants.get(id)?.channel === channel` 防 stale channel 触发。
+  `unregisterParticipant()` 也调 cleanup。所有 Electron 子类（webContents/utility/preload）
+  的 `disconnect()` 已在父类 `AbstractChannelProtocol` 触发 `onDidDisconnectedEvent`，
+  因此自动适用，子类零改动。
+- **签名修正**：`handleParticipantLost(id, reason: string)` 是必填两参（D-006 旧描述
+  `(id, error?)` 不准）。
+- **测试** — 新增 `packages/async/async-call-rpc/test/orchestrator/gaps.spec.ts`，6 用例全绿
+  （Gap 2 × 3：never resolve → TimeoutError + state IDLE / 快速 resolve 不超时 / 三参向后兼容；
+   Gap 3 × 3：disconnect 触发 lost + state TRANSIENT_FAILURE / re-register 后 stale 不触发 /
+   unregister 后不触发）。
+- **回归验证**：stash 法对比 `async-call-rpc-electron` baseline = 22 failed / 51 passed，
+  改动后数字不变；`async-call-rpc` baseline = 6 failed / 252 passed，数字不变。
+  Pre-existing failure 是上游开发者写错的 wire 格式期望（`{__orchestrator: ...}`），不在
+  D-006 scope 内。
+- **集成验证** — `pnpm compile` 在 `async-call-rpc` 与 `async-call-rpc-electron` 都跑通刷新 dist；
+  telegraph 仓 `pnpm -r typecheck/lint/test` 三连绿，确认 API 向后兼容。
 
 ### Phase 3 — DesignPageletProcess spawn + UtilityCpClient + DesignBootstrap
 
