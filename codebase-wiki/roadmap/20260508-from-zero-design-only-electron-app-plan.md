@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 complete; awaiting review before Phase 2
+**Status**: Phase 0 + Phase 1 + Phase 2 complete; awaiting review before Phase 2.5 (x-oasis upstream gap fixes)
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -570,6 +570,43 @@ test: {
 
 **验收**：UI 上能看到 `{participants:[], connections:[], capturedAt:...}`；点刷新有新时间戳。
 此时 participants 还是空（design utility 还没引入）。
+
+#### Phase 2 完成记录（2026-05-08）
+
+**实施落点**：
+
+main 侧（`apps/telegraph/src/services/connection-orchestrator/`）：
+- `common/cp-config.ts` — `ORCHESTRATOR_CP_CHANNEL_NAME = 'telegraph:orchestrator-cp'`、`ORCHESTRATOR_INSPECTOR_PATH = '/services/orchestrator-inspector'`、`ORCHESTRATOR_PROJECT_NAME = 'telegraph'`。
+- `common/types.ts` — wire 类型 `ParticipantSnapshot` / `ConnectionSnapshot` / `TopologySnapshot` / `RequestConnectResult` / `IOrchestratorInspectorService`。`ParticipantTypeWire` / `ConnectionStateWire` 为字符串字面量并集，与 x-oasis 内部枚举字面量等同。
+- `electron-main/AppOrchestrator.ts` — `@injectable extends ElectronConnectionOrchestrator`；logger funnel 到 `LogService`（注意 `logger` 是函数 `(level, message, data?) => void`，不是 object）；`listParticipants()` / `listConnections()` 用 narrow cast 读 protected `participants` / `connections` Map（不污染上游 API 表面）；`requestConnect(fromId, toId)` 包 `super.connect()` 返回 wire-friendly summary（不能 override `connect()` 改返回类型，TS 不允许窄化父类返回）。
+- `electron-main/OrchestratorInspectorService.ts` — `@injectable implements IOrchestratorInspectorService`；`getTopology()` 组合两个 list 并打 capturedAt；`requestConnect()` 直透到 orchestrator。
+- `electron-main/MainCpServer.ts` — `start()` 流程：`new IPCMainChannel({ acceptAllSenders: true })` → `new RPCServiceHost()` + `registerServiceHandler(ORCHESTRATOR_INSPECTOR_PATH, inspector)` → `channel.setServiceHost(host)` → `orchestrator.registerParticipant('renderer:main', channel, 'renderer')` + `orchestrator.setRendererCpChannel(channel)`。
+
+renderer 侧（`apps/telegraph/src/services/connection-orchestrator/browser/`）：
+- `RendererCpClient.ts` — module-scoped singleton `getRendererCpChannel()`；从 `window.telegraph.ipc` 取 preload 桥（运行时 `unknown` cast 兜底，绕过 ambient 类型 over-optimism）；构造 `IPCRendererChannel({ channelName, ipcRenderer, projectName, description: 'renderer-cp' })`。renderer 侧 Phase 2 不引入 DI 容器，singleton 即可。
+- `inspectorClient.ts` — `getInspectorClient()` factory：`new ProxyRPCClient(ORCHESTRATOR_INSPECTOR_PATH, { channel })`；`createProxy<T>` 约束 `T extends Record<string, (...a) => any>`，`interface` 不结构性满足，所以 `as unknown as IOrchestratorInspectorService` 局部 cast，公开面仍是严格类型。
+
+preload 升级（`apps/telegraph/src/application/preload/preload.ts`）：暴露 `window.telegraph.ipc`，含 `IPCRendererChannel` 实际调用的 5 个方法 `send / postMessage(含 transfer) / on / removeListener / removeAllListeners`。
+
+DI 接入：
+- `application/telegraph-application-module.ts` — 新 bind `AppOrchestratorId` / `OrchestratorInspectorServiceId` / `MainCpServerId`。
+- `application/telegraph-application.ts` — `start()` 顺序：`mainCpServer.start()` 先（cp channel 必须在 renderer 发送第一条消息前就 listening），再 `windowManager.openMainWindow()`。
+
+renderer 入口（`apps/telegraph/src/index.tsx`）：替换 Phase 1 "Hello Telegraph" 占位，挂载后用 `useEffect` 调 `getInspectorClient().getTopology()`，把 JSON 渲染到深色 `<pre>` 块；error 路径用红字显示。
+
+**实施踩坑**：
+- `ProxyRPCClient.createProxy<T>()` 的泛型约束 `T extends Record<string, (...args) => any>` 与 `interface IOrchestratorInspectorService` 不结构性兼容（TS 对 interface vs index signature 有已知坑）。解法：`createProxy()` 不带泛型，调用点 `as unknown as IOrchestratorInspectorService` 兜底。
+- preload 暴露的 ipc 对象不是完整 Electron `IpcRenderer`，`IPCRendererChannel` 只用其中 5 个方法。直接 `as unknown as IpcRenderer` 比让 preload 暴露 ~30 个方法更克制。
+- `window.telegraph` 的 ambient 类型是 required（`Window` 接口里 `telegraph: TelegraphPreloadApi`），但运行时若 preload 失败它就是 undefined。eslint `no-unnecessary-condition` 会把 `window.telegraph?.ipc` 判成无意义 optional chain；解法是先 `as unknown as { telegraph?: ... }` 让运行时 guard 通过 lint。
+- `info.type as ParticipantTypeWire` 是冗余 cast（两个类型字面量并集相同），lint `no-unnecessary-type-assertion` 报错；删 cast 即可。
+- `apps/design/package.json` 和 `packages/runtime-contracts/package.json` 的 `test` 没传 `--passWithNoTests`，Phase 1 之后这俩没测试导致 `pnpm -r test` 退出码非零；本 Phase 顺手补上 `--passWithNoTests` 让 CI 基线干净。
+- IDE LSP 在本会话里持续报一堆 stale 错（指向 `_legacy/` 时代的旧路径），实际盘上 `tsc --noEmit` 完全干净。**判据以 `pnpm -r typecheck` 为准**，IDE diagnostic 当噪音忽略。
+
+**验证状态**：
+- `pnpm -r typecheck` ✅ 三个项目全绿。
+- `pnpm -r lint` ✅ 三个项目全绿。
+- `pnpm -r test` ✅ 三个项目全绿（无 test 文件，全走 `--passWithNoTests`）。
+- 端到端 `pnpm start` 在 TTY 里手动验证 UI 显示 topology JSON：**留作 D8 review 时由用户在前台亲自跑一次**（同 Phase 1，后台 nohup 会让 forge 失去 TTY 后退）。日志侧仍可在 `/tmp/telegraph-main.log` 看到 `MainCpServer.start() channel=telegraph:orchestrator-cp`、`MainCpServer ready — inspector @ ...`、`inspector.getTopology() participants=1 connections=0` 等关键序列。
 
 ### Phase 2.5 — x-oasis 上游 P0 缺口补强（gate to Phase 3）
 

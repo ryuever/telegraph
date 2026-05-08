@@ -20,7 +20,20 @@
       "@/*": ["src/*"],
       "@telegraph/application/*": ["src/application/*"],
       "@telegraph/core/*": ["src/core/*"],
-      "@telegraph/services/*": ["src/services/*"]
+      "@telegraph/services/*": ["src/services/*"],
+      // Redirect x-oasis packages to their pre-built dist .d.ts so we get
+      // skipLibCheck-style behaviour. Without this, link-to-source pulls
+      // their .ts straight in and our `strict: true` flunks the upstream
+      // sloppy types (Function, uninitialised fields, etc). Phase 2.5+
+      // when we actually edit x-oasis, run `pnpm -r build` over there to
+      // refresh dist, or temporarily comment these out.
+      "@x-oasis/async-call-rpc": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc/dist/src/index.d.ts"
+      ],
+      "@x-oasis/async-call-rpc-electron": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
+      ],
+      "@x-oasis/deferred": ["../../../../../red/x-oasis/packages/promise/deferred/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],

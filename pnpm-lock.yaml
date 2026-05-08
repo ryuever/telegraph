@@ -71,6 +71,12 @@ importers:
 
   apps/telegraph:
     dependencies:
+      '@x-oasis/async-call-rpc':
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc
+      '@x-oasis/async-call-rpc-electron':
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
       '@x-oasis/di':
         specifier: link:../../../../../red/x-oasis/packages/ioc/di
         version: link:../../../../../red/x-oasis/packages/ioc/di
