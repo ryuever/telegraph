@@ -30,27 +30,7 @@
       // import shared wire types from common/. Both build chains agree on
       // these paths via vite alias (see vite.config.ts).
       "@telegraph/services/*": ["../telegraph/src/services/*"],
-      "@telegraph/core/*": ["../telegraph/src/core/*"],
-      // Same x-oasis dist redirect as apps/telegraph (see
-      // apps/telegraph/tsconfig.json for rationale).
-      "@x-oasis/async-call-rpc": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc/dist/src/index.d.ts"
-      ],
-      "@x-oasis/async-call-rpc-electron": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
-      ],
-      // See apps/telegraph/tsconfig.json for sub-path rationale. Design's
-      // utility-process code imports types only via `electron-main`.
-      "@x-oasis/async-call-rpc-electron/electron-browser": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-browser/index.d.ts"
-      ],
-      "@x-oasis/async-call-rpc-electron/electron-main": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-main/index.d.ts"
-      ],
-      "@x-oasis/async-call-rpc-web": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-web/dist/src/index.d.ts"
-      ],
-      "@x-oasis/deferred": ["../../../../../red/x-oasis/packages/promise/deferred/dist/index.d.ts"]
+      "@telegraph/core/*": ["../telegraph/src/core/*"]
     }
   },
   // Restrict the include to design-only sources + the two utility-side files

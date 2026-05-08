@@ -15,10 +15,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@x-oasis/async-call-rpc": "*",
-    "@x-oasis/async-call-rpc-electron": "*",
-    "@x-oasis/async-call-rpc-web": "*",
-    "@x-oasis/di": "*",
+    "@x-oasis/async-call-rpc": "^0.6.0",
+    "@x-oasis/async-call-rpc-electron": "^0.4.0",
+    "@x-oasis/async-call-rpc-web": "^0.4.0",
+    "@x-oasis/di": "^0.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

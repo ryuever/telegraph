@@ -34,9 +34,6 @@ export default defineConfig({
         ...nodeBuiltins,
         ...nodeBuiltins.map(m => `node:${m}`),
         'electron',
-        '@x-oasis/di',
-        '@x-oasis/async-call-rpc',
-        '@x-oasis/async-call-rpc-electron',
       ],
       output: {
         entryFileNames: 'index.js',

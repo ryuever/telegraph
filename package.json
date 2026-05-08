@@ -4,23 +4,6 @@
   "description": "Telegraph workspace root.",
   "private": true,
   "type": "module",
-  "pnpm": {
-    "overrides": {
-      "@x-oasis/async-call-rpc": "link:../../../red/x-oasis/packages/async/async-call-rpc",
-      "@x-oasis/async-call-rpc-electron": "link:../../../red/x-oasis/packages/async/async-call-rpc-electron",
-      "@x-oasis/async-call-rpc-node": "link:../../../red/x-oasis/packages/async/async-call-rpc-node",
-      "@x-oasis/async-call-rpc-web": "link:../../../red/x-oasis/packages/async/async-call-rpc-web",
-      "@x-oasis/deferred": "link:../../../red/x-oasis/packages/promise/deferred",
-      "@x-oasis/di": "link:../../../red/x-oasis/packages/ioc/di",
-      "@x-oasis/disposable": "link:../../../red/x-oasis/packages/event/disposable",
-      "@x-oasis/emitter": "link:../../../red/x-oasis/packages/event/emitter",
-      "@x-oasis/id": "link:../../../red/x-oasis/packages/misc/id",
-      "@x-oasis/is-ascii": "link:../../../red/x-oasis/packages/assertion/is-ascii",
-      "@x-oasis/is-function": "link:../../../red/x-oasis/packages/assertion/is-function",
-      "@x-oasis/is-object": "link:../../../red/x-oasis/packages/assertion/is-object",
-      "@x-oasis/is-promise": "link:../../../red/x-oasis/packages/assertion/is-promise"
-    }
-  },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",

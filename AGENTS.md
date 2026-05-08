@@ -64,7 +64,7 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
 │   └── reference/                                 # R-001 x-oasis link-to-source setup, etc.
 │
 ├── package.json                                   # workspace root (proxy scripts only)
-├── pnpm-workspace.yaml                            # apps/* + packages/*; excludes apps/_legacy/**; pnpm.overrides link x-oasis to source
+├── pnpm-workspace.yaml                            # apps/* + packages/*; excludes apps/_legacy/**
 └── AGENTS.md                                      # this file
 ```
 
@@ -114,10 +114,8 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
   `RPCServiceHost`; the `UtilityCpClient` rebinds it onto every direct channel that
   the orchestrator activates (Phase 5+ multi-peer fan-out kept in mind via
   `directChannels: Map<symbol, channel>`).
-- x-oasis is consumed via `pnpm.overrides` link-to-source (R-001). Its packages have
-  stale dist for some types, so telegraph's `tsconfig.json` paths redirect each
-  `@x-oasis/*` import to the package's `dist/.../index.d.ts`. Required: run
-  `pnpm compile` (NOT `pnpm build`) inside x-oasis after editing source.
+- x-oasis is consumed via npm packages. The `tsconfig.json` does not need special
+  paths configuration for x-oasis packages.
 
 ## Path aliases
 
@@ -136,8 +134,8 @@ The three `@telegraph/{application,core,services}/*` subroots are explicit prefi
 
 | File                                              | Aliases declared                                                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------|
-| `apps/telegraph/tsconfig.json`                    | `@/*`, `@telegraph/{application,core,services}/*`, `@design/*`, x-oasis dist redirects |
-| `apps/design/tsconfig.json`                       | `@design/*` (self), `@telegraph/{services,core}/*`, x-oasis dist redirects        |
+| `apps/telegraph/tsconfig.json`                    | `@/*`, `@telegraph/{application,core,services}/*`, `@design/*` |
+| `apps/design/tsconfig.json`                       | `@design/*` (self), `@telegraph/{services,core}/*`        |
 | `apps/telegraph/vite.main.config.ts`              | `@telegraph/{application,core,services}` (no design — main never touches React)   |
 | `apps/telegraph/vite.preload.config.ts`           | minimal                                                                           |
 | `apps/telegraph/vite.design.config.ts`            | `@telegraph/{application,core,services}` for cross-app entry                      |
@@ -177,5 +175,5 @@ forge swallows stdout when not attached to a TTY; tail the files above instead o
   (Phase 0–5; check the Status header for the current phase).
 - **x-oasis capability gaps** — `codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md`
   (D-006). Phase 2.5 closed Gap 2 + Gap 3 upstream; Gap 1 is queued for Phase 6.
-- **x-oasis link-to-source** — `codebase-wiki/reference/20260508-x-oasis-link-to-source-setup.md` (R-001).
+- **x-oasis link-to-source (archived)** — `codebase-wiki/reference/20260508-x-oasis-link-to-source-setup.md` (R-001, no longer used).
 - **Legacy code** — `apps/_legacy/README.md` (rules: do not import; treat as historical literature).

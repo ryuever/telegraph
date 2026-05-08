@@ -25,40 +25,7 @@
       // apps/design/src/application/browser/. Mirror the alias used by
       // vite.renderer.config.ts so `tsc --noEmit` resolves cross-app
       // imports the same way the renderer bundle does at build time.
-      "@design/*": ["../design/src/*"],
-      // Redirect x-oasis packages to their pre-built dist .d.ts so we get
-      // skipLibCheck-style behaviour. Without this, link-to-source pulls
-      // their .ts straight in and our `strict: true` flunks the upstream
-      // sloppy types (Function, uninitialised fields, etc). Phase 2.5+
-      // when we actually edit x-oasis, run `pnpm -r build` over there to
-      // refresh dist, or temporarily comment these out.
-      "@x-oasis/async-call-rpc": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc/dist/src/index.d.ts"
-      ],
-      "@x-oasis/async-call-rpc-electron": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
-      ],
-      // Phase 5 — sub-path entries for the split bundle. `electron-browser` is
-      // the renderer-safe surface (zero electron runtime imports), used by
-      // browser/RendererCpClient.ts + browser/directChannelClient.ts. This
-      // lets the renderer bundle skip aliasing the `electron` package
-      // entirely (no more electron-stub.ts).
-      "@x-oasis/async-call-rpc-electron/electron-browser": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-browser/index.d.ts"
-      ],
-      // `electron-main` carries the main + utility process channels +
-      // ElectronConnectionOrchestrator. Imported by electron-main/* + node/*
-      // (utility processes also import from this sub-path because the helper
-      // `registerOrchestratorHandler` is re-exported here for utility code
-      // that wants a single sub-path for *all* its connection-orchestrator
-      // needs).
-      "@x-oasis/async-call-rpc-electron/electron-main": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-main/index.d.ts"
-      ],
-      "@x-oasis/async-call-rpc-web": [
-        "../../../../../red/x-oasis/packages/async/async-call-rpc-web/dist/src/index.d.ts"
-      ],
-      "@x-oasis/deferred": ["../../../../../red/x-oasis/packages/promise/deferred/dist/index.d.ts"]
+      "@design/*": ["../design/src/*"]
     }
   },
   // Include the design pagelet's renderer surface so tsc resolves and checks

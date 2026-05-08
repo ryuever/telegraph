@@ -5,11 +5,13 @@ description: >
   把 telegraph workspace 的 4 个 app 全部指向本地 /Users/ryu/Documents/code/red/x-oasis/
   的 source（而非 dist）的完整步骤：上游 12 个包改 main 字段 + telegraph pnpm.overrides
   + 移除 vite external + tsconfig paths。
+  
+  ⚠️ **已过时**：项目已于 2026-05-09 切换回 npm 包版本，不再使用 link 方式。
 category: reference
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-09
 tags: [x-oasis, pnpm, link, vite, tsconfig, monorepo, electron, setup]
-status: draft
+status: archived
 references:
   - id: P-003
     rel: derived-from
