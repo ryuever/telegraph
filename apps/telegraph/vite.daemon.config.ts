@@ -16,11 +16,11 @@ export default defineConfig({
   resolve: {
     mainFields: ['module', 'jsnext:main', 'jsnext'],
     alias: {
+      // Cross-app reference: UtilityCpClient + common wire types + core services
+      // all live under apps/telegraph/src.
       '@telegraph/services': resolve(__dirname, 'src/services'),
+      '@telegraph/core': resolve(__dirname, 'src/core'),
     },
-    modules: [
-      resolve(__dirname, '../daemon/node_modules'),
-    ],
   },
   build: {
     outDir: '.vite/build/daemon_utility',
