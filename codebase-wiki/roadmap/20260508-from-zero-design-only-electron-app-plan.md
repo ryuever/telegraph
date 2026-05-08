@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; Phase 5 doc/cleanup landed, runtime smoke test pending user TTY run
+**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; Phase 5 doc/cleanup + x-oasis sub-path split + multi-arg RPC fix landed (P5.6); runtime smoke test pending user TTY run
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -814,6 +814,32 @@ design utility 日志写出 `design utility ready`。
   6. 点 Ping → RTT 数字（毫秒级）显示出来
 
 烟囱通过后，本文档 status 改 **Implemented**，从 active 移到 archived。
+
+**P5.6 — `@x-oasis/async-call-rpc-electron` 子路径拆分 + multi-arg RPC 修复**
+
+P5.5 的烟囱跑前发现两个上游问题，必须先在 x-oasis 解决再回到 telegraph：
+
+1. **multi-arg RPC bug**（async-call-rpc）
+   - `middlewares/handleRequest.ts` 中 Promise/Subscription 分支调 `handler(args)`，把整个 args 数组当成单个参数传进 user handler。
+   - `OrchestratorInspectorService.requestConnect(fromId, toId)` 在 utility 侧收到 `args = [fromId, toId]`，然后 `requestConnect([fromId, toId])` → `connect(undefined, undefined)` → `Unknown participant: "undefined"`。
+   - `test/test.spec.ts:426` 的 `expect(handler).toHaveBeenCalledWith('arg1', 'arg2')` 已经预期 spread 行为——这本来就是 latent bug。
+   - **修法**：按 RequestType 区分，Promise/Subscription 走 `handler(...args)`；TransferableArgs* 保留 `handler(args)` 单参（语义就是单个 ports 参数）。
+   - **回归**：electron-rpc baseline `22 fail / 51 pass` → 修后 `22 fail / 51 pass`，0 regression（剩余 22 fail 是 sync vs async race，与 spread 无关）。
+
+2. **renderer bundle 不能拉 `electron`**（async-call-rpc-electron）
+   - 老的 root barrel 同时 re-export `IPCMainChannel`/`ElectronMessagePortMainChannel`/… 这些 main 进程模块。renderer 通过 `import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron'` 时，bundler 还是会爬到 main 模块的 `import { ipcMain } from 'electron'`，触发 `__dirname is not defined` 之类的崩溃。
+   - 烟囱 fix 期临时用 `vite.renderer.config.ts` 里的 `electron` → `electron-stub.ts` alias + `optimizeDeps.exclude: ['electron']` 兜住，但这是脏修法。
+   - **真修法**：拆 `src/electron-browser/` + `src/electron-main/` 两条子路径，root barrel 退化成兼容 re-export。
+     - `electron-browser/`：`IPCRendererChannel` + `registerOrchestratorHandler`（从 `ElectronConnectionOrchestrator` 抽出，零 electron 运行时 import）+ `index.ts` barrel。
+     - `electron-main/`：`IPCMainChannel` + `ElectronMessagePortMainChannel` + `ElectronUtilityProcessChannel` + `ElectronConnectionOrchestrator`（去掉 `registerOrchestratorHandler` import）+ `index.ts` barrel。`registerOrchestratorHandler` 也从这里 re-export 一份，让 utility (node) 代码可以"一个子路径包打所有"。
+     - `package.json` 加 `exports`：`"."`、`"./electron-browser"`、`"./electron-main"` 三个条目。
+   - **telegraph 侧**：
+     - `apps/telegraph/src/services/connection-orchestrator/browser/{RendererCpClient,directChannelClient}.ts` 改 import `/electron-browser`。
+     - `apps/telegraph/src/services/connection-orchestrator/electron-main/{AppOrchestrator,MainCpServer,DesignPageletProcess}.ts` + `node/UtilityCpClient.ts` + `apps/design/src/application/node/DesignBootstrap.ts` 改 import `/electron-main`。
+     - 删 `electron-stub.ts`、`vite.renderer.config.ts` 里的 `electron` alias 与 `optimizeDeps.exclude`。
+     - 两个 `tsconfig.json` 加子路径 paths 条目，分别指向 `dist/src/electron-{browser,main}/index.d.ts`。
+   - **回归**：electron-rpc baseline `22 fail / 51 pass` → 拆分后 `22 fail / 51 pass`，0 regression。telegraph `pnpm -r typecheck` ✅ `pnpm -r lint` ✅ `pnpm --filter telegraph package` ✅（三个 vite entries 都干净 build）。
+   - **意义**：renderer 不再需要 alias `electron`；channel 类的进程归属由 import 子路径直接表达，违例（renderer import `/electron-main`）会立刻在 type/runtime 层报错。
 
 ---
 
