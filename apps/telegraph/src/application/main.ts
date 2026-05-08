@@ -1,45 +1,62 @@
-import * as path from 'path'
-import * as fs from 'fs'
+// Phase 1 — Electron main entry. Forge invokes this via .vite/build/index.js.
+//
+// Side-channel debug log to /tmp/telegraph-debug.log before any imports run,
+// so even import-time crashes are observable when running under electron-forge
+// (which may swallow stdout when there is no TTY).
+import { appendFileSync, writeFileSync } from 'node:fs';
 
-const __LOG = '/tmp/telegraph-main.log'
-function dlog(msg: string) {
+const __DBG = '/tmp/telegraph-debug.log';
+function dlog(msg: string): void {
   try {
-    fs.appendFileSync(__LOG, `[${new Date().toISOString()}] ${msg}\n`)
-  } catch {}
-}
-fs.writeFileSync(__LOG, '')
-dlog(`main.ts entry; pid=${process.pid}`)
-process.on('uncaughtException', (e) => dlog(`UNCAUGHT: ${(e as Error)?.stack || e}`))
-process.on('unhandledRejection', (e) => dlog(`UNHANDLED: ${(e as Error)?.stack || e}`))
-process.on('exit', (code) => dlog(`EXIT code=${code}`))
-
-const { app } = require('electron')
-
-import { Container } from '@x-oasis/di'
-import registry from './telegraph-application-module'
-import { TelegraphApplicationId } from './telegraph-application'
-import type TelegraphApplication from './telegraph-application'
-
-dlog('imports ok; building DI container')
-
-const container = new Container()
-container.load(registry)
-
-dlog('container loaded; waiting for app.whenReady')
-
-app.whenReady().then(() => {
-  dlog('app.whenReady fired; resolving TelegraphApplication')
-  try {
-    const application = container.get(TelegraphApplicationId) as TelegraphApplication
-    dlog('TelegraphApplication resolved; calling start()')
-    application.start()
-    dlog('start() returned')
-  } catch (err) {
-    dlog(`startup error: ${(err as Error)?.stack || err}`)
-    throw err
+    appendFileSync(__DBG, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {
+    // ignore
   }
-})
+}
+
+try {
+  writeFileSync(__DBG, '');
+} catch {
+  /* ignore */
+}
+dlog(`main.ts entry; pid=${String(process.pid)}`);
+process.on('uncaughtException', (e: Error) => {
+  dlog(`UNCAUGHT: ${e.stack ?? String(e)}`);
+});
+process.on('unhandledRejection', (e) => {
+  dlog(`UNHANDLED: ${e instanceof Error ? e.stack ?? String(e) : String(e)}`);
+});
+process.on('exit', (code) => {
+  dlog(`EXIT code=${String(code)}`);
+});
+
+import { app } from 'electron';
+
+import { Container } from '@x-oasis/di';
+
+import registry from './telegraph-application-module';
+import { TelegraphApplicationId, type ITelegraphApplication } from './telegraph-application';
+
+dlog('imports ok; building DI container');
+
+const container = new Container();
+container.load(registry);
+
+dlog('container loaded; awaiting app.whenReady');
+
+app
+  .whenReady()
+  .then(() => {
+    dlog('app.whenReady fired');
+    const application = container.get(TelegraphApplicationId) as ITelegraphApplication;
+    application.start();
+    dlog('application.start() returned');
+  })
+  .catch((err: unknown) => {
+    dlog(`startup error: ${err instanceof Error ? err.stack ?? String(err) : String(err)}`);
+    throw err;
+  });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  if (process.platform !== 'darwin') app.quit();
+});

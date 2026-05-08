@@ -9,8 +9,9 @@ description: >
 category: roadmap
 created: 2026-05-08
 updated: 2026-05-08
+progress: Phase 0–8 完成；Phase 8 故障注入待验证（需运行时）
 tags: [port-management, orchestrator, async-call-rpc, electron, design, refactor, roadmap]
-status: draft
+status: in-progress
 references:
   - id: A-002
     rel: related-to
@@ -93,7 +94,7 @@ Phase 9  (Wiki / 文档同步)
 
 ---
 
-## Phase 0 — 依赖准备 & link 验证
+## Phase 0 — 依赖准备 & link 验证 ✅
 
 **目标**：让 telegraph workspace 能够直接消费 x-oasis 本地 source，且 main / fork bundle 能正确打包。
 
@@ -112,7 +113,7 @@ Phase 9  (Wiki / 文档同步)
 
 ---
 
-## Phase 1 — apps/design 目录重构
+## Phase 1 — apps/design 目录重构 ✅
 
 **目标**：把 design 改成与 chat 对齐的标准结构，UI 迁回 app 内。
 
@@ -146,7 +147,7 @@ apps/design/
 
 ---
 
-## Phase 2 — 引入 AppOrchestrator（main 进程侧）
+## Phase 2 — 引入 AppOrchestrator（main 进程侧）✅
 
 **目标**：在 main 进程中创建一个 **全局唯一** 的 `ElectronConnectionOrchestrator`，所有 participant 在它这里注册。
 
@@ -164,7 +165,7 @@ apps/design/
 
 ---
 
-## Phase 3 — 各 process 暴露 participant channel
+## Phase 3 — 各 process 暴露 participant channel ✅
 
 **目标**：让 shared / daemon / pagelet 都把自己注册成 orchestrator 的 participant。
 
@@ -182,7 +183,7 @@ apps/design/
 
 ---
 
-## Phase 4 — design utility 端接 port + 内部 client
+## Phase 4 — design utility 端接 port + 内部 client ✅
 
 **目标**：design pagelet utility 进程内主动 `connect` 到 shared / daemon / main，并各持一个 RPC client。
 
@@ -199,7 +200,7 @@ apps/design/
 
 ---
 
-## Phase 5 — renderer 改造（1 条 direct + Forwarding Proxy）
+## Phase 5 — renderer 改造（1 条 direct + Forwarding Proxy）✅
 
 **目标**：renderer 只持有 1 条到 pagelet 的 direct port；shared/daemon/main 能力通过 pagelet 转发。
 
@@ -222,7 +223,7 @@ apps/design/
 
 ---
 
-## Phase 6 — OrchestratorInspectorService
+## Phase 6 — OrchestratorInspectorService ✅
 
 **目标**：把 orchestrator 的拓扑、状态、事件流暴露给 renderer，供 Connections Tab 消费。
 
@@ -243,7 +244,7 @@ apps/design/
 
 ---
 
-## Phase 7 — Connections Tab UI
+## Phase 7 — Connections Tab UI ✅
 
 **目标**：在 design panel 内嵌入 Connections Tab，实时展示拓扑 + 提供 Ping 按钮。
 
@@ -261,7 +262,7 @@ apps/design/
 
 ---
 
-## Phase 8 — 联调 + 故障注入
+## Phase 8 — 联调 + 故障注入 🔄（build 通过；故障注入待运行时验证）
 
 **目标**：验证重连、跨进程 RPC、性能不退化。
 
@@ -279,7 +280,7 @@ apps/design/
 
 ---
 
-## Phase 9 — 文档 / Wiki 更新
+## Phase 9 — 文档 / Wiki 更新 ✅
 
 9.1 在 `architecture/` 新写 A-008 反映新通路（设计完成后）
 9.2 把 `refactor-port-management.md` 标注为 **历史 brief**（不删除）
@@ -320,3 +321,58 @@ design 跑通后：
 2. monitor 是单独 BrowserView，可只做 Phase 4 / 5（preload 共用）
 3. 删除 `services/port-manager/` 全部代码
 4. `services/process/` 中只保留进程生命周期管理（spawn / kill），握手逻辑全部下沉到 orchestrator
+
+---
+
+## 7. 实施摘要（2026-05-08 完成）
+
+### 核心新增文件
+
+| 文件 | 职责 |
+|------|------|
+| `src/services/connection-orchestrator/electron-main/AppOrchestrator.ts` | 全局唯一的 ElectronConnectionOrchestrator 包装，participant 注册/connect/拓扑查询 |
+| `src/services/connection-orchestrator/electron-main/OrchestratorInspectorService.ts` | 把拓扑、stats、ping 暴露为 RPC service，注册在 main 进程 `/services/orchestrator-inspector` |
+| `src/services/connection-orchestrator/browser/OrchestratorInspectorService.ts` | renderer 端 `createOrchestratorInspectorClient(channel)` 工厂 |
+| `src/services/connection-orchestrator/common/types.ts` | 跨进程共享类型（TopologySnapshot / ConnectionSnapshot / PingResult 等） |
+| `src/services/connection-orchestrator/common/exposeRemoteService.ts` | D-005 Forwarding Proxy 工具函数 |
+| `apps/design/src/application/node/DesignPageletNode.ts` | pagelet 侧：等待 orchestrator 分配 shared/daemon/main port，创建 RPC clients |
+| `apps/design/src/application/browser/connections/ConnectionsTab.tsx` | Connections Tab UI：实时拓扑 + Participant 行 + Ping |
+
+### 关键修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `telegraph-application.ts` | `prepareMainProcess()` 注册 `OrchestratorInspectorService`；constructor 注入 |
+| `telegraph-application-module.ts` | `AppOrchestrator` + `OrchestratorInspectorService` 绑定为 singleton |
+| `port-manager/electron-main/AcquireProcessPortMain.ts` | `processChannel` 改 protected，新增 `get channel()` getter |
+| `port-manager/node/ProcessClientChannel.ts` | `initOrchestratorHandler()` + `bindNextOrchestratorPort()` |
+| `process/pagelet-process/electron-main/PageletProcess.ts` | 注入 AppOrchestrator，createUtilityProcess() 后注册 participant + connect |
+| `apps/design/src/main.ts` | Phase 4/5/6：DesignPageletNode init + forwarding proxies + inspector forwarding |
+| `vite.fork.config.ts` | external 改为 function 形式，`@telegraph/ui` / react / react-dom external |
+
+### 数据流（已实现）
+
+```
+renderer
+  → (MessagePort: pagelet direct port)
+  → pagelet serviceHost['/services/design']          ← DesignApplication
+  → pagelet serviceHost['/services/orchestrator-inspector']  ← forwarding → main OrchestratorInspectorService
+  → pagelet serviceHost['/services/forwarding/shared']  ← forwarding → shared process
+  → pagelet serviceHost['/services/forwarding/daemon']  ← forwarding → daemon process
+  → pagelet serviceHost['/services/forwarding/main']    ← forwarding → main process
+```
+
+```
+main (AppOrchestrator)
+  ├─ participant: 'shared'        → sharedProcessChannel
+  ├─ participant: 'daemon'        → daemonProcessChannel
+  ├─ participant: 'main'          → sharedProcessChannel (main 宿主)
+  └─ participant: 'pagelet:design:<id>'  → pagelet ElectronUtilityProcessChannel
+       └─ connect: pagelet → shared / daemon / main（顺序绑定）
+```
+
+### 已知限制（Phase 8 待验证）
+
+- 故障注入（pagelet 崩溃、shared 崩溃）需运行时验证，x-oasis Gap 1/2/3 尚未补强
+- Ping 实现为模拟 RTT（getTopology 延迟），Phase 8 后替换为真实 orchestrator.ping()
+- heartbeat 配置为 `enabled: false`，Phase 8 开启后验证

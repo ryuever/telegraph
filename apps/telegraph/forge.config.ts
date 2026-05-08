@@ -1,21 +1,16 @@
-import type { ForgeConfig } from '@electron-forge/shared-types'
-import { MakerSquirrel } from '@electron-forge/maker-squirrel'
-import { MakerZIP } from '@electron-forge/maker-zip'
-import { MakerDeb } from '@electron-forge/maker-deb'
-import { MakerRpm } from '@electron-forge/maker-rpm'
-import { VitePlugin } from '@electron-forge/plugin-vite'
+// Phase 1 — minimal Forge config: main + preload + one renderer.
+// Phase 3 will add `apps/design` utility entries.
+import type { ForgeConfig } from '@electron-forge/shared-types';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
+import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const config: ForgeConfig = {
-  packagerConfig: {
-    extraResource: ['resources/pi-runtime'],
-  },
+  packagerConfig: {},
   rebuildConfig: {},
-  makers: [
-    new MakerSquirrel({}),
-    new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
-  ],
+  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
     new VitePlugin({
       build: [
@@ -24,32 +19,8 @@ const config: ForgeConfig = {
           config: 'vite.main.config.ts',
         },
         {
-          entry: 'src/application/preload/px.ts',
+          entry: 'src/application/preload/preload.ts',
           config: 'vite.preload.config.ts',
-        },
-        {
-          entry: 'src/services/process/shared-process/node/shared-process-bootstrap.ts',
-          config: 'vite.fork.config.ts',
-        },
-        {
-          entry: 'src/services/process/daemon-process/node/daemon-process-bootstrap.ts',
-          config: 'vite.fork.config.ts',
-        },
-        {
-          entry: 'src/services/process/pagelet-process/node/pagelet-process-bootstrap.ts',
-          config: 'vite.fork.config.ts',
-        },
-        {
-          entry: 'src/services/process/pagelet-process/node/chat-pagelet-entry.ts',
-          config: 'vite.fork.config.ts',
-        },
-        {
-          entry: 'src/services/process/pagelet-process/node/design-pagelet-entry.ts',
-          config: 'vite.fork.config.ts',
-        },
-        {
-          entry: 'src/services/process/pagelet-process/node/monitor-pagelet-entry.ts',
-          config: 'vite.fork.config.ts',
         },
       ],
       renderer: [
@@ -60,6 +31,6 @@ const config: ForgeConfig = {
       ],
     }),
   ],
-}
+};
 
-export default config
+export default config;

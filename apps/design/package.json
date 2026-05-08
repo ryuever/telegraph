@@ -1,25 +1,15 @@
 {
   "name": "design",
   "version": "1.0.0",
-  "description": "Design application as a standalone process",
+  "description": "Design pagelet utility process — built from zero (see codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md).",
   "private": true,
-  "main": ".vite/build/index.js",
+  "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
-  },
-  "dependencies": {
-    "@telegraph/runtime-contracts": "workspace:*",
-    "@x-oasis/async-call-rpc": "^0.4.0",
-    "@x-oasis/async-call-rpc-node": "^0.2.0",
-    "@x-oasis/di": "^0.4.0",
-    "@x-oasis/disposable": "^0.4.0",
-    "@x-oasis/emitter": "^0.4.0",
-    "@x-oasis/id": "^0.4.0"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.3.0",
-    "vite": "^5.0.0"
+    "typescript": "^5.3.0"
   }
 }

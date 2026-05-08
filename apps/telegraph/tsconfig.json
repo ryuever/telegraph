@@ -1,50 +1,28 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "commonjs",
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "noImplicitAny": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "noEmit": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "strictNullChecks": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node", "vite/client"],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@telegraph/application/*": ["./src/application/*"],
-      "@telegraph/core/*": ["./src/core/*"],
-      "@telegraph/services/*": ["./src/services/*"],
-      "@telegraph/ui/globals.css": ["../../packages/ui/src/styles/globals.css"],
-      "@telegraph/ui/components/*": ["../../packages/ui/src/components/*"],
-      "@telegraph/ui/lib/*": ["../../packages/ui/src/lib/*"],
-      "@telegraph/ui/hooks/*": ["../../packages/ui/src/hooks/*"],
-      "@telegraph/agent": ["../../packages/agent/src/index.ts"],
-      "@telegraph/agent/*": ["../../packages/agent/src/*"],
-      "@telegraph/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
-      "@telegraph/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"],
-      "@chat/*": ["../../apps/chat/src/*"],
-      "@design/*": ["../../apps/design/src/*"],
-      "@monitor/*": ["../../apps/monitor/src/*"]
+      "@/*": ["src/*"],
+      "@telegraph/application/*": ["src/application/*"],
+      "@telegraph/core/*": ["src/core/*"],
+      "@telegraph/services/*": ["src/services/*"]
     }
   },
-  "include": [
-    ".",
-    "vite.main.config.ts",
-    "vite.preload.config.ts",
-    "vite.fork.config.ts",
-    "vite.config.ts",
-    "vite.renderer.config.ts",
-    "forge.config.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "out",
-    ".vite",
-    "dist"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", ".vite", "dist"]
 }
