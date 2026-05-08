@@ -40,7 +40,9 @@ export class OrchestratorInspectorService implements IOrchestratorInspectorServi
   }
 
   async requestConnect(fromId: string, toId: string): Promise<RequestConnectResult> {
-    this.log.info(`inspector.requestConnect(${fromId} -> ${toId})`);
+    this.log.info(
+      `inspector.requestConnect raw: argc=${String(arguments.length)} fromId=${JSON.stringify(fromId)} toId=${JSON.stringify(toId)}`,
+    );
     const result = await this.orchestrator.requestConnect(fromId, toId);
     return result;
   }
