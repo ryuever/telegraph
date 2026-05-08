@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 complete; proceeding to Phase 4 (DesignPanel + ConnectionsTab)
+**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; proceeding to Phase 5 (smoke test + cleanup)
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -703,7 +703,7 @@ design utility 日志写出 `design utility ready`。
 - 验证：`pnpm -r typecheck/lint/test` 三连绿。运行时验收（`ps aux` + `/tmp/telegraph-design.log`）
   留待 Phase 4 一起跑（UI 已经能看到 participants 后再 sanity check）。
 
-### Phase 4 — DesignPanel + ConnectionsTab + connect/Ping
+### Phase 4 — DesignPanel + ConnectionsTab + connect/Ping ✅ 完成
 
 实现：
 - 在 `packages/ui` 里按 shadcn 风格补 design 面板需要的原语（如缺）
@@ -714,6 +714,64 @@ design utility 日志写出 `design utility ready`。
 - 主 `index.tsx` 把临时调试块替换为 DesignPanel
 
 **验收**：UI 看到 ConnectionsTab，能 Connect、能 Ping，RTT 数字显示出来；`getTopology` 里出现 connection。
+
+#### 完成记录（实施回放）
+
+**P4.1 — web RPC 包接入**
+- `apps/telegraph/package.json` 加 `@x-oasis/async-call-rpc-web` dep（`*` 走 `pnpm.overrides` link-to-source）。
+- `apps/telegraph/tsconfig.json` `paths` 加 web 包 dist redirect（与 `async-call-rpc` / `async-call-rpc-electron` 同模式）。
+- 决策：**不引入 shadcn/tailwind**——Phase 4 用 inline style + 原生 elements 把跨进程链路打通就行；shadcn 真用上时再 retrofit，Phase 4 越小验证面越扎实。
+
+**P4.2 — UtilityCpClient 升级（Phase 3 留的 placeholder cb）**
+- `apps/telegraph/src/services/connection-orchestrator/node/UtilityCpClient.ts` 的 `start(onActivated?)` 改造：
+  cb 不再传 raw `MessagePortMain`，而是内部建 `ElectronMessagePortMainChannel({description})` +
+  `setServiceHost(this.serviceHost)` + `bindPort(port)`，cb 仅传已绑定好的 channel。
+- 调用方（`apps/design/src/application/node/DesignBootstrap.ts`）现在不需要关心 MessagePort 细节，只在 cb 里打日志确认 direct 通道就绪。
+- 持有 `directChannels: Map<symbol, ElectronMessagePortMainChannel>` 备多 peer 扩展（Phase 5+ 多 utility 时可直接 fan-out）。
+
+**P4.3 — renderer-side 直通 client 工厂**
+- 新增 `apps/telegraph/src/services/connection-orchestrator/browser/directChannelClient.ts`：
+  - `awaitDirectChannelClient<T>(servicePath)` 用 `registerOrchestratorHandler(cpChannel, onPort)` 监听 main 来的 activate。
+  - 拿到 port 后建 `RPCMessageChannel({port, description})`（`@x-oasis/async-call-rpc-web`）+ `new ProxyRPCClient(servicePath, {channel}).createProxy() as unknown as T`。
+  - **idempotent**：handler 全局只装一次（x-oasis `registerOrchestratorHandler` 内部 `service.setChannel` 是覆盖型 ——
+    多次调用会互相覆盖；改用 module-scoped `pending: Map<servicePath, PendingEntry>` + `handlerInstalled` 单例 flag），
+    同一 servicePath 多次调用返回同一个 cached promise（防止 React StrictMode 双调用 / 用户连点 Ping 触发多次注册）。
+  - 暴露 `__resetDirectChannelClient()` 给测试用。
+
+**P4.4 — DesignPanel + ConnectionsTab**
+- `apps/design/package.json` 加 `react`/`react-dom` 运行依赖 + `@types/react`/`@types/react-dom` devDep
+  （组件最终在 telegraph renderer bundle 里跑，但 design 自己 typecheck 也要见到 react 类型）。
+- `apps/design/tsconfig.json` 加 `"jsx": "react-jsx"` + `"lib": ["ES2022","DOM","DOM.Iterable"]` + web 包 dist redirect。
+- `apps/design/src/application/browser/DesignPanel.tsx` —— 顶层壳，仅渲染 `ConnectionsTab`（Phase 5+ 添加真业务 tab 时再扩展）。
+- `apps/design/src/application/browser/connections/ConnectionsTab.tsx` —— 三大块：
+  1. `useEffect` 1Hz poll `inspector.getTopology()` → 实时表格显示 participants + connections（连接状态用色块徽章，READY = 绿）。
+  2. "Connect" 按钮 → `inspector.requestConnect('renderer:main', DESIGN_PARTICIPANT_ID)` → 显示返回的 `connectionId`；
+     基于 topology 自动 disable/enable（READY 时显示 "Connected"）。
+  3. "Ping" 按钮 → `awaitDirectChannelClient<IDesignService>(DESIGN_SERVICE_PATH).ping(start)` → echo 校验 + 显示 RTT(ms) + serverTime。
+- 全部用 inline style，无外部 CSS 依赖；颜色风格暗黑（`#0d0d0d` 背景 + `#eee` 字 + 绿色 READY 徽章）跟 Phase 2 调试块对齐。
+
+**P4.5 — telegraph renderer entry 切换**
+- `apps/telegraph/src/index.tsx` —— 删除 Phase 2 的 topology JSON 调试块，改为 `<DesignPanel />` 单组件挂载。
+- `apps/telegraph/vite.renderer.config.ts` 加 `@design` alias 指向 `../design/src/`（符合 design tsconfig 的 `@design/*` 自身别名）。
+- `apps/telegraph/tsconfig.json` 同步加 `@design/*` paths + 把 `../design/src/application/browser/**/*` 加入 `include`，
+  让 telegraph 这边 `tsc --noEmit` 也跨 app 检 DesignPanel 的类型（design 自己的 typecheck pass 也覆盖一遍，**双重检查捕获跨 app 类型漂移**）。
+
+**P4.6 — 三连绿验证**
+- `pnpm install`：4 个 workspace project，design 新增 react/react-dom + types 安装成功。
+- `pnpm -r typecheck`：telegraph + design + runtime-contracts 全 Done。
+  - 一处坑：design 的 tsc 拉到 cross-app 引入的 `UtilityCpClient.ts`，`bindPort(port: MessagePortMain)` 不接受 x-oasis 的 `MainPort`。
+    最终用 `(rawPort: unknown) => ... port = rawPort as MessagePortMain` 在 cb 入口处一次性 narrow，规避双侧 lib 形状差异。
+- `pnpm -r lint`：全 Done。
+  - 三处 lint 反复横跳：`@typescript-eslint/no-unnecessary-type-assertion`（assertion 多余）↔ `@typescript-eslint/no-unsafe-argument`（缺 assertion），
+    解法是给 cb 显式标 `unknown` 类型再做单次 assertion，让两条规则都满意。
+  - 另一处：DesignBootstrap 里 `${String(directChannel)}` 触发 `@typescript-eslint/no-base-to-string`（channel 没 toString），改成打印 `DESIGN_SERVICE_PATH` 字符串。
+- `pnpm -r test`：3 个项目都 "No test files found, exiting with code 0"（Phase 4 不引入新单测，运行时验收延后到 Phase 5 用户在 TTY 跑）。
+
+**遗留 / 后续 Phase 处理**
+- 多 utility 同时在线时，`awaitDirectChannelClient` 现在用 `lastServicePath` 单变量记录目标 service，活动 connection 大于 1 时会路由错。
+  Phase 5+ 多 pagelet 上线时，需要 x-oasis 在 activate 事件里带上 target servicePath（小幅 API 扩展），单独跟踪。
+- `directChannels: Map<symbol, channel>` 在 utility 侧只记不清——Phase 5 加 disconnect handling 时需要清理这张表。
+- 运行时验证（`pnpm start` → 主窗口 → ConnectionsTab → Connect → Ping → RTT > 0）放到 Phase 5 由用户在 TTY 内执行。
 
 ### Phase 5 — 收尾
 
