@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; proceeding to Phase 5 (smoke test + cleanup)
+**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; Phase 5 doc/cleanup landed, runtime smoke test pending user TTY run
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -773,7 +773,7 @@ design utility 日志写出 `design utility ready`。
 - `directChannels: Map<symbol, channel>` 在 utility 侧只记不清——Phase 5 加 disconnect handling 时需要清理这张表。
 - 运行时验证（`pnpm start` → 主窗口 → ConnectionsTab → Connect → Ping → RTT > 0）放到 Phase 5 由用户在 TTY 内执行。
 
-### Phase 5 — 收尾
+### Phase 5 — 收尾 🟡 文档完成，运行时 smoke test 待用户在 TTY 跑
 
 - 在每个 services 关键文件头补上对设计文档与 Phase 的指针注释
 - 更新 `AGENTS.md` 反映新仓库结构
@@ -781,6 +781,39 @@ design utility 日志写出 `design utility ready`。
 - `apps/_legacy/README.md` 强调该目录不 import
 - 跑一次 `pnpm lint && pnpm typecheck && pnpm test`，全过
 - 烟囱测试通过
+
+#### 完成记录（实施回放）
+
+**P5.1 — 关键文件 roadmap 指针**
+- 大多数 services 文件在 Phase 0–4 已带 `// Phase N — ...` header；Phase 5 给入口/核心补上明确的 `Design context: codebase-wiki/roadmap/...` 注释，让新读者从代码就能跳到设计文档。
+- 涉及：`apps/telegraph/src/application/main.ts`、`apps/design/src/main.ts`、
+  `apps/telegraph/src/services/connection-orchestrator/electron-main/AppOrchestrator.ts`（额外加 D-006 缺口分析指针）、
+  `apps/design/src/application/browser/DesignPanel.tsx`。
+- 决策：不对每个文件都加 doc-pointer，只在 4 个高杠杆点（main 进程入口、utility 进程入口、orchestrator 核心、design UI 入口）落锚——其余文件的 `// Phase N` 已足够回溯。
+
+**P5.2 — `AGENTS.md` 重写**
+- 旧 `AGENTS.md` 描述的是 legacy（`packages/ui` shadcn vite-monorepo + monitor 面板 + `vite.fork.config.ts`）。
+- 新版本完整反映 from-zero 结构：apps/{telegraph,design} 分工、process topology ASCII 图、path aliases 表、x-oasis link-to-source 调用链、调试日志 sink、设计文档定位指南。
+
+**P5.3 — `apps/_legacy/README.md`**
+- Phase 5 检查现有 README，规则（不 import / 历史文献 / 复用要重写）已经全在。**无修改**。
+
+**P5.4 — 三连绿 final pass**
+- `pnpm -r typecheck`：runtime-contracts + telegraph + design 全 Done。
+- `pnpm -r lint`：全 Done。
+- `pnpm -r test`：全 "No test files found, exiting 0"（按计划无新增单测）。
+
+**P5.5 — 烟囱测试 🔜 待用户**
+- forge 没有 TTY 时立刻退出（Discoveries 第 10 条），自动化跑不动；放到用户在终端里手动跑 `pnpm start`。
+- 验证清单（roadmap §11 第 5–9 条）：
+  1. 主窗口出现，`<DesignPanel />` 渲染（黑底标题 "Design"）
+  2. design utility 在 `ps aux | grep node` 能看到，5s 内不退
+  3. `/tmp/telegraph-main.log` 有 `start ok` 类条目，无 UNHANDLED
+  4. ConnectionsTab 拓扑表显示 2 个 participant（renderer:main + pagelet:design）
+  5. 点 Connect → 出现 1 条 READY connection
+  6. 点 Ping → RTT 数字（毫秒级）显示出来
+
+烟囱通过后，本文档 status 改 **Implemented**，从 active 移到 archived。
 
 ---
 

@@ -1,5 +1,7 @@
 // Phase 3 — Electron utility-process entry for the design pagelet.
 //
+// Design context: codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md
+//
 // Loaded via `utilityProcess.fork(<bundle>)` from
 // `apps/telegraph/src/services/connection-orchestrator/electron-main/DesignPageletProcess.ts`.
 //

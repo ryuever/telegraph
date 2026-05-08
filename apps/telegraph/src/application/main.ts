@@ -1,5 +1,7 @@
 // Phase 1 — Electron main entry. Forge invokes this via .vite/build/index.js.
 //
+// Design context: codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md
+//
 // Side-channel debug log to /tmp/telegraph-debug.log before any imports run,
 // so even import-time crashes are observable when running under electron-forge
 // (which may swallow stdout when there is no TTY).

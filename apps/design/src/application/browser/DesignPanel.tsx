@@ -1,5 +1,7 @@
 // Phase 4 — top-level renderer surface for the design pagelet.
 //
+// Design context: codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md (§10 Phase 4).
+//
 // Hosts the per-tab views; Phase 4 only ships ConnectionsTab (the smoke-test
 // for the renderer ↔ design utility direct channel). Phase 5+ adds real
 // design-tool tabs (canvas, layers, inspector) once the wire-level link is

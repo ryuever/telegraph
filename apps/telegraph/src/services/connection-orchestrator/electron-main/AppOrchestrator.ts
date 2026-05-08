@@ -5,7 +5,10 @@
 //      OrchestratorInspectorService can build a wire-friendly snapshot
 //      without poking at protected fields.
 //
-// Phase 3 will add `DesignPageletProcess` which calls `registerParticipant()`
+// Design context: codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md (§5 process topology).
+// Capability gaps: codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md (D-006).
+//
+// Phase 3 added `DesignPageletProcess` which calls `registerParticipant()`
 // from outside; Phase 4 layers heartbeat/reconnect config on top via the
 // `ConnectionOrchestratorConfig`.
 import {
