@@ -1,5 +1,5 @@
-// Phase 2 — DI Registry wiring.
-// Adds orchestrator services on top of the Phase 1 baseline.
+// Phase 3 — DI Registry wiring.
+// Adds DesignPageletProcess on top of the Phase 2 baseline.
 import { Registry } from '@x-oasis/di';
 
 import { LogService, LogServiceId } from '@telegraph/core/log/LogService';
@@ -19,6 +19,10 @@ import {
   MainCpServer,
   MainCpServerId,
 } from '@telegraph/services/connection-orchestrator/electron-main/MainCpServer';
+import {
+  DesignPageletProcess,
+  DesignPageletProcessId,
+} from '@telegraph/services/connection-orchestrator/electron-main/DesignPageletProcess';
 
 import { TelegraphApplication, TelegraphApplicationId } from './telegraph-application';
 
@@ -28,5 +32,6 @@ export default new Registry((bind) => {
   bind(AppOrchestratorId).to(AppOrchestrator);
   bind(OrchestratorInspectorServiceId).to(OrchestratorInspectorService);
   bind(MainCpServerId).to(MainCpServer);
+  bind(DesignPageletProcessId).to(DesignPageletProcess);
   bind(TelegraphApplicationId).to(TelegraphApplication);
 });

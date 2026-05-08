@@ -12,8 +12,37 @@
     "isolatedModules": true,
     "noEmit": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      // Local design source.
+      "@design/*": ["src/*"],
+      // Cross-app references — UtilityCpClient lives in
+      // apps/telegraph/src/services/connection-orchestrator/node, and we
+      // import shared wire types from common/. Both build chains agree on
+      // these paths via vite alias (see vite.config.ts).
+      "@telegraph/services/*": ["../telegraph/src/services/*"],
+      "@telegraph/core/*": ["../telegraph/src/core/*"],
+      // Same x-oasis dist redirect as apps/telegraph (see
+      // apps/telegraph/tsconfig.json for rationale).
+      "@x-oasis/async-call-rpc": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc/dist/src/index.d.ts"
+      ],
+      "@x-oasis/async-call-rpc-electron": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
+      ],
+      "@x-oasis/deferred": ["../../../../../red/x-oasis/packages/promise/deferred/dist/index.d.ts"]
+    }
   },
-  "include": ["src/**/*"],
+  // Restrict the include to design-only sources + the two utility-side files
+  // we actually consume from apps/telegraph. Capturing the entire
+  // connection-orchestrator tree would pull in main-process and renderer
+  // code that has its own (incompatible) lib requirements.
+  "include": [
+    "src/**/*",
+    "../telegraph/src/services/connection-orchestrator/common/**/*",
+    "../telegraph/src/services/connection-orchestrator/node/**/*"
+  ],
   "exclude": ["node_modules", ".vite", "dist"]
 }

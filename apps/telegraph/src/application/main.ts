@@ -46,11 +46,11 @@ dlog('container loaded; awaiting app.whenReady');
 
 app
   .whenReady()
-  .then(() => {
+  .then(async () => {
     dlog('app.whenReady fired');
     const application = container.get(TelegraphApplicationId) as ITelegraphApplication;
-    application.start();
-    dlog('application.start() returned');
+    await application.start();
+    dlog('application.start() resolved');
   })
   .catch((err: unknown) => {
     dlog(`startup error: ${err instanceof Error ? err.stack ?? String(err) : String(err)}`);

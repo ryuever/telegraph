@@ -56,3 +56,36 @@ export interface IOrchestratorInspectorService {
   getTopology(): Promise<TopologySnapshot>;
   requestConnect(fromId: string, toId: string): Promise<RequestConnectResult>;
 }
+
+/**
+ * Phase 3 — design utility participant id.
+ *
+ * Stable wire identifier shared by `DesignPageletProcess` (main side) and
+ * `DesignBootstrap` (utility side). Both sides MUST agree on this exact
+ * string when calling `orchestrator.registerParticipant(...)`.
+ */
+export const DESIGN_PARTICIPANT_ID = 'pagelet:design';
+
+/**
+ * Phase 3 — design service RPC path.
+ *
+ * Mounted on the design utility's `RPCServiceHost` and called by the renderer
+ * (Phase 4) over the activated direct channel.
+ */
+export const DESIGN_SERVICE_PATH = '/services/design';
+
+/**
+ * Design service contract — the surface the design utility process exposes
+ * to its callers. Phase 3 only `ping()` is wired; Phase 4+ adds real design
+ * pagelet operations (load project, render, etc).
+ *
+ * Wire-friendly: arguments and return values must serialise across
+ * `postMessage`. Keep functions pure-data in / pure-data out.
+ */
+export interface IDesignService {
+  /**
+   * Round-trip liveness check. Echoes `now` so the caller can compute RTT.
+   * Returns `{ pong: now, serverTime }`.
+   */
+  ping(now: number): Promise<{ pong: number; serverTime: number }>;
+}

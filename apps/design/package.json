@@ -9,7 +9,13 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."
   },
+  "dependencies": {
+    "@x-oasis/async-call-rpc": "*",
+    "@x-oasis/async-call-rpc-electron": "*",
+    "@x-oasis/di": "*"
+  },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.3.0"
   }
 }

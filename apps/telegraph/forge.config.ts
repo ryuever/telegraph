@@ -1,5 +1,10 @@
-// Phase 1 — minimal Forge config: main + preload + one renderer.
-// Phase 3 will add `apps/design` utility entries.
+// Phase 3 — Forge config: main + preload + design utility + one renderer.
+//
+// The `design_utility` build entry is the third bundle, output as
+// `.vite/build/design_utility/index.js`. `DesignPageletProcess` (main side)
+// resolves the entry path relative to its own __dirname, which after vite
+// build also lands at `.vite/build/index.js` — so the relative path
+// `./design_utility/index.js` is the same in dev and packaged.
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -21,6 +26,10 @@ const config: ForgeConfig = {
         {
           entry: 'src/application/preload/preload.ts',
           config: 'vite.preload.config.ts',
+        },
+        {
+          entry: '../design/src/main.ts',
+          config: 'vite.design.config.ts',
         },
       ],
       renderer: [
