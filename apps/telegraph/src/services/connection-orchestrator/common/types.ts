@@ -58,6 +58,22 @@ export interface IOrchestratorInspectorService {
 }
 
 /**
+ * Phase 4 — shared utility participant id.
+ *
+ * Stable wire identifier shared by `SharedProcess` (main side) and
+ * the shared utility process bootstrap (utility side).
+ */
+export const SHARED_PARTICIPANT_ID = 'utility:shared';
+
+/**
+ * Phase 4 — daemon utility participant id.
+ *
+ * Stable wire identifier shared by `DaemonProcess` (main side) and
+ * the daemon utility process bootstrap (utility side).
+ */
+export const DAEMON_PARTICIPANT_ID = 'utility:daemon';
+
+/**
  * Phase 3 — design utility participant id.
  *
  * Stable wire identifier shared by `DesignPageletProcess` (main side) and
@@ -67,12 +83,67 @@ export interface IOrchestratorInspectorService {
 export const DESIGN_PARTICIPANT_ID = 'pagelet:design';
 
 /**
+ * Phase 4 — Daemon service path.
+ *
+ * Mounted on the daemon utility's `RPCServiceHost`. The daemon itself
+ * generally initiates connections to pagelets for monitoring; this path
+ * is reserved if pagelets need to call daemon services.
+ */
+export const DAEMON_SERVICE_PATH = '/services/daemon';
+
+/**
  * Phase 3 — design service RPC path.
  *
  * Mounted on the design utility's `RPCServiceHost` and called by the renderer
  * (Phase 4) over the activated direct channel.
  */
 export const DESIGN_SERVICE_PATH = '/services/design';
+
+/**
+ * Phase 4 — Shared service path.
+ *
+ * Mounted on the shared utility's `RPCServiceHost` and called by pagelet
+ * processes over their activated direct channels.
+ */
+export const SHARED_SERVICE_PATH = '/services/shared';
+
+/**
+ * Shared service contract — the surface the shared utility process exposes.
+ * Provides common services like app info, login, session management.
+ *
+ * Wire-friendly: arguments and return values must serialise across
+ * `postMessage`. Keep functions pure-data in / pure-data out.
+ */
+export interface ISharedService {
+  /**
+   * Round-trip liveness check. Echoes `now` so the caller can compute RTT.
+   * Returns `{ pong: now, serverTime }`.
+   */
+  ping(now: number): Promise<{ pong: number; serverTime: number }>;
+  /**
+   * Get application information.
+   */
+  getAppInfo(): Promise<{ name: string; version: string }>;
+}
+
+/**
+ * Daemon service contract — the surface the daemon utility process exposes.
+ * Provides process monitoring, metrics collection, and lifecycle management.
+ *
+ * Wire-friendly: arguments and return values must serialise across
+ * `postMessage`. Keep functions pure-data in / pure-data out.
+ */
+export interface IDaemonService {
+  /**
+   * Round-trip liveness check. Echoes `now` so the caller can compute RTT.
+   * Returns `{ pong: now, serverTime }`.
+   */
+  ping(now: number): Promise<{ pong: number; serverTime: number }>;
+  /**
+   * Get status of the daemon and all monitored processes.
+   */
+  getProcessStatus(): Promise<{ shared: string; pagelets: string[] }>;
+}
 
 /**
  * Design service contract — the surface the design utility process exposes

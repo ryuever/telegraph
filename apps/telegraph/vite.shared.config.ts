@@ -1,0 +1,40 @@
+// Vite config for the shared utility-process bundle.
+//
+// Source lives in `../shared/src/main.ts`.
+// Output goes under `.vite/build/shared_utility/index.js`.
+import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
+
+const nodeBuiltins = [
+  'assert', 'buffer', 'child_process', 'cluster', 'crypto', 'dgram', 'dns',
+  'domain', 'events', 'fs', 'http', 'https', 'net', 'os', 'path', 'process',
+  'querystring', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
+  'tty', 'url', 'util', 'v8', 'vm', 'zlib',
+];
+
+export default defineConfig({
+  resolve: {
+    mainFields: ['module', 'jsnext:main', 'jsnext'],
+    alias: {
+      '@telegraph/services': resolve(__dirname, 'src/services'),
+    },
+    modules: [
+      resolve(__dirname, '../shared/node_modules'),
+    ],
+  },
+  build: {
+    outDir: '.vite/build/shared_utility',
+    rollupOptions: {
+      external: [
+        ...nodeBuiltins,
+        'electron',
+        '@x-oasis/di',
+        '@x-oasis/async-call-rpc',
+        '@x-oasis/async-call-rpc-electron',
+      ],
+      output: {
+        entryFileNames: 'index.js',
+      },
+    },
+  },
+});

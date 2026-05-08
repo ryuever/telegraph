@@ -1,0 +1,14 @@
+{
+  "name": "daemon",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@x-oasis/async-call-rpc": "*",
+    "@x-oasis/async-call-rpc-electron": "*",
+    "@x-oasis/di": "*"
+  }
+}

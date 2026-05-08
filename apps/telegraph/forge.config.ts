@@ -1,10 +1,15 @@
-// Phase 3 — Forge config: main + preload + design utility + one renderer.
+// Phase 4 — Forge config: main + preload + shared + daemon + design utilities + one renderer.
 //
-// The `design_utility` build entry is the third bundle, output as
-// `.vite/build/design_utility/index.js`. `DesignPageletProcess` (main side)
-// resolves the entry path relative to its own __dirname, which after vite
-// build also lands at `.vite/build/index.js` — so the relative path
-// `./design_utility/index.js` is the same in dev and packaged.
+// Build entries:
+//   - main: electron main process entry
+//   - preload: context-bridge preload for renderer isolation
+//   - shared: shared utility process (singleton, spawned by main)
+//   - daemon: daemon utility process (singleton, spawned by main)
+//   - design: design pagelet utility process
+// All utility bundles are output as `.vite/build/{shared,daemon,design}_utility/index.js`.
+// The spawners resolve entry paths relative to the main bundle's __dirname, which
+// after vite build lands at `.vite/build/index.js` — so relative paths like
+// `./shared_utility/index.js` are consistent across dev and packaged.
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -26,6 +31,14 @@ const config: ForgeConfig = {
         {
           entry: 'src/application/preload/preload.ts',
           config: 'vite.preload.config.ts',
+        },
+        {
+          entry: '../shared/src/main.ts',
+          config: 'vite.shared.config.ts',
+        },
+        {
+          entry: '../daemon/src/main.ts',
+          config: 'vite.daemon.config.ts',
         },
         {
           entry: '../design/src/main.ts',

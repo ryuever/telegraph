@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@telegraph/services/*": ["../telegraph/src/services/*"],
+      "@telegraph/core/*": ["../telegraph/src/core/*"],
+      "@x-oasis/async-call-rpc": [
+        "../../../red/x-oasis/packages/async/async-call-rpc/dist/src/index.d.ts"
+      ],
+      "@x-oasis/async-call-rpc-electron": [
+        "../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
+      ],
+      "@x-oasis/async-call-rpc-electron/electron-main": [
+        "../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/electron-main/index.d.ts"
+      ],
+      "@x-oasis/di": [
+        "../../../red/x-oasis/packages/di/dist/index.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "../telegraph/src/services/connection-orchestrator/common/**/*",
+    "../telegraph/src/services/connection-orchestrator/node/**/*"
+  ],
+  "exclude": ["node_modules", ".vite", "dist"]
+}
