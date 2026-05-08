@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 complete (Gap 2 + Gap 3 in x-oasis upstream); proceeding to Phase 3
+**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 complete; proceeding to Phase 4 (DesignPanel + ConnectionsTab)
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)
@@ -671,6 +671,37 @@ renderer 入口（`apps/telegraph/src/index.tsx`）：替换 Phase 1 "Hello Tele
 
 **验收**：`ps aux` 看到 design utility；UI 调试块的 participants 出现 `{id:'pagelet:design', role:'utility', ...}`；
 design utility 日志写出 `design utility ready`。
+
+**完成记录（2026-05-08）** — telegraph commit `461550f`。
+
+实际落地：
+- `services/connection-orchestrator/common/types.ts` 加 `IDesignService { ping(now): {pong, serverTime} }`、
+  `DESIGN_PARTICIPANT_ID = 'pagelet:design'`、`DESIGN_SERVICE_PATH = '/services/design'`。
+- `services/connection-orchestrator/node/UtilityCpClient.ts` —— 通用 utility 侧 helper：
+  封装 `ElectronUtilityProcessChannel` over `parentPort`、持有共享 `RPCServiceHost`、
+  通过 `registerOrchestratorHandler` 注册 activate-connection 回调。`start(onActivated)`
+  把 port 透传给调用方（Phase 4 真正绑 direct channel）。
+- `services/connection-orchestrator/electron-main/DesignPageletProcess.ts` ——
+  `utilityProcess.fork(.vite/build/design_utility/index.js)` + 包 `ElectronUtilityProcessChannel` +
+  `orchestrator.registerParticipant(DESIGN_PARTICIPANT_ID, channel, 'utility')`。
+  Channel 自动断开走 Phase 2.5 Gap 3；额外 `process.on('exit')` log 用于诊断。
+- `TelegraphApplication.start()` 改 async：`mainCpServer.start()` → `await designPagelet.spawn()` →
+  `windowManager.openMainWindow()`，确保 renderer 第一次 poll topology 已能看到两个 participant。
+- `apps/design/src/main.ts` —— utility 进程入口；`/tmp/telegraph-design.log` 调试管道；
+  `Container.load(designModule)` → `bootstrap.start()`。
+- `apps/design/src/application/node/{DesignApplication,DesignBootstrap,design-application-module}.ts` ——
+  `DesignApplication implements IDesignService` (Phase 3 仅 `ping()` 实现)；
+  `DesignBootstrap` 把 `DesignApplication` 注册到 `cpClient.serviceHost` under `DESIGN_SERVICE_PATH`，
+  然后 `cpClient.start()` 监听 activations。Electron `process.parentPort` 通过 `as unknown as ParentPort`
+  桥接 Electron DOM lib 与 x-oasis 结构类型差异。
+- `apps/telegraph/vite.design.config.ts` + `forge.config.ts` —— 第三个 build entry：
+  `entry: '../design/src/main.ts'`，输出 `.vite/build/design_utility/index.js`，
+  与 `DesignPageletProcess.resolveEntryPath()` 对齐。
+- `apps/design/tsconfig.json` —— shadcn-style 跨 app paths（`@telegraph/services/*`、
+  `@telegraph/core/*`），include 限制在 design src + utility-side orchestrator 文件，
+  避免拉进 main/renderer 代码引发 lib 冲突。
+- 验证：`pnpm -r typecheck/lint/test` 三连绿。运行时验收（`ps aux` + `/tmp/telegraph-design.log`）
+  留待 Phase 4 一起跑（UI 已经能看到 participants 后再 sanity check）。
 
 ### Phase 4 — DesignPanel + ConnectionsTab + connect/Ping
 
