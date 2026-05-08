@@ -23,10 +23,16 @@ export default defineConfig({
     },
   },
   build: {
+    // Explicitly set entry point to daemon's main.ts
+    lib: {
+      entry: resolve(__dirname, '../daemon/src/main.ts'),
+      formats: ['cjs'],
+    },
     outDir: '.vite/build/daemon_utility',
     rollupOptions: {
       external: [
         ...nodeBuiltins,
+        ...nodeBuiltins.map(m => `node:${m}`),
         'electron',
         '@x-oasis/di',
         '@x-oasis/async-call-rpc',

@@ -23,10 +23,16 @@ export default defineConfig({
     },
   },
   build: {
+    // Explicitly set entry point to shared's main.ts
+    lib: {
+      entry: resolve(__dirname, '../shared/src/main.ts'),
+      formats: ['cjs'],
+    },
     outDir: '.vite/build/shared_utility',
     rollupOptions: {
       external: [
         ...nodeBuiltins,
+        ...nodeBuiltins.map(m => `node:${m}`),
         'electron',
         '@x-oasis/di',
         '@x-oasis/async-call-rpc',
