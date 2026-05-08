@@ -15,6 +15,13 @@ export default defineConfig(({ command }) => ({
       '@telegraph/application': resolve(__dirname, 'src/application'),
       '@telegraph/core': resolve(__dirname, 'src/core'),
       '@telegraph/services': resolve(__dirname, 'src/services'),
+      // Phase 4 — design pagelet's renderer surface (DesignPanel +
+      // ConnectionsTab) lives in apps/design/src/application/browser/.
+      // Aliasing here lets the telegraph renderer bundle pull those
+      // components in directly via `@design/application/browser/...` —
+      // matches the path mapping in apps/design/tsconfig.json so the
+      // typecheck and the runtime build agree.
+      '@design': resolve(__dirname, '../design/src'),
     },
   },
   server: {

@@ -21,6 +21,11 @@
       "@telegraph/application/*": ["src/application/*"],
       "@telegraph/core/*": ["src/core/*"],
       "@telegraph/services/*": ["src/services/*"],
+      // Phase 4 — design pagelet's renderer surface lives in
+      // apps/design/src/application/browser/. Mirror the alias used by
+      // vite.renderer.config.ts so `tsc --noEmit` resolves cross-app
+      // imports the same way the renderer bundle does at build time.
+      "@design/*": ["../design/src/*"],
       // Redirect x-oasis packages to their pre-built dist .d.ts so we get
       // skipLibCheck-style behaviour. Without this, link-to-source pulls
       // their .ts straight in and our `strict: true` flunks the upstream
@@ -33,9 +38,16 @@
       "@x-oasis/async-call-rpc-electron": [
         "../../../../../red/x-oasis/packages/async/async-call-rpc-electron/dist/src/index.d.ts"
       ],
+      "@x-oasis/async-call-rpc-web": [
+        "../../../../../red/x-oasis/packages/async/async-call-rpc-web/dist/src/index.d.ts"
+      ],
       "@x-oasis/deferred": ["../../../../../red/x-oasis/packages/promise/deferred/dist/index.d.ts"]
     }
   },
-  "include": ["src/**/*"],
+  // Include the design pagelet's renderer surface so tsc resolves and checks
+  // it as part of the telegraph build. The same files are also checked by
+  // apps/design/tsconfig.json's own pass — running both is intentional and
+  // catches cross-app type drift early.
+  "include": ["src/**/*", "../design/src/application/browser/**/*"],
   "exclude": ["node_modules", ".vite", "dist"]
 }

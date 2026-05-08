@@ -17,6 +17,7 @@
   "dependencies": {
     "@x-oasis/async-call-rpc": "*",
     "@x-oasis/async-call-rpc-electron": "*",
+    "@x-oasis/async-call-rpc-web": "*",
     "@x-oasis/di": "*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

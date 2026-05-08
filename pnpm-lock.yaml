@@ -71,13 +71,28 @@ importers:
       '@x-oasis/async-call-rpc-electron':
         specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
         version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
+      '@x-oasis/async-call-rpc-web':
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
       '@x-oasis/di':
         specifier: link:../../../../../red/x-oasis/packages/ioc/di
         version: link:../../../../../red/x-oasis/packages/ioc/di
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.2.0
+        version: 18.3.7(@types/react@18.3.28)
       typescript:
         specifier: ^5.3.0
         version: 5.9.3
@@ -90,6 +105,9 @@ importers:
       '@x-oasis/async-call-rpc-electron':
         specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
         version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-electron
+      '@x-oasis/async-call-rpc-web':
+        specifier: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
+        version: link:../../../../../red/x-oasis/packages/async/async-call-rpc-web
       '@x-oasis/di':
         specifier: link:../../../../../red/x-oasis/packages/ioc/di
         version: link:../../../../../red/x-oasis/packages/ioc/di

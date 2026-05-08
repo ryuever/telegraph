@@ -81,11 +81,14 @@ export class DesignBootstrap implements IDesignBootstrap {
       this.designApp,
     );
 
-    this.cpClient.start((port) => {
-      // Phase 3 placeholder: just log. Phase 4 will:
-      //   const direct = new ElectronMessagePortChannel({ port });
-      //   direct.setServiceHost(this.cpClient!.serviceHost);
-      console.log(`[DesignBootstrap] activate port received (typeof=${typeof port})`);
+    this.cpClient.start(() => {
+      // Phase 4: the cp client has already wrapped the activated port in a
+      // direct channel and attached our shared service host. We just log
+      // for diagnostics — the channel instance itself isn't meaningful in
+      // string form (no toString impl), so we report by service path.
+      console.log(
+        `[DesignBootstrap] direct channel ready — services available at ${DESIGN_SERVICE_PATH}`,
+      );
     });
 
     console.log('[DesignBootstrap] design utility ready');
