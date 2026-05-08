@@ -58,6 +58,8 @@ features:
 | D-002 | [20260506-flue-pi-integration-analysis.md](./discussion/20260506-flue-pi-integration-analysis.md) | Flue 框架的 PI 集成模式与 Role/Connector 机制分析 | 分析 Flue（withastro/flue）如何集成 PI（pi-agent-core + pi-ai）作为嵌入式运行时，详细阐述 Role 角色指令系统和 Connector 第三方服务适配机制，并探讨对 Telegraph 的借鉴价值。 |
 | D-003 | [20260506-spawn-cli-vs-embed-orchestra-agent-invocation.md](./discussion/20260506-spawn-cli-vs-embed-orchestra-agent-invocation.md) | Spawn CLI 与 Embed Orchestra 两种 Agent 调用模式对比 | 以 open-design（spawn CLI）和 Telegraph（embed orchestra）为实例，对比两种宿主应用集成 AI agent 的架构范式的优缺点与适用场景。 |
 | D-004 | [20260506-electron-multi-renderer-vs-single-renderer.md](./discussion/20260506-electron-multi-renderer-vs-single-renderer.md) | Electron 多 Renderer vs 单 Renderer 面板架构调研与迁移方案 | 调研 VS Code、Slack、Discord 等主流应用架构，分析 Telegraph 从 BrowserView 多 renderer 迁移到单 renderer 的可行性、影响面与实施路径。 |
+| D-005 | [20260508-renderer-pagelet-channel-convergence.md](./discussion/20260508-renderer-pagelet-channel-convergence.md) | Renderer ↔ Pagelet 通道收敛设计（Forwarding Proxy） | 对比 renderer 通道收敛三种方案，确定 "1 条 direct port + pagelet Forwarding Proxy" 方案 A，给出 exposeRemoteService 工具函数草稿。 |
+| D-006 | [20260508-x-oasis-orchestrator-capability-gaps.md](./discussion/20260508-x-oasis-orchestrator-capability-gaps.md) | x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角） | 盘点 @x-oasis/async-call-rpc-electron v0.3.0 的 8 项能力缺口，分 P0/P1/P2 三档，给出 API 草案与 telegraph 阻塞 Phase。 |
 
 ### issue/ — Issue 记录
 
@@ -70,7 +72,7 @@ features:
 
 | # | 文件 | 标题 | 概述 |
 |---|------|------|------|
-|  |  |  |  |
+| R-001 | [20260508-x-oasis-link-to-source-setup.md](./reference/20260508-x-oasis-link-to-source-setup.md) | x-oasis 本地 source link 配置手册（telegraph） | 把 telegraph 4 个 app 全部指向本地 x-oasis source 的完整步骤：上游 12 个包改 main + telegraph pnpm.overrides + 移除 vite external + tsconfig paths。 |
 
 ### roadmap/ — 规划路线
 
@@ -78,3 +80,4 @@ features:
 |---|------|------|------|
 | P-001 | [20260504-multi-agent-telegraph-roadmap.md](./roadmap/20260504-multi-agent-telegraph-roadmap.md) | Telegraph 多智能体（类 Multica）分阶段路线图 | 从 Run/事件契约、execenv 与 Backend 分叉、daemon 托管执行，到 pi-subagents 编排与可选协调平面/Multica 集成的分阶段清单与验收标准。 |
 | P-002 | [20260505-agent-runtime-extension-host-phase-gates.md](./roadmap/20260505-agent-runtime-extension-host-phase-gates.md) | Telegraph Agent Runtime / Extension Host 实施 Phase-Gate 模板 | 基于 A-005 的阶段门禁模板，按 Entry/Exit/Gate Evidence/No-Go 管理 contracts、runtime 迁移、extension host、安全与 SLO 落地。 |
+| P-003 | [20260508-port-management-orchestrator-migration-plan.md](./roadmap/20260508-port-management-orchestrator-migration-plan.md) | Port Management → ConnectionOrchestrator 迁移计划（design 先行） | 把 telegraph 手工 port 编排迁移到 ConnectionOrchestrator 的 9 阶段路线图；第一阶段只覆盖 design，含可视化 Connections Tab 验收物与 x-oasis 能力依赖。 |

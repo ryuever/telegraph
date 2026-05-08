@@ -33,7 +33,7 @@ export const wikiSidebar = {
           "link": "/architecture/20260505-chat-to-llm-data-flow"
         },
         {
-          "text": "A-007 Pagelet Process 通信架构与 Daemon 直连",
+          "text": "A-007 Telegraph 多进程架构全貌",
           "link": "/architecture/20260506-pagelet-process-communication"
         }
       ]
@@ -58,6 +58,18 @@ export const wikiSidebar = {
         {
           "text": "D-003 Spawn CLI 与 Embed Orchestra 两种 Agent 调用模式对比",
           "link": "/discussion/20260506-spawn-cli-vs-embed-orchestra-agent-invocation"
+        },
+        {
+          "text": "D-004 Electron 多 Renderer vs 单 Renderer 面板架构调研与 Telegraph 迁移方案",
+          "link": "/discussion/20260506-electron-multi-renderer-vs-single-renderer"
+        },
+        {
+          "text": "D-005 Renderer ↔ Pagelet 通道收敛设计（Forwarding Proxy）",
+          "link": "/discussion/20260508-renderer-pagelet-channel-convergence"
+        },
+        {
+          "text": "D-006 x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角）",
+          "link": "/discussion/20260508-x-oasis-orchestrator-capability-gaps"
         }
       ]
     }
@@ -84,7 +96,12 @@ export const wikiSidebar = {
   "/reference/": [
     {
       "text": "参考手册",
-      "items": []
+      "items": [
+        {
+          "text": "R-001 x-oasis 本地 source link 配置手册（telegraph）",
+          "link": "/reference/20260508-x-oasis-link-to-source-setup"
+        }
+      ]
     }
   ],
   "/roadmap/": [
@@ -98,6 +115,10 @@ export const wikiSidebar = {
         {
           "text": "P-002 Telegraph Agent Runtime / Extension Host 实施 Phase-Gate 模板",
           "link": "/roadmap/20260505-agent-runtime-extension-host-phase-gates"
+        },
+        {
+          "text": "P-003 Port Management → ConnectionOrchestrator 迁移计划（design 先行）",
+          "link": "/roadmap/20260508-port-management-orchestrator-migration-plan"
         }
       ]
     }
@@ -120,6 +141,10 @@ export const wikiNav = [
   {
     "text": "Issue 记录",
     "link": "/issue/20260504-chat-tailwind-not-applied-postmortem"
+  },
+  {
+    "text": "参考手册",
+    "link": "/reference/20260508-x-oasis-link-to-source-setup"
   },
   {
     "text": "开发规划",
