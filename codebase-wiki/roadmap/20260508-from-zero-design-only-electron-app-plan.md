@@ -1,7 +1,7 @@
 # Telegraph (Design) — From-Zero Build Plan
 
 **Date**: 2026-05-08
-**Status**: Phase 0 + Phase 1 + Phase 2 + Phase 2.5 + Phase 3 + Phase 4 complete; Phase 5 doc/cleanup + x-oasis sub-path split + multi-arg RPC fix (P5.6) + activateConnection race fix (P5.7) landed; runtime smoke test of P5.7 pending user TTY run
+**Status**: ✅ Implemented — Phase 0–5 全部完成，烟囱测试通过（Connect → READY，Ping → RTT 正常显示，2026-05-08）
 **Replaces**: `20260508-port-management-orchestrator-migration-plan.md` (archived),
               `20260508-design-only-orchestrator-rewrite-plan.md` (archived)
 **Depends on**: [`D-006` x-oasis ConnectionOrchestrator 能力缺口分析](../discussion/20260508-x-oasis-orchestrator-capability-gaps.md)

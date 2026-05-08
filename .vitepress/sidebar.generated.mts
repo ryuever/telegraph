@@ -89,6 +89,10 @@ export const wikiSidebar = {
         {
           "text": "I-003 Agent Runtime Abstraction - Phase 1 Implementation Debt & Optimization",
           "link": "/issue/20260505-agent-runtime-abstraction-phase1-debt"
+        },
+        {
+          "text": "I-003 Renderer ↔ Design Utility RPC Ping 全链路调试复盘（Phase 4–5）",
+          "link": "/issue/20260508-renderer-design-rpc-ping-debug"
         }
       ]
     }

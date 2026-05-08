@@ -7,51 +7,37 @@
 //
 // Intentionally NOT injected through `@x-oasis/di` — the renderer doesn't
 // boot a DI container in Phase 2; this module exposes a tiny module-scoped
-// singleton instead. If renderer-side DI shows up later, dropping `@injectable`
-// on this class is a one-line change.
+// singleton instead.
 //
-// ## Why we install the orchestrator handler eagerly
+// ## Channel ownership split (Phase 4)
 //
-// race timeline (the bug this prevents):
+// The renderer shares the same Electron IPC channel name with the preload.
+// Both sides listen on the same channel:
 //
-//   t0  user clicks Connect
-//   t1  inspector.requestConnect() builds renderer cp channel + ProxyRPCClient
-//       and sends the request via ipcRenderer
-//   t2  main runs OrchestratorInspectorService.requestConnect →
-//       AppOrchestrator.connect → activateParticipant → main does
-//       `channel.makeRequest(ORCHESTRATOR_SERVICE_PATH, 'activateConnection',
-//       port)` aimed at the renderer.
-//   t3  renderer receives the activateConnection request. If the renderer cp
-//       channel has no `RPCService`/host bound for ORCHESTRATOR_SERVICE_PATH,
-//       handleRequest synthesises a -32601 "Method not found" reply. main's
-//       activateParticipant awaits that reply and rejects, which collapses
-//       the entire connect promise back to `inspector.requestConnect`'s
-//       caller as `Method not found`.
+//   • preload's IPCRendererChannel  — owns the `activateConnection` handler.
+//     It receives the MessagePort directly (no contextBridge hop) and wires it
+//     to the design direct channel (RPCMessageChannel).  The preload sends the
+//     ReturnSuccess ack back to main so the orchestrator can transition to READY.
 //
-// The previous design installed the orchestrator handler lazily inside
-// `awaitDirectChannelClient` (i.e. only when the renderer's *consumer* of the
-// direct channel decided to wait for the proxy). That meant the very first
-// Connect — clicked before any caller awaited the direct channel — always
-// raced to t3 with no handler, surfacing as the intermittent "Method not
-// found". Subsequent Connects worked because the lazy install ran on the
-// first Ping.
+//   • renderer's IPCRendererChannel (this file) — used only for outgoing
+//     inspector RPC (getTopology, requestConnect) and their incoming responses.
+//     It MUST NOT register an activateConnection handler, because:
+//       1. It cannot safely receive the MessagePort across contextBridge.
+//       2. Sending "Method not found" from this channel would confuse main's
+//          orchestrator (it would reject the activateParticipant deferred).
 //
-// Eagerly installing in `getRendererCpChannel` closes the window: by the time
-// any consumer (inspector proxy, direct channel waiter, anything) holds the
-// channel, the orchestrator handler is already live, and any incoming
-// activateConnection has somewhere to land. The handler delegates to
-// `dispatchActivatedPort` so the consumer-keyed routing logic continues to
-// live in `directChannelClient`.
+//     To achieve silent pass-through for any incoming requests (like
+//     activateConnection), we attach an empty RPCServiceHost. The
+//     handleRequest middleware skips requests whose path is not found in the
+//     host — no error reply is sent.
 import { IPCRendererChannel } from '@x-oasis/async-call-rpc-electron/electron-browser';
-import { registerOrchestratorHandler } from '@x-oasis/async-call-rpc-electron/electron-browser';
+import { RPCServiceHost } from '@x-oasis/async-call-rpc';
 import type { IpcRenderer } from 'electron';
 
 import {
   ORCHESTRATOR_CP_CHANNEL_NAME,
   ORCHESTRATOR_PROJECT_NAME,
 } from '@telegraph/services/connection-orchestrator/common/cp-config';
-
-import { dispatchActivatedPort } from './directChannelClient';
 
 let cachedChannel: IPCRendererChannel | undefined;
 
@@ -60,9 +46,10 @@ let cachedChannel: IPCRendererChannel | undefined;
  * the first call; we throw a loud error otherwise so the failure mode is
  * obvious during dev.
  *
- * Side-effect on first call: registers `dispatchActivatedPort` as the
- * channel's orchestrator handler. This is what makes the very first
- * `inspector.requestConnect()` race-free (see file header).
+ * The channel is equipped with an empty `RPCServiceHost` so any incoming
+ * requests that this channel does not handle (e.g. `activateConnection`,
+ * which is owned by the preload) are silently ignored instead of replied
+ * to with "Method not found".
  */
 export function getRendererCpChannel(): IPCRendererChannel {
   if (cachedChannel) return cachedChannel;
@@ -90,13 +77,11 @@ export function getRendererCpChannel(): IPCRendererChannel {
     description: 'renderer-cp',
   });
 
-  // Install the orchestrator activateConnection handler eagerly. Doing this
-  // *before* anyone gets a reference to the channel guarantees the handler
-  // is live by the time any RPC traffic flows in either direction. The
-  // handler routes the activated port into directChannelClient's pending map
-  // (keyed by servicePath) so consumers see a typed proxy at the awaited
-  // promise.
-  registerOrchestratorHandler(channel, dispatchActivatedPort);
+  // Attach an empty service host so handleRequest silently ignores any
+  // incoming requests (e.g. activateConnection) whose path is not registered
+  // here. Without this, the framework would emit a "Method not found" reply
+  // for those requests, which would confuse main's activateParticipant deferred.
+  channel.setServiceHost(new RPCServiceHost());
 
   cachedChannel = channel;
   return cachedChannel;

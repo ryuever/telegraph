@@ -21,14 +21,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 
-import { awaitDirectChannelClient } from '@telegraph/services/connection-orchestrator/browser/directChannelClient';
 import { getInspectorClient } from '@telegraph/services/connection-orchestrator/browser/inspectorClient';
 import {
   DESIGN_PARTICIPANT_ID,
-  DESIGN_SERVICE_PATH,
 } from '@telegraph/services/connection-orchestrator/common/types';
 import type {
-  IDesignService,
   TopologySnapshot,
 } from '@telegraph/services/connection-orchestrator/common/types';
 
@@ -103,11 +100,11 @@ export function ConnectionsTab(): JSX.Element {
     setPinging(true);
     setPingError(undefined);
     const start = Date.now();
-    awaitDirectChannelClient<IDesignService>(DESIGN_SERVICE_PATH)
-      .then(async (proxy) => {
-        const { pong, serverTime } = await proxy.ping(start);
-        return { pong, serverTime };
-      })
+    // The design direct channel lives entirely in the preload (port cannot
+    // safely cross contextBridge). Call the bridge surface instead of the
+    // renderer-side awaitDirectChannelClient.
+    window.telegraph.designService
+      .ping(start)
       .then(({ pong, serverTime }) => {
         const finish = Date.now();
         // Sanity guard: pong should equal what we sent. If not, surface as

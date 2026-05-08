@@ -10,6 +10,7 @@
 // The actual direct-channel binding (taking the activated MessagePort and
 // attaching it to an `ElectronMessagePortChannel` so RPC traffic flows) lands
 // in Phase 4. Phase 3 is "spawn + handshake survives 5s without exit".
+import { appendFileSync } from 'node:fs';
 import { createId, inject, injectable } from '@x-oasis/di';
 
 import type { ParentPort } from '@x-oasis/async-call-rpc-electron/electron-main';
@@ -27,6 +28,14 @@ import {
 
 export interface IDesignBootstrap {
   start(): void;
+}
+
+// Route diagnostics to file so they survive forge's stdout suppression.
+const DLOG_FILE = '/tmp/telegraph-design.log';
+function dlog(msg: string): void {
+  try {
+    appendFileSync(DLOG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch { /* ignore */ }
 }
 
 @injectable()
@@ -62,15 +71,9 @@ export class DesignBootstrap implements IDesignBootstrap {
       parentPort: electronParentPort as ParentPort,
       description: 'pagelet:design-utility-cp',
       log: {
-        info: (msg) => {
-          console.log(msg);
-        },
-        warn: (msg) => {
-          console.warn(msg);
-        },
-        error: (msg) => {
-          console.error(msg);
-        },
+        info: (msg) => { dlog(msg); },
+        warn: (msg) => { dlog(`[WARN] ${msg}`); },
+        error: (msg) => { dlog(`[ERROR] ${msg}`); },
       },
     });
 
@@ -82,16 +85,10 @@ export class DesignBootstrap implements IDesignBootstrap {
     );
 
     this.cpClient.start(() => {
-      // Phase 4: the cp client has already wrapped the activated port in a
-      // direct channel and attached our shared service host. We just log
-      // for diagnostics — the channel instance itself isn't meaningful in
-      // string form (no toString impl), so we report by service path.
-      console.log(
-        `[DesignBootstrap] direct channel ready — services available at ${DESIGN_SERVICE_PATH}`,
-      );
+      dlog(`[DesignBootstrap] direct channel ready — services available at ${DESIGN_SERVICE_PATH}`);
     });
 
-    console.log('[DesignBootstrap] design utility ready');
+    dlog('[DesignBootstrap] design utility ready');
   }
 }
 
