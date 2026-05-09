@@ -1,31 +1,26 @@
 // Phase 4 — design pagelet's "Connections" tab.
 //
-// First end-to-end exercise of the renderer ↔ design direct channel:
+// End-to-end exercise of the renderer ↔ utility direct channels for ALL
+// spawned participants: design, shared, and daemon.
 //
 //   1. Polls `inspector.getTopology()` every second for live participant /
-//      connection state (read-only mirror of `AppOrchestrator`).
-//   2. "Connect" button triggers `inspector.requestConnect('renderer:main',
-//      DESIGN_PARTICIPANT_ID)` which flows through main's
-//      `OrchestratorInspectorService → AppOrchestrator.requestConnect →
-//      BaseConnectionOrchestrator.connect`. On READY, both endpoints have a
-//      `MessagePort` bound to a direct channel.
-//   3. After Connect resolves, "Ping" calls
-//      `awaitDirectChannelClient<IDesignService>(DESIGN_SERVICE_PATH).ping(now)`
-//      which round-trips through the renderer's `RPCMessageChannel` →
-//      MessagePort → utility's `ElectronMessagePortMainChannel` →
-//      `RPCServiceHost` → `DesignService.ping`. RTT printed inline.
-//
-// Inline styles only — Phase 4 explicitly defers shadcn/tailwind (see roadmap
-// rationale: keep the first cross-process verification surface as small as
-// possible).
+//      connection state.
+//   2. "Connect" buttons trigger `inspector.requestConnect('renderer:main',
+//      <participantId>)` for each utility.
+//   3. After Connect resolves, "Ping" calls the service via
+//      `window.telegraph.<service>.ping(now)`, round-tripping through
+//      the preload's direct MessagePort channel.
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 
 import { getInspectorClient } from '@telegraph/services/connection-orchestrator/browser/inspectorClient';
 import {
+  DAEMON_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
+  SHARED_PARTICIPANT_ID,
 } from '@telegraph/services/connection-orchestrator/common/types';
 import type {
+  ConnectionSnapshot,
   TopologySnapshot,
 } from '@telegraph/services/connection-orchestrator/common/types';
 
@@ -38,21 +33,133 @@ interface PingResult {
   at: number;
 }
 
+interface ParticipantRow {
+  id: string;
+  label: string;
+  serviceKey: 'designService' | 'sharedService' | 'daemonService';
+}
+
+const PARTICIPANTS: ParticipantRow[] = [
+  { id: DESIGN_PARTICIPANT_ID, label: 'Design', serviceKey: 'designService' },
+  { id: SHARED_PARTICIPANT_ID, label: 'Shared', serviceKey: 'sharedService' },
+  { id: DAEMON_PARTICIPANT_ID, label: 'Daemon', serviceKey: 'daemonService' },
+];
+
+function isReady(topology: TopologySnapshot | undefined, participantId: string): boolean {
+  if (!topology) return false;
+  return !!topology.connections.find(
+    (c) =>
+      c.state === 'READY' &&
+      ((c.fromId === RENDERER_PARTICIPANT_ID && c.toId === participantId) ||
+        (c.toId === RENDERER_PARTICIPANT_ID && c.fromId === participantId)),
+  );
+}
+
+interface TreeNode {
+  id: string;
+  type: string;
+  registeredAt: number;
+  children: TreeNode[];
+  conn?: ConnectionSnapshot;
+}
+
+function buildTree(topology: TopologySnapshot): TreeNode {
+  // Build a structural hierarchy: renderer is root, all other participants
+  // are children. Connection state is attached to the child edge.
+  const connMap = new Map<string, ConnectionSnapshot>();
+  for (const conn of topology.connections) {
+    connMap.set(conn.toId, conn);
+    connMap.set(conn.fromId, conn);
+  }
+
+  const renderer = topology.participants.find((p) => p.id === RENDERER_PARTICIPANT_ID);
+  const root: TreeNode = renderer
+    ? { id: renderer.id, type: renderer.type, registeredAt: renderer.registeredAt, children: [] }
+    : { id: RENDERER_PARTICIPANT_ID, type: 'renderer', registeredAt: 0, children: [] };
+
+  for (const p of topology.participants) {
+    if (p.id === RENDERER_PARTICIPANT_ID) continue;
+    root.children.push({
+      id: p.id,
+      type: p.type,
+      registeredAt: p.registeredAt,
+      children: [],
+      conn: connMap.get(p.id),
+    });
+  }
+
+  return root;
+}
+
+function stateColor(state: string): string {
+  if (state === 'READY') return '#0a3';
+  if (state === 'CONNECTING' || state === 'RECONNECTING') return '#aa0';
+  if (state === 'FAILED' || state === 'CLOSED') return '#a33';
+  return '#555';
+}
+
+function TreeRow({ node, depth, isLast }: { node: TreeNode; depth: number; isLast: boolean }): JSX.Element {
+  const indent = depth * 20;
+  const hasChildren = node.children.length > 0;
+  const prefix = depth === 0 ? '●' : isLast ? '└─' : '├─';
+
+  return (
+    <>
+      <div style={{ ...treeRowStyle, paddingLeft: indent }}>
+        <span style={treeGlyphStyle}>{prefix}</span>
+        <code style={treeIdStyle}>{node.id}</code>
+        <span style={treeTypeStyle}>{node.type}</span>
+        {depth > 0 && node.conn && (
+          <span
+            style={{
+              ...stateBadgeStyle,
+              background: stateColor(node.conn.state),
+            }}
+          >
+            {node.conn.state}
+          </span>
+        )}
+        {depth > 0 && !node.conn && (
+          <span style={{ ...stateBadgeStyle, background: '#333' }}>IDLE</span>
+        )}
+        {node.conn?.errorMessage && (
+          <span style={treeErrorStyle}>{node.conn.errorMessage}</span>
+        )}
+      </div>
+      {hasChildren &&
+        node.children.map((child, i) => (
+          <TreeRow
+            key={child.id}
+            node={child}
+            depth={depth + 1}
+            isLast={i === node.children.length - 1}
+          />
+        ))}
+    </>
+  );
+}
+
+function TopologyTree({ topology }: { topology: TopologySnapshot }): JSX.Element {
+  const root = buildTree(topology);
+  return (
+    <div style={treeContainerStyle}>
+      <TreeRow node={root} depth={0} isLast />
+    </div>
+  );
+}
+
 export function ConnectionsTab(): JSX.Element {
   const [topology, setTopology] = useState<TopologySnapshot | undefined>();
   const [topologyError, setTopologyError] = useState<string | undefined>();
 
-  const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState<string | undefined>();
-  const [connectionId, setConnectionId] = useState<string | undefined>();
+  const [connectingId, setConnectingId] = useState<string | undefined>();
+  const [connectErrors, setConnectErrors] = useState<Record<string, string>>({});
+  const [connectionIds, setConnectionIds] = useState<Record<string, string>>({});
 
-  const [pinging, setPinging] = useState(false);
-  const [pingError, setPingError] = useState<string | undefined>();
-  const [pingResult, setPingResult] = useState<PingResult | undefined>();
+  const [pingingId, setPingingId] = useState<string | undefined>();
+  const [pingErrors, setPingErrors] = useState<Record<string, string>>({});
+  const [pingResults, setPingResults] = useState<Record<string, PingResult>>({});
 
-  // Poll topology. `inspector.getTopology()` is cheap (it's an in-memory
-  // snapshot of two Maps); 1 Hz is plenty for a debug surface and avoids
-  // hammering the cp channel.
   useEffect(() => {
     let cancelled = false;
     const inspector = getInspectorClient();
@@ -79,161 +186,141 @@ export function ConnectionsTab(): JSX.Element {
     };
   }, []);
 
-  const onConnect = useCallback(() => {
-    setConnecting(true);
-    setConnectError(undefined);
+  const onConnect = useCallback((participantId: string) => {
+    setConnectingId(participantId);
+    setConnectErrors((prev) => { const next = { ...prev }; delete next[participantId]; return next; });
+    // Preload needs to know which participant this port is for BEFORE the
+    // orchestrator delivers the activated MessagePort, so it can route the
+    // port to the correct direct channel.
+    window.telegraph.enqueueConnect(participantId);
     const inspector = getInspectorClient();
     inspector
-      .requestConnect(RENDERER_PARTICIPANT_ID, DESIGN_PARTICIPANT_ID)
+      .requestConnect(RENDERER_PARTICIPANT_ID, participantId)
       .then((result) => {
-        setConnectionId(result.connectionId);
+        setConnectionIds((prev) => ({ ...prev, [participantId]: result.connectionId }));
       })
       .catch((err: unknown) => {
-        setConnectError(err instanceof Error ? err.message : String(err));
+        setConnectErrors((prev) => ({ ...prev, [participantId]: err instanceof Error ? err.message : String(err) }));
       })
       .finally(() => {
-        setConnecting(false);
+        setConnectingId(undefined);
       });
   }, []);
 
-  const onPing = useCallback(() => {
-    setPinging(true);
-    setPingError(undefined);
+  const onPing = useCallback((participantId: string, serviceKey: ParticipantRow['serviceKey']) => {
+    setPingingId(participantId);
+    setPingErrors((prev) => { const next = { ...prev }; delete next[participantId]; return next; });
     const start = Date.now();
-    // The design direct channel lives entirely in the preload (port cannot
-    // safely cross contextBridge). Call the bridge surface instead of the
-    // renderer-side awaitDirectChannelClient.
-    window.telegraph.designService
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    (window.telegraph as any)[serviceKey]
       .ping(start)
-      .then(({ pong, serverTime }) => {
+      .then(({ pong, serverTime }: { pong: number; serverTime: number }) => {
         const finish = Date.now();
-        // Sanity guard: pong should equal what we sent. If not, surface as
-        // an error — protocol drift is louder than a misleading RTT.
         if (pong !== start) {
-          throw new Error(
-            `ping echo mismatch: sent ${String(start)}, got ${String(pong)}`,
-          );
+          throw new Error(`ping echo mismatch: sent ${String(start)}, got ${String(pong)}`);
         }
-        setPingResult({ rttMs: finish - start, serverTime, at: finish });
+        setPingResults((prev) => ({ ...prev, [participantId]: { rttMs: finish - start, serverTime, at: finish } }));
       })
       .catch((err: unknown) => {
-        setPingError(err instanceof Error ? err.message : String(err));
+        setPingErrors((prev) => ({ ...prev, [participantId]: err instanceof Error ? err.message : String(err) }));
       })
       .finally(() => {
-        setPinging(false);
+        setPingingId(undefined);
       });
   }, []);
 
-  const designReady = !!topology?.connections.find(
-    (c) =>
-      c.state === 'READY' &&
-      ((c.fromId === RENDERER_PARTICIPANT_ID && c.toId === DESIGN_PARTICIPANT_ID) ||
-        (c.toId === RENDERER_PARTICIPANT_ID && c.fromId === DESIGN_PARTICIPANT_ID)),
-  );
+  const onGetAppInfo = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    (window.telegraph as any).sharedService
+      .getAppInfo()
+      .then((info: { name: string; version: string }) => {
+        setPingResults((prev) => ({
+          ...prev,
+          [SHARED_PARTICIPANT_ID]: {
+            rttMs: prev[SHARED_PARTICIPANT_ID]?.rttMs ?? -1,
+            serverTime: Date.now(),
+            at: Date.now(),
+          },
+        }));
+        window.alert(`AppInfo: ${info.name} v${info.version}`);
+      })
+      .catch((err: unknown) => {
+        setPingErrors((prev) => ({ ...prev, [SHARED_PARTICIPANT_ID]: err instanceof Error ? err.message : String(err) }));
+      });
+  }, []);
+
+  const onGetProcessStatus = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    (window.telegraph as any).daemonService
+      .getProcessStatus()
+      .then((status: { shared: string; pagelets: string[] }) => {
+        window.alert(`ProcessStatus: shared=${status.shared}, pagelets=${status.pagelets.join(', ')}`);
+      })
+      .catch((err: unknown) => {
+        setPingErrors((prev) => ({ ...prev, [DAEMON_PARTICIPANT_ID]: err instanceof Error ? err.message : String(err) }));
+      });
+  }, []);
 
   return (
     <section style={sectionStyle}>
       <h2 style={h2Style}>Connections</h2>
-      <div style={controlsRowStyle}>
-        <button
-          type="button"
-          onClick={onConnect}
-          disabled={connecting || designReady}
-          style={buttonStyle}
-        >
-          {designReady
-            ? 'Connected'
-            : connecting
-              ? 'Connecting…'
-              : `Connect → ${DESIGN_PARTICIPANT_ID}`}
-        </button>
-        <button
-          type="button"
-          onClick={onPing}
-          disabled={!designReady || pinging}
-          style={buttonStyle}
-        >
-          {pinging ? 'Pinging…' : 'Ping design'}
-        </button>
-      </div>
 
-      {connectionId && (
-        <p style={metaStyle}>
-          connectionId: <code>{connectionId}</code>
-        </p>
-      )}
-      {connectError && <pre style={errorStyle}>connect error: {connectError}</pre>}
-      {pingError && <pre style={errorStyle}>ping error: {pingError}</pre>}
-      {pingResult && (
-        <p style={metaStyle}>
-          rtt: <strong>{String(pingResult.rttMs)}ms</strong> · serverTime:{' '}
-          {new Date(pingResult.serverTime).toISOString()}
-        </p>
-      )}
+      {PARTICIPANTS.map((p) => {
+        const ready = isReady(topology, p.id);
+        const connecting = connectingId === p.id;
+        const pinging = pingingId === p.id;
+        const connId = connectionIds[p.id];
+        const connectErr = connectErrors[p.id];
+        const pingErr = pingErrors[p.id];
+        const pingRes = pingResults[p.id];
 
-      <h3 style={h3Style}>Participants</h3>
+        return (
+          <div key={p.id} style={cardStyle}>
+            <h3 style={h3Style}>{p.label} <code style={idCodeStyle}>{p.id}</code></h3>
+            <div style={controlsRowStyle}>
+              <button
+                type="button"
+                onClick={() => onConnect(p.id)}
+                disabled={connecting || ready}
+                style={buttonStyle}
+              >
+                {ready ? 'Connected' : connecting ? 'Connecting…' : `Connect → ${p.id}`}
+              </button>
+              <button
+                type="button"
+                onClick={() => onPing(p.id, p.serviceKey)}
+                disabled={!ready || pinging}
+                style={buttonStyle}
+              >
+                {pinging ? 'Pinging…' : 'Ping'}
+              </button>
+              {p.id === SHARED_PARTICIPANT_ID && (
+                <button type="button" onClick={onGetAppInfo} disabled={!ready} style={buttonStyle}>
+                  AppInfo
+                </button>
+              )}
+              {p.id === DAEMON_PARTICIPANT_ID && (
+                <button type="button" onClick={onGetProcessStatus} disabled={!ready} style={buttonStyle}>
+                  Status
+                </button>
+              )}
+            </div>
+            {connId && <p style={metaStyle}>connectionId: <code>{connId}</code></p>}
+            {connectErr && <pre style={errorStyle}>connect: {connectErr}</pre>}
+            {pingErr && <pre style={errorStyle}>ping: {pingErr}</pre>}
+            {pingRes && (
+              <p style={metaStyle}>
+                rtt: <strong>{String(pingRes.rttMs)}ms</strong> · serverTime:{' '}
+                {new Date(pingRes.serverTime).toISOString()}
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      <h3 style={h3Style}>Topology</h3>
       {topology ? (
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>id</th>
-              <th style={thStyle}>type</th>
-              <th style={thStyle}>registeredAt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topology.participants.map((p) => (
-              <tr key={p.id}>
-                <td style={tdStyle}>{p.id}</td>
-                <td style={tdStyle}>{p.type}</td>
-                <td style={tdStyle}>{new Date(p.registeredAt).toISOString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p style={mutedStyle}>loading…</p>
-      )}
-
-      <h3 style={h3Style}>Connections</h3>
-      {topology ? (
-        topology.connections.length === 0 ? (
-          <p style={mutedStyle}>no connections yet — click Connect</p>
-        ) : (
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>id</th>
-                <th style={thStyle}>from → to</th>
-                <th style={thStyle}>state</th>
-                <th style={thStyle}>changedAt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topology.connections.map((c) => (
-                <tr key={c.connectionId}>
-                  <td style={tdStyle}>{c.connectionId}</td>
-                  <td style={tdStyle}>
-                    {c.fromId} → {c.toId}
-                  </td>
-                  <td style={tdStyle}>
-                    <span
-                      style={{
-                        ...stateBadgeStyle,
-                        background: c.state === 'READY' ? '#0a3' : '#777',
-                      }}
-                    >
-                      {c.state}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    {new Date(c.lastStateChangedAt).toISOString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
+        <TopologyTree topology={topology} />
       ) : (
         <p style={mutedStyle}>loading…</p>
       )}
@@ -254,10 +341,19 @@ const sectionStyle: React.CSSProperties = {
 const h2Style: React.CSSProperties = { fontSize: 18, margin: '0 0 12px' };
 const h3Style: React.CSSProperties = { fontSize: 14, margin: '20px 0 8px', opacity: 0.8 };
 
+const cardStyle: React.CSSProperties = {
+  background: '#1a1a1a',
+  borderRadius: 6,
+  padding: 12,
+  marginBottom: 12,
+};
+
+const idCodeStyle: React.CSSProperties = { fontSize: 11, opacity: 0.6 };
+
 const controlsRowStyle: React.CSSProperties = {
   display: 'flex',
   gap: 8,
-  marginBottom: 12,
+  marginBottom: 8,
 };
 
 const buttonStyle: React.CSSProperties = {
@@ -287,30 +383,50 @@ const errorStyle: React.CSSProperties = {
   borderRadius: 4,
 };
 
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 12,
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'left',
-  borderBottom: '1px solid #333',
-  padding: '4px 6px',
-  opacity: 0.7,
-  fontWeight: 600,
-};
-
-const tdStyle: React.CSSProperties = {
-  borderBottom: '1px solid #1a1a1a',
-  padding: '4px 6px',
-  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-};
-
 const stateBadgeStyle: React.CSSProperties = {
   display: 'inline-block',
   padding: '2px 6px',
   borderRadius: 3,
   color: '#fff',
   fontSize: 11,
+  marginLeft: 6,
+};
+
+const treeContainerStyle: React.CSSProperties = {
+  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+  fontSize: 12,
+  lineHeight: '24px',
+  padding: '8px 0',
+};
+
+const treeRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  whiteSpace: 'nowrap',
+};
+
+const treeGlyphStyle: React.CSSProperties = {
+  color: '#555',
+  width: 20,
+  textAlign: 'center',
+  flexShrink: 0,
+};
+
+const treeIdStyle: React.CSSProperties = {
+  color: '#9cdcfe',
+  fontSize: 12,
+};
+
+const treeTypeStyle: React.CSSProperties = {
+  color: '#555',
+  fontSize: 10,
+  marginLeft: 6,
+  fontStyle: 'italic',
+};
+
+const treeErrorStyle: React.CSSProperties = {
+  color: '#c33',
+  fontSize: 10,
+  marginLeft: 6,
 };

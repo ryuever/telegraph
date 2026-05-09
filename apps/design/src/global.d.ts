@@ -19,5 +19,17 @@ declare interface Window {
     designService: {
       ping(now: number): Promise<{ pong: number; serverTime: number }>;
     };
+    /** Shared direct-channel surface. */
+    sharedService: {
+      ping(now: number): Promise<{ pong: number; serverTime: number }>;
+      getAppInfo(): Promise<{ name: string; version: string }>;
+    };
+    /** Daemon direct-channel surface. */
+    daemonService: {
+      ping(now: number): Promise<{ pong: number; serverTime: number }>;
+      getProcessStatus(): Promise<{ shared: string; pagelets: string[] }>;
+    };
+    /** Notify preload which participant the next activated port belongs to. */
+    enqueueConnect(participantId: string): void;
   };
 }

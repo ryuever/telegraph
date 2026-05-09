@@ -43,8 +43,12 @@ import {
   ORCHESTRATOR_PROJECT_NAME,
 } from '@telegraph/services/connection-orchestrator/common/cp-config';
 import {
+  DAEMON_SERVICE_PATH,
   DESIGN_SERVICE_PATH,
+  SHARED_SERVICE_PATH,
+  type IDaemonService,
   type IDesignService,
+  type ISharedService,
 } from '@telegraph/services/connection-orchestrator/common/types';
 
 // ── IPC bridge (for inspector RPC from renderer) ───────────────────────────
@@ -79,42 +83,86 @@ const cpChannel = new IPCRendererChannel({
   description: 'preload-cp',
 });
 
-// Unbound direct channel — port will be wired when activateConnection fires.
-const designDirectChannel = new RPCMessageChannel({
-  description: 'preload-design-direct',
-});
+// Each utility process gets its own unbound direct channel. When the
+// orchestrator sends activateConnection, the arriving MessagePort must be
+// routed to the correct channel.
+//
+// x-oasis's `registerOrchestratorHandler` callback only receives the `port`
+// — there is no payload identifying which participant the port belongs to.
+// We work around this by tracking connect requests in a FIFO queue: when the
+// renderer calls `requestConnect(renderer, X)`, we push `X` onto the queue;
+// when the activated port arrives, we pop the next expected participantId
+// and bind the port to its channel. This is safe because:
+//   - Connections are initiated sequentially from the UI
+//   - Each `connect()` → `activateConnection` is 1:1
+const designDirectChannel = new RPCMessageChannel({ description: 'preload-design-direct' });
+const sharedDirectChannel = new RPCMessageChannel({ description: 'preload-shared-direct' });
+const daemonDirectChannel = new RPCMessageChannel({ description: 'preload-daemon-direct' });
 
-// Register the orchestrator handler. When main calls activateConnection and
-// transfers the MessagePort to this renderer, the handler runs here in the
-// preload context where the native MessagePort is accessible. We bind it
-// directly to designDirectChannel — no contextBridge hop, no structured-clone
-// stripping.
+const participantChannels = new Map<string, RPCMessageChannel>([
+  ['pagelet:design', designDirectChannel],
+  ['utility:shared', sharedDirectChannel],
+  ['utility:daemon', daemonDirectChannel],
+]);
+
+const pendingConnectQueue: string[] = [];
+
+function enqueueConnect(participantId: string): void {
+  pendingConnectQueue.push(participantId);
+}
+
 registerOrchestratorHandler(cpChannel, (port: MessagePort) => {
-  designDirectChannel.bindPort(port);
+  const nextId = pendingConnectQueue.shift();
+  const targetChannel = nextId ? participantChannels.get(nextId) : designDirectChannel;
+  if (targetChannel) {
+    targetChannel.bindPort(port);
+  }
 });
 
-// Build the typed proxy. ProxyRPCClient queues outgoing calls while the
-// channel is disconnected (before bindPort), so callers don't need to await
-// "channel ready" themselves — the pending send queue will drain on bindPort.
 const designProxy = new ProxyRPCClient(DESIGN_SERVICE_PATH, {
   channel: designDirectChannel,
 }).createProxy() as unknown as IDesignService;
 
-// Expose a plain-data surface for the renderer.  contextBridge can safely
-// transfer primitives and Promises of primitives/plain-objects, which is all
-// `ping` needs.
+const sharedProxy = new ProxyRPCClient(SHARED_SERVICE_PATH, {
+  channel: sharedDirectChannel,
+}).createProxy() as unknown as ISharedService;
+
+const daemonProxy = new ProxyRPCClient(DAEMON_SERVICE_PATH, {
+  channel: daemonDirectChannel,
+}).createProxy() as unknown as IDaemonService;
+
 const designService = {
   ping(now: number): Promise<{ pong: number; serverTime: number }> {
     return designProxy.ping(now);
   },
 };
 
+const sharedService = {
+  ping(now: number): Promise<{ pong: number; serverTime: number }> {
+    return sharedProxy.ping(now);
+  },
+  getAppInfo(): Promise<{ name: string; version: string }> {
+    return sharedProxy.getAppInfo();
+  },
+};
+
+const daemonService = {
+  ping(now: number): Promise<{ pong: number; serverTime: number }> {
+    return daemonProxy.ping(now);
+  },
+  getProcessStatus(): Promise<{ shared: string; pagelets: string[] }> {
+    return daemonProxy.getProcessStatus();
+  },
+};
+
 // ── contextBridge export ───────────────────────────────────────────────────
 
-const api = { ipc, designService };
+const api = { ipc, designService, sharedService, daemonService, enqueueConnect };
 
 contextBridge.exposeInMainWorld('telegraph', api);
 
 export type TelegraphPreloadApi = typeof api;
 export type TelegraphIpcRenderer = typeof ipc;
 export type TelegraphDesignService = typeof designService;
+export type TelegraphSharedService = typeof sharedService;
+export type TelegraphDaemonService = typeof daemonService;
