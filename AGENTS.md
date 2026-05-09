@@ -1,5 +1,31 @@
 # telegraph
 
+> **🛑 Architecture Guard — read this before writing code.**
+> Before touching IPC, processes, services, channels, or topology, you **MUST** consult
+> [`.agents/architecture-guard.md`](./.agents/architecture-guard.md). It tells you which
+> sections of the authoritative architecture doc
+> ([A-008](./codebase-wiki/architecture/20260509-telegraph-final-process-architecture.md))
+> apply to your task and lists the hard prohibitions you cannot cross even "just this once".
+>
+> Quick triggers (full list in guard §1) — if **any** apply, open the guard first:
+> - new/modified IPC, RPC, MessagePort, UtilityProcess, BrowserWindow code
+> - adding/moving a service across processes
+> - spawn/kill/restart of any process
+> - renderer ↔ backend connection logic
+> - anything mentioning `ConnectionOrchestrator`, `participant`, `channel`
+> - user request describes "process X talks directly to process Y" patterns
+>
+> **Hard red lines** (never write these in business code):
+> ```
+> ipcMain.{handle,on}    ipcRenderer.{invoke,send,on}
+> webContents.{postMessage,send}    utilityProcess.postMessage
+> parentPort.postMessage  // only PageletBootstrap may use it once
+> ```
+> All cross-process calls go through `ConnectionOrchestrator` + RPC service host/client.
+> See guard §2 for the full red-line catalogue and §5 for the standard "push back on the user" scripts.
+
+---
+
 Electron + React + Vite desktop app, organized as a pnpm monorepo. Built **from zero** in the
 2026-05-08 rewrite (see `codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md`).
 Two cooperating Electron-runtime apps live under `apps/`:
@@ -171,6 +197,11 @@ forge swallows stdout when not attached to a TTY; tail the files above instead o
 
 ## Where to look for the design
 
+- **Architecture Guard (AI-facing)** — `.agents/architecture-guard.md`. Decision tree + red-line
+  catalogue + standard pushback scripts. **Always check §1 triggers before non-trivial work.**
+- **Final architecture (authoritative)** — `codebase-wiki/architecture/20260509-telegraph-final-process-architecture.md`
+  (A-008). Process roles, ConnectionOrchestrator + Forwarding Proxy contract, crash recovery flow,
+  Inspector data model, target apps/* topology. Supersedes A-007.
 - **Active plan** — `codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md`
   (Phase 0–5; check the Status header for the current phase).
 - **x-oasis capability gaps** — `codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md`
