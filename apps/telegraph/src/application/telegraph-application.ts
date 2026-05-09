@@ -25,6 +25,8 @@ import type { IMainCpServer } from '@telegraph/services/connection-orchestrator/
 import { MainCpServerId } from '@telegraph/services/connection-orchestrator/electron-main/MainCpServer';
 import type { IDesignPageletProcess } from '@telegraph/services/connection-orchestrator/electron-main/DesignPageletProcess';
 import { DesignPageletProcessId } from '@telegraph/services/connection-orchestrator/electron-main/DesignPageletProcess';
+import type { IMonitorPageletProcess } from '@telegraph/services/connection-orchestrator/electron-main/MonitorPageletProcess';
+import { MonitorPageletProcessId } from '@telegraph/services/connection-orchestrator/electron-main/MonitorPageletProcess';
 import type { ISharedProcess } from '@telegraph/services/connection-orchestrator/electron-main/SharedProcess';
 import { SharedProcessId } from '@telegraph/services/connection-orchestrator/electron-main/SharedProcess';
 import type { IDaemonProcess } from '@telegraph/services/connection-orchestrator/electron-main/DaemonProcess';
@@ -43,6 +45,7 @@ export class TelegraphApplication implements ITelegraphApplication {
     @inject(SharedProcessId) private readonly sharedProcess: ISharedProcess,
     @inject(DaemonProcessId) private readonly daemonProcess: IDaemonProcess,
     @inject(DesignPageletProcessId) private readonly designPagelet: IDesignPageletProcess,
+    @inject(MonitorPageletProcessId) private readonly monitorPagelet: IMonitorPageletProcess,
   ) {}
 
   async start(): Promise<void> {
@@ -57,11 +60,18 @@ export class TelegraphApplication implements ITelegraphApplication {
       this.daemonProcess.spawn(),
     ]);
     
-    // Step 3: Spawn the design pagelet utility.
-    await this.designPagelet.spawn();
+    // Step 3: Spawn the design and monitor pagelet utilities.
+    await Promise.all([
+      this.designPagelet.spawn(),
+      this.monitorPagelet.spawn(),
+    ]);
     
     // Step 4: Open the renderer.
     this.windowManager.openMainWindow();
+    
+    // Step 5: Set up application menu + dock menu (macOS).
+    this.windowManager.setupApplicationMenu();
+    this.windowManager.setupDockMenu();
     
     this.log.info('TelegraphApplication.start() done');
   }

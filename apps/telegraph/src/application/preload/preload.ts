@@ -45,10 +45,14 @@ import {
 import {
   DAEMON_SERVICE_PATH,
   DESIGN_SERVICE_PATH,
+  MONITOR_PARTICIPANT_ID,
+  MONITOR_SERVICE_PATH,
   SHARED_SERVICE_PATH,
   type IDaemonService,
   type IDesignService,
+  type IMonitorService,
   type ISharedService,
+  type PidTreeJson,
 } from '@telegraph/services/connection-orchestrator/common/types';
 
 // ── IPC bridge (for inspector RPC from renderer) ───────────────────────────
@@ -98,11 +102,13 @@ const cpChannel = new IPCRendererChannel({
 const designDirectChannel = new RPCMessageChannel({ description: 'preload-design-direct' });
 const sharedDirectChannel = new RPCMessageChannel({ description: 'preload-shared-direct' });
 const daemonDirectChannel = new RPCMessageChannel({ description: 'preload-daemon-direct' });
+const monitorDirectChannel = new RPCMessageChannel({ description: 'preload-monitor-direct' });
 
 const participantChannels = new Map<string, RPCMessageChannel>([
   ['pagelet:design', designDirectChannel],
   ['utility:shared', sharedDirectChannel],
   ['utility:daemon', daemonDirectChannel],
+  [MONITOR_PARTICIPANT_ID, monitorDirectChannel],
 ]);
 
 const pendingConnectQueue: string[] = [];
@@ -131,6 +137,10 @@ const daemonProxy = new ProxyRPCClient(DAEMON_SERVICE_PATH, {
   channel: daemonDirectChannel,
 }).createProxy() as unknown as IDaemonService;
 
+const monitorProxy = new ProxyRPCClient(MONITOR_SERVICE_PATH, {
+  channel: monitorDirectChannel,
+}).createProxy() as unknown as IMonitorService;
+
 const designService = {
   ping(now: number): Promise<{ pong: number; serverTime: number }> {
     return designProxy.ping(now);
@@ -153,11 +163,32 @@ const daemonService = {
   getProcessStatus(): Promise<{ shared: string; pagelets: string[] }> {
     return daemonProxy.getProcessStatus();
   },
+  getSnapshot(): Promise<{
+    timestamp: number;
+    totals: { cpu: number; memory: number };
+    processes: Array<{
+      pid: number;
+      ppid: number;
+      name?: string;
+      type: string;
+      cpu: number;
+      memory: number;
+    }>;
+    pidTree: PidTreeJson | null;
+  }> {
+    return daemonProxy.getSnapshot();
+  },
+};
+
+const monitorService = {
+  ping(now: number): Promise<{ pong: number; serverTime: number }> {
+    return monitorProxy.ping(now);
+  },
 };
 
 // ── contextBridge export ───────────────────────────────────────────────────
 
-const api = { ipc, designService, sharedService, daemonService, enqueueConnect };
+const api = { ipc, designService, sharedService, daemonService, monitorService, enqueueConnect };
 
 contextBridge.exposeInMainWorld('telegraph', api);
 
@@ -166,3 +197,4 @@ export type TelegraphIpcRenderer = typeof ipc;
 export type TelegraphDesignService = typeof designService;
 export type TelegraphSharedService = typeof sharedService;
 export type TelegraphDaemonService = typeof daemonService;
+export type TelegraphMonitorService = typeof monitorService;

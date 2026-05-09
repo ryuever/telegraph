@@ -133,6 +133,31 @@ export interface ISharedService {
  * Wire-friendly: arguments and return values must serialise across
  * `postMessage`. Keep functions pure-data in / pure-data out.
  */
+export interface ProcessRow {
+  pid: number;
+  ppid: number;
+  name?: string;
+  type: string;
+  cpu: number;
+  memory: number;
+}
+
+export interface PidTreeJson {
+  pid: string;
+  ppid: string;
+  cpu: string;
+  mem: string;
+  command: string;
+  children: PidTreeJson[];
+}
+
+export interface MonitorSnapshot {
+  timestamp: number;
+  totals: { cpu: number; memory: number };
+  processes: ProcessRow[];
+  pidTree: PidTreeJson | null;
+}
+
 export interface IDaemonService {
   /**
    * Round-trip liveness check. Echoes `now` so the caller can compute RTT.
@@ -143,6 +168,10 @@ export interface IDaemonService {
    * Get status of the daemon and all monitored processes.
    */
   getProcessStatus(): Promise<{ shared: string; pagelets: string[] }>;
+  /**
+   * Get a full monitor snapshot with per-process CPU/memory, totals, and pid tree.
+   */
+  getSnapshot(): Promise<MonitorSnapshot>;
 }
 
 /**
@@ -154,6 +183,37 @@ export interface IDaemonService {
  * `postMessage`. Keep functions pure-data in / pure-data out.
  */
 export interface IDesignService {
+  /**
+   * Round-trip liveness check. Echoes `now` so the caller can compute RTT.
+   * Returns `{ pong: now, serverTime }`.
+   */
+  ping(now: number): Promise<{ pong: number; serverTime: number }>;
+}
+
+/**
+ * Monitor pagelet participant id.
+ *
+ * Stable wire identifier shared by `MonitorPageletProcess` (main side) and
+ * `MonitorBootstrap` (utility side). Both sides MUST agree on this exact
+ * string when calling `orchestrator.registerParticipant(...)`.
+ */
+export const MONITOR_PARTICIPANT_ID = 'pagelet:monitor';
+
+/**
+ * Monitor service path.
+ *
+ * Mounted on the monitor utility's `RPCServiceHost` and called by the renderer
+ * over the activated direct channel.
+ */
+export const MONITOR_SERVICE_PATH = '/services/monitor';
+
+/**
+ * Monitor service contract — the surface the monitor pagelet exposes to the renderer.
+ *
+ * Wire-friendly: arguments and return values must serialise across
+ * `postMessage`. Keep functions pure-data in / pure-data out.
+ */
+export interface IMonitorService {
   /**
    * Round-trip liveness check. Echoes `now` so the caller can compute RTT.
    * Returns `{ pong: now, serverTime }`.

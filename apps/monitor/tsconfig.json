@@ -14,18 +14,20 @@
     "noEmit": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "types": ["node", "vite/client"],
+    "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@telegraph/application/*": ["src/application/*"],
-      "@telegraph/core/*": ["src/core/*"],
-      "@telegraph/services/*": ["src/services/*"],
-      "@telegraph/ui/*": ["../../packages/ui/src/*"],
-      "@design/*": ["../design/src/*"],
-      "@monitor/*": ["../monitor/src/*"]
+      "@monitor/*": ["src/*"],
+      "@telegraph/services/*": ["../telegraph/src/services/*"],
+      "@telegraph/core/*": ["../telegraph/src/core/*"],
+      "@telegraph/ui/*": ["../../packages/ui/src/*"]
     }
   },
-  "include": ["src/**/*", "../design/src/application/browser/**/*", "../monitor/src/application/browser/**/*"],
+  "include": [
+    "src/**/*",
+    "../telegraph/src/services/connection-orchestrator/common/**/*",
+    "../telegraph/src/services/connection-orchestrator/node/**/*",
+    "../telegraph/src/services/connection-orchestrator/browser/**/*"
+  ],
   "exclude": ["node_modules", ".vite", "dist"]
 }

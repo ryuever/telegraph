@@ -13,6 +13,7 @@ export default defineConfig(({ command }) => ({
       '@telegraph/services': resolve(__dirname, 'src/services'),
       '@telegraph/ui': resolve(__dirname, '../../packages/ui/src'),
       '@design': resolve(__dirname, '../design/src'),
+      '@monitor': resolve(__dirname, '../monitor/src'),
     },
   },
   server: {

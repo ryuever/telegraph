@@ -1,4 +1,4 @@
-// Phase 4 — Forge config: main + preload + shared + daemon + design utilities + one renderer.
+// Forge config: main + preload + shared + daemon + design + monitor utilities + one renderer.
 //
 // Build entries:
 //   - main: electron main process entry
@@ -6,7 +6,8 @@
 //   - shared: shared utility process (singleton, spawned by main)
 //   - daemon: daemon utility process (singleton, spawned by main)
 //   - design: design pagelet utility process
-// All utility bundles are output as `.vite/build/{shared,daemon,design}_utility/index.js`.
+//   - monitor: monitor pagelet utility process
+// All utility bundles are output as `.vite/build/{shared,daemon,design,monitor}_utility/index.js`.
 // The spawners resolve entry paths relative to the main bundle's __dirname, which
 // after vite build lands at `.vite/build/index.js` — so relative paths like
 // `./shared_utility/index.js` are consistent across dev and packaged.
@@ -43,6 +44,10 @@ const config: ForgeConfig = {
         {
           entry: '../design/src/main.ts',
           config: 'vite.design.config.ts',
+        },
+        {
+          entry: '../monitor/src/main.ts',
+          config: 'vite.monitor.config.ts',
         },
       ],
       renderer: [

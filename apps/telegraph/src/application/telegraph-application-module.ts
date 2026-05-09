@@ -24,6 +24,10 @@ import {
   DesignPageletProcessId,
 } from '@telegraph/services/connection-orchestrator/electron-main/DesignPageletProcess';
 import {
+  MonitorPageletProcess,
+  MonitorPageletProcessId,
+} from '@telegraph/services/connection-orchestrator/electron-main/MonitorPageletProcess';
+import {
   SharedProcess,
   SharedProcessId,
 } from '@telegraph/services/connection-orchestrator/electron-main/SharedProcess';
@@ -41,6 +45,7 @@ export default new Registry((bind) => {
   bind(OrchestratorInspectorServiceId).to(OrchestratorInspectorService);
   bind(MainCpServerId).to(MainCpServer);
   bind(DesignPageletProcessId).to(DesignPageletProcess);
+  bind(MonitorPageletProcessId).to(MonitorPageletProcess);
   bind(SharedProcessId).to(SharedProcess);
   bind(DaemonProcessId).to(DaemonProcess);
   bind(TelegraphApplicationId).to(TelegraphApplication);
