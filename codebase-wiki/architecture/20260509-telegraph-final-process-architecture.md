@@ -196,7 +196,7 @@ Telegraph 是一个 Electron 桌面应用，定位为**本地多 Agent / 多 Pag
 - ❌ 不跑 Agent runtime（那是 Pagelet 的职责）
 - ❌ 不跑长任务（那是 Daemon 的职责）
 
-### 3.3 Daemon process — 监控与诊断（无治理权）
+### 3.3 Daemon process — 监控与策略决策（无执行权）
 
 **职责**：
 
@@ -206,21 +206,49 @@ Telegraph 是一个 Electron 桌面应用，定位为**本地多 Agent / 多 Pag
 | `Diagnostics` | 性能快照（heap / event loop lag / GC） |
 | `DumpService` | 崩溃时收集 minidump |
 | `LogAggregator` | 汇总各进程结构化日志 |
-| `ThresholdAlerter` | 资源超阈值时**只发告警事件给 Main**，不直接 kill |
+| `KillPolicy` | 基于阈值/优先级/历史，**决策**哪些进程需要被 kill；通过 RPC 通知 Main 执行 |
 
-**关键设计变更（vs A-007）**：
+**关键设计变更（vs A-007）—— 策略与执行分离**：
 
 ```diff
 - Daemon 直接 utilityProcess.kill() 超阈值的进程
-+ Daemon 仅 emit ThresholdExceededEvent { participantId, metric, value, threshold }
-+ Main 的 ProcessSupervisor 订阅该事件，做出 kill / 降级 / 通知用户的决策
++ Daemon 持有策略：基于资源采样 + 阈值规则，判断「pagelet:chat:1 应被 kill，原因 OOM」
++ Daemon 通过 RPC 调用 main.processSupervisor.killParticipant({ id, reason, severity })
++ Main 的 ProcessSupervisor 是唯一执行者：调用 utilityProcess.kill()、决定是否重启、走 cooldown
 ```
+
+**职责切分**：
+
+| 角色 | Daemon（决策者） | Main（执行者） |
+|------|------------------|----------------|
+| 数据采集 | ✅ 持续采样 metrics | ❌ |
+| 阈值判定 | ✅ KillPolicy 决策"该不该 kill" | ❌ |
+| 实际 kill | ❌ 不持有 process handle | ✅ utilityProcess.kill() |
+| 重启决策 | ❌ | ✅ ProcessSupervisor cooldown / 用户授权 |
+| `replaceParticipantChannel` | ❌ | ✅ orchestrator 唯一入口 |
 
 理由（capability boundary）：
 
-- Daemon 拿到了 kill 权后，相当于拿到了**对兄弟进程的生杀大权**，违反最小权限原则
-- 决策与执行分离：Daemon = 信号源，Main = 决策与执行者
-- Main 已经持有所有 process handle，kill 操作无需跨进程
+- **Daemon 不持有 process handle**：物理上无法直接 kill 兄弟进程，避免误操作或被恶意 extension 间接利用
+- **Main 不做策略**：Main 只对外暴露 `killParticipant(id, reason)` RPC，不内嵌阈值规则——策略可在 Daemon 内热更新而不需要重启 Main
+- **审计闭环**：所有 kill 都经过 Main，Inspector 能完整记录 `who decided / when / why → who executed / outcome`
+
+**Main 暴露给 Daemon 的 RPC（精确接口）**：
+
+```typescript
+interface IProcessSupervisorService {
+  /** Daemon 唯一被授权调用的方法 */
+  killParticipant(req: {
+    id: string                              // 'pagelet:chat:1'
+    reason: 'threshold:cpu' | 'threshold:memory' | 'threshold:handles' | 'unresponsive'
+    severity: 'soft' | 'hard'               // soft = SIGTERM 允许 graceful；hard = SIGKILL
+    metricSnapshot?: { metric: string; value: number; threshold: number }
+  }): Promise<{ killed: boolean; willRestart: boolean; cooldownUntil?: number }>
+}
+```
+
+Main 收到请求后**仍可拒绝**（例如该进程正在 cooldown / 用户刚交互过 / 有未保存数据），
+返回 `{ killed: false, ... }` 让 Daemon 决定降级策略（如延长观察窗口）。
 
 **特性**：
 
@@ -398,14 +426,19 @@ const client = createRPCClient<IFoo>({ channel, servicePath }) // 调用服务
 [Daemon ResourceWatcher]
      │ 检测到 pagelet:chat:1 内存超阈值
      ▼
-[Daemon ThresholdAlerter] ──emit──▶ ThresholdExceededEvent
-     │ 通过 control plane RPC 上报
+[Daemon KillPolicy]
+     │ 决策：该进程应被 kill（reason: threshold:memory, severity: soft）
+     │ （考虑阈值规则、采样窗口、白名单、最近 kill 历史）
+     ▼
+[Daemon → Main RPC]
+     │ main.processSupervisor.killParticipant({ id, reason, severity, metricSnapshot })
      ▼
 [Main ProcessSupervisor]
-     │ 决策：是否 kill / 降级 / 通知用户
-     │ （考虑 restartCount、用户偏好、是否有未保存数据）
+     │ 校验：是否 cooldown 中 / 用户刚交互 / 有未保存数据
+     │ 拒绝 → 返回 { killed: false }，Daemon 据此延长观察窗口
+     │ 通过 → 执行 utilityProcess.kill(SIGTERM | SIGKILL)
      ▼
-[Main] utilityProcess.kill() ──▶ pagelet:chat:1 退出
+pagelet:chat:1 退出
      │
      │ Main 监听到 process exit 事件
      ▼
