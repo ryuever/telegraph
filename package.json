@@ -14,7 +14,8 @@
     "make": "pnpm --filter telegraph make",
     "docs:wiki:dev": "vitepress dev",
     "docs:wiki:build": "vitepress build",
-    "docs:wiki:preview": "vitepress preview"
+    "docs:wiki:preview": "vitepress preview",
+    "clean:build": "pnpm -r exec rm -rf out dist .vite"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
