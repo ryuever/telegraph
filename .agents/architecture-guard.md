@@ -21,7 +21,7 @@
 | T6 | 涉及 ConnectionOrchestrator / participant / channel 概念 | A-008 §1（不变量）+ §4 + §5.6 |
 | T7 | 调整 apps/* 目录结构、tsconfig paths、vite alias | A-008 §7（代码组织） |
 | T8 | 设计「跨 pagelet 共享」的功能 | A-008 §3.4 禁止条款 + §3.2 Shared 职责 |
-| T9 | 引入新的 Agent runtime / Extension 机制 | A-008 §8 + 联读 [A-005](../codebase-wiki/architecture/20260505-telegraph-agent-runtime-extension-host-theory.md) |
+| T9 | 引入新的 Agent runtime / Extension 机制 | A-008 §8 + **同时打开 [`agent-runtime-guard.md`](./agent-runtime-guard.md)**（agent 层正交维度，必读） |
 | T10 | 用户的需求中出现"我想让 X 进程直接调用 Y 进程"、"renderer 直接拿 shared 的服务" 等绕开拓扑的描述 | 整篇 §1-§5（这是常见的反模式陷阱） |
 
 **安全场景**（无需读 A-008，可直接动手）：
@@ -173,10 +173,12 @@ const client = createRPCClient<IFoo>({ channel, servicePath })
 
 | 文档 | 作用 | 何时读 |
 |------|------|--------|
-| **本文档** (`architecture-guard.md`) | 决策树 + 红线清单 | 每次任务开始前扫一眼 §1 触发条件 |
+| **本文档** (`architecture-guard.md`) | **进程拓扑维度**：决策树 + 红线清单 | 每次任务开始前扫一眼 §1 触发条件 |
+| [`agent-runtime-guard.md`](./agent-runtime-guard.md) | **Agent 协议维度**：runtime / tool / extension / trace 红线 | 触发 T9 或写 agent 相关代码时（与本文档正交） |
+| [`agent-runtime-design.md`](./agent-runtime-design.md) | Agent 子系统的 8 条核心设计原则浓缩版 | 设计 / 评审 agent 方案时 |
 | [`AGENTS.md`](../AGENTS.md) | 仓库基础信息 + 触发条件摘要 | 每次对话自动加载 |
 | [`A-008`](../codebase-wiki/architecture/20260509-telegraph-final-process-architecture.md) | 最终架构权威定义 | §1 触发条件命中时按章节读 |
-| [`A-005`](../codebase-wiki/architecture/20260505-telegraph-agent-runtime-extension-host-theory.md) | Runtime / Extension Host 理论 | T9 触发或处理 agent runtime / extension 时 |
+| [`A-005`](../codebase-wiki/architecture/20260505-telegraph-agent-runtime-extension-host-theory.md) | Runtime / Extension Host 理论（含 §0 reality gap + §15 与 A-008 边界） | T9 触发或处理 agent runtime / extension 时 |
 | [`D-005`](../codebase-wiki/discussion/20260508-renderer-pagelet-channel-convergence.md) | Forwarding Proxy 决策推导 | 想理解"为什么 renderer 只连 pagelet"时 |
 | [`D-006`](../codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md) | x-oasis 能力缺口 | 实现重连 / `replaceParticipantChannel` 遇到问题时 |
 | [`P-003`](../codebase-wiki/roadmap/20260508-port-management-orchestrator-migration-plan.md) | Orchestrator 迁移分阶段路线 | 不确定当前 phase 该做什么时 |

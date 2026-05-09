@@ -7,7 +7,7 @@ description: >
   并说明如何兼容 Pi、LangGraph、Vercel AI SDK、Mastra 与未来 agent framework。
 category: architecture
 created: 2026-05-05
-updated: 2026-05-05
+updated: 2026-05-09
 tags:
   - telegraph
   - agent-runtime
@@ -19,7 +19,7 @@ tags:
   - ai-sdk
   - mastra
   - anthropic-agents
-status: draft
+status: theory-approved-implementation-pending
 sources:
   - title: Anthropic Engineering - Building effective agents
     url: https://www.anthropic.com/engineering/building-effective-agents
@@ -45,6 +45,54 @@ references:
 # Telegraph Agent Runtime 与 Extension Host 理论基础
 
 > 本文沉淀一次围绕 Telegraph 未来定位的架构讨论：Telegraph 不应只是 Pi CLI 的 UI 包装，而应成为一个通用 **agent runtime host / extension host**。Pi 是第一套重点接入的生态，但核心抽象应保持框架无关，从而在未来接入 LangGraph、Vercel AI SDK、Mastra、OpenAI Agents SDK、MCP 或自研 runtime 时不需要推倒 ChatPanel、Trace、Session 与 Extension 管理体系。
+
+## 0. 状态与现实落差（2026-05-09 补丁）
+
+> **🛑 阅读本文前必读。** 本节是后续所有章节的"现实滤镜"。下方未列出的章节默认仍然成立。
+
+### 0.1 当前实现状态
+
+`from-zero` 重写（2026-05-08，见 `roadmap/20260508-from-zero-design-only-electron-app-plan.md`）将仓库归零，本文 §10 路线图中**已经做完的实现全部回退到 `apps/_legacy/`**，新仓库里 agent runtime 体系的存量是：
+
+| 资产 | 状态 | 位置 |
+|------|------|------|
+| `packages/runtime-contracts/` 类型骨架 | ✅ 保留（runtime / events / tools / extensions / hooks / permissions / messages / errors / workflow / version / fixtures） | `packages/runtime-contracts/src/` |
+| `PiAiRuntime` / `PiCliRuntime` / `PiEmbeddedRuntime` | ⚠️ 仅在 `apps/_legacy` 中存在，**禁止 import** | `apps/_legacy/packages/agent/src/runtime/` |
+| `LangGraphRuntime` / `PiSubagentsRuntime` / `ExecutionTimeline` | ⚠️ 同上 | 同上 |
+| `AgentStreamService` / `RuntimeEventForwarder` / `LlmTracePanel` | ⚠️ 同上 | `apps/_legacy/telegraph/...`、`apps/_legacy/packages/ui/...` |
+| 新仓库内 runtime-contracts 的活跃消费者 | ❌ **零**（`apps/telegraph` / `apps/design` 都没接入） | — |
+
+**结论**：本文 §10 的"Phase 0 已完成"只在 _legacy 时代成立。新仓库视角下 Phase 0 的**类型层骨架仍在**，但 Phase 1+ 的实现需要在新进程拓扑下重新接入。
+
+### 0.2 进程归属变更
+
+本文写于 A-007（pagelet 通信架构）之前；`AgentStreamService` 在旧拓扑里跑在 daemon 进程。**A-008 将 agent runtime 的承载边界明确移到 Pagelet 内**（见 A-008 §3.4 + §8）：
+
+- `AgentRuntime.run()` 在 **Pagelet utility process** 内执行（chat pagelet 跑 chat runtime、design pagelet 跑 design runtime）。
+- daemon **不再**承载 agent stream，它的职责收敛到 KillPolicy 决策（A-008 §3.3）。
+- main **不再**做 agent backend 分支，它只负责 spawn pagelet + RPC service host（A-008 §3.1）。
+- renderer 通过 ConnectionOrchestrator 直连**当前 pagelet**，调用 pagelet 暴露的业务 service（如 `IChatPageletService.runTurn`），后者返回 `AsyncIterable<RuntimeEvent>`。
+
+因此本文 §2.2、§8.1、§8.3、§9 中所有"daemon -> main -> renderer"字样的链路在新拓扑下**全部失效**，请按 A-008 §3 + §4 + §15 重新归位。
+
+### 0.3 Trace / IPC 架构变更
+
+本文 §4.3 + §8.3 的 trace 通道讨论建立在"daemon 向 renderer 推流"前提上。在 A-008 拓扑下：
+
+- Trace 通道与业务 RPC 通道**共用同一个 ConnectionOrchestrator direct channel**（pagelet ↔ renderer），不再是双独立链路。
+- 跨 pagelet 的 trace（例如 monitor pagelet 想看 chat pagelet 的 trace）走 **ForwardingProxy**（A-008 §4.2），不是 daemon 中转。
+- I-002 描述的死锁形态在新拓扑下**形态会变**（参与者不同），但"trace 阻塞主流"的根因仍在，约束依然有效（见本文 §8.3 + §12.4 + §12.8）。
+
+### 0.4 阅读指引
+
+- 想了解**长期目标 / 抽象哲学 / Anthropic 启发** → 直接读 §1–§7、§11、§14；这些章节与拓扑无关，仍然权威。
+- 想了解**事件协议字段定义** → §4.2 + §4.2.1；contracts 包当前类型与此对齐。
+- 想了解**进程归属 / 跨进程通信** → **不要看本文**，去读 A-008 §3 + §4 + §8 + 本文新增的 §15。
+- 想了解**当前实现到哪一步** → 看本节 §0.1 + 当前 active plan（`roadmap/20260508-from-zero-design-only-electron-app-plan.md`）的 Phase 状态。
+- 想做 agent 子系统的**新设计** → 先打开 `.agents/agent-runtime-design.md`（5–8 条核心原则的浓缩版）。
+- 想**写 agent 相关代码** → 先打开 `.agents/agent-runtime-guard.md`（红线 + 触发条件）。
+
+---
 
 ## 来源
 
@@ -1585,3 +1633,73 @@ PiExtensionAdapter
 这会让 Telegraph 在短期继续吃到 Pi 生态红利，在中长期具备接入 LangGraph、Vercel AI SDK、Mastra、OpenAI Agents SDK、MCP 与自研 runtime 的能力。也就是说，Telegraph 的真正核心价值应沉淀为：
 
 > 一个框架无关、可扩展、可观测、可安装能力的本地 agent host。
+
+## 15. 与 A-008 的边界（2026-05-09 补充）
+
+本文（A-005）与 A-008 是**两个正交维度**的契约，新代码必须同时满足两者：
+
+| 维度 | A-005（本文） | A-008（最终进程架构） |
+|------|---------------|----------------------|
+| 关注层 | **Agent run 内部协议**：RuntimeEvent / Tool / Extension / Hook / Trace 语义 | **跨进程机制**：participant / channel / RPC / ForwardingProxy / 崩溃恢复 |
+| 作用域 | 单个 pagelet 内部 + 跨 runtime adapter | 跨进程边界 + 跨 pagelet 协作 |
+| 失败代价 | 抽象偏向某 framework、长期债务 | 进程崩溃、IPC 死锁、数据丢失 |
+| 演进节奏 | 协议向后兼容（schemaVersion 治理） | 拓扑硬不变（I1-I7） |
+
+### 15.1 分层归位
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Renderer（A-008: participant 'renderer:main'）              │
+│   ChatPanel / TracePanel                                      │
+│      ↓ 消费 RuntimeEvent (A-005 §4.2)                        │
+│      ↓ 通过 RPC client 调用 pagelet service                  │
+└──────────────────────────────────────────────────────────────┘
+         ↕ ConnectionOrchestrator direct channel
+         ↕ (A-008 §4.1 单 channel + ForwardingProxy 路由)
+┌──────────────────────────────────────────────────────────────┐
+│ Pagelet utility process (A-008: 'pagelet:chat:1' 等)         │
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │ Pagelet RPC service host (A-008 §4.2)                    │ │
+│ │   IChatPageletService.runTurn() → AsyncIterable<...>     │ │
+│ │           ↑ 返回的事件类型由 A-005 §4.2 定义             │ │
+│ ├──────────────────────────────────────────────────────────┤ │
+│ │ Agent runtime layer (本文管辖)                           │ │
+│ │   AgentRuntime.run() → AsyncIterable<RuntimeEvent>       │ │
+│ │   ExtensionHost / ToolRegistry / HookBus                 │ │
+│ │   Runtime adapters: PiAi / PiCli / PiEmbedded / ...      │ │
+│ └──────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**关键含义**：
+- Agent runtime 是 **pagelet 的内部能力**，不是独立进程。pagelet utility process = "RPC service host（A-008）+ runtime host（A-005）" 的物理承载。
+- `RuntimeEvent` 是 **pagelet 边界内部协议**；它**穿过**进程边界时由 A-008 的 RPC 框架序列化承载。这意味着：
+  - `RuntimeEvent` 字段必须是 RPC-serializable（参考 A-008 附录 A.2）。
+  - `raw: unknown` 字段在跨进程时的处理需谨慎（见 §15.2）。
+- daemon、main、shared **永远不应该** import runtime 实现或调用 `runtime.run()`。它们的能力通过 ForwardingProxy 暴露给 pagelet，反之亦然。
+
+### 15.2 RuntimeEvent 序列化约束（A-008 引入的新约束）
+
+A-005 §4.2 设计 `raw: unknown` 时假设 trace 推送在同进程内。在 A-008 跨进程拓扑下，新增以下机械约束：
+
+| 约束 | 原因 |
+|------|------|
+| `raw` 字段必须 structured-cloneable（无函数、无 class instance、无循环引用） | RPC 框架序列化要求 |
+| `raw` 单事件 payload 上限建议 ≤ 256 KB；超大数据走 `rawRef: { storeId, key }` 外置引用 | 避免 IPC backpressure（呼应 §12.8） |
+| 新增 `RuntimeEvent.type` = 破坏性契约变更（renderer 可能跨版本运行） | A-005 §4.2.1 schemaVersion 治理 + A-008 §4.3 RPC 接口稳定性 |
+| 跨 pagelet 的 trace 转发由 ForwardingProxy 完成，runtime 不感知 | A-008 §4.2 + §3.4 capability boundary |
+
+### 15.3 决策矩阵：你想做的事归谁管
+
+| 任务 | 主管文档 | 关联章节 |
+|------|----------|----------|
+| 新增 RuntimeEvent 类型 | A-005 | §4.2 + §4.2.1 + 本文 §15.2 |
+| 新增 runtime adapter（如 OpenAI Agents SDK） | A-005 | §4.1 + §6.3 |
+| 决定 runtime 跑在哪个进程 | A-008 | §3.4 + §8 |
+| 决定 chat pagelet 与 design pagelet 如何共享 tool | A-008 | §3.4（禁止 P2P）+ §4.2（ForwardingProxy） |
+| Pagelet 崩溃后 run 如何恢复 | A-008 主、A-005 辅 | A-008 §5 + 本文 §12.4 |
+| Extension 安装目录、权限确认 UI | A-005 | §7 + §12.7 |
+| Extension 进程隔离（是否独立 utility） | A-008 | §3.4 + §7（pagelet 拓扑） |
+| Trace 通道 backpressure | 两者都 | A-005 §12.8 + A-008 §4.3 |
+
+**判定原则**：涉及"事件 / 类型 / 协议字段 / runtime 行为"→ A-005；涉及"进程 / 通道 / 谁能调用谁"→ A-008。同时涉及 → 两者都读。

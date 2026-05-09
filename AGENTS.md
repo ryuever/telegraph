@@ -1,13 +1,18 @@
 # telegraph
 
-> **🛑 Architecture Guard — read this before writing code.**
-> Before touching IPC, processes, services, channels, or topology, you **MUST** consult
-> [`.agents/architecture-guard.md`](./.agents/architecture-guard.md). It tells you which
-> sections of the authoritative architecture doc
-> ([A-008](./codebase-wiki/architecture/20260509-telegraph-final-process-architecture.md))
-> apply to your task and lists the hard prohibitions you cannot cross even "just this once".
+> **🛑 Two orthogonal Guards — read the relevant one(s) before writing code.**
 >
-> Quick triggers (full list in guard §1) — if **any** apply, open the guard first:
+> | Guard | Dimension | Open it when… |
+> |-------|-----------|---------------|
+> | [`.agents/architecture-guard.md`](./.agents/architecture-guard.md) | **Process topology / IPC** (how processes talk) | touching IPC, RPC, channels, processes, services, BrowserWindow, ConnectionOrchestrator |
+> | [`.agents/agent-runtime-guard.md`](./.agents/agent-runtime-guard.md) | **Agent run protocol** (RuntimeEvent, tool, extension, trace) | touching runtime adapters, tools, extensions, hooks, trace, RuntimeEvent types, pi-ai/pi-cli |
+>
+> Both can apply at once (e.g. "how does renderer consume RuntimeEvent across pagelet boundary?" needs both).
+> For agent **design / strategy** discussions, also open [`.agents/agent-runtime-design.md`](./.agents/agent-runtime-design.md) (8 core principles, condensed from A-005).
+>
+> Quick triggers — if **any** apply, open the matching guard(s) first:
+>
+> *Topology (architecture-guard):*
 > - new/modified IPC, RPC, MessagePort, UtilityProcess, BrowserWindow code
 > - adding/moving a service across processes
 > - spawn/kill/restart of any process
@@ -15,14 +20,31 @@
 > - anything mentioning `ConnectionOrchestrator`, `participant`, `channel`
 > - user request describes "process X talks directly to process Y" patterns
 >
+> *Agent runtime (agent-runtime-guard):*
+> - new/modified `RuntimeEvent` type or field
+> - new runtime adapter (pi-ai / pi-cli / langgraph / ai-sdk / mastra / custom)
+> - new tool / extension / hook / trace plumbing
+> - workflow / pattern / DSL design
+> - any reference to `apps/_legacy/` runtime code
+>
 > **Hard red lines** (never write these in business code):
+>
+> *Topology:*
 > ```
 > ipcMain.{handle,on}    ipcRenderer.{invoke,send,on}
 > webContents.{postMessage,send}    utilityProcess.postMessage
 > parentPort.postMessage  // only PageletBootstrap may use it once
 > ```
 > All cross-process calls go through `ConnectionOrchestrator` + RPC service host/client.
-> See guard §2 for the full red-line catalogue and §5 for the standard "push back on the user" scripts.
+>
+> *Agent runtime:*
+> ```
+> import … from 'apps/_legacy/…'                     // never; legacy is read-only history
+> runtime.run(input)  in main / daemon / shared      // runtime only lives in pagelet
+> type Event = PiJsonLine | LangGraphNodeEvent       // framework types stay in adapters
+> await traceSink.push(ev)  blocking model stream    // I-002 deadlock pattern
+> ```
+> See each guard's §2 for the full red-line catalogue.
 
 ---
 
@@ -197,11 +219,20 @@ forge swallows stdout when not attached to a TTY; tail the files above instead o
 
 ## Where to look for the design
 
-- **Architecture Guard (AI-facing)** — `.agents/architecture-guard.md`. Decision tree + red-line
-  catalogue + standard pushback scripts. **Always check §1 triggers before non-trivial work.**
+- **Architecture Guard (AI-facing, topology dimension)** — `.agents/architecture-guard.md`.
+  Decision tree + red-line catalogue + standard pushback scripts for **process / IPC** work.
+  **Always check §1 triggers before non-trivial work.**
+- **Agent Runtime Guard (AI-facing, agent protocol dimension)** — `.agents/agent-runtime-guard.md`.
+  Red lines + triggers + reality-gap reminder for **RuntimeEvent / tool / extension / trace** work.
+  Orthogonal to the architecture guard; both may apply simultaneously.
+- **Agent Runtime Design Principles** — `.agents/agent-runtime-design.md`. 8 condensed principles
+  from A-005, used during **design / review** of agent subsystems (not for daily coding).
 - **Final architecture (authoritative)** — `codebase-wiki/architecture/20260509-telegraph-final-process-architecture.md`
   (A-008). Process roles, ConnectionOrchestrator + Forwarding Proxy contract, crash recovery flow,
   Inspector data model, target apps/* topology. Supersedes A-007.
+- **Agent runtime theory** — `codebase-wiki/architecture/20260505-telegraph-agent-runtime-extension-host-theory.md`
+  (A-005). Read §0 first for the from-zero reality gap, §15 for the boundary with A-008. Main body
+  (§1–§14) is the long-term design theory.
 - **Active plan** — `codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md`
   (Phase 0–5; check the Status header for the current phase).
 - **x-oasis capability gaps** — `codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md`
