@@ -3,10 +3,6 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    // DOM + DOM.Iterable are needed because Phase 4 lands the React-based
-    // DesignPanel under src/application/browser/. The renderer bundle is
-    // produced by apps/telegraph's vite renderer config, but the type-check
-    // for these files runs against this tsconfig, so we need browser libs.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "strict": true,
@@ -18,25 +14,15 @@
     "noEmit": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    // node for the utility-process side; react/react-dom types are picked up
-    // automatically through devDependencies + jsx: react-jsx.
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      // Local design source.
       "@design/*": ["src/*"],
-      // Cross-app references — UtilityCpClient lives in
-      // apps/telegraph/src/services/connection-orchestrator/node, and we
-      // import shared wire types from common/. Both build chains agree on
-      // these paths via vite alias (see vite.config.ts).
       "@telegraph/services/*": ["../telegraph/src/services/*"],
-      "@telegraph/core/*": ["../telegraph/src/core/*"]
+      "@telegraph/core/*": ["../telegraph/src/core/*"],
+      "@telegraph/ui/*": ["../../packages/ui/src/*"]
     }
   },
-  // Restrict the include to design-only sources + the two utility-side files
-  // we actually consume from apps/telegraph. Capturing the entire
-  // connection-orchestrator tree would pull in main-process and renderer
-  // code that has its own (incompatible) lib requirements.
   "include": [
     "src/**/*",
     "../telegraph/src/services/connection-orchestrator/common/**/*",

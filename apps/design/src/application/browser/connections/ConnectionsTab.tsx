@@ -263,6 +263,7 @@ export function ConnectionsTab(): JSX.Element {
 
   return (
     <section style={sectionStyle}>
+      <div style={scrollContainerStyle}>
       <h2 style={h2Style}>Connections</h2>
 
       {PARTICIPANTS.map((p) => {
@@ -328,6 +329,7 @@ export function ConnectionsTab(): JSX.Element {
       {topologyError && (
         <pre style={errorStyle}>topology error: {topologyError}</pre>
       )}
+      </div>
     </section>
   );
 }
@@ -335,7 +337,18 @@ export function ConnectionsTab(): JSX.Element {
 // ----- styles ---------------------------------------------------------------
 
 const sectionStyle: React.CSSProperties = {
-  marginTop: 24,
+  height: '100%',
+  background: '#0d0d0d',
+  color: '#eee',
+  fontFamily: 'system-ui, sans-serif',
+  boxSizing: 'border-box',
+};
+
+const scrollContainerStyle: React.CSSProperties = {
+  padding: 24,
+  overflowY: 'auto',
+  height: '100%',
+  boxSizing: 'border-box',
 };
 
 const h2Style: React.CSSProperties = { fontSize: 18, margin: '0 0 12px' };

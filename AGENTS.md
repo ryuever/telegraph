@@ -96,7 +96,7 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
 │   │   │   ├── main.ts                            # utility-process entry (electron-forge spawns this via vite.design.config.ts)
 │   │   │   ├── application/
 │   │   │   │   ├── node/                          # DesignApplication (the IDesignService impl), DesignBootstrap (wires UtilityCpClient + serviceHost), DI module
-│   │   │   │   └── browser/                       # DesignPanel + connections/ConnectionsTab — react UI bundled into telegraph's renderer
+│   │   │   │   └── browser/                       # DesignPanel (sidebar nav) + DesignEntry + DesignWorkspace + connections/ConnectionsTab
 │   │   │   └── services/                          # design-internal services (placeholder — Phase 5+)
 │   │   ├── tsconfig.json                          # paths: @design/*, @telegraph/services/*, @telegraph/core/*; include limited
 │   │   └── package.json                           # x-oasis + react devDeps; typecheck/lint/test only (built by telegraph's forge config)
@@ -104,7 +104,8 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
 │   └── _legacy/                                   # frozen previous codebase — DO NOT IMPORT (see _legacy/README.md)
 │
 ├── packages/
-│   └── runtime-contracts/                         # @telegraph/runtime-contracts — RunInput / RuntimeEvent / tool & extension types (kept across rewrite)
+│   ├── runtime-contracts/                         # @telegraph/runtime-contracts — RunInput / RuntimeEvent / tool & extension types (kept across rewrite)
+│   └── ui/                                        # @telegraph/ui — shared UI component library (React + Tailwind, shadcn-based, no Electron imports)
 │
 ├── codebase-wiki/                                 # design + decision archive
 │   ├── roadmap/                                   # active + archived plans (from-zero plan is the active one)
@@ -173,21 +174,23 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
 | `@telegraph/application/*`       | `apps/telegraph/src/application/*`             | telegraph internal main-process imports                                 |
 | `@telegraph/core/*`              | `apps/telegraph/src/core/*`                    | Cross-process (main + utility + renderer can all hit `core/log`)        |
 | `@telegraph/services/*`          | `apps/telegraph/src/services/*`                | telegraph internal + cross-app (design imports `connection-orchestrator/{common,node}`) |
+| `@telegraph/ui/*`                | `packages/ui/src/*`                            | Shared UI components (shadcn/Tailwind, no Electron imports)             |
 | `@design/*`                      | `apps/design/src/*`                            | telegraph renderer entry imports `@design/application/browser/DesignPanel`; design app self-reference |
 
 The three `@telegraph/{application,core,services}/*` subroots are explicit prefixes (not a single
 `@telegraph/*` wildcard) so the new design preserves the clean per-area dependency split.
+`@telegraph/ui/*` is the shared component library — any app can import it for UI primitives.
 
 ### Where each alias is configured
 
 | File                                              | Aliases declared                                                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------|
-| `apps/telegraph/tsconfig.json`                    | `@/*`, `@telegraph/{application,core,services}/*`, `@design/*` |
-| `apps/design/tsconfig.json`                       | `@design/*` (self), `@telegraph/{services,core}/*`        |
+| `apps/telegraph/tsconfig.json`                    | `@/*`, `@telegraph/{application,core,services,ui}/*`, `@design/*` |
+| `apps/design/tsconfig.json`                       | `@design/*` (self), `@telegraph/{services,core,ui}/*`        |
 | `apps/telegraph/vite.main.config.ts`              | `@telegraph/{application,core,services}` (no design — main never touches React)   |
 | `apps/telegraph/vite.preload.config.ts`           | minimal                                                                           |
 | `apps/telegraph/vite.design.config.ts`            | `@telegraph/{application,core,services}` for cross-app entry                      |
-| `apps/telegraph/vite.renderer.config.ts`          | `@`, `@telegraph/{application,core,services}`, **`@design`** (cross-app UI bundle) |
+| `apps/telegraph/vite.renderer.config.ts`          | `@`, `@telegraph/{application,core,services,ui}`, **`@design`** (cross-app UI bundle) |
 
 ## Running and building
 

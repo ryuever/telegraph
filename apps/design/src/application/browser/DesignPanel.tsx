@@ -1,48 +1,53 @@
-// Phase 4 — top-level renderer surface for the design pagelet.
-//
-// Design context: codebase-wiki/roadmap/20260508-from-zero-design-only-electron-app-plan.md (§10 Phase 4).
-//
-// Hosts the per-tab views; Phase 4 only ships ConnectionsTab (the smoke-test
-// for the renderer ↔ design utility direct channel). Phase 5+ adds real
-// design-tool tabs (canvas, layers, inspector) once the wire-level link is
-// proven trustworthy.
-//
-// Lives under `apps/design/` rather than `apps/telegraph/` so the design
-// pagelet's UI can evolve in lock-step with its utility-process services.
-// The renderer bundle is produced by apps/telegraph's vite renderer config,
-// which exposes `@design/*` and `@telegraph/services/*` aliases so this file
-// resolves at build time.
-import type { JSX } from 'react';
+import { useState } from 'react'
+import type { JSX } from 'react'
+import { Palette, Link2 } from 'lucide-react'
+import { cn } from '@telegraph/ui/lib/utils'
+import { ConnectionsTab } from './connections/ConnectionsTab'
+import { DesignView } from './DesignView'
 
-import { ConnectionsTab } from './connections/ConnectionsTab';
+type SubPanelId = 'design' | 'connections'
 
-export function DesignPanel(): JSX.Element {
-  return (
-    <div style={containerStyle}>
-      <header style={headerStyle}>
-        <h1 style={titleStyle}>Design</h1>
-        <p style={subtitleStyle}>
-          Phase 4 — renderer ↔ design utility direct channel.
-        </p>
-      </header>
-      <ConnectionsTab />
-    </div>
-  );
+interface SubNavItem {
+  id: SubPanelId
+  icon: typeof Palette
+  label: string
 }
 
-const containerStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-  padding: 24,
-  color: '#eee',
-  background: '#0d0d0d',
-  minHeight: '100vh',
-  boxSizing: 'border-box',
-};
+const SUB_NAV: SubNavItem[] = [
+  { id: 'design', icon: Palette, label: 'Design' },
+  { id: 'connections', icon: Link2, label: 'Connections' },
+]
 
-const headerStyle: React.CSSProperties = { marginBottom: 8 };
-const titleStyle: React.CSSProperties = { fontSize: 28, margin: 0 };
-const subtitleStyle: React.CSSProperties = {
-  margin: '6px 0 0',
-  opacity: 0.65,
-  fontSize: 13,
-};
+export function DesignPanel(): JSX.Element {
+  const [active, setActive] = useState<SubPanelId>('design')
+
+  return (
+    <div className="flex h-full">
+      <nav className="flex w-12 flex-col items-center gap-1 border-r border-border bg-zinc-950 py-3">
+        {SUB_NAV.map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => { setActive(item.id); }}
+              title={item.label}
+              className={cn(
+                'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
+                active === item.id
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
+              )}
+            >
+              <Icon size={18} />
+            </button>
+          )
+        })}
+      </nav>
+      <main className="flex-1 overflow-hidden">
+        {active === 'design' && <DesignView />}
+        {active === 'connections' && <ConnectionsTab />}
+      </main>
+    </div>
+  )
+}
