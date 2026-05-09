@@ -28,6 +28,10 @@ references:
   - id: R-001
     rel: extended-by
     file: ../reference/20260508-x-oasis-link-to-source-setup.md
+  - id: A-008
+    rel: related-to
+    file: ../architecture/20260509-telegraph-final-process-architecture.md
+    note: A-008 是本计划的目标态权威定义；本计划是其分阶段实施路径
 ---
 
 # Port Management → ConnectionOrchestrator 迁移计划（design 先行）

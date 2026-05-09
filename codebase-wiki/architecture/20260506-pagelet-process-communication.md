@@ -17,6 +17,10 @@ references:
   - id: A-001
     rel: related
     note: DI 容器与跨进程 RPC 代理是 pagelet 通信的底层基础
+  - id: A-008
+    rel: superseded-by
+    file: ./20260509-telegraph-final-process-architecture.md
+    note: 本文描述的是改造期现状与踩坑记录；A-008 是目标态权威架构定义
 ---
 
 # Telegraph 多进程架构全貌

@@ -20,6 +20,10 @@ references:
   - id: R-001
     rel: related-to
     file: ../reference/20260508-x-oasis-link-to-source-setup.md
+  - id: A-008
+    rel: extended-by
+    file: ../architecture/20260509-telegraph-final-process-architecture.md
+    note: A-008 §5.6 把本文 P0 缺口锁定为最终架构的硬依赖
 ---
 
 # x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角）

@@ -36,6 +36,10 @@ references:
   - id: I-002
     rel: related-to
     file: ../issue/20260505-pi-ai-llm-trace-await-sink-deadlock.md
+  - id: A-008
+    rel: related-to
+    file: ./20260509-telegraph-final-process-architecture.md
+    note: A-008 §8 定义 Runtime/Extension Host 在最终进程架构中的承载边界（Pagelet 内）
 ---
 
 # Telegraph Agent Runtime 与 Extension Host 理论基础

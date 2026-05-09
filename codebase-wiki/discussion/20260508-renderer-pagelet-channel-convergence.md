@@ -20,6 +20,10 @@ references:
   - id: D-006
     rel: related-to
     file: ./20260508-x-oasis-orchestrator-capability-gaps.md
+  - id: A-008
+    rel: extended-by
+    file: ../architecture/20260509-telegraph-final-process-architecture.md
+    note: 本文的 Forwarding Proxy 决策被 A-008 §4.2 落地为最终架构
 ---
 
 # Renderer ↔ Pagelet 通道收敛设计（Forwarding Proxy）
