@@ -50,6 +50,7 @@ features:
 | A-006 | [20260505-chat-to-llm-data-flow.md](./architecture/20260505-chat-to-llm-data-flow.md) | Chat 消息到 LLM 数据流（当前架构） | 从用户输入到 LLM 返回的五层调用链（renderer → main → daemon → runtime → pi-ai）、IPC/RPC 通道设计、RuntimeEvent 统一事件协议与响应回流路径。 |
 | A-007 | [20260506-pagelet-process-communication.md](./architecture/20260506-pagelet-process-communication.md) | Telegraph 多进程架构全貌 | 完整多进程架构文档：进程拓扑、Panel/Pagelet/PageletProcess 三层机制、侧边栏 IPC 面板切换（Chat/Design/Home）、MessagePort 通信、Resume 断线重连、Monitor 改造案例与踩坑记录、生命周期管理。**已被 A-008 替代为目标态架构。** |
 | A-008 | [20260509-telegraph-final-process-architecture.md](./architecture/20260509-telegraph-final-process-architecture.md) | Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet） | 不背历史包袱的目标态权威定义：Renderer 只与 Pagelet 直连；Shared/Daemon/Main 能力由 Pagelet ForwardingProxy 透明转发；Daemon 仅监控、Main 独占进程治理；所有 channel 经 x-oasis ConnectionOrchestrator 编排；进程崩溃通过 `replaceParticipantChannel` 透明换链。 |
+| A-009 | [20260512-runtime-directory-convention-and-file-structure.md](./architecture/20260512-runtime-directory-convention-and-file-structure.md) | Telegraph 运行时目录分层与文件结构约定 | 以 VS Code 的 node/electron-browser/browser-common/browser 范式为参照，系统梳理 Telegraph 的 common / electron-main / electron-browser / browser / node 五层运行时目录含义、代码边界、完整文件映射与跨目录 import 规则矩阵。 |
 
 ### discussion/ — 技术讨论
 

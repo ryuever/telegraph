@@ -35,6 +35,14 @@ export const wikiSidebar = {
         {
           "text": "A-007 Telegraph 多进程架构全貌",
           "link": "/architecture/20260506-pagelet-process-communication"
+        },
+        {
+          "text": "A-008 Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）",
+          "link": "/architecture/20260509-telegraph-final-process-architecture"
+        },
+        {
+          "text": "A-009 Telegraph 运行时目录分层与文件结构约定",
+          "link": "/architecture/20260512-runtime-directory-convention-and-file-structure"
         }
       ]
     }
