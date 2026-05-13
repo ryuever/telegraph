@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import PageView from '@telegraph/connection/application/browser/PageView';
 import MonitorPage from '@telegraph/monitor/application/browser/MonitorPage';
 import { DesignPanel } from '@telegraph/design/application/browser/DesignPanel';
+import ChatPage from '@telegraph/chat/application/browser/ChatPage';
 
 import {
   CONNECTION_PAGE,
@@ -12,6 +13,7 @@ import {
   CONNECTION_PARTICIPANT_ID,
   MONITOR_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
+  CHAT_PARTICIPANT_ID,
 } from '@telegraph/pagelet-host/common';
 import { SETTING_PARTICIPANT_ID } from '@telegraph/setting/application/common';
 
@@ -114,7 +116,7 @@ function App(): JSX.Element {
                   flexShrink: 0,
                 }}
               >
-                {page.id === 'connection' ? 'C' : page.id === 'monitor' ? 'M' : 'D'}
+                {page.id === 'connection' ? 'C' : page.id === 'monitor' ? 'M' : page.id === 'chat' ? 'Chat' : 'D'}
               </span>
               <div>
                 <div style={{ lineHeight: '16px' }}>{page.label}</div>
@@ -208,6 +210,8 @@ function App(): JSX.Element {
             <br />
             {DESIGN_PARTICIPANT_ID} ↔ shared/daemon
             <br />
+            {CHAT_PARTICIPANT_ID} ↔ daemon
+            <br />
             {SETTING_PARTICIPANT_ID} ↔ shared/daemon
           </div>
         </div>
@@ -225,6 +229,8 @@ function App(): JSX.Element {
           <PageView page={CONNECTION_PAGE} />
         ) : activePage.id === 'monitor' ? (
           <MonitorPage />
+        ) : activePage.id === 'chat' ? (
+          <ChatPage />
         ) : (
           <DesignPanel />
         )}

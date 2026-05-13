@@ -11,6 +11,10 @@ import {
   DESIGN_PAGELET_SERVICE_PATH,
   IDesignPageletService,
 } from '@telegraph/design/application/common';
+import {
+  CHAT_PAGELET_SERVICE_PATH,
+  IChatPageletService,
+} from '@telegraph/chat/application/common';
 
 export const client = createOrchestratorClient({
   directChannelDescription: 'renderer↔preload',
@@ -28,3 +32,7 @@ export const monitorPageletClient = client.getProxy(
 export const designPageletClient = client.getProxy(
   DESIGN_PAGELET_SERVICE_PATH
 ) as unknown as IDesignPageletService;
+
+export const chatPageletClient = client.getProxy(
+  CHAT_PAGELET_SERVICE_PATH
+) as unknown as IChatPageletService;

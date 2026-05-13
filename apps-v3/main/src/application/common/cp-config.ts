@@ -22,6 +22,13 @@ export const DESIGN_PAGE = {
   description: 'Design Workspace',
 } as const;
 
-export type PageConfig = typeof CONNECTION_PAGE | typeof MONITOR_PAGE | typeof DESIGN_PAGE;
+export const CHAT_PAGE = {
+  id: 'chat',
+  label: 'Chat',
+  color: '#f59e0b',
+  description: 'AI Chat Assistant',
+} as const;
 
-export const ALL_PAGES: PageConfig[] = [CONNECTION_PAGE, MONITOR_PAGE, DESIGN_PAGE];
+export type PageConfig = typeof CONNECTION_PAGE | typeof MONITOR_PAGE | typeof DESIGN_PAGE | typeof CHAT_PAGE;
+
+export const ALL_PAGES: PageConfig[] = [CONNECTION_PAGE, MONITOR_PAGE, DESIGN_PAGE, CHAT_PAGE];

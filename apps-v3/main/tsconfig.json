@@ -24,7 +24,12 @@
       "@telegraph/monitor/*": ["../monitor/src/*"],
       "@telegraph/setting/*": ["../setting/src/*"],
       "@telegraph/design/*": ["../design/src/*"],
-      "@telegraph/ui/*": ["../../packages/ui/src/*"]
+      "@telegraph/chat/*": ["../chat/src/*"],
+      "@telegraph/ui/*": ["../../packages/ui/src/*"],
+      "@telegraph/stores": ["../../packages/stores/src/index.ts"],
+      "@telegraph/stores/*": ["../../packages/stores/src/*"],
+      "@telegraph/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
+      "@telegraph/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"]
     }
   },
   "include": ["src/**/*"]

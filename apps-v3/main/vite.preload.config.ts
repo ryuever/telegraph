@@ -10,6 +10,7 @@ export default defineConfig({
       '@telegraph/monitor': resolve(__dirname, '../monitor/src'),
       '@telegraph/setting': resolve(__dirname, '../setting/src'),
       '@telegraph/design': resolve(__dirname, '../design/src'),
+      '@telegraph/chat': resolve(__dirname, '../chat/src'),
     },
   },
   build: {

@@ -48,6 +48,10 @@ const config: ForgeConfig = {
           entry: '../design/src/application/node/main.ts',
           config: 'vite.design.config.ts',
         },
+        {
+          entry: '../chat/src/application/node/main.ts',
+          config: 'vite.chat.config.ts',
+        },
       ],
       renderer: [
         {

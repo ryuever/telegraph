@@ -8,6 +8,8 @@ export const SETTING_PARTICIPANT_ID = 'setting';
 
 export const DESIGN_PARTICIPANT_ID = 'design';
 
+export const CHAT_PARTICIPANT_ID = 'chat';
+
 export const MAIN_RPC_SERVICE_PATH = 'main-rpc';
 
 export interface IMainRpcService {

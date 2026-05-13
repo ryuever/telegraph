@@ -49,6 +49,10 @@ import {
   DesignApplicationId,
 } from '@telegraph/design/application/electron-main/DesignApplication';
 import {
+  ChatApplication,
+  ChatApplicationId,
+} from '@telegraph/chat/application/electron-main/ChatApplication';
+import {
   AppApplication,
   AppApplicationId,
 } from '@telegraph/main/application/electron-main/AppApplication';
@@ -69,6 +73,7 @@ export default new Registry((bind) => {
   bind(MonitorApplicationId).to(MonitorApplication);
   bind(SettingApplicationId).to(SettingApplication);
   bind(DesignApplicationId).to(DesignApplication);
+  bind(ChatApplicationId).to(ChatApplication);
 
   bind(AppApplicationId).to(AppApplication);
 });
