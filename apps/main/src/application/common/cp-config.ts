@@ -31,4 +31,4 @@ export const CHAT_PAGE = {
 
 export type PageConfig = typeof CONNECTION_PAGE | typeof MONITOR_PAGE | typeof DESIGN_PAGE | typeof CHAT_PAGE;
 
-export const ALL_PAGES: PageConfig[] = [CONNECTION_PAGE, MONITOR_PAGE, DESIGN_PAGE, CHAT_PAGE];
+export const ALL_PAGES: PageConfig[] = [DESIGN_PAGE, CHAT_PAGE, MONITOR_PAGE, CONNECTION_PAGE];

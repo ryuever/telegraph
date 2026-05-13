@@ -6,6 +6,7 @@ import ChatPage from '@telegraph/chat/application/browser/ChatPage';
 
 import {
   CONNECTION_PAGE,
+  DESIGN_PAGE,
   ALL_PAGES,
   PageConfig,
 } from '@telegraph/main/application/common/cp-config';
@@ -23,7 +24,7 @@ declare global {
 }
 
 function App(): JSX.Element {
-  const [activePage, setActivePage] = useState<PageConfig>(CONNECTION_PAGE);
+  const [activePage, setActivePage] = useState<PageConfig>(DESIGN_PAGE);
 
   useEffect(() => {
     window.electronAPI?.onSwitchPage((pageId: string) => {
@@ -63,7 +64,7 @@ function App(): JSX.Element {
               letterSpacing: -0.3,
             }}
           >
-            Telegraph
+            Telegraph V2
           </div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
 AI Agent Desktop
@@ -110,7 +111,7 @@ AI Agent Desktop
                   flexShrink: 0,
                 }}
               >
-                {page.id === 'connection' ? 'C' : page.id === 'monitor' ? 'M' : page.id === 'chat' ? 'Chat' : 'D'}
+                {page.id === 'connection' ? 'C' : page.id === 'monitor' ? 'M' : page.id === 'chat' ? 'C' : 'D'}
               </span>
               <div>
                 <div style={{ lineHeight: '16px' }}>{page.label}</div>
