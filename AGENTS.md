@@ -117,54 +117,9 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
 └── AGENTS.md                                      # this file
 ```
 
-## Process topology
+## Multi-Page (DI)
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ telegraph (main process)                                             │
-│   ├─ AppOrchestrator (extends ElectronConnectionOrchestrator)        │
-│   │     • registers main-side participants                           │
-│   │     • drives connect()/handleParticipantLost lifecycle           │
-│   ├─ OrchestratorInspectorService                                    │
-│   │     • mounted on cp via MainCpServer (RPCServiceHost)            │
-│   │     • exposes getTopology() / requestConnect() to the renderer   │
-│   ├─ DesignPageletProcess                                            │
-│   │     • spawns apps/design's main.ts as a utilityProcess           │
-│   │     • registers it as participant 'pagelet:design'               │
-│   └─ WindowManager → main BrowserWindow                              │
-└──┬──────────────────────────────────────┬───────────────────────────┘
-   │ IPCMainChannel ('orchestrator-cp')   │ ElectronUtilityProcessChannel
-   ▼                                      ▼
-┌──────────────────────────┐   ┌──────────────────────────────────────┐
-│ renderer (telegraph)     │   │ design (utility process)              │
-│   <DesignPanel />        │   │   DesignBootstrap                     │
-│   <ConnectionsTab />     │   │     • UtilityCpClient (cp + service   │
-│     • inspector proxy    │   │       host shared)                    │
-│     • requestConnect →   │   │     • mounts DesignApplication on     │
-│     • awaitDirect-       │   │       /services/design path           │
-│       ChannelClient<     │   │     • on activate: bind MessagePort   │
-│       IDesignService>    │   │       to ElectronMessagePortMain-     │
-│     • ping(now) ──┐      │   │       Channel + serviceHost           │
-└───────────────────┼──────┘   └───────▲──────────────────────────────┘
-                    │                  │
-                    └──────────────────┘
-                  direct MessagePort channel
-                  (RPCMessageChannel ↔ ElectronMessagePortMainChannel)
-                  carries /services/design.ping() RPC
-```
-
-**Key invariants** (from-zero rewrite):
-- Main is **not** a participant — only utilities + renderers are. The inspector lives on
-  main's cp channel and proxies between the orchestrator and the renderer.
-- The renderer is the participant `'renderer:main'`; its cp channel is created in main
-  the moment the BrowserWindow is wired (single channel, multi-renderer supported via
-  `acceptAllSenders: true`).
-- Each utility participant exposes its business services via a single
-  `RPCServiceHost`; the `UtilityCpClient` rebinds it onto every direct channel that
-  the orchestrator activates (Phase 5+ multi-peer fan-out kept in mind via
-  `directChannels: Map<symbol, channel>`).
-- x-oasis is consumed via npm packages. The `tsconfig.json` does not need special
-  paths configuration for x-oasis packages.
+Keep Alive + DI
 
 ## Path aliases
 

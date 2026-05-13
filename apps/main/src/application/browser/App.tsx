@@ -9,13 +9,7 @@ import {
   ALL_PAGES,
   PageConfig,
 } from '@telegraph/main/application/common/cp-config';
-import {
-  CONNECTION_PARTICIPANT_ID,
-  MONITOR_PARTICIPANT_ID,
-  DESIGN_PARTICIPANT_ID,
-  CHAT_PARTICIPANT_ID,
-} from '@telegraph/pagelet-host/common';
-import { SETTING_PARTICIPANT_ID } from '@telegraph/setting/application/common';
+
 
 export type { PageConfig };
 
@@ -69,10 +63,10 @@ function App(): JSX.Element {
               letterSpacing: -0.3,
             }}
           >
-            Multi-Page (DI)
+            Telegraph
           </div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-            Keep Alive + DI
+AI Agent Desktop
           </div>
         </div>
 
@@ -178,43 +172,7 @@ function App(): JSX.Element {
           </button>
         </div>
 
-        <div style={{ padding: '8px 16px 12px' }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: '#64748b',
-              marginBottom: 6,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-            }}
-          >
-            Topology
-          </div>
-          <div
-            style={{
-              fontSize: 10,
-              color: '#94a3b8',
-              lineHeight: '16px',
-              fontFamily: 'monospace',
-            }}
-          >
-            renderer ↔ {CONNECTION_PARTICIPANT_ID}
-            <br />
-            {CONNECTION_PARTICIPANT_ID} ↔ shared
-            <br />
-            {CONNECTION_PARTICIPANT_ID} ↔ daemon
-            <br />
-            renderer ↔ main → {MONITOR_PARTICIPANT_ID}
-            <br />
-            {MONITOR_PARTICIPANT_ID} ↔ daemon
-            <br />
-            {DESIGN_PARTICIPANT_ID} ↔ shared/daemon
-            <br />
-            {CHAT_PARTICIPANT_ID} ↔ daemon
-            <br />
-            {SETTING_PARTICIPANT_ID} ↔ shared/daemon
-          </div>
-        </div>
+
       </div>
 
       <div

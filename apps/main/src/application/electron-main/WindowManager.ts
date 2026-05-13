@@ -22,7 +22,7 @@ export class WindowManager implements IWindowManager {
     this.mainWindow = new BrowserWindow({
       width: 1100,
       height: 750,
-      title: 'Multi-Page Router (DI)',
+      title: 'Telegraph',
       webPreferences: {
         preload: join(__dirname, '../preload/preload.js'),
         contextIsolation: true,
