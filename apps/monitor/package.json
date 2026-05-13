@@ -1,13 +1,12 @@
 {
-  "name": "@telegraph-v3/daemon",
+  "name": "@telegraph/monitor",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "main": "./src/application/node/main.ts",
   "types": "./src/application/common/index.ts",
   "exports": {
-    "./application/common": "./src/application/common/index.ts",
-    "./diagnostics/common": "./src/diagnostics/common/index.ts"
+    "./application/common": "./src/application/common/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -18,7 +17,8 @@
     "@x-oasis/async-call-rpc-electron": "^0.11.0",
     "@x-oasis/di": "^0.13.0",
     "@telegraph/services": "workspace:*",
-    "@telegraph-v3/main": "workspace:*"
+    "@telegraph/daemon": "workspace:*",
+    "@telegraph/ui": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0"
