@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "apps-v2/*"
+  - "apps-v3/*"
   - "packages/*"
   - "!apps/_legacy/**"
 
