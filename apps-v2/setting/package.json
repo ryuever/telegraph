@@ -1,5 +1,5 @@
 {
-  "name": "@telegraph/setting",
+  "name": "@telegraph-v2/setting",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,8 +17,8 @@
     "@x-oasis/async-call-rpc-electron": "^0.11.0",
     "@x-oasis/di": "^0.13.0",
     "@telegraph/services": "workspace:*",
-    "@telegraph/shared": "workspace:*",
-    "@telegraph/daemon": "workspace:*",
+    "@telegraph-v2/shared": "workspace:*",
+    "@telegraph-v2/daemon": "workspace:*",
     "@telegraph/ui": "workspace:*"
   },
   "devDependencies": {

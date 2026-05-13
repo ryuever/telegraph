@@ -1,5 +1,5 @@
 {
-  "name": "@telegraph/daemon",
+  "name": "@telegraph-v2/daemon",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,7 @@
     "@x-oasis/async-call-rpc-electron": "^0.11.0",
     "@x-oasis/di": "^0.13.0",
     "@telegraph/services": "workspace:*",
-    
-    
-    "@telegraph/main": "workspace:*"
+    "@telegraph-v2/main": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

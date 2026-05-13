@@ -50,18 +50,18 @@ importers:
 
   apps-v2/connection:
     dependencies:
-      '@telegraph/daemon':
+      '@telegraph-v2/daemon':
         specifier: workspace:*
         version: link:../daemon
-      '@telegraph/main':
+      '@telegraph-v2/main':
         specifier: workspace:*
         version: link:../main
+      '@telegraph-v2/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@telegraph/services':
         specifier: workspace:*
         version: link:../../packages/services
-      '@telegraph/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@telegraph/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -81,7 +81,7 @@ importers:
 
   apps-v2/daemon:
     dependencies:
-      '@telegraph/main':
+      '@telegraph-v2/main':
         specifier: workspace:*
         version: link:../main
       '@telegraph/services':
@@ -158,24 +158,24 @@ importers:
       '@electron-forge/shared-types':
         specifier: ^7.10.0
         version: 7.11.1
-      '@telegraph/connection':
+      '@telegraph-v2/connection':
         specifier: workspace:*
         version: link:../connection
-      '@telegraph/daemon':
+      '@telegraph-v2/daemon':
         specifier: workspace:*
         version: link:../daemon
-      '@telegraph/monitor':
+      '@telegraph-v2/monitor':
         specifier: workspace:*
         version: link:../monitor
+      '@telegraph-v2/setting':
+        specifier: workspace:*
+        version: link:../setting
+      '@telegraph-v2/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@telegraph/services':
         specifier: workspace:*
         version: link:../../packages/services
-      '@telegraph/setting':
-        specifier: workspace:*
-        version: link:../setting
-      '@telegraph/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.40
@@ -200,7 +200,7 @@ importers:
 
   apps-v2/monitor:
     dependencies:
-      '@telegraph/daemon':
+      '@telegraph-v2/daemon':
         specifier: workspace:*
         version: link:../daemon
       '@telegraph/services':
@@ -225,15 +225,15 @@ importers:
 
   apps-v2/setting:
     dependencies:
-      '@telegraph/daemon':
+      '@telegraph-v2/daemon':
         specifier: workspace:*
         version: link:../daemon
+      '@telegraph-v2/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@telegraph/services':
         specifier: workspace:*
         version: link:../../packages/services
-      '@telegraph/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@telegraph/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -253,7 +253,7 @@ importers:
 
   apps-v2/shared:
     dependencies:
-      '@telegraph/main':
+      '@telegraph-v2/main':
         specifier: workspace:*
         version: link:../main
       '@telegraph/services':
