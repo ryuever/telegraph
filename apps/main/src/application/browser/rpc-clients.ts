@@ -1,4 +1,5 @@
 import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/browser';
+import { clientHost } from '@x-oasis/async-call-rpc';
 import {
   CONNECTION_PAGELET_SERVICE_PATH,
   IConnectionPageletService,
@@ -15,6 +16,10 @@ import {
   CHAT_PAGELET_SERVICE_PATH,
   IChatPageletService,
 } from '@telegraph/chat/application/common';
+import {
+  MAIN_WINDOW_SERVICE_PATH,
+  type IMainWindowService,
+} from '@telegraph/pagelet-host/common';
 
 export const client = createOrchestratorClient({
   directChannelDescription: 'renderer↔preload',
@@ -36,3 +41,7 @@ export const designPageletClient = client.getProxy(
 export const chatPageletClient = client.getProxy(
   CHAT_PAGELET_SERVICE_PATH
 ) as unknown as IChatPageletService;
+
+export const mainWindowClient = clientHost
+  .registerClient(MAIN_WINDOW_SERVICE_PATH, { channel: client.ipcChannel })
+  .createProxy() as unknown as IMainWindowService;

@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from 'electron';
+import { ipcRenderer } from 'electron';
 import { createPageBridge } from '@x-oasis/async-call-rpc-electron';
 import { clientHost } from '@x-oasis/async-call-rpc';
 
@@ -8,6 +8,7 @@ import {
   MONITOR_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
   CHAT_PARTICIPANT_ID,
+  MAIN_WINDOW_SERVICE_PATH,
 } from '@telegraph/pagelet-host/common';
 import { CONNECTION_PAGELET_SERVICE_PATH } from '@telegraph/connection/application/common';
 import { MONITOR_PAGELET_SERVICE_PATH } from '@telegraph/monitor/application/common';
@@ -33,11 +34,6 @@ clientHost
   .registerClient(CONNECTION_PAGELET_SERVICE_PATH, { channel: bridge.channel })
   .createProxy();
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  openSettingWindow: () => ipcRenderer.invoke('open-setting-window'),
-  onSwitchPage: (callback: (pageId: string) => void) => {
-    ipcRenderer.on('switch-page', (_event, pageId: string) => {
-      callback(pageId);
-    });
-  },
-});
+clientHost
+  .registerClient(MAIN_WINDOW_SERVICE_PATH, { channel: bridge.ipcChannel })
+  .createProxy();

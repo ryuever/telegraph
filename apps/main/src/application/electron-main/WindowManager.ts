@@ -1,5 +1,5 @@
 import { createId, injectable } from '@x-oasis/di';
-import { BrowserWindow, ipcMain, Menu, app } from 'electron';
+import { BrowserWindow, Menu, app } from 'electron';
 import { join } from 'path';
 
 export interface IWindowManager {
@@ -8,6 +8,7 @@ export interface IWindowManager {
   openSettingWindow(): BrowserWindow | null;
   getSettingWindow(): BrowserWindow | null;
   onSettingWindowCreated(callback: (win: BrowserWindow) => void): void;
+  setSwitchPageCallback(callback: (pageId: string) => void): void;
 }
 
 export const WindowManagerId = createId('WindowManager');
@@ -17,6 +18,7 @@ export class WindowManager implements IWindowManager {
   private mainWindow: BrowserWindow | null = null;
   private settingWindow: BrowserWindow | null = null;
   private settingWindowCallbacks: ((win: BrowserWindow) => void)[] = [];
+  private switchPageCallback: ((pageId: string) => void) | null = null;
 
   openMainWindow(): BrowserWindow {
     this.mainWindow = new BrowserWindow({
@@ -31,14 +33,10 @@ export class WindowManager implements IWindowManager {
     });
 
     if (process.env.NODE_ENV === 'development') {
-      this.mainWindow.loadURL('http://localhost:5173');
+      void this.mainWindow.loadURL('http://localhost:5173');
     } else {
-      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+      void this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
-
-    ipcMain.handle('open-setting-window', () => {
-      this.openSettingWindow();
-    });
 
     this.setupApplicationMenu();
 
@@ -64,6 +62,10 @@ export class WindowManager implements IWindowManager {
     this.settingWindowCallbacks.push(callback);
   }
 
+  setSwitchPageCallback(callback: (pageId: string) => void): void {
+    this.switchPageCallback = callback;
+  }
+
   openSettingWindow(): BrowserWindow | null {
     if (this.settingWindow && !this.settingWindow.isDestroyed()) {
       this.settingWindow.focus();
@@ -83,9 +85,9 @@ export class WindowManager implements IWindowManager {
     });
 
     if (process.env.NODE_ENV === 'development') {
-      this.settingWindow.loadURL('http://localhost:5173/setting.html');
+      void this.settingWindow.loadURL('http://localhost:5173/setting.html');
     } else {
-      this.settingWindow.loadFile(join(__dirname, '../renderer/setting.html'));
+      void this.settingWindow.loadFile(join(__dirname, '../renderer/setting.html'));
     }
 
     for (const cb of this.settingWindowCallbacks) {
@@ -127,19 +129,19 @@ export class WindowManager implements IWindowManager {
           {
             label: 'Connection',
             click: () => {
-              this.mainWindow?.webContents.send('switch-page', 'connection');
+              this.switchPageCallback?.('connection');
             },
           },
           {
             label: 'Monitor',
             click: () => {
-              this.mainWindow?.webContents.send('switch-page', 'monitor');
+              this.switchPageCallback?.('monitor');
             },
           },
           {
             label: 'Design',
             click: () => {
-              this.mainWindow?.webContents.send('switch-page', 'design');
+              this.switchPageCallback?.('design');
             },
           },
           { type: 'separator' },

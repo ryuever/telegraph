@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import type React from 'react';
 import PageView from '@telegraph/connection/application/browser/PageView';
 import MonitorPage from '@telegraph/monitor/application/browser/MonitorPage';
 import { DesignPanel } from '@telegraph/design/application/browser/DesignPanel';
 import ChatPage from '@telegraph/chat/application/browser/ChatPage';
+import { mainWindowClient } from '@telegraph/main/application/browser/rpc-clients';
 
 import {
   CONNECTION_PAGE,
@@ -14,20 +16,11 @@ import {
 
 export type { PageConfig };
 
-declare global {
-  interface Window {
-    electronAPI: {
-      openSettingWindow: () => Promise<void>;
-      onSwitchPage: (callback: (pageId: string) => void) => void;
-    };
-  }
-}
-
-function App(): JSX.Element {
+function App(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageConfig>(DESIGN_PAGE);
 
   useEffect(() => {
-    window.electronAPI?.onSwitchPage((pageId: string) => {
+    mainWindowClient.onSwitchPage((pageId: string) => {
       const page = ALL_PAGES.find((p) => p.id === pageId);
       if (page) setActivePage(page);
     });
@@ -75,7 +68,7 @@ AI Agent Desktop
           {ALL_PAGES.map((page) => (
             <button
               key={page.id}
-              onClick={() => setActivePage(page)}
+              onClick={() => { setActivePage(page); }}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -134,7 +127,7 @@ AI Agent Desktop
 
         <div style={{ padding: '8px 8px 4px', borderTop: '1px solid #334155' }}>
           <button
-            onClick={() => window.electronAPI?.openSettingWindow()}
+            onClick={() => { void mainWindowClient.openSettingWindow(); }}
             style={{
               width: '100%',
               display: 'flex',

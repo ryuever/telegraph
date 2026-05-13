@@ -56,6 +56,14 @@ import {
   AppApplication,
   AppApplicationId,
 } from '@telegraph/main/application/electron-main/AppApplication';
+import {
+  MainMetricsService,
+  MainMetricsServiceId,
+} from '@telegraph/main-metrics/electron-main/MainMetricsService';
+import {
+  PidNameRegistry,
+  PidNameRegistryId,
+} from '@telegraph/main-metrics/common';
 
 export default new Registry((bind) => {
   bind(WindowManagerId).to(WindowManager);
@@ -69,6 +77,8 @@ export default new Registry((bind) => {
 
   bind(PageletProcessId).to(PageletProcess);
   bind(AppOrchestratorId).to(AppOrchestrator);
+  bind(PidNameRegistryId).to(PidNameRegistry);
+  bind(MainMetricsServiceId).to(MainMetricsService);
   bind(ConnectionApplicationId).to(ConnectionApplication);
   bind(MonitorApplicationId).to(MonitorApplication);
   bind(SettingApplicationId).to(SettingApplication);

@@ -1,5 +1,4 @@
 import { createId, inject, injectable } from '@x-oasis/di';
-import { app } from 'electron';
 import { serviceHost } from '@x-oasis/async-call-rpc';
 
 import type { IWindowManager } from '@telegraph/main/application/electron-main/WindowManager';
@@ -22,42 +21,16 @@ import type { IChatApplication } from '@telegraph/chat/application/electron-main
 import { ChatApplicationId } from '@telegraph/chat/application/electron-main/ChatApplication';
 import type { IAppOrchestrator } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
 import { AppOrchestratorId } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
-import { MAIN_RPC_SERVICE_PATH } from '@telegraph/pagelet-host/common';
+import { MAIN_RPC_SERVICE_PATH, MAIN_WINDOW_SERVICE_PATH } from '@telegraph/pagelet-host/common';
 import { MAIN_METRICS_SERVICE_PATH } from '@telegraph/main-metrics/common';
-import { pidNameRegistry } from '@telegraph/main-metrics/electron-main/pidNameRegistry';
+import type { IMainMetricsService } from '@telegraph/main-metrics/common';
+import { MainMetricsServiceId } from '@telegraph/main-metrics/common';
 
 export interface IAppApplication {
   start(): Promise<void>;
 }
 
 export const AppApplicationId = createId('AppApplication');
-
-function queryPsForPids(
-  pids: number[]
-): Map<number, { cpu: number; mem: number }> {
-  const result = new Map<number, { cpu: number; mem: number }>();
-  if (pids.length === 0) return result;
-  try {
-    const cp = require('child_process');
-    const pidArgs = pids.map((p) => `-p ${p}`).join(' ');
-    const out = cp.execSync(`ps ${pidArgs} -o pid=,pcpu=,pmem=`, {
-      encoding: 'utf-8',
-      timeout: 3000,
-    });
-    for (const line of out.trim().split('\n')) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 3) {
-        const pid = Number(parts[0]);
-        const cpu = parseFloat(parts[1]);
-        const mem = parseFloat(parts[2]);
-        if (!isNaN(pid)) {
-          result.set(pid, { cpu, mem });
-        }
-      }
-    }
-  } catch {}
-  return result;
-}
 
 @injectable()
 export class AppApplication implements IAppApplication {
@@ -77,7 +50,9 @@ export class AppApplication implements IAppApplication {
     @inject(ChatApplicationId)
     private readonly chatApp: IChatApplication,
     @inject(AppOrchestratorId)
-    private readonly appOrchestrator: IAppOrchestrator
+    private readonly appOrchestrator: IAppOrchestrator,
+    @inject(MainMetricsServiceId)
+    private readonly metricsService: IMainMetricsService
   ) {}
 
   async start(): Promise<void> {
@@ -86,6 +61,8 @@ export class AppApplication implements IAppApplication {
     this.windowManager.openMainWindow();
 
     this.mainCpServer.start();
+
+    const rendererIpcChannel = this.mainCpServer.getRendererIpcChannel();
 
     let mainCallCount = 0;
     serviceHost.registerServiceHandler(MAIN_RPC_SERVICE_PATH, {
@@ -96,64 +73,24 @@ export class AppApplication implements IAppApplication {
     });
 
     serviceHost.registerServiceHandler(MAIN_METRICS_SERVICE_PATH, {
-      getAppMetrics: () => {
-        const electronMetrics = app.getAppMetrics();
-        const knownPids = new Set(electronMetrics.map((m) => m.pid));
-        const utilityByName = new Map<number, string>();
-        for (const entry of pidNameRegistry.getAll()) {
-          utilityByName.set(entry.pid, entry.name);
-        }
-
-        const result = electronMetrics.map((m) => {
-          const registeredName = utilityByName.get(m.pid);
-          let name: string;
-          if (registeredName) {
-            name = registeredName;
-          } else if (m.type === 'Browser') {
-            name = 'Main Process';
-          } else if (m.type === 'Tab') {
-            name = 'Renderer';
-          } else {
-            name = m.type;
-          }
-          return {
-            pid: m.pid,
-            name,
-            type: m.type,
-            cpu: { percentCPUUsage: m.cpu.percentCPUUsage },
-            memory: { workingSetSize: m.memory.workingSetSize },
-          };
-        });
-
-        const utilityEntries = pidNameRegistry
-          .getAll()
-          .filter((e) => !knownPids.has(e.pid));
-
-        if (utilityEntries.length > 0) {
-          const utilityPids = utilityEntries.map((e) => e.pid);
-          const psData = queryPsForPids(utilityPids);
-          for (const entry of utilityEntries) {
-            const ps = psData.get(entry.pid);
-            result.push({
-              pid: entry.pid,
-              name: entry.name,
-              type: 'Utility',
-              cpu: { percentCPUUsage: ps?.cpu ?? 0 },
-              memory: { workingSetSize: ps ? ps.mem * 1024 : 0 },
-            });
-          }
-        }
-
-        return result;
-      },
-      getMainPid: () => {
-        return process.pid;
-      },
+      getAppMetrics: () => this.metricsService.getAppMetrics(),
+      getMainPid: () => this.metricsService.getMainPid(),
+      getUtilityPidNames: () => this.metricsService.getUtilityPidNames(),
     });
 
     await Promise.all([this.sharedApp.start(), this.daemonApp.start()]);
 
     await this.connectionApp.start();
+
+    rendererIpcChannel.serviceHost?.registerServiceHandler(MAIN_WINDOW_SERVICE_PATH, {
+      openSettingWindow: () => {
+        this.windowManager.openSettingWindow();
+      },
+      onSwitchPage: (callback: (pageId: string) => void) => {
+        this.windowManager.setSwitchPageCallback(callback);
+      },
+    });
+
     await this.monitorApp.start();
     await this.settingApp.start();
     await this.designApp.start();
