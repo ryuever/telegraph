@@ -1,27 +1,57 @@
 {
   "name": "@telegraph/main",
+  "productName": "Telegraph v2",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
-  "main": "./src/application/electron-main/main.ts",
+  "main": ".vite/build/index.js",
+  "exports": {
+    "./application/common/cp-config": "./src/application/common/cp-config.ts",
+    "./application/electron-main/WindowManager": "./src/application/electron-main/WindowManager.ts",
+    "./application/electron-main/MainCpServer": "./src/application/electron-main/MainCpServer.ts",
+    "./application/browser/rpc-clients": "./src/application/browser/rpc-clients.ts"
+  },
   "scripts": {
+    "start": "electron-forge start --inspect-electron",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "dev": "vite",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@x-oasis/async-call-rpc": "workspace:*",
-    "@x-oasis/async-call-rpc-electron": "workspace:*",
-    "@x-oasis/di": "workspace:*",
-    "@telegraph/services": "workspace:*",
-    
-    "@telegraph/connection": "workspace:*",
-    "@telegraph/daemon": "workspace:*",
-    "@telegraph/shared": "workspace:*",
-    "@telegraph/monitor": "workspace:*",
-    "@telegraph/setting": "workspace:*",
-    "@telegraph/ui": "workspace:*"
+    "@tailwindcss/postcss": "^4.1.0",
+    "@telegraph/ui": "workspace:*",
+    "@x-oasis/async-call-rpc": "^0.13.0",
+    "@x-oasis/async-call-rpc-electron": "^0.11.0",
+    "@x-oasis/async-call-rpc-web": "^0.11.0",
+    "@x-oasis/di": "^0.13.0",
+    "lucide-react": "^1.14.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^4.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.0"
+    "@electron-forge/cli": "^7.10.0",
+    "@electron-forge/maker-deb": "^7.10.0",
+    "@electron-forge/maker-dmg": "^7.10.0",
+    "@electron-forge/maker-rpm": "^7.10.0",
+    "@electron-forge/maker-squirrel": "^7.10.0",
+    "@electron-forge/maker-zip": "^7.10.0",
+    "@electron-forge/plugin-vite": "^7.10.0",
+    "@electron-forge/shared-types": "^7.10.0",
+    "@telegraph/connection": "workspace:*",
+    "@telegraph/daemon": "workspace:*",
+    "@telegraph/monitor": "workspace:*",
+    "@telegraph/services": "workspace:*",
+    "@telegraph/setting": "workspace:*",
+    "@telegraph/shared": "workspace:*",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "electron": "^41.0.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
   }
 }

@@ -155,7 +155,7 @@ function SettingApp() {
       setLoading(method);
       const start = performance.now();
       try {
-        const result = await settingClient[method](...args);
+        const result = await (settingClient as any)[method](...args);
         addLog(method, result, Math.round(performance.now() - start));
         return result;
       } catch (err: any) {

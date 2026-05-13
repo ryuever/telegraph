@@ -4,10 +4,8 @@ import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron'
 import { serviceHost } from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
-import {
-  IMainCpServer,
-  MainCpServerId,
-} from '@telegraph/main/application/electron-main/MainCpServer';
+import type { IMainCpServer } from '@telegraph/main/application/electron-main/MainCpServer';
+import { MainCpServerId } from '@telegraph/main/application/electron-main/MainCpServer';
 import { pidNameRegistry } from '@telegraph/main-metrics/electron-main/pidNameRegistry';
 import { SHARED_PARTICIPANT_ID } from '@telegraph/shared/application/common';
 

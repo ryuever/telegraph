@@ -1,12 +1,16 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { RPCServiceHost } from '@x-oasis/async-call-rpc';
 
-import {
+import type {
   IMainCpServer,
-  MainCpServerId,
 } from '@telegraph/main/application/electron-main/MainCpServer';
 import {
+  MainCpServerId,
+} from '@telegraph/main/application/electron-main/MainCpServer';
+import type {
   IPageletProcess,
+} from '@telegraph/pagelet-host/electron-main/PageletProcess';
+import {
   PageletProcessId,
 } from '@telegraph/pagelet-host/electron-main/PageletProcess';
 import { ORCHESTRATOR_SERVICE_PATH } from '@telegraph/main/application/common/types';
@@ -31,7 +35,7 @@ export interface IOrchestratorService {
   onClosed(callback: (event: any) => void): void;
 }
 
-export interface IAppOrchestrator extends IOrchestratorService {
+export interface IAppOrchestrator {
   registerOrchestratorService(): void;
   registerSettingOrchestratorService(): void;
   connectMonitor(): Promise<void>;
@@ -123,25 +127,25 @@ export class AppOrchestrator implements IAppOrchestrator {
           this.pageletProcess.kill(CONNECTION_PARTICIPANT_ID);
         },
         onStateChange(remoteCallback: (event: any) => void) {
-          orchestrator.onStateChange((event) => remoteCallback(event));
+          orchestrator.onStateChange((event: any) => remoteCallback(event));
         },
         onReady(remoteCallback: (event: any) => void) {
-          orchestrator.onReady((event) => remoteCallback(event));
+          orchestrator.onReady((event: any) => remoteCallback(event));
         },
         onDisconnected(remoteCallback: (event: any) => void) {
-          orchestrator.onDisconnected((event) => remoteCallback(event));
+          orchestrator.onDisconnected((event: any) => remoteCallback(event));
         },
         onReconnecting(remoteCallback: (event: any) => void) {
-          orchestrator.onReconnecting((event) => remoteCallback(event));
+          orchestrator.onReconnecting((event: any) => remoteCallback(event));
         },
         onReconnected(remoteCallback: (event: any) => void) {
-          orchestrator.onReconnected((event) => remoteCallback(event));
+          orchestrator.onReconnected((event: any) => remoteCallback(event));
         },
         onReconnectFailed(remoteCallback: (event: any) => void) {
-          orchestrator.onReconnectFailed((event) => remoteCallback(event));
+          orchestrator.onReconnectFailed((event: any) => remoteCallback(event));
         },
         onClosed(remoteCallback: (event: any) => void) {
-          orchestrator.onClosed((event) => remoteCallback(event));
+          orchestrator.onClosed((event: any) => remoteCallback(event));
         },
       },
     });
@@ -233,27 +237,27 @@ export class AppOrchestrator implements IAppOrchestrator {
           this.pageletProcess.kill(SETTING_PARTICIPANT_ID);
         },
         onStateChange(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onStateChange((event) => remoteCallback(event));
+          settingOrchestrator.onStateChange((event: any) => remoteCallback(event));
         },
         onReady(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReady((event) => remoteCallback(event));
+          settingOrchestrator.onReady((event: any) => remoteCallback(event));
         },
         onDisconnected(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onDisconnected((event) => remoteCallback(event));
+          settingOrchestrator.onDisconnected((event: any) => remoteCallback(event));
         },
         onReconnecting(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReconnecting((event) => remoteCallback(event));
+          settingOrchestrator.onReconnecting((event: any) => remoteCallback(event));
         },
         onReconnected(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReconnected((event) => remoteCallback(event));
+          settingOrchestrator.onReconnected((event: any) => remoteCallback(event));
         },
         onReconnectFailed(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReconnectFailed((event) =>
+          settingOrchestrator.onReconnectFailed((event: any) =>
             remoteCallback(event)
           );
         },
         onClosed(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onClosed((event) => remoteCallback(event));
+          settingOrchestrator.onClosed((event: any) => remoteCallback(event));
         },
       },
     });

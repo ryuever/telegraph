@@ -15,7 +15,7 @@ export const client = createOrchestratorClient({
 
 export const connectionPageletClient = client.getProxy(
   CONNECTION_PAGELET_SERVICE_PATH
-) as IConnectionPageletService;
+) as unknown as IConnectionPageletService;
 
 export const monitorPageletClient = client.getProxy(
   MONITOR_PAGELET_SERVICE_PATH

@@ -1,10 +1,7 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
-import {
-  PageletWorker,
-  PageletWorkerConfigId,
-  IPageletWorkerConfig,
-} from '@telegraph/pagelet-host/node/PageletWorker';
+import { PageletWorker, PageletWorkerConfigId } from '@telegraph/pagelet-host/node/PageletWorker';
+import type { IPageletWorkerConfig } from '@telegraph/pagelet-host/node/PageletWorker';
 import { MONITOR_PAGELET_SERVICE_PATH } from '@telegraph/monitor/application/common';
 import { IDaemonService } from '@telegraph/daemon/application/common';
 

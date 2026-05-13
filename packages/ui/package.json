@@ -7,7 +7,9 @@
   "exports": {
     "./styles/globals.css": "./src/styles/globals.css",
     "./components/ui/*": "./src/components/ui/*.tsx",
-    "./lib/*": "./src/lib/*.ts"
+    "./lib/*": "./src/lib/*.ts",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./useOrchestratorDashboard": "./src/hooks/useOrchestratorDashboard.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

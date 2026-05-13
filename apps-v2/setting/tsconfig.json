@@ -16,8 +16,10 @@
     "paths": {
       "@telegraph/setting/*": ["src/*"],
       "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
+      "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
       "@telegraph/shared/*": ["../shared/src/*"],
       "@telegraph/daemon/*": ["../daemon/src/*"],
+      "@telegraph/main/*": ["../main/src/*"],
       "@telegraph/ui/*": ["../../packages/ui/src/*"]
     }
   },

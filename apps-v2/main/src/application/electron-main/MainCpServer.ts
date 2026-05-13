@@ -6,8 +6,10 @@ import {
 import { serviceHost } from '@x-oasis/async-call-rpc';
 import { BrowserWindow } from 'electron';
 
-import {
+import type {
   IWindowManager,
+} from '@telegraph/main/application/electron-main/WindowManager';
+import {
   WindowManagerId,
 } from '@telegraph/main/application/electron-main/WindowManager';
 import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@telegraph/main/application/common/cp-config';

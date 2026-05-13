@@ -1,12 +1,16 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 
-import {
+import type {
   IPageletProcess,
-  PageletProcessId,
 } from '@telegraph/pagelet-host/electron-main/PageletProcess';
 import {
-  AppOrchestratorId,
+  PageletProcessId,
+} from '@telegraph/pagelet-host/electron-main/PageletProcess';
+import type {
   IAppOrchestrator,
+} from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
+import {
+  AppOrchestratorId,
 } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
 import { CONNECTION_PARTICIPANT_ID } from '@telegraph/pagelet-host/common';
 

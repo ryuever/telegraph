@@ -43,7 +43,7 @@ interface PageViewProps {
 function createPageApi(): OrchestratorAPI {
   return {
     connect: () => client.connect(),
-    disconnect: () => client.disconnect(),
+    disconnect: () => client.disconnect() as Promise<void>,
     simulateLost: () => client.simulateLost(),
     getStatus: () => client.getStatus(),
     killUtility: () => client.killUtility(),

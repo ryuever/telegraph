@@ -34,7 +34,8 @@ export function useMonitorSnapshots() {
 
       try {
         if (cancelled) return;
-        const result = monitorPageletClient.onPerformanceUpdate(
+        const result: (() => void) | { unsubscribe: () => void } | void =
+          monitorPageletClient.onPerformanceUpdate(
           (snap: MonitorSnapshot) => {
             if (!cancelled) {
               setSnapshot(snap);
@@ -42,12 +43,12 @@ export function useMonitorSnapshots() {
             }
           }
         );
-        const unsub =
-          typeof result === 'function'
-            ? result
-            : result?.unsubscribe
-            ? result.unsubscribe.bind(result)
-            : () => {};
+        let unsub: () => void = () => {};
+        if (typeof result === 'function') {
+          unsub = result;
+        } else if (result && typeof result === 'object' && 'unsubscribe' in result) {
+          unsub = (result as { unsubscribe: () => void }).unsubscribe.bind(result);
+        }
         if (!cancelled) {
           unsubRef.current = unsub;
         } else {

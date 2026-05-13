@@ -16,6 +16,7 @@
     "paths": {
       "@telegraph/shared/*": ["src/*"],
       "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
+      "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
       "@telegraph/main/*": ["../main/src/*"]
     }
   },

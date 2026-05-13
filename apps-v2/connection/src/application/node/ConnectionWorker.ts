@@ -3,6 +3,8 @@ import { serviceHost } from '@x-oasis/async-call-rpc';
 import {
   PageletWorker,
   PageletWorkerConfigId,
+} from '@telegraph/pagelet-host/node/PageletWorker';
+import type {
   IPageletWorkerConfig,
 } from '@telegraph/pagelet-host/node/PageletWorker';
 import { CONNECTION_PAGELET_SERVICE_PATH } from '@telegraph/connection/application/common';

@@ -2,38 +2,22 @@ import { createId, inject, injectable } from '@x-oasis/di';
 import { app } from 'electron';
 import { serviceHost } from '@x-oasis/async-call-rpc';
 
-import {
-  IWindowManager,
-  WindowManagerId,
-} from '@telegraph/main/application/electron-main/WindowManager';
-import {
-  IMainCpServer,
-  MainCpServerId,
-} from '@telegraph/main/application/electron-main/MainCpServer';
-import {
-  IDaemonApplication,
-  DaemonApplicationId,
-} from '@telegraph/daemon/application/node/DaemonApplication';
-import {
-  ISharedApplication,
-  SharedApplicationId,
-} from '@telegraph/shared/application/node/SharedApplication';
-import {
-  IConnectionApplication,
-  ConnectionApplicationId,
-} from '@telegraph/connection/application/node/ConnectionApplication';
-import {
-  IMonitorApplication,
-  MonitorApplicationId,
-} from '@telegraph/monitor/application/electron-main/MonitorApplication';
-import {
-  ISettingApplication,
-  SettingApplicationId,
-} from '@telegraph/setting/application/electron-main/SettingApplication';
-import {
-  IAppOrchestrator,
-  AppOrchestratorId,
-} from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
+import type { IWindowManager } from '@telegraph/main/application/electron-main/WindowManager';
+import { WindowManagerId } from '@telegraph/main/application/electron-main/WindowManager';
+import type { IMainCpServer } from '@telegraph/main/application/electron-main/MainCpServer';
+import { MainCpServerId } from '@telegraph/main/application/electron-main/MainCpServer';
+import type { IDaemonApplication } from '@telegraph/daemon/application/node/DaemonApplication';
+import { DaemonApplicationId } from '@telegraph/daemon/application/node/DaemonApplication';
+import type { ISharedApplication } from '@telegraph/shared/application/node/SharedApplication';
+import { SharedApplicationId } from '@telegraph/shared/application/node/SharedApplication';
+import type { IConnectionApplication } from '@telegraph/connection/application/node/ConnectionApplication';
+import { ConnectionApplicationId } from '@telegraph/connection/application/node/ConnectionApplication';
+import type { IMonitorApplication } from '@telegraph/monitor/application/electron-main/MonitorApplication';
+import { MonitorApplicationId } from '@telegraph/monitor/application/electron-main/MonitorApplication';
+import type { ISettingApplication } from '@telegraph/setting/application/electron-main/SettingApplication';
+import { SettingApplicationId } from '@telegraph/setting/application/electron-main/SettingApplication';
+import type { IAppOrchestrator } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
+import { AppOrchestratorId } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
 import { MAIN_RPC_SERVICE_PATH } from '@telegraph/pagelet-host/common';
 import { MAIN_METRICS_SERVICE_PATH } from '@telegraph/main-metrics/common';
 import { pidNameRegistry } from '@telegraph/main-metrics/electron-main/pidNameRegistry';
