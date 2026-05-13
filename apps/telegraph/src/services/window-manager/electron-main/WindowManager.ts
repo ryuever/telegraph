@@ -1,167 +1,170 @@
-import { inject, injectable, createId } from '@x-oasis/di'
-import { Disposable } from '@x-oasis/disposable'
-import { Event } from '@x-oasis/emitter'
-import type { Workbench } from '@telegraph/services/workbench/electron-main/Workbench'
-import type PageletProcess from '@telegraph/services/process/pagelet-process/electron-main/PageletProcess'
-import { buildId } from '@x-oasis/id'
-import type { LogService } from '@telegraph/services/log/common/log'
-import { LogServiceId } from '@telegraph/services/log/common/log'
-import type { FileAccess } from '@telegraph/services/file-access/electron-main/FileAccess'
-import { FileAccessId } from '@telegraph/services/file-access/electron-main/FileAccess'
-import { TELEGRAPH_PAGELET_RENDERER_PROCESS_ID } from '@telegraph/core/node/process/env'
-import { BrowserWindowFactoryId } from './BrowserWindow'
-import type { IBrowserWindowFactory, BrowserWindow } from './BrowserWindow'
+// Phase 1 — minimal WindowManager: opens a single main BrowserWindow.
+// Phase 4+ will manage multiple windows / pagelets.
+import { join } from 'node:path';
 
-export const WindowManagerId = createId('browser-window-factory')
+import { BrowserWindow, Menu, app } from 'electron';
 
-const MONITOR_WINDOW_WIDTH = 620
-const MONITOR_WINDOW_HEIGHT = 760
-const MONITOR_WINDOW_MIN_WIDTH = 480
-const MONITOR_WINDOW_MIN_HEIGHT = 520
+import { createId, inject, injectable } from '@x-oasis/di';
+
+import type { ILogService } from '@telegraph/core/log/LogService';
+import { LogServiceId } from '@telegraph/core/log/LogService';
+
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
+declare const MAIN_WINDOW_VITE_NAME: string;
+
+export interface IWindowManager {
+  openMainWindow(): BrowserWindow;
+  openMonitorWindow(): BrowserWindow;
+  setupApplicationMenu(): void;
+  setupDockMenu(): void;
+}
 
 @injectable()
-export class WindowManager extends Disposable {
-  private workbench: Workbench
+export class WindowManager implements IWindowManager {
+  private monitorWindow?: BrowserWindow;
 
-  private mainWindow: BrowserWindow
+  constructor(@inject(LogServiceId) private readonly log: ILogService) {}
 
-  private auxiliaryWindow: BrowserWindow
+  openMainWindow(): BrowserWindow {
+    this.log.info('WindowManager.openMainWindow() begin');
 
-  private monitorWindow: BrowserWindow | null = null
+    const win = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      title: 'Telegraph',
+      webPreferences: {
+        preload: this.preloadPath(),
+        contextIsolation: true,
+        sandbox: false,
+        nodeIntegration: false,
+      },
+    });
 
-  private windowMap = new Map<string, BrowserWindow>()
-
-  private onDidMainWindowCreatedEvent = new Event({ name: 'on-did-main-window-created' })
-
-  onDidMainWindowCreated = this.onDidMainWindowCreatedEvent.subscribe
-
-  constructor(
-    @inject(FileAccessId) private fileAccess: FileAccess,
-    @inject(BrowserWindowFactoryId) private browserWindowFactory: IBrowserWindowFactory,
-    @inject(LogServiceId) private logService: LogService
-  ) {
-    super()
-  }
-
-  initialize(workbench: Workbench) {
-    this.workbench = workbench
-  }
-
-  createMainWindow() {
-    this.mainWindow = this.browserWindowFactory({
-      isPrimary: true,
-      workbench: this.workbench,
-    })
-    this.registerDisposable(
-      this.mainWindow.onDidWindowCreated(() => {
-        this.onDidMainWindowCreatedEvent.fire(this.mainWindow.window)
-      })
-    )
-    this.mainWindow.createWindow()
-    this.windowMap.set(this.mainWindow.id, this.mainWindow)
-  }
-
-  createAuxiliaryWindow() {
-    this.auxiliaryWindow = this.browserWindowFactory({
-      isPrimary: false,
-      workbench: this.workbench,
-    })
-    this.registerDisposable(
-      this.auxiliaryWindow.onDidWindowCreated(() => {
-        this.auxiliaryWindow.window.loadURL(
-          ...this.fileAccess.asLoadURL(
-            `/auxiliary?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=auxiliary-app`
-          )
-        )
-      })
-    )
-    this.auxiliaryWindow.createWindow()
-    this.windowMap.set(this.auxiliaryWindow.id, this.auxiliaryWindow)
-  }
-
-  getMainWindow() {
-    return this.mainWindow
-  }
-
-  getMonitorWindow() {
-    if (this.monitorWindow && !this.monitorWindow.window?.isDestroyed()) {
-      return this.monitorWindow
-    }
-    return null
-  }
-
-  createMonitorWindow() {
-    const existing = this.getMonitorWindow()
-    if (existing) {
-      existing.window.focus()
-      return existing
+    if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string') {
+      this.log.info(`loadURL(${MAIN_WINDOW_VITE_DEV_SERVER_URL})`);
+      void win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    } else {
+      const indexHtml = join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
+      this.log.info(`loadFile(${indexHtml})`);
+      void win.loadFile(indexHtml);
     }
 
-    const monitorWindow = this.browserWindowFactory({
-      isPrimary: false,
-      workbench: this.workbench,
-      width: MONITOR_WINDOW_WIDTH,
-      height: MONITOR_WINDOW_HEIGHT,
-      minWidth: MONITOR_WINDOW_MIN_WIDTH,
-      minHeight: MONITOR_WINDOW_MIN_HEIGHT,
-      title: 'Monitor',
-    })
+    win.on('ready-to-show', () => {
+      this.log.info('main window ready-to-show');
+      win.show();
+    });
 
-    this.registerDisposable(
-      monitorWindow.onDidWindowCreated(() => {
-        monitorWindow.window.loadURL(
-          ...this.fileAccess.asLoadURL(
-            `/monitor?${TELEGRAPH_PAGELET_RENDERER_PROCESS_ID}=monitor-window-app`
-          )
-        )
-      })
-    )
-
-    this.registerDisposable(
-      monitorWindow.onWindowDidCloseHandler(() => {
-        this.windowMap.delete(monitorWindow.id)
-        if (this.monitorWindow === monitorWindow) {
-          this.monitorWindow = null
-        }
-      })
-    )
-
-    monitorWindow.createWindow()
-    this.monitorWindow = monitorWindow
-    this.windowMap.set(monitorWindow.id, monitorWindow)
-    return monitorWindow
+    return win;
   }
 
-  toggleMonitorWindow() {
-    const existing = this.getMonitorWindow()
-    if (existing) {
-      existing.window.close()
-      return
+  openMonitorWindow(): BrowserWindow {
+    if (this.monitorWindow && !this.monitorWindow.isDestroyed()) {
+      this.monitorWindow.focus();
+      return this.monitorWindow;
     }
-    this.createMonitorWindow()
+
+    this.log.info('WindowManager.openMonitorWindow()');
+
+    this.monitorWindow = new BrowserWindow({
+      width: 720,
+      height: 520,
+      title: 'Telegraph — Activity Monitor',
+      webPreferences: {
+        preload: this.preloadPath(),
+        contextIsolation: true,
+        sandbox: false,
+        nodeIntegration: false,
+      },
+    });
+
+    if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string') {
+      void this.monitorWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}#/monitor`);
+    } else {
+      const indexHtml = join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
+      void this.monitorWindow.loadFile(indexHtml, { hash: '/monitor' });
+    }
+
+    this.monitorWindow.on('closed', () => {
+      this.monitorWindow = undefined;
+    });
+
+    return this.monitorWindow;
   }
 
-  createDisposablePanel(props: { windowId?: string; projectName: string }) {
-    const { windowId, ...rest } = props
-    let window = this.getWindow(windowId ?? '')
-    if (!windowId) window = this.auxiliaryWindow
-    window?.createDisposablePanel(rest)
+  setupApplicationMenu(): void {
+    const template: Electron.MenuItemConstructorOptions[] = [
+      {
+        label: 'File',
+        submenu: [
+          { role: 'quit' },
+        ],
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' },
+        ],
+      },
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' },
+          { type: 'separator' },
+          { role: 'togglefullscreen' },
+          { type: 'separator' },
+          {
+            label: 'Toggle Monitor',
+            click: () => { this.openMonitorWindow(); },
+          },
+        ],
+      },
+      {
+        label: 'Window',
+        submenu: [
+          { role: 'minimize' },
+          { role: 'zoom' },
+          { type: 'separator' },
+          { role: 'front' },
+        ],
+      },
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+    this.log.info('Application menu set up with Toggle Monitor in View');
   }
 
-  createPanel(props: { windowId?: string; projectName: string }) {
-    const { windowId, ...rest } = props
-    let window = this.getWindow(windowId ?? '')
-    if (!windowId) window = this.mainWindow
-    window?.createPanel(rest)
+  setupDockMenu(): void {
+    if (process.platform !== 'darwin') return;
+
+    const dockMenu = Menu.buildFromTemplate([
+      {
+        label: 'Toggle Monitor',
+        click: () => { this.openMonitorWindow(); },
+      },
+    ]);
+
+    if (app.dock) {
+      app.dock.setMenu(dockMenu);
+    }
+    this.log.info('Dock menu set up with Toggle Monitor');
   }
 
-  findPageletProcess(props: { windowId?: string; pageletId: string }): PageletProcess | null {
-    const { windowId = buildId('window', 1), pageletId } = props
-    const window = this.getWindow(windowId)
-    return window?.findPageletProcess(pageletId) ?? null
-  }
-
-  getWindow(windowId: string) {
-    return this.windowMap.get(windowId)
+  private preloadPath(): string {
+    return join(__dirname, 'preload.js');
   }
 }
+
+export const WindowManagerId = createId('WindowManager');

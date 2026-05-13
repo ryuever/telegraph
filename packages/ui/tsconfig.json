@@ -8,20 +8,13 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/ui/*": ["./src/*"],
-      "@telegraph/application/*": ["../../apps/telegraph/src/application/*"],
-      "@telegraph/core/*": ["../../apps/telegraph/src/core/*"],
-      "@telegraph/services/*": ["../../apps/telegraph/src/services/*"],
-      "@telegraph/agent": ["../agent/src/index.ts"],
-      "@telegraph/agent/*": ["../agent/src/*"],
-      "@telegraph/runtime-contracts": ["../runtime-contracts/src/index.ts"],
-      "@telegraph/runtime-contracts/*": ["../runtime-contracts/src/*"],
-      "@telegraph/stores": ["../stores/src/index.ts"],
-      "@telegraph/stores/*": ["../stores/src/*"]
+      "@telegraph/ui/*": ["./src/*"]
     }
   },
-  "include": ["."],
+  "include": ["src/**/*"],
   "exclude": ["node_modules"]
 }

@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import { resolve } from 'path'
+// Phase 1 — Vite config for the preload bundle.
+import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
 
-// https://vitejs.dev/config
 export default defineConfig({
   resolve: {
     alias: {
@@ -12,9 +12,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      external: ['electron'],
       output: {
         entryFileNames: 'preload.js',
       },
     },
   },
-})
+});

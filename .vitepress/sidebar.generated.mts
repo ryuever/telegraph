@@ -31,6 +31,18 @@ export const wikiSidebar = {
         {
           "text": "A-006 Chat 消息到 LLM 数据流（当前架构）",
           "link": "/architecture/20260505-chat-to-llm-data-flow"
+        },
+        {
+          "text": "A-007 Telegraph 多进程架构全貌",
+          "link": "/architecture/20260506-pagelet-process-communication"
+        },
+        {
+          "text": "A-008 Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）",
+          "link": "/architecture/20260509-telegraph-final-process-architecture"
+        },
+        {
+          "text": "A-009 Telegraph 运行时目录分层与文件结构约定",
+          "link": "/architecture/20260512-runtime-directory-convention-and-file-structure"
         }
       ]
     }
@@ -54,6 +66,18 @@ export const wikiSidebar = {
         {
           "text": "D-003 Spawn CLI 与 Embed Orchestra 两种 Agent 调用模式对比",
           "link": "/discussion/20260506-spawn-cli-vs-embed-orchestra-agent-invocation"
+        },
+        {
+          "text": "D-004 Electron 多 Renderer vs 单 Renderer 面板架构调研与 Telegraph 迁移方案",
+          "link": "/discussion/20260506-electron-multi-renderer-vs-single-renderer"
+        },
+        {
+          "text": "D-005 Renderer ↔ Pagelet 通道收敛设计（Forwarding Proxy）",
+          "link": "/discussion/20260508-renderer-pagelet-channel-convergence"
+        },
+        {
+          "text": "D-006 x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角）",
+          "link": "/discussion/20260508-x-oasis-orchestrator-capability-gaps"
         }
       ]
     }
@@ -73,6 +97,10 @@ export const wikiSidebar = {
         {
           "text": "I-003 Agent Runtime Abstraction - Phase 1 Implementation Debt & Optimization",
           "link": "/issue/20260505-agent-runtime-abstraction-phase1-debt"
+        },
+        {
+          "text": "I-003 Renderer ↔ Design Utility RPC Ping 全链路调试复盘（Phase 4–5）",
+          "link": "/issue/20260508-renderer-design-rpc-ping-debug"
         }
       ]
     }
@@ -80,7 +108,12 @@ export const wikiSidebar = {
   "/reference/": [
     {
       "text": "参考手册",
-      "items": []
+      "items": [
+        {
+          "text": "R-001 x-oasis 本地 source link 配置手册（telegraph）",
+          "link": "/reference/20260508-x-oasis-link-to-source-setup"
+        }
+      ]
     }
   ],
   "/roadmap/": [
@@ -94,6 +127,10 @@ export const wikiSidebar = {
         {
           "text": "P-002 Telegraph Agent Runtime / Extension Host 实施 Phase-Gate 模板",
           "link": "/roadmap/20260505-agent-runtime-extension-host-phase-gates"
+        },
+        {
+          "text": "P-003 Port Management → ConnectionOrchestrator 迁移计划（design 先行）",
+          "link": "/roadmap/20260508-port-management-orchestrator-migration-plan"
         }
       ]
     }
@@ -116,6 +153,10 @@ export const wikiNav = [
   {
     "text": "Issue 记录",
     "link": "/issue/20260504-chat-tailwind-not-applied-postmortem"
+  },
+  {
+    "text": "参考手册",
+    "link": "/reference/20260508-x-oasis-link-to-source-setup"
   },
   {
     "text": "开发规划",

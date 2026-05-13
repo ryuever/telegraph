@@ -1,0 +1,33 @@
+{
+  "name": "@telegraph/ui",
+  "version": "0.0.0",
+  "description": "Telegraph renderer view layer (React + Tailwind, no Electron imports).",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./styles/globals.css": "./src/styles/globals.css",
+    "./components/*": "./src/components/*.tsx",
+    "./lib/*": "./src/lib/*.ts",
+    "./hooks/*": "./src/hooks/*.ts"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@telegraph/agent": "workspace:*",
+    "@telegraph/runtime-contracts": "workspace:*",
+    "@telegraph/stores": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.14.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "rxjs": "^7.8.2",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^4.4.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.3.0"
+  }
+}
