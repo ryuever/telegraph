@@ -45,6 +45,10 @@ import {
   SettingApplicationId,
 } from '@telegraph/setting/application/electron-main/SettingApplication';
 import {
+  DesignApplication,
+  DesignApplicationId,
+} from '@telegraph/design/application/electron-main/DesignApplication';
+import {
   AppApplication,
   AppApplicationId,
 } from '@telegraph/main/application/electron-main/AppApplication';
@@ -64,6 +68,7 @@ export default new Registry((bind) => {
   bind(ConnectionApplicationId).to(ConnectionApplication);
   bind(MonitorApplicationId).to(MonitorApplication);
   bind(SettingApplicationId).to(SettingApplication);
+  bind(DesignApplicationId).to(DesignApplication);
 
   bind(AppApplicationId).to(AppApplication);
 });

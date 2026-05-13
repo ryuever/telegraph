@@ -1,0 +1,32 @@
+{
+  "name": "@telegraph-v3/design",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/application/node/main.ts",
+  "types": "./src/application/common/index.ts",
+  "exports": {
+    "./application/common": "./src/application/common/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@x-oasis/async-call-rpc": "^0.13.0",
+    "@x-oasis/async-call-rpc-electron": "^0.11.0",
+    "@x-oasis/di": "^0.13.0",
+    "@telegraph/services": "workspace:*",
+    "@telegraph-v3/daemon": "workspace:*",
+    "@telegraph-v3/shared": "workspace:*",
+    "@telegraph/ui": "workspace:*",
+    "lucide-react": "^1.14.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.3.0"
+  }
+}

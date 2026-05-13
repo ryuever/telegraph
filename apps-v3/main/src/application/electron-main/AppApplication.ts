@@ -16,6 +16,8 @@ import type { IMonitorApplication } from '@telegraph/monitor/application/electro
 import { MonitorApplicationId } from '@telegraph/monitor/application/electron-main/MonitorApplication';
 import type { ISettingApplication } from '@telegraph/setting/application/electron-main/SettingApplication';
 import { SettingApplicationId } from '@telegraph/setting/application/electron-main/SettingApplication';
+import type { IDesignApplication } from '@telegraph/design/application/electron-main/DesignApplication';
+import { DesignApplicationId } from '@telegraph/design/application/electron-main/DesignApplication';
 import type { IAppOrchestrator } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
 import { AppOrchestratorId } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
 import { MAIN_RPC_SERVICE_PATH } from '@telegraph/pagelet-host/common';
@@ -68,6 +70,8 @@ export class AppApplication implements IAppApplication {
     private readonly monitorApp: IMonitorApplication,
     @inject(SettingApplicationId)
     private readonly settingApp: ISettingApplication,
+    @inject(DesignApplicationId)
+    private readonly designApp: IDesignApplication,
     @inject(AppOrchestratorId)
     private readonly appOrchestrator: IAppOrchestrator
   ) {}
@@ -148,6 +152,7 @@ export class AppApplication implements IAppApplication {
     await this.connectionApp.start();
     await this.monitorApp.start();
     await this.settingApp.start();
+    await this.designApp.start();
 
     this.windowManager.onSettingWindowCreated((win) => {
       this.mainCpServer.registerSettingWindow(win);

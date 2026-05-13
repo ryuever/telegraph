@@ -46,6 +46,7 @@
     "@telegraph/services": "workspace:*",
     "@telegraph-v3/setting": "workspace:*",
     "@telegraph-v3/shared": "workspace:*",
+    "@telegraph-v3/design": "workspace:*",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

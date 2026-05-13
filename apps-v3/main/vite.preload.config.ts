@@ -9,6 +9,7 @@ export default defineConfig({
       '@telegraph/connection': resolve(__dirname, '../connection/src'),
       '@telegraph/monitor': resolve(__dirname, '../monitor/src'),
       '@telegraph/setting': resolve(__dirname, '../setting/src'),
+      '@telegraph/design': resolve(__dirname, '../design/src'),
     },
   },
   build: {

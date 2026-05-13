@@ -136,6 +136,12 @@ export class WindowManager implements IWindowManager {
               this.mainWindow?.webContents.send('switch-page', 'monitor');
             },
           },
+          {
+            label: 'Design',
+            click: () => {
+              this.mainWindow?.webContents.send('switch-page', 'design');
+            },
+          },
           { type: 'separator' },
           {
             label: 'Setting',

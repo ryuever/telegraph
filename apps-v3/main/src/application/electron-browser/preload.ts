@@ -6,9 +6,11 @@ import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@telegraph/main/application/common
 import {
   CONNECTION_PARTICIPANT_ID,
   MONITOR_PARTICIPANT_ID,
+  DESIGN_PARTICIPANT_ID,
 } from '@telegraph/pagelet-host/common';
 import { CONNECTION_PAGELET_SERVICE_PATH } from '@telegraph/connection/application/common';
 import { MONITOR_PAGELET_SERVICE_PATH } from '@telegraph/monitor/application/common';
+import { DESIGN_PAGELET_SERVICE_PATH } from '@telegraph/design/application/common';
 
 const channelName = ORCHESTRATOR_CP_CHANNEL_NAME;
 
@@ -19,6 +21,7 @@ const bridge = createPageBridge({
   serviceRoutes: {
     [CONNECTION_PAGELET_SERVICE_PATH]: CONNECTION_PARTICIPANT_ID,
     [MONITOR_PAGELET_SERVICE_PATH]: MONITOR_PARTICIPANT_ID,
+    [DESIGN_PAGELET_SERVICE_PATH]: DESIGN_PARTICIPANT_ID,
   },
   defaultPeerId: CONNECTION_PARTICIPANT_ID,
 });

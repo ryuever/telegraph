@@ -12,28 +12,24 @@ export default defineConfig({
   resolve: {
     mainFields: ['module', 'jsnext:main', 'jsnext'],
     alias: {
-      '@telegraph/main': resolve(__dirname, 'src'),
+      '@telegraph/design': resolve(__dirname, '../design/src'),
       '@telegraph/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
-      '@telegraph/main-metrics': resolve(__dirname, '../../packages/services/src/main-metrics/src'),
-      '@telegraph/process': resolve(__dirname, '../../packages/services/src/process/src'),
-      '@telegraph/connection': resolve(__dirname, '../connection/src'),
       '@telegraph/daemon': resolve(__dirname, '../daemon/src'),
       '@telegraph/shared': resolve(__dirname, '../shared/src'),
-      '@telegraph/monitor': resolve(__dirname, '../monitor/src'),
-      '@telegraph/setting': resolve(__dirname, '../setting/src'),
-      '@telegraph/design': resolve(__dirname, '../design/src'),
+      '@telegraph/main': resolve(__dirname, 'src'),
       '@telegraph/ui': resolve(__dirname, '../../packages/ui/src'),
     },
   },
   build: {
+    outDir: '.vite/preload',
     lib: {
-      entry: resolve(__dirname, 'src/application/electron-main/main.ts'),
+      entry: resolve(__dirname, '../design/src/application/node/main.ts'),
       formats: ['cjs'],
     },
     rollupOptions: {
       external: [...nodeBuiltins, ...nodeBuiltins.map(m => `node:${m}`), 'electron'],
       output: {
-        entryFileNames: 'index.js',
+        entryFileNames: 'design-worker.js',
       },
     },
   },

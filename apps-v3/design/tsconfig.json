@@ -14,16 +14,12 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/main/*": ["src/*"],
+      "@telegraph/design/*": ["src/*"],
       "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
       "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
-      "@telegraph/process/*": ["../../packages/services/src/process/src/*"],
-      "@telegraph/connection/*": ["../connection/src/*"],
       "@telegraph/daemon/*": ["../daemon/src/*"],
       "@telegraph/shared/*": ["../shared/src/*"],
-      "@telegraph/monitor/*": ["../monitor/src/*"],
-      "@telegraph/setting/*": ["../setting/src/*"],
-      "@telegraph/design/*": ["../design/src/*"],
+      "@telegraph/main/*": ["../main/src/*"],
       "@telegraph/ui/*": ["../../packages/ui/src/*"]
     }
   },

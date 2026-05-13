@@ -15,6 +15,7 @@ export default defineConfig(({ command }) => ({
       '@telegraph/shared': resolve(__dirname, '../shared/src'),
       '@telegraph/monitor': resolve(__dirname, '../monitor/src'),
       '@telegraph/setting': resolve(__dirname, '../setting/src'),
+      '@telegraph/design': resolve(__dirname, '../design/src'),
       '@telegraph/ui/useOrchestratorDashboard': resolve(__dirname, '../../packages/ui/src/hooks/useOrchestratorDashboard.ts'),
       '@telegraph/ui': resolve(__dirname, '../../packages/ui/src'),
     },

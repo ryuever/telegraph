@@ -24,6 +24,7 @@ const PAGELET_NAMES: Record<string, string> = {
   connection: 'Connection',
   monitor: 'Monitor',
   setting: 'Setting',
+  design: 'Design',
 };
 
 @injectable()

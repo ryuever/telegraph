@@ -44,6 +44,10 @@ const config: ForgeConfig = {
           entry: '../setting/src/application/node/main.ts',
           config: 'vite.setting.config.ts',
         },
+        {
+          entry: '../design/src/application/node/main.ts',
+          config: 'vite.design.config.ts',
+        },
       ],
       renderer: [
         {

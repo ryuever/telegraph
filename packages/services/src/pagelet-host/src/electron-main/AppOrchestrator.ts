@@ -18,6 +18,7 @@ import {
   RENDERER_PARTICIPANT_ID,
   CONNECTION_PARTICIPANT_ID,
   SETTING_PARTICIPANT_ID,
+  DESIGN_PARTICIPANT_ID,
 } from '@telegraph/pagelet-host/common';
 
 export interface IOrchestratorService {
@@ -39,7 +40,7 @@ export interface IAppOrchestrator {
   registerOrchestratorService(): void;
   registerSettingOrchestratorService(): void;
   connectMonitor(): Promise<void>;
-  connectSetting(): Promise<void>;
+  connectDesign(): Promise<void>;
 }
 
 export const AppOrchestratorId = createId('AppOrchestrator');
@@ -272,5 +273,11 @@ export class AppOrchestrator implements IAppOrchestrator {
       SETTING_PARTICIPANT_ID
     );
     console.log('[AppOrchestrator] setting direct connection established');
+  }
+
+  async connectDesign(): Promise<void> {
+    const orchestrator = this.cpServer.getOrchestrator();
+    await orchestrator.connect(RENDERER_PARTICIPANT_ID, DESIGN_PARTICIPANT_ID);
+    console.log('[AppOrchestrator] design direct connection established');
   }
 }

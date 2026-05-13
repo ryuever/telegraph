@@ -15,6 +15,13 @@ export const MONITOR_PAGE = {
   description: 'Performance Monitor',
 } as const;
 
-export type PageConfig = typeof CONNECTION_PAGE | typeof MONITOR_PAGE;
+export const DESIGN_PAGE = {
+  id: 'design',
+  label: 'Design',
+  color: '#8b5cf6',
+  description: 'Design Workspace',
+} as const;
 
-export const ALL_PAGES: PageConfig[] = [CONNECTION_PAGE, MONITOR_PAGE];
+export type PageConfig = typeof CONNECTION_PAGE | typeof MONITOR_PAGE | typeof DESIGN_PAGE;
+
+export const ALL_PAGES: PageConfig[] = [CONNECTION_PAGE, MONITOR_PAGE, DESIGN_PAGE];

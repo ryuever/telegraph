@@ -7,6 +7,10 @@ import {
   MONITOR_PAGELET_SERVICE_PATH,
   IMonitorPageletService,
 } from '@telegraph/monitor/application/common';
+import {
+  DESIGN_PAGELET_SERVICE_PATH,
+  IDesignPageletService,
+} from '@telegraph/design/application/common';
 
 export const client = createOrchestratorClient({
   directChannelDescription: 'renderer↔preload',
@@ -20,3 +24,7 @@ export const connectionPageletClient = client.getProxy(
 export const monitorPageletClient = client.getProxy(
   MONITOR_PAGELET_SERVICE_PATH
 ) as unknown as IMonitorPageletService;
+
+export const designPageletClient = client.getProxy(
+  DESIGN_PAGELET_SERVICE_PATH
+) as unknown as IDesignPageletService;
