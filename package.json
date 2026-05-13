@@ -15,7 +15,9 @@
     "docs:wiki:dev": "vitepress dev",
     "docs:wiki:build": "vitepress build",
     "docs:wiki:preview": "vitepress preview",
-    "clean:build": "pnpm -r exec rm -rf out dist .vite"
+    "clean:build": "pnpm -r exec rm -rf out dist .vite",
+    "clean": "pnpm run clean:build && pnpm run clean:modules",
+    "clean:modules": "rm -rf node_modules && pnpm -r exec rm -rf node_modules"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
