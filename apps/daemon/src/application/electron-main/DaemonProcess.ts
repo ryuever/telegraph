@@ -6,7 +6,8 @@ import { join } from 'path';
 
 import type { IMainCpServer } from '@telegraph/main/application/electron-main/MainCpServer';
 import { MainCpServerId } from '@telegraph/main/application/electron-main/MainCpServer';
-import { pidNameRegistry } from '@telegraph/main-metrics/electron-main/pidNameRegistry';
+import type { IPidNameRegistry } from '@telegraph/main-metrics/common';
+import { PidNameRegistryId } from '@telegraph/main-metrics/common';
 import { DAEMON_PARTICIPANT_ID } from '@telegraph/daemon/application/common';
 
 export interface IDaemonProcess {
@@ -18,7 +19,8 @@ export const DaemonProcessId = createId('DaemonProcess');
 @injectable()
 export class DaemonProcess implements IDaemonProcess {
   constructor(
-    @inject(MainCpServerId) private readonly cpServer: IMainCpServer
+    @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
+    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
   ) {}
 
   async spawn(): Promise<void> {
@@ -35,7 +37,7 @@ export class DaemonProcess implements IDaemonProcess {
       .getOrchestrator()
       .registerParticipant(DAEMON_PARTICIPANT_ID, channel, 'utility');
 
-    pidNameRegistry.register(proc, 'Daemon');
+    this.pidNameRegistry.register(proc, 'Daemon');
 
     console.log('[DaemonProcess] spawned');
   }

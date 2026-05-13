@@ -15,3 +15,10 @@ export const MAIN_RPC_SERVICE_PATH = 'main-rpc';
 export interface IMainRpcService {
   mainPing(msg: string): Promise<string>;
 }
+
+export const MAIN_WINDOW_SERVICE_PATH = 'main-window';
+
+export interface IMainWindowService {
+  openSettingWindow(): Promise<void>;
+  onSwitchPage(callback: (pageId: string) => void): void;
+}

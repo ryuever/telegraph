@@ -6,7 +6,8 @@ import { join } from 'path';
 
 import type { IMainCpServer } from '@telegraph/main/application/electron-main/MainCpServer';
 import { MainCpServerId } from '@telegraph/main/application/electron-main/MainCpServer';
-import { pidNameRegistry } from '@telegraph/main-metrics/electron-main/pidNameRegistry';
+import type { IPidNameRegistry } from '@telegraph/main-metrics/common';
+import { PidNameRegistryId } from '@telegraph/main-metrics/common';
 import { SHARED_PARTICIPANT_ID } from '@telegraph/shared/application/common';
 
 export interface ISharedProcess {
@@ -18,7 +19,8 @@ export const SharedProcessId = createId('SharedProcess');
 @injectable()
 export class SharedProcess implements ISharedProcess {
   constructor(
-    @inject(MainCpServerId) private readonly cpServer: IMainCpServer
+    @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
+    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
   ) {}
 
   async spawn(): Promise<void> {
@@ -35,7 +37,7 @@ export class SharedProcess implements ISharedProcess {
       .getOrchestrator()
       .registerParticipant(SHARED_PARTICIPANT_ID, channel, 'utility');
 
-    pidNameRegistry.register(proc, 'Shared');
+    this.pidNameRegistry.register(proc, 'Shared');
 
     console.log('[SharedProcess] spawned');
   }

@@ -17,3 +17,8 @@ export interface IMainMetricsService {
   getMainPid(): number;
   getUtilityPidNames(): Record<number, string>;
 }
+
+export type { IPidNameRegistry } from '../electron-main/PidNameRegistry';
+export { PidNameRegistryId, PidNameRegistry } from '../electron-main/PidNameRegistry';
+
+export { MainMetricsServiceId } from '../electron-main/MainMetricsService';

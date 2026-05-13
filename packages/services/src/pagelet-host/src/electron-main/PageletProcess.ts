@@ -10,7 +10,8 @@ import type {
 import {
   MainCpServerId,
 } from '@telegraph/main/application/electron-main/MainCpServer';
-import { pidNameRegistry } from '@telegraph/main-metrics/electron-main/pidNameRegistry';
+import type { IPidNameRegistry } from '@telegraph/main-metrics/common';
+import { PidNameRegistryId } from '@telegraph/main-metrics/common';
 
 export interface IPageletProcess {
   spawn(pageletId: string, workerFileName: string): Promise<void>;
@@ -33,7 +34,8 @@ export class PageletProcess implements IPageletProcess {
   private channels = new Map<string, ElectronUtilityProcessChannel>();
 
   constructor(
-    @inject(MainCpServerId) private readonly cpServer: IMainCpServer
+    @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
+    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
   ) {}
 
   async spawn(pageletId: string, workerFileName: string): Promise<void> {
@@ -62,7 +64,7 @@ export class PageletProcess implements IPageletProcess {
         .registerParticipant(pageletId, channel, 'utility');
     }
 
-    pidNameRegistry.register(proc, PAGELET_NAMES[pageletId] || pageletId);
+    this.pidNameRegistry.register(proc, PAGELET_NAMES[pageletId] || pageletId);
 
     console.log(`[PageletProcess] spawned ${pageletId}`);
   }
