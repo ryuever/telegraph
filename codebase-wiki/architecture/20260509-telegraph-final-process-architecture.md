@@ -8,7 +8,7 @@ description: >
   所有 channel 经由 x-oasis ConnectionOrchestrator 编排。
 category: architecture
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-05-13
 tags:
   - architecture
   - process-topology
@@ -36,6 +36,9 @@ references:
   - id: P-003
     rel: related-to
     file: ../roadmap/20260508-port-management-orchestrator-migration-plan.md
+  - id: A-010
+    rel: related-to
+    file: ./20260513-vscode-contribution-model-for-telegraph.md
 ---
 
 # Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）

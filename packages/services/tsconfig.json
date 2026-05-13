@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@telegraph/services/*": ["src/*"],
+      "@telegraph/main-metrics/*": ["src/main-metrics/src/*"],
+      "@telegraph/pagelet-host/*": ["src/pagelet-host/src/*"],
+      "@telegraph/process/*": ["src/process/src/*"],
+      "@telegraph/main/*": ["../../apps-v2/main/src/*"],
+      "@telegraph/daemon/*": ["../../apps-v2/daemon/src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

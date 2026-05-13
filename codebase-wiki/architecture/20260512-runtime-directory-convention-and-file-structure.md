@@ -7,7 +7,7 @@ description: >
   五个运行时目录的含义、代码边界与完整文件映射。
 category: architecture
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-13
 tags: [file-structure, runtime-environment, electron-main, electron-browser, preload, browser, node, common]
 status: draft
 references:
@@ -17,6 +17,9 @@ references:
   - id: A-008
     rel: related-to
     file: ./20260509-telegraph-final-process-architecture.md
+  - id: A-010
+    rel: extended-by
+    file: ./20260513-vscode-contribution-model-for-telegraph.md
 ---
 
 # Telegraph 运行时目录分层与文件结构约定

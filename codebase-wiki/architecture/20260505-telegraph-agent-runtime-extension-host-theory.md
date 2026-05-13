@@ -7,7 +7,7 @@ description: >
   并说明如何兼容 Pi、LangGraph、Vercel AI SDK、Mastra 与未来 agent framework。
 category: architecture
 created: 2026-05-05
-updated: 2026-05-09
+updated: 2026-05-13
 tags:
   - telegraph
   - agent-runtime
@@ -40,6 +40,9 @@ references:
     rel: related-to
     file: ./20260509-telegraph-final-process-architecture.md
     note: A-008 §8 定义 Runtime/Extension Host 在最终进程架构中的承载边界（Pagelet 内）
+  - id: A-010
+    rel: extended-by
+    file: ./20260513-vscode-contribution-model-for-telegraph.md
 ---
 
 # Telegraph Agent Runtime 与 Extension Host 理论基础

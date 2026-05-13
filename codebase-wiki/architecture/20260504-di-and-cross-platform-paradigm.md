@@ -7,7 +7,7 @@ description: >
   服务消费的开发范式，沉淀未来扩展服务和插入新平台时应遵循的开发规范。
 category: architecture
 created: 2026-05-04
-updated: 2026-05-04
+updated: 2026-05-13
 tags: [di, dependency-injection, multi-platform, rpc, conventions]
 status: final
 references:
@@ -17,6 +17,9 @@ references:
   - id: A-003
     rel: related-to
     file: ./20260504-stability-and-performance-monitoring.md
+  - id: A-010
+    rel: related-to
+    file: ./20260513-vscode-contribution-model-for-telegraph.md
 ---
 
 # Telegraph DI 容器与多平台代码维护范式
