@@ -1,5 +1,5 @@
 import { createId, injectable } from '@x-oasis/di';
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, Menu, app } from 'electron';
 import { join } from 'path';
 
 export interface IWindowManager {
@@ -39,6 +39,8 @@ export class WindowManager implements IWindowManager {
     ipcMain.handle('open-setting-window', () => {
       this.openSettingWindow();
     });
+
+    this.setupApplicationMenu();
 
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
@@ -95,5 +97,72 @@ export class WindowManager implements IWindowManager {
     });
 
     return this.settingWindow;
+  }
+
+  private setupApplicationMenu(): void {
+    const isMac = process.platform === 'darwin';
+
+    const template: Electron.MenuItemConstructorOptions[] = [
+      ...(isMac
+        ? [
+            {
+              label: app.name,
+              submenu: [
+                { role: 'about' as const },
+                { type: 'separator' as const },
+                { role: 'services' as const },
+                { type: 'separator' as const },
+                { role: 'hide' as const },
+                { role: 'hideOthers' as const },
+                { role: 'unhide' as const },
+                { type: 'separator' as const },
+                { role: 'quit' as const },
+              ],
+            },
+          ]
+        : []),
+      {
+        label: 'Develop',
+        submenu: [
+          {
+            label: 'Connection',
+            click: () => {
+              this.mainWindow?.webContents.send('switch-page', 'connection');
+            },
+          },
+          {
+            label: 'Monitor',
+            click: () => {
+              this.mainWindow?.webContents.send('switch-page', 'monitor');
+            },
+          },
+          { type: 'separator' },
+          {
+            label: 'Setting',
+            click: () => {
+              this.openSettingWindow();
+            },
+          },
+        ],
+      },
+    ];
+
+    if (process.env.NODE_ENV === 'development') {
+      template.push({
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' },
+        ],
+      });
+    }
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
   }
 }

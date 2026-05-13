@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageView from '@telegraph/connection/application/browser/PageView';
 import MonitorPage from '@telegraph/monitor/application/browser/MonitorPage';
 
@@ -19,12 +19,20 @@ declare global {
   interface Window {
     electronAPI: {
       openSettingWindow: () => Promise<void>;
+      onSwitchPage: (callback: (pageId: string) => void) => void;
     };
   }
 }
 
 function App(): JSX.Element {
   const [activePage, setActivePage] = useState<PageConfig>(CONNECTION_PAGE);
+
+  useEffect(() => {
+    window.electronAPI?.onSwitchPage((pageId: string) => {
+      const page = ALL_PAGES.find((p) => p.id === pageId);
+      if (page) setActivePage(page);
+    });
+  }, []);
 
   return (
     <div

@@ -29,4 +29,9 @@ clientHost
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openSettingWindow: () => ipcRenderer.invoke('open-setting-window'),
+  onSwitchPage: (callback: (pageId: string) => void) => {
+    ipcRenderer.on('switch-page', (_event, pageId: string) => {
+      callback(pageId);
+    });
+  },
 });
