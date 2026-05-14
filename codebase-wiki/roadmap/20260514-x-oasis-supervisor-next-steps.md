@@ -210,33 +210,37 @@
 
 ---
 
-### 3.B — D-006 Gap 1 Forwarding Proxy
+### 3.B — D-006 Gap 1 Forwarding Proxy ✅ DONE (2026-05-14)
 
-**前置阅读**：
+**Discovery**：本节最初描述「pagelet A 调 proxy.connect('B') 会报错或 hang」是**过时的**。
+深入读 `BaseConnectionOrchestrator.connect()` (async-call-rpc/src/orchestrator/
+BaseConnectionOrchestrator.ts:441-559) 和 `ParticipantOrchestratorProxy.requestConnect()`
+(async-call-rpc-electron/src/electron-main/ParticipantOrchestratorProxy.ts) 后发现：
 
-- D-006 §Gap 1 的现状描述：`~/Documents/code/modules/ai/telegraph/codebase-wiki/discussion/20260514-x-oasis-capability-gaps-v2.md`
-- A-008 hub 拓扑图：`~/Documents/code/modules/ai/telegraph/codebase-wiki/architecture/20260509-telegraph-final-process-architecture.md`
-- 现有 ParticipantOrchestratorProxy：`~/Documents/code/red/x-oasis/packages/async/async-call-rpc-electron/src/electron-main/ParticipantOrchestratorProxy.ts`
+- `connect(fromId, toId)` 不限定 fromId 必须是 main，任何两个已注册 participant 都可
+- ParticipantOrchestratorProxy.connect() 通过 `requestConnect(selfId, toId)` 委托给 main hub
+- main 用 `MessageChannelMain` 创建 entangled port pair，分别 ship 给 A 和 B
+- A↔B 直连后走自己的 channel，main 不在 RPC 转发路径上
 
-**核心思路**（A-008 §转发模型）：
+**结论**：能力自 v0.10+ 就完整存在，本节实质工作是「补 demo + 补 spec + 文档化」，
+**不需要写 ForwardingMiddleware**（本节最初的设想是误读）。
 
-- main 作为 hub，维护 `participantId → controlChannel` 映射
-- 当 pagelet A 调 `proxy.connect('B')` 时：
-  - 当前实现：直接报错或 hang（pagelet 间无 channel）
-  - 目标实现：main 在 ORCHESTRATOR_SERVICE_PATH 路由层把 A→B 的 control 消息转发给 B 的 controlChannel，并把回应转回 A
-- 需要新增 `ForwardingMiddleware`，在 ORCHESTRATOR 协议层注入
+**已交付**（x-oasis main 上 2 个 commit）：
 
-**红线**：
+- `c13a88f3 test(orchestrator): cover P↔P direct connection in spec suite`
+  - `ElectronConnectionOrchestrator.spec.ts` 新增 2 个用例（P↔P + 幂等）
+  - `ParticipantOrchestratorProxy.spec.ts` 新文件 8 个用例（connect/disconnect/
+    listParticipants/listConnections/selfId 传递/onConnection 回调）
+  - 共 37 tests 全绿
+- `9cc6789b feat(example): demonstrate pagelet ↔ pagelet direct RPC`
+  - `PageletWorker` 基类加 `connectToPeer<T>()` + `onPeerConnection()` 扩展点 + peerClients 缓存
+  - `setting` pagelet 暴露 `ISettingPageletPeerService`（peerInfo(fromId) → string）
+  - `connection` pagelet handler `callSettingPeerInfo()` 触发 P↔P RPC，可在 inspector 看到 ConnectionStats
 
-- ⚠️ **不要**在转发路径上加 serviceHost.setServiceHost——这就是 commit `2d8648c` 踩的坑（见 §3.C）
-- 转发是 control 层的事，不应碰业务 service
+**红线兑现**：
 
-**最小可行 demo**：
-
-- 在 example multi-page-router-di 加 connection pagelet → setting pagelet 直连按钮
-- 观察 OrchestratorInspector 看到 A--B 的 ConnectionStats
-
-**测试**：在 async-call-rpc-electron 加 ParticipantOrchestratorProxy.forwarding.spec.ts
+- ✅ 没在转发路径加 `serviceHost.setServiceHost`——P↔P 是 entangled port，根本没有「转发路径」
+- ✅ 控制平面（main 撮合）和业务平面（A↔B 直连）正交
 
 ---
 
