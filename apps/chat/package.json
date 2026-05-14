@@ -17,9 +17,9 @@
     "@telegraph/services": "workspace:*",
     "@telegraph/stores": "workspace:*",
     "@telegraph/ui": "workspace:*",
-    "@x-oasis/async-call-rpc": "^0.13.1",
-    "@x-oasis/async-call-rpc-electron": "^0.11.1",
-    "@x-oasis/di": "^0.13.1"
+    "@x-oasis/async-call-rpc": "^0.13.2",
+    "@x-oasis/async-call-rpc-electron": "^0.11.2",
+    "@x-oasis/di": "^0.13.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
