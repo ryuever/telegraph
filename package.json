@@ -9,7 +9,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests",
-    "start": "pnpm --filter telegraph start",
+    "start": "pnpm --filter @telegraph/main start",
     "package": "pnpm --filter telegraph package",
     "make": "pnpm --filter telegraph make",
     "docs:wiki:dev": "vitepress dev",

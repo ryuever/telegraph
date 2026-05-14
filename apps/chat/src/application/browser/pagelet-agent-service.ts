@@ -110,7 +110,7 @@ export class PageletAgentService implements AgentService {
   }
 
   private getSettings(): ChatSendRequest['settings'] {
-    const raw = localStorage.getItem('telegraph.chat.modelSettings.v2')
+    const raw = localStorage.getItem('telegraph.chat.modelSettings')
     if (raw) {
       try {
         const parsed = JSON.parse(raw)

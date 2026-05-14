@@ -57,7 +57,7 @@ function App(): React.JSX.Element {
               letterSpacing: -0.3,
             }}
           >
-            Telegraph V2
+            Telegraph
           </div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
 AI Agent Desktop

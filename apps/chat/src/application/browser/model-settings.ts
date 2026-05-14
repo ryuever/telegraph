@@ -10,7 +10,7 @@ import type { AgentRuntimeSettings } from '@/apps/chat/application/common'
 
 export type { AgentRuntimeSettings, ModelDescriptor }
 
-const STORAGE_KEY = 'telegraph.chat.modelSettings.v2'
+const STORAGE_KEY = 'telegraph.chat.modelSettings'
 
 export interface ModelSelection {
   provider: string

@@ -1,6 +1,6 @@
 {
   "name": "@telegraph/main",
-  "productName": "Telegraph v2",
+  "productName": "Telegraph",
   "version": "0.0.0",
   "private": true,
   "main": ".vite/build/index.js",
