@@ -8,7 +8,7 @@ description: >
   所有 channel 经由 x-oasis ConnectionOrchestrator 编排。
 category: architecture
 created: 2026-05-09
-updated: 2026-05-13
+updated: 2026-05-14
 tags:
   - architecture
   - process-topology
@@ -39,6 +39,10 @@ references:
   - id: A-010
     rel: related-to
     file: ./20260513-vscode-contribution-model-for-telegraph.md
+  - id: D-007
+    rel: related-to
+    file: ../discussion/20260514-x-oasis-capability-gaps-v2.md
+    note: D-007 §5 给出本文 §5（进程换链）/§6（Inspector）的 telegraph 侧改造清单与当前实施进度
 ---
 
 # Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）
@@ -48,6 +52,17 @@ references:
 >
 > 历史推导请见：A-007（旧架构现状）、D-005（renderer 通道收敛决策）、
 > D-006（x-oasis Orchestrator 能力缺口）、P-003（迁移路线）。
+> 当前实施进度与 telegraph 侧改造清单：D-007 §5。
+
+> **实施进度（截至 2026-05-14）**
+>
+> | 章节 | 进度 | 备注 |
+> |------|------|------|
+> | §3.3 治理分离（Main 治理 / Daemon 监控） | ✅ 已落地 | `apps/main` + `apps/daemon` 目录已分离 |
+> | §4 ConnectionOrchestrator 编排 | ✅ 已落地 | `MainCpServer` + `AppOrchestrator`（已用 `createEventForwarder` + `ExponentialBackoffPolicy`） |
+> | §5 进程换链（透明换链 + supervisor） | ⏳ 阻塞 | 等 x-oasis G1（D-004 RFC 已提案） |
+> | §6 Inspector 数据模型 | ⏳ 阻塞 | 等 x-oasis G3 + `listParticipants()` 接入 |
+> | §3.4 重连/熔断 | 🟡 部分 | reconnect ✅；circuitBreaker 阻塞于 x-oasis G2 dead-code（D-005） |
 
 ---
 

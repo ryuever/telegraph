@@ -8,7 +8,7 @@ description: >
   使新 Pagelet / Extension 的接入从"改 6 处代码"收敛到"写 1 份 manifest"。
 category: architecture
 created: 2026-05-13
-updated: 2026-05-13
+updated: 2026-05-14
 tags:
   - contribution-points
   - manifest
@@ -31,6 +31,10 @@ references:
   - id: A-001
     rel: related-to
     file: ./20260504-di-and-cross-platform-paradigm.md
+  - id: D-007
+    rel: related-to
+    file: ../discussion/20260514-x-oasis-capability-gaps-v2.md
+    note: D-007 G4 (OrchestratorRegistry) 是本文 manifest 化的 x-oasis 侧前置条件
 ---
 
 # VS Code Contribution 模型对 Telegraph 可扩展架构的启示与落地路径
@@ -38,6 +42,14 @@ references:
 > 本文从 VS Code extension 的 `contributes` 声明式贡献点机制出发，
 > 对照 apps-v2 中已存在的隐式 registration 模式，提出 Telegraph 的
 > 贡献点分层模型与 `TelegraphManifest` 声明式契约设计。
+
+> **实施进度（截至 2026-05-14）**
+>
+> | 章节 | 进度 | 备注 |
+> |------|------|------|
+> | §3 隐式 contribution 识别 | ✅ 文档完成 | apps/main + 5 pagelet apps 已落到对应"隐式贡献"位置 |
+> | §4-5 TelegraphManifest 契约 | ❌ 未实施 | 阻塞于 x-oasis G4（OrchestratorRegistry，详见 D-007） |
+> | PageletProcess manifest 化 | 🟡 部分 | 第一步：setting 硬编码已下沉到 `MainCpServer.getAdditionalOrchestratorsFor`；完全声明式 spawn 见 D-007 §5.1 follow-up |
 
 ---
 

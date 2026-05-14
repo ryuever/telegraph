@@ -24,6 +24,13 @@ references:
     rel: related-to
     file: ../architecture/20260513-vscode-contribution-model-for-telegraph.md
     note: 声明式 topology 需要 x-oasis 提供基础 API
+sources:
+  - title: 'x-oasis D-004 — UtilityProcessSupervisor RFC'
+    url: '../../../../red/x-oasis/codebase-wiki/discussion/20260514-utility-process-supervisor-rfc.md'
+    note: 对应本文 G1 的 x-oasis 侧 RFC
+  - title: 'x-oasis D-005 — CircuitBreaker dead-code 分析与修复方案'
+    url: '../../../../red/x-oasis/codebase-wiki/discussion/20260514-circuit-breaker-dead-code.md'
+    note: 对应本文 G2 的 x-oasis 侧根因分析与最小接入方案
 ---
 
 # x-oasis 能力差距盘点 v2（telegraph apps/ 实际落地视角）
@@ -319,6 +326,40 @@ function bootstrapRendererForWindow(opts: {
 **第二波**（依赖 G1/G2 落地）：
 6. 用 supervisor 重写 `DaemonProcess` / `SharedProcess` / `PageletProcess`
 7. forwarding handler 接入 `circuitBreaker.allowRequest()`（待 G2 修复）
+
+### 5.1 Follow-up — PageletProcess 完全声明式 spawn
+
+第一波 step 4 之外，我们额外做了一个**与第一波 step 4 同时收尾**的小重构：把
+`PageletProcess.spawn` 中的 `if (pageletId === 'setting')` 双 orchestrator 注册
+硬编码下沉到 `MainCpServer.getAdditionalOrchestratorsFor(pageletId)`，让
+`PageletProcess` 重新成为完全通用的 host。详见 commit
+`refactor(pagelet-host): replace setting hardcode with MainCpServer hook`。
+
+这一步只把"setting 属于 setting orchestrator"这条领域知识从通用 host 搬到了
+真正负责 main 进程拓扑的 `MainCpServer` —— 条件分支仍然存在，只是搬到了正确
+的层。要做到**完全声明式**（host 没有任何 pagelet 名字字符串），下一步是：
+
+| 当前 | 完全声明式（候选） |
+|---|---|
+| `spawn(pageletId, file)` 内部决定挂哪些 orchestrator | `spawn(pageletId, file): Promise<Channel>` —— 返回 channel 句柄 |
+| MainCpServer 内有 `if (pageletId === 'setting') return [settingOrch]` | 调用方（SettingApplication）拿到 channel 后自己 `settingOrch.registerParticipant(id, channel, 'utility')` |
+| 新加一个有自己 orchestrator 的窗口需要改 MainCpServer | 新加只动新 Application；MainCpServer 完全不感知 |
+
+**代价（暂未付出）**：
+
+1. `IPageletProcess.spawn` 签名 breaking change（`Promise<void>` → `Promise<Channel>`）
+2. 所有 5 个 `*Application` 中至少 SettingApplication 需要新增对
+   `cpServer.getSettingOrchestrator()` 的依赖（DI 链路加注入）
+3. `AppOrchestrator.connectSetting()` 与 `SettingApplication.start()` 之间的
+   时序约束需要明确：必须先 `registerParticipant` 再 `connect`；目前由
+   `MainCpServer.getAdditionalOrchestratorsFor` 在 `spawn` 内同步完成，迁到
+   调用方后需要保证调用方按正确顺序操作（或在 connect 内做 lazy 等待）
+
+**触发条件**：当出现第 2 个"自带 orchestrator 的窗口"时（例如未来的 monitor
+独立窗口），就值得做这一步——届时 `MainCpServer.getAdditionalOrchestratorsFor`
+里的 if 链会开始恶化。在那之前 ROI 不足。
+
+跟踪标签：`#pagelet-process-fully-declarative-spawn`。
 
 ## 6. 推进策略
 

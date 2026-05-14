@@ -7,7 +7,7 @@ description: >
   并给出每项的 API 草案与 telegraph 阻塞 Phase。
 category: discussion
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-14
 tags: [x-oasis, async-call-rpc, orchestrator, capability-gap, electron, telegraph]
 status: partial-implemented
 references:
