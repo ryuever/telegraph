@@ -1,5 +1,16 @@
 import { createId, inject, injectable } from '@x-oasis/di';
-import { RPCServiceHost } from '@x-oasis/async-call-rpc';
+import { RPCServiceHost, ExponentialBackoffPolicy } from '@x-oasis/async-call-rpc';
+import type {
+  ConnectionInfo,
+  ConnectionStats,
+  OrchestratorEvent,
+  ConnectionConfig,
+  ConnectOptions,
+} from '@x-oasis/async-call-rpc';
+import type {
+  ElectronConnectionOrchestrator,
+  IPCMainChannel,
+} from '@x-oasis/async-call-rpc-electron';
 
 import type {
   IMainCpServer,
@@ -21,19 +32,49 @@ import {
   DESIGN_PARTICIPANT_ID,
 } from '@/packages/services/pagelet-host/common';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ConnectResult {
+  connectionId?: string;
+  fromId?: string;
+  toId?: string;
+  state?: string;
+  lastStateChangedAt?: number;
+  error?: string;
+}
+
+export interface StatsView {
+  totalRpcCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  avgLatencyMs: number;
+  totalReconnects: number;
+}
+
+export interface StatusView {
+  connectionId: string;
+  fromId: string;
+  toId: string;
+  state: string;
+  lastStateChangedAt: number;
+  error?: string;
+  isReady: boolean;
+  stats: StatsView | null;
+}
+
 export interface IOrchestratorService {
-  connect(): Promise<any>;
+  connect(): Promise<ConnectResult>;
   disconnect(): Promise<void>;
   simulateLost(): void;
-  getStatus(): Promise<any>;
+  getStatus(): Promise<StatusView | null>;
   killUtility(): void;
-  onStateChange(callback: (event: any) => void): void;
-  onReady(callback: (event: any) => void): void;
-  onDisconnected(callback: (event: any) => void): void;
-  onReconnecting(callback: (event: any) => void): void;
-  onReconnected(callback: (event: any) => void): void;
-  onReconnectFailed(callback: (event: any) => void): void;
-  onClosed(callback: (event: any) => void): void;
+  onStateChange(callback: (event: OrchestratorEvent) => void): void;
+  onReady(callback: (event: OrchestratorEvent) => void): void;
+  onDisconnected(callback: (event: OrchestratorEvent) => void): void;
+  onReconnecting(callback: (event: OrchestratorEvent) => void): void;
+  onReconnected(callback: (event: OrchestratorEvent) => void): void;
+  onReconnectFailed(callback: (event: OrchestratorEvent) => void): void;
+  onClosed(callback: (event: OrchestratorEvent) => void): void;
 }
 
 export interface IAppOrchestrator {
@@ -41,9 +82,55 @@ export interface IAppOrchestrator {
   registerSettingOrchestratorService(): void;
   connectMonitor(): Promise<void>;
   connectDesign(): Promise<void>;
+  connectSetting(): Promise<void>;
 }
 
 export const AppOrchestratorId = createId('AppOrchestrator');
+
+// ─── Connection defaults ─────────────────────────────────────────────────────
+
+/**
+ * Long-lived connection config shared by every direct connection the
+ * AppOrchestrator establishes. Exponential backoff covers transient utility
+ * crashes (caps at 30s after ~5 attempts; gives up after 5min).
+ *
+ * 与 D-007 "类别 A" 配套：以前 connect() 不传 reconnectPolicy → 重连不会发生。
+ */
+function defaultConnectionConfig(): ConnectionConfig {
+  return {
+    reconnectPolicy: new ExponentialBackoffPolicy({
+      initialDelayMs: 1_000,
+      maxDelayMs: 30_000,
+      multiplier: 2,
+      jitterFactor: 0.3,
+      maxRetries: 10,
+      maxElapsedMs: 5 * 60_000,
+    }),
+  };
+}
+
+/**
+ * First-attempt activation options.
+ * - 30s 超时容忍冷启动
+ * - retryOnInitialFailure: 首连失败也走重连策略而不是直接 reject
+ *   (D-006 §2 Gap 2 + retryOnInitialFailure)
+ */
+function defaultConnectOptions(): ConnectOptions {
+  return {
+    activateTimeoutMs: 30_000,
+    retryOnInitialFailure: true,
+  };
+}
+
+// ─── Implementation ──────────────────────────────────────────────────────────
+
+interface OrchestratorScopeContext {
+  orchestrator: ElectronConnectionOrchestrator;
+  channel: IPCMainChannel;
+  serviceHost: RPCServiceHost;
+  utilityParticipantId: string;
+  serviceLabel: string;
+}
 
 @injectable()
 export class AppOrchestrator implements IAppOrchestrator {
@@ -56,228 +143,201 @@ export class AppOrchestrator implements IAppOrchestrator {
   ) {}
 
   registerOrchestratorService(): void {
-    const rendererIpcChannel = this.cpServer.getRendererIpcChannel();
-    rendererIpcChannel.setServiceHost(this.pageServiceHost);
-
-    const orchestrator = this.cpServer.getOrchestrator();
-
-    this.pageServiceHost.registerService(ORCHESTRATOR_SERVICE_PATH, {
-      channel: rendererIpcChannel,
+    const channel = this.cpServer.getRendererIpcChannel();
+    this.registerScopedOrchestratorService({
+      orchestrator: this.cpServer.getOrchestrator(),
+      channel,
       serviceHost: this.pageServiceHost,
-      handlers: {
-        async connect(): Promise<any> {
-          try {
-            const info = await orchestrator.connect(
-              RENDERER_PARTICIPANT_ID,
-              CONNECTION_PARTICIPANT_ID
-            );
-            return {
-              connectionId: info.connectionId,
-              fromId: info.fromId,
-              toId: info.toId,
-              state: info.state,
-              lastStateChangedAt: info.lastStateChangedAt,
-              error: info.error?.message,
-            };
-          } catch (err: any) {
-            return { error: err.message };
-          }
-        },
-        async disconnect(): Promise<void> {
-          const info = orchestrator.getConnectionInfo(
+      utilityParticipantId: CONNECTION_PARTICIPANT_ID,
+      serviceLabel: 'main',
+    });
+  }
+
+  registerSettingOrchestratorService(): void {
+    const channel = this.cpServer.getSettingIpcChannel();
+    if (!channel) {
+      console.warn('[AppOrchestrator] setting IPC channel not ready yet');
+      return;
+    }
+    this.registerScopedOrchestratorService({
+      orchestrator: this.cpServer.getSettingOrchestrator(),
+      channel,
+      serviceHost: this.settingPageServiceHost,
+      utilityParticipantId: SETTING_PARTICIPANT_ID,
+      serviceLabel: 'setting',
+    });
+    console.log('[AppOrchestrator] setting orchestrator service registered');
+  }
+
+  /**
+   * Internal: register the orchestrator control RPC service against the given
+   * scope (main vs setting). The two scopes used to be ~210 lines of duplicate
+   * registration code; now they share this single method.
+   *
+   * 使用 createEventForwarder 一次拿全 7 个事件，删掉手写转发样板。
+   * （x-oasis BaseConnectionOrchestrator.ts:384）
+   */
+  private registerScopedOrchestratorService(ctx: OrchestratorScopeContext): void {
+    const { orchestrator, channel, serviceHost: scopeServiceHost, utilityParticipantId, serviceLabel } = ctx;
+
+    channel.setServiceHost(scopeServiceHost);
+
+    // Build remote-callback subscription helpers up-front so the
+    // event handlers in `handlers` are tiny and uniform.
+    type RemoteCallback = (event: OrchestratorEvent) => void;
+    const remoteCallbacks = new Map<string, RemoteCallback[]>();
+
+    const subscribe = (eventType: string) => (cb: RemoteCallback) => {
+      let list = remoteCallbacks.get(eventType);
+      if (!list) {
+        list = [];
+        remoteCallbacks.set(eventType, list);
+      }
+      list.push(cb);
+    };
+
+    // Single forwarder for all 7 event types; dispatches to the per-event
+    // remote-callback lists. This replaces the hand-written 7 × per-orchestrator
+    // (= 14 lines) of orchestrator.onXxx(cb => remoteCallback(cb)) plumbing.
+    orchestrator.createEventForwarder((event) => {
+      const list = remoteCallbacks.get(event.type);
+      if (!list) return;
+      for (const cb of list) {
+        try {
+          cb(event);
+        } catch (err) {
+          console.warn(
+            `[AppOrchestrator:${serviceLabel}] remote ${event.type} callback threw`,
+            err
+          );
+        }
+      }
+    });
+
+    const handlers: IOrchestratorService = {
+      connect: async (): Promise<ConnectResult> => {
+        try {
+          const info = await orchestrator.connect(
             RENDERER_PARTICIPANT_ID,
-            CONNECTION_PARTICIPANT_ID
+            utilityParticipantId,
+            defaultConnectionConfig(),
+            defaultConnectOptions()
           );
-          if (info) {
-            await orchestrator.disconnect(info.connectionId);
-          }
-        },
-        simulateLost(): void {
-          orchestrator.handleParticipantLost(
-            CONNECTION_PARTICIPANT_ID,
-            'simulated process exit'
-          );
-        },
-        async getStatus(): Promise<any> {
-          const info = orchestrator.getConnectionInfo(
-            RENDERER_PARTICIPANT_ID,
-            CONNECTION_PARTICIPANT_ID
-          );
-          if (!info) return null;
-          const stats = orchestrator.getConnectionStats(info.connectionId);
-          return {
-            connectionId: info.connectionId,
-            fromId: info.fromId,
-            toId: info.toId,
-            state: info.state,
-            lastStateChangedAt: info.lastStateChangedAt,
-            error: info.error?.message,
-            isReady: info.isReady,
-            stats: stats
-              ? {
-                  totalRpcCalls: stats.totalRpcCalls,
-                  successfulCalls: stats.successfulCalls,
-                  failedCalls: stats.failedCalls,
-                  avgLatencyMs: stats.avgLatencyMs,
-                  totalReconnects: stats.totalReconnects,
-                }
-              : null,
-          };
-        },
-        killUtility: (): void => {
-          this.pageletProcess.kill(CONNECTION_PARTICIPANT_ID);
-        },
-        onStateChange(remoteCallback: (event: any) => void) {
-          orchestrator.onStateChange((event: any) => remoteCallback(event));
-        },
-        onReady(remoteCallback: (event: any) => void) {
-          orchestrator.onReady((event: any) => remoteCallback(event));
-        },
-        onDisconnected(remoteCallback: (event: any) => void) {
-          orchestrator.onDisconnected((event: any) => remoteCallback(event));
-        },
-        onReconnecting(remoteCallback: (event: any) => void) {
-          orchestrator.onReconnecting((event: any) => remoteCallback(event));
-        },
-        onReconnected(remoteCallback: (event: any) => void) {
-          orchestrator.onReconnected((event: any) => remoteCallback(event));
-        },
-        onReconnectFailed(remoteCallback: (event: any) => void) {
-          orchestrator.onReconnectFailed((event: any) => remoteCallback(event));
-        },
-        onClosed(remoteCallback: (event: any) => void) {
-          orchestrator.onClosed((event: any) => remoteCallback(event));
-        },
+          return formatConnectResult(info);
+        } catch (err) {
+          return { error: (err as Error).message };
+        }
       },
+      disconnect: async (): Promise<void> => {
+        const info = orchestrator.getConnectionInfo(
+          RENDERER_PARTICIPANT_ID,
+          utilityParticipantId
+        );
+        if (info) {
+          await orchestrator.disconnect(info.connectionId);
+        }
+      },
+      simulateLost: (): void => {
+        orchestrator.handleParticipantLost(
+          utilityParticipantId,
+          'simulated process exit'
+        );
+      },
+      getStatus: async (): Promise<StatusView | null> => {
+        const info = orchestrator.getConnectionInfo(
+          RENDERER_PARTICIPANT_ID,
+          utilityParticipantId
+        );
+        if (!info) return null;
+        const stats = orchestrator.getConnectionStats(info.connectionId);
+        return formatStatusView(info, stats);
+      },
+      killUtility: (): void => {
+        this.pageletProcess.kill(utilityParticipantId);
+      },
+      onStateChange: subscribe('stateChange'),
+      onReady: subscribe('ready'),
+      onDisconnected: subscribe('disconnected'),
+      onReconnecting: subscribe('reconnecting'),
+      onReconnected: subscribe('reconnected'),
+      onReconnectFailed: subscribe('reconnectFailed'),
+      onClosed: subscribe('closed'),
+    };
+
+    scopeServiceHost.registerService(ORCHESTRATOR_SERVICE_PATH, {
+      channel,
+      serviceHost: scopeServiceHost,
+      handlers: handlers as unknown as Record<string, (...args: unknown[]) => unknown>,
     });
   }
 
   async connectMonitor(): Promise<void> {
     const orchestrator = this.cpServer.getOrchestrator();
-    await orchestrator.connect(RENDERER_PARTICIPANT_ID, 'monitor');
+    await orchestrator.connect(
+      RENDERER_PARTICIPANT_ID,
+      'monitor',
+      defaultConnectionConfig(),
+      defaultConnectOptions()
+    );
     console.log('[AppOrchestrator] monitor direct connection established');
-  }
-
-  registerSettingOrchestratorService(): void {
-    const settingIpcChannel = this.cpServer.getSettingIpcChannel();
-    if (!settingIpcChannel) {
-      console.warn('[AppOrchestrator] setting IPC channel not ready yet');
-      return;
-    }
-
-    settingIpcChannel.setServiceHost(this.settingPageServiceHost);
-
-    const settingOrchestrator = this.cpServer.getSettingOrchestrator();
-
-    this.settingPageServiceHost.registerService('orchestrator', {
-      channel: settingIpcChannel,
-      serviceHost: this.settingPageServiceHost,
-      handlers: {
-        async connect(): Promise<any> {
-          try {
-            const info = await settingOrchestrator.connect(
-              RENDERER_PARTICIPANT_ID,
-              SETTING_PARTICIPANT_ID
-            );
-            return {
-              connectionId: info.connectionId,
-              fromId: info.fromId,
-              toId: info.toId,
-              state: info.state,
-              lastStateChangedAt: info.lastStateChangedAt,
-              error: info.error?.message,
-            };
-          } catch (err: any) {
-            return { error: err.message };
-          }
-        },
-        async disconnect(): Promise<void> {
-          const info = settingOrchestrator.getConnectionInfo(
-            RENDERER_PARTICIPANT_ID,
-            SETTING_PARTICIPANT_ID
-          );
-          if (info) {
-            await settingOrchestrator.disconnect(info.connectionId);
-          }
-        },
-        simulateLost(): void {
-          settingOrchestrator.handleParticipantLost(
-            SETTING_PARTICIPANT_ID,
-            'simulated process exit'
-          );
-        },
-        async getStatus(): Promise<any> {
-          const info = settingOrchestrator.getConnectionInfo(
-            RENDERER_PARTICIPANT_ID,
-            SETTING_PARTICIPANT_ID
-          );
-          if (!info) return null;
-          const stats = settingOrchestrator.getConnectionStats(
-            info.connectionId
-          );
-          return {
-            connectionId: info.connectionId,
-            fromId: info.fromId,
-            toId: info.toId,
-            state: info.state,
-            lastStateChangedAt: info.lastStateChangedAt,
-            error: info.error?.message,
-            isReady: info.isReady,
-            stats: stats
-              ? {
-                  totalRpcCalls: stats.totalRpcCalls,
-                  successfulCalls: stats.successfulCalls,
-                  failedCalls: stats.failedCalls,
-                  avgLatencyMs: stats.avgLatencyMs,
-                  totalReconnects: stats.totalReconnects,
-                }
-              : null,
-          };
-        },
-        killUtility: (): void => {
-          this.pageletProcess.kill(SETTING_PARTICIPANT_ID);
-        },
-        onStateChange(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onStateChange((event: any) => remoteCallback(event));
-        },
-        onReady(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReady((event: any) => remoteCallback(event));
-        },
-        onDisconnected(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onDisconnected((event: any) => remoteCallback(event));
-        },
-        onReconnecting(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReconnecting((event: any) => remoteCallback(event));
-        },
-        onReconnected(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReconnected((event: any) => remoteCallback(event));
-        },
-        onReconnectFailed(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onReconnectFailed((event: any) =>
-            remoteCallback(event)
-          );
-        },
-        onClosed(remoteCallback: (event: any) => void) {
-          settingOrchestrator.onClosed((event: any) => remoteCallback(event));
-        },
-      },
-    });
-
-    console.log('[AppOrchestrator] setting orchestrator service registered');
   }
 
   async connectSetting(): Promise<void> {
     const settingOrchestrator = this.cpServer.getSettingOrchestrator();
     await settingOrchestrator.connect(
       RENDERER_PARTICIPANT_ID,
-      SETTING_PARTICIPANT_ID
+      SETTING_PARTICIPANT_ID,
+      defaultConnectionConfig(),
+      defaultConnectOptions()
     );
     console.log('[AppOrchestrator] setting direct connection established');
   }
 
   async connectDesign(): Promise<void> {
     const orchestrator = this.cpServer.getOrchestrator();
-    await orchestrator.connect(RENDERER_PARTICIPANT_ID, DESIGN_PARTICIPANT_ID);
+    await orchestrator.connect(
+      RENDERER_PARTICIPANT_ID,
+      DESIGN_PARTICIPANT_ID,
+      defaultConnectionConfig(),
+      defaultConnectOptions()
+    );
     console.log('[AppOrchestrator] design direct connection established');
   }
+}
+
+// ─── Pure formatters ─────────────────────────────────────────────────────────
+
+function formatConnectResult(info: ConnectionInfo): ConnectResult {
+  return {
+    connectionId: info.connectionId,
+    fromId: info.fromId,
+    toId: info.toId,
+    state: info.state,
+    lastStateChangedAt: info.lastStateChangedAt,
+    error: info.error?.message,
+  };
+}
+
+function formatStatusView(
+  info: ConnectionInfo,
+  stats: ConnectionStats | undefined
+): StatusView {
+  return {
+    connectionId: info.connectionId,
+    fromId: info.fromId,
+    toId: info.toId,
+    state: info.state,
+    lastStateChangedAt: info.lastStateChangedAt,
+    error: info.error?.message,
+    isReady: info.isReady,
+    stats: stats
+      ? {
+          totalRpcCalls: stats.totalRpcCalls,
+          successfulCalls: stats.successfulCalls,
+          failedCalls: stats.failedCalls,
+          avgLatencyMs: stats.avgLatencyMs,
+          totalReconnects: stats.totalReconnects,
+        }
+      : null,
+  };
 }
