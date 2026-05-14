@@ -14,11 +14,11 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/daemon/*": ["src/*"],
-      "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
-      "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
-      "@telegraph/process/*": ["../../packages/services/src/process/src/*"],
-      "@telegraph/main/*": ["../main/src/*"]
+      "@/apps/daemon/*": ["src/*"],
+      "@/packages/services/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
+      "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
+      "@/packages/services/process/*": ["../../packages/services/src/process/src/*"],
+      "@/apps/main/*": ["../main/src/*"]
     }
   },
   "include": ["src/**/*"]

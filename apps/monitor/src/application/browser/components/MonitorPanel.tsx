@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { ProcessesTable } from './ProcessesTable';
 import { Sparkline, cpuColorClass } from './Sparkline';
 import { useMonitorSnapshots, useNowTick, useSnapshotHistory } from '../hooks';
-import { MonitorSnapshot, ProcessRow } from '@telegraph/monitor/application/common';
-import { cn } from '@telegraph/ui/lib/utils';
+import { MonitorSnapshot, ProcessRow } from '@/apps/monitor/application/common';
+import { cn } from '@/packages/ui/lib/utils';
 
 type TabId = 'overview' | 'processes';
 

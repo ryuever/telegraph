@@ -3,7 +3,7 @@
  * Manages message history, run records, and execution state.
  */
 
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
 
 export interface Message {
   role: 'user' | 'assistant' | 'tool'

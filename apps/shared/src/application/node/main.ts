@@ -2,7 +2,7 @@ import { Container, Registry } from '@x-oasis/di';
 import {
   SharedWorker,
   SharedWorkerId,
-} from '@telegraph/shared/application/node/SharedWorker';
+} from '@/apps/shared/application/node/SharedWorker';
 
 const container = new Container();
 container.load(

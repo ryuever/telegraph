@@ -10,8 +10,8 @@
  * or `settings.backend === 'pi-subagents'`.
  */
 
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
 import { BaseAgentRuntime, type RuntimeInput } from '../AgentRuntime'
 import type { AgentRuntimeSettings } from '../../types'
 import { orchestrate, TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION } from './orchestrator'

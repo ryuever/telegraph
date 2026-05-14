@@ -1,5 +1,5 @@
 import { MonitorSnapshot, ProcessRow } from '../common/types';
-import { AppMetric, IMainMetricsService } from '@telegraph/main-metrics/common';
+import { AppMetric, IMainMetricsService } from '@/packages/services/main-metrics/common';
 
 export class Diagnostics {
   private listeners: Set<(snapshot: MonitorSnapshot) => void> = new Set();

@@ -1,10 +1,10 @@
-import type { RuntimeSettings } from '@telegraph/runtime-contracts'
-import { PiAiRuntime } from '@telegraph/agent/runtime/PiAiRuntime'
-import { PiEmbeddedRuntime } from '@telegraph/agent/runtime/PiEmbeddedRuntime'
-import { createLangGraphRuntime } from '@telegraph/agent/runtime/LangGraphRuntime'
-import { createVercelAiRuntime } from '@telegraph/agent/runtime/VercelAiRuntime'
-import type { RuntimeExecutor } from '@telegraph/agent/runtime/AgentRuntime'
-import type { AgentRuntimeSettings } from '@telegraph/agent/types'
+import type { RuntimeSettings } from '@/packages/runtime-contracts'
+import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime'
+import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime'
+import { createLangGraphRuntime } from '@/packages/agent/runtime/LangGraphRuntime'
+import { createVercelAiRuntime } from '@/packages/agent/runtime/VercelAiRuntime'
+import type { RuntimeExecutor } from '@/packages/agent/runtime/AgentRuntime'
+import type { AgentRuntimeSettings } from '@/packages/agent/types'
 
 /**
  * Factory function to create a RuntimeExecutor instance.
@@ -32,7 +32,7 @@ export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings):
   if (agentSettings.orchestration === 'pi-subagents' || backend === 'pi-subagents') {
     // Lazy require to avoid pulling node:fs into the renderer bundle.
     // This code path only executes in the daemon (Node.js) process.
-    const { PiSubagentsRuntime } = require('@telegraph/agent/runtime/piSubagents/PiSubagentsRuntime') as typeof import('@telegraph/agent/runtime/piSubagents/PiSubagentsRuntime')
+    const { PiSubagentsRuntime } = require('@/packages/agent/runtime/piSubagents/PiSubagentsRuntime') as typeof import('@/packages/agent/runtime/piSubagents/PiSubagentsRuntime')
     return new PiSubagentsRuntime()
   }
   

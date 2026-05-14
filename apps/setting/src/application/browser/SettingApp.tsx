@@ -3,7 +3,7 @@ import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/brows
 import {
   SETTING_PAGELET_SERVICE_PATH,
   ISettingPageletService,
-} from '@telegraph/setting/application/common';
+} from '@/apps/setting/application/common';
 
 const client = createOrchestratorClient({
   directChannelDescription: 'setting-page↔preload',

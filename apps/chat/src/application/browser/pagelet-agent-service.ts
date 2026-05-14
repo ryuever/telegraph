@@ -4,7 +4,7 @@ import {
   type ChatSendRequest,
   type ChatStreamEvent,
   type IChatPageletService,
-} from '@telegraph/chat/application/common'
+} from '@/apps/chat/application/common'
 
 let chatPageletClient: IChatPageletService | null = null
 

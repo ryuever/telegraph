@@ -14,12 +14,12 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/services/*": ["src/*"],
-      "@telegraph/main-metrics/*": ["src/main-metrics/src/*"],
-      "@telegraph/pagelet-host/*": ["src/pagelet-host/src/*"],
-      "@telegraph/process/*": ["src/process/src/*"],
-      "@telegraph/main/*": ["../../apps-v2/main/src/*"],
-      "@telegraph/daemon/*": ["../../apps-v2/daemon/src/*"]
+      "@/packages/services/*": ["src/*"],
+      "@/packages/services/main-metrics/*": ["src/main-metrics/src/*"],
+      "@/packages/services/pagelet-host/*": ["src/pagelet-host/src/*"],
+      "@/packages/services/process/*": ["src/process/src/*"],
+      "@/apps/main/*": ["../../apps/main/src/*"],
+      "@/apps/daemon/*": ["../../apps/daemon/src/*"]
     }
   },
   "include": ["src/**/*"]

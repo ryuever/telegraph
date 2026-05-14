@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import type React from 'react';
-import PageView from '@telegraph/connection/application/browser/PageView';
-import MonitorPage from '@telegraph/monitor/application/browser/MonitorPage';
-import { DesignPanel } from '@telegraph/design/application/browser/DesignPanel';
-import ChatPage from '@telegraph/chat/application/browser/ChatPage';
-import { mainWindowClient } from '@telegraph/main/application/browser/rpc-clients';
+import PageView from '@/apps/connection/application/browser/PageView';
+import MonitorPage from '@/apps/monitor/application/browser/MonitorPage';
+import { DesignPanel } from '@/apps/design/application/browser/DesignPanel';
+import ChatPage from '@/apps/chat/application/browser/ChatPage';
+import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
 
 import {
   CONNECTION_PAGE,
   DESIGN_PAGE,
   ALL_PAGES,
   PageConfig,
-} from '@telegraph/main/application/common/cp-config';
+} from '@/apps/main/application/common/cp-config';
 
 
 export type { PageConfig };

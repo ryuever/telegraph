@@ -5,12 +5,12 @@ import {
 } from '@x-oasis/async-call-rpc-electron';
 import { clientHost, RPCServiceHost } from '@x-oasis/async-call-rpc';
 
-import { DAEMON_SERVICE_PATH } from '@telegraph/daemon/application/common';
-import { Diagnostics } from '@telegraph/daemon/diagnostics/node/Diagnostics';
+import { DAEMON_SERVICE_PATH } from '@/apps/daemon/application/common';
+import { Diagnostics } from '@/apps/daemon/diagnostics/node/Diagnostics';
 import {
   MAIN_METRICS_SERVICE_PATH,
   IMainMetricsService,
-} from '@telegraph/main-metrics/common';
+} from '@/packages/services/main-metrics/common';
 
 export interface IDaemonWorker {
   boot(): void;

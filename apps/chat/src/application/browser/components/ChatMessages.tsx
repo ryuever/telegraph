@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
-import { cn } from '@telegraph/ui/lib/utils'
-import type { ChatMessage } from '@telegraph/chat/application/common'
+import { cn } from '@/packages/ui/lib/utils'
+import type { ChatMessage } from '@/apps/chat/application/common'
 
 interface Props {
   messages: ChatMessage[]

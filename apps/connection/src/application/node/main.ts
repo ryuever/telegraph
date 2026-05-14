@@ -1,7 +1,7 @@
 import { Container, Registry } from '@x-oasis/di';
 import { ConnectionWorker, ConnectionWorkerId } from './ConnectionWorker';
-import { PageletWorkerConfigId } from '@telegraph/pagelet-host/node/PageletWorker';
-import { CONNECTION_PARTICIPANT_ID } from '@telegraph/pagelet-host/common';
+import { PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
+import { CONNECTION_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
 
 const SELF_ID = CONNECTION_PARTICIPANT_ID;
 const RENDERER_ID = 'renderer';

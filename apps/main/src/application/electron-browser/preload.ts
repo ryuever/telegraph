@@ -2,18 +2,18 @@ import { ipcRenderer } from 'electron';
 import { createPageBridge } from '@x-oasis/async-call-rpc-electron';
 import { clientHost } from '@x-oasis/async-call-rpc';
 
-import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@telegraph/main/application/common/cp-config';
+import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@/apps/main/application/common/cp-config';
 import {
   CONNECTION_PARTICIPANT_ID,
   MONITOR_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
   CHAT_PARTICIPANT_ID,
   MAIN_WINDOW_SERVICE_PATH,
-} from '@telegraph/pagelet-host/common';
-import { CONNECTION_PAGELET_SERVICE_PATH } from '@telegraph/connection/application/common';
-import { MONITOR_PAGELET_SERVICE_PATH } from '@telegraph/monitor/application/common';
-import { DESIGN_PAGELET_SERVICE_PATH } from '@telegraph/design/application/common';
-import { CHAT_PAGELET_SERVICE_PATH } from '@telegraph/chat/application/common';
+} from '@/packages/services/pagelet-host/common';
+import { CONNECTION_PAGELET_SERVICE_PATH } from '@/apps/connection/application/common';
+import { MONITOR_PAGELET_SERVICE_PATH } from '@/apps/monitor/application/common';
+import { DESIGN_PAGELET_SERVICE_PATH } from '@/apps/design/application/common';
+import { CHAT_PAGELET_SERVICE_PATH } from '@/apps/chat/application/common';
 
 const channelName = ORCHESTRATOR_CP_CHANNEL_NAME;
 

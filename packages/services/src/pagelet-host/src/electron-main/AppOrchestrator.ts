@@ -3,23 +3,23 @@ import { RPCServiceHost } from '@x-oasis/async-call-rpc';
 
 import type {
   IMainCpServer,
-} from '@telegraph/main/application/electron-main/MainCpServer';
+} from '@/apps/main/application/electron-main/MainCpServer';
 import {
   MainCpServerId,
-} from '@telegraph/main/application/electron-main/MainCpServer';
+} from '@/apps/main/application/electron-main/MainCpServer';
 import type {
   IPageletProcess,
-} from '@telegraph/pagelet-host/electron-main/PageletProcess';
+} from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import {
   PageletProcessId,
-} from '@telegraph/pagelet-host/electron-main/PageletProcess';
-import { ORCHESTRATOR_SERVICE_PATH } from '@telegraph/main/application/common/types';
+} from '@/packages/services/pagelet-host/electron-main/PageletProcess';
+import { ORCHESTRATOR_SERVICE_PATH } from '@/apps/main/application/common/types';
 import {
   RENDERER_PARTICIPANT_ID,
   CONNECTION_PARTICIPANT_ID,
   SETTING_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
-} from '@telegraph/pagelet-host/common';
+} from '@/packages/services/pagelet-host/common';
 
 export interface IOrchestratorService {
   connect(): Promise<any>;

@@ -6,7 +6,7 @@ export {
   MINIMAX_OPENAI_BASE_URL,
   createMiniMaxOpenAIModel,
   resolveModel,
-} from '@telegraph/agent/providers/index'
+} from '@/packages/agent/providers/index'
 export type {
   AgentBackendKind,
   AgentOrchestrationMode,
@@ -20,51 +20,51 @@ export type {
   AgentTextMessage,
   AgentTool,
   ModelDescriptor,
-} from '@telegraph/agent/types'
+} from '@/packages/agent/types'
 export type {
   AgentRuntime,
   RunInput,
   RuntimeEvent,
   RuntimeSettings,
   ToolDefinition,
-} from '@telegraph/runtime-contracts'
-export { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@telegraph/runtime-contracts'
+} from '@/packages/runtime-contracts'
+export { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
 export {
   streamPiAiRuntimeEvents,
   TELEGRAPH_PI_AI_PRODUCER_VERSION,
-} from '@telegraph/agent/runtime/streamPiAiRuntime'
-export { jsonSchemaToolToDefinition, piAiToolLikeToDefinition } from '@telegraph/agent/runtime/toolAdapters'
-export type { RuntimeExecutor, RuntimeInput } from '@telegraph/agent/runtime/AgentRuntime'
-export { BaseAgentRuntime } from '@telegraph/agent/runtime/AgentRuntime'
-export { RunLifecycleManager } from '@telegraph/agent/runtime/RunLifecycleManager'
-export { PiAiRuntime } from '@telegraph/agent/runtime/PiAiRuntime'
+} from '@/packages/agent/runtime/streamPiAiRuntime'
+export { jsonSchemaToolToDefinition, piAiToolLikeToDefinition } from '@/packages/agent/runtime/toolAdapters'
+export type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
+export { BaseAgentRuntime } from '@/packages/agent/runtime/AgentRuntime'
+export { RunLifecycleManager } from '@/packages/agent/runtime/RunLifecycleManager'
+export { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime'
 export {
   PiEmbeddedRuntime,
   TELEGRAPH_PI_EMBEDDED_PRODUCER_VERSION,
-} from '@telegraph/agent/runtime/PiEmbeddedRuntime'
+} from '@/packages/agent/runtime/PiEmbeddedRuntime'
 export {
   LangGraphRuntime,
   TELEGRAPH_LANGGRAPH_PRODUCER_VERSION,
   createLangGraphRuntime,
   type LangGraphConfig,
-} from '@telegraph/agent/runtime/LangGraphRuntime'
+} from '@/packages/agent/runtime/LangGraphRuntime'
 export {
   VercelAiRuntime,
   TELEGRAPH_VERCEL_AI_PRODUCER_VERSION,
   createVercelAiRuntime,
   type VercelAiConfig,
-} from '@telegraph/agent/runtime/VercelAiRuntime'
+} from '@/packages/agent/runtime/VercelAiRuntime'
 export {
   createRuntime,
   createPiAiRuntime,
-} from '@telegraph/agent/runtime/createRuntime'
-export { Session, type Message, type RunRecord, type ExecutionContext } from '@telegraph/agent/runtime/sessionManagement/Session'
-export { SessionStore, type SessionStoreConfig } from '@telegraph/agent/runtime/sessionManagement/SessionStore'
-export { ToolRegistry, type ToolCallEvent, type ToolResultEvent, type ToolParameter, type ToolParameters } from '@telegraph/agent/runtime/toolExecution/ToolRegistry'
-export { ToolExecutor, type ToolCallInput } from '@telegraph/agent/runtime/toolExecution/ToolExecutor'
-export { ToolCallParser, type ParsedToolCall } from '@telegraph/agent/runtime/toolExecution/ToolCallParser'
+} from '@/packages/agent/runtime/createRuntime'
+export { Session, type Message, type RunRecord, type ExecutionContext } from '@/packages/agent/runtime/sessionManagement/Session'
+export { SessionStore, type SessionStoreConfig } from '@/packages/agent/runtime/sessionManagement/SessionStore'
+export { ToolRegistry, type ToolCallEvent, type ToolResultEvent, type ToolParameter, type ToolParameters } from '@/packages/agent/runtime/toolExecution/ToolRegistry'
+export { ToolExecutor, type ToolCallInput } from '@/packages/agent/runtime/toolExecution/ToolExecutor'
+export { ToolCallParser, type ParsedToolCall } from '@/packages/agent/runtime/toolExecution/ToolCallParser'
 // Node.js-only exports (ExtensionRegistry, createExecutor) are intentionally excluded from main export
-// Import them from '@telegraph/agent/extensions/node' if needed in Node.js environments
+// Import them from '@/packages/agent/extensions/node' if needed in Node.js environments
 export {
   validateManifest,
   assertValidManifest,
@@ -77,31 +77,31 @@ export {
   type PermissionType,
   type ExecutableType,
   type LLMHints,
-} from '@telegraph/agent/extensions/ExtensionManifest'
-export { SessionRepository, type StoredSession, type StoredMessage, SessionRepositoryMigration } from '@telegraph/agent/persistence/SessionRepository'
+} from '@/packages/agent/extensions/ExtensionManifest'
+export { SessionRepository, type StoredSession, type StoredMessage, SessionRepositoryMigration } from '@/packages/agent/persistence/SessionRepository'
 export {
   DependencyGraph,
   type ToolDependency,
   type TopoSortResult,
-} from '@telegraph/agent/runtime/toolCoordination/DependencyGraph'
+} from '@/packages/agent/runtime/toolCoordination/DependencyGraph'
 export {
   RateLimiter,
   type RateLimitConfig,
   type RateLimitResult,
-} from '@telegraph/agent/runtime/toolCoordination/RateLimiter'
+} from '@/packages/agent/runtime/toolCoordination/RateLimiter'
 export {
   PermissionValidator,
   type ToolPermissionPolicy,
   type ExecutionContext as PermissionExecutionContext,
   type PermissionCheckResult,
   type PermissionLevel,
-} from '@telegraph/agent/runtime/toolCoordination/PermissionValidator'
+} from '@/packages/agent/runtime/toolCoordination/PermissionValidator'
 // Node.js-only pi-subagents exports (PiSubagentsRuntime, orchestrate, discoverAgents, etc.)
 // are intentionally excluded from main export to avoid bundling node:fs into the renderer.
-// Import from '@telegraph/agent/runtime/piSubagents/index' in Node.js environments.
+// Import from '@/packages/agent/runtime/piSubagents/index' in Node.js environments.
 export {
   TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION,
-} from '@telegraph/agent/runtime/piSubagents/constants'
+} from '@/packages/agent/runtime/piSubagents/constants'
 export type {
   SubagentDefinition,
   SubagentScope,
@@ -111,13 +111,13 @@ export type {
   SubagentChainStep,
   SubagentParallelTask,
   SubagentChildResult,
-} from '@telegraph/agent/runtime/piSubagents/types'
+} from '@/packages/agent/runtime/piSubagents/types'
 export {
   ExecutionTimeline,
   type TimelineEntry,
   type EventStats,
   type ExecutionMetrics,
-} from '@telegraph/agent/runtime/observability/ExecutionTimeline'
+} from '@/packages/agent/runtime/observability/ExecutionTimeline'
 export {
   MemoryTierManager,
   type MemoryTierConfig,

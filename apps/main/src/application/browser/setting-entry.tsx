@@ -1,2 +1,2 @@
-import '@telegraph/ui/styles/globals.css';
-import '@telegraph/setting/application/browser/setting-main';
+import '@/packages/ui/styles/globals.css';
+import '@/apps/setting/application/browser/setting-main';

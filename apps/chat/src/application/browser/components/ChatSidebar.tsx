@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { cn } from '@telegraph/ui/lib/utils'
-import type { ChatConversation } from '@telegraph/chat/application/common'
+import { cn } from '@/packages/ui/lib/utils'
+import type { ChatConversation } from '@/apps/chat/application/common'
 
 interface Props {
   conversations: ChatConversation[]

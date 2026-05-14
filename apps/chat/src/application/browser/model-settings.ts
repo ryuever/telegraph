@@ -5,8 +5,8 @@ import {
   type AgentOrchestrationMode,
   type AgentOrchestrationPattern,
   type ModelDescriptor,
-} from '@telegraph/chat/application/common'
-import type { AgentRuntimeSettings } from '@telegraph/chat/application/common'
+} from '@/apps/chat/application/common'
+import type { AgentRuntimeSettings } from '@/apps/chat/application/common'
 
 export type { AgentRuntimeSettings, ModelDescriptor }
 

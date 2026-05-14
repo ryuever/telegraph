@@ -1,4 +1,4 @@
-import type { RuntimeEvent, RuntimeSettings } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent, RuntimeSettings } from '@/packages/runtime-contracts'
 
 /**
  * Runtime input for executing an agent run.
@@ -17,7 +17,7 @@ export interface RuntimeInput {
  * All execution backends (pi-ai, pi-cli, future frameworks) implement this.
  * 
  * NOTE: This is the IMPLEMENTATION interface for runtime executors.
- * The CONTRACT interface is RuntimeExecutor in @telegraph/runtime-contracts.
+ * The CONTRACT interface is RuntimeExecutor in @/packages/runtime-contracts.
  * 
  * Implementations should:
  * - Emit RuntimeEvent stream via AsyncIterable

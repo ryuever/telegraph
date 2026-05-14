@@ -1,7 +1,7 @@
-import { streamPiAiRuntimeEvents, TELEGRAPH_PI_AI_PRODUCER_VERSION } from '@telegraph/agent/runtime/streamPiAiRuntime'
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@telegraph/runtime-contracts'
-import { BaseAgentRuntime, type RuntimeInput } from '@telegraph/agent/runtime/AgentRuntime'
+import { streamPiAiRuntimeEvents, TELEGRAPH_PI_AI_PRODUCER_VERSION } from '@/packages/agent/runtime/streamPiAiRuntime'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+import { BaseAgentRuntime, type RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
 
 /**
  * Pi-AI runtime executor.

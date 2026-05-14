@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import { Palette } from 'lucide-react'
-import { cn } from '@telegraph/ui/lib/utils'
+import { cn } from '@/packages/ui/lib/utils'
 import { DesignView } from './DesignView'
 
 type SubPanelId = 'design'

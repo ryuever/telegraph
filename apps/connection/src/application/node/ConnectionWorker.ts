@@ -3,14 +3,14 @@ import { serviceHost } from '@x-oasis/async-call-rpc';
 import {
   PageletWorker,
   PageletWorkerConfigId,
-} from '@telegraph/pagelet-host/node/PageletWorker';
+} from '@/packages/services/pagelet-host/node/PageletWorker';
 import type {
   IPageletWorkerConfig,
-} from '@telegraph/pagelet-host/node/PageletWorker';
-import { CONNECTION_PAGELET_SERVICE_PATH } from '@telegraph/connection/application/common';
-import { ISharedService } from '@telegraph/shared/application/common';
-import { IDaemonService } from '@telegraph/daemon/application/common';
-import { IMainRpcService } from '@telegraph/pagelet-host/common';
+} from '@/packages/services/pagelet-host/node/PageletWorker';
+import { CONNECTION_PAGELET_SERVICE_PATH } from '@/apps/connection/application/common';
+import { ISharedService } from '@/apps/shared/application/common';
+import { IDaemonService } from '@/apps/daemon/application/common';
+import { IMainRpcService } from '@/packages/services/pagelet-host/common';
 
 export const ConnectionWorkerId = createId('ConnectionWorker');
 

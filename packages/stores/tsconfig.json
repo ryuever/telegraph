@@ -9,7 +9,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/stores/*": ["./src/*"]
+      "@/packages/stores/*": ["./src/*"]
     },
     "outDir": "./dist",
     "rootDir": "./src"

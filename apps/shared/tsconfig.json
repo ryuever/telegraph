@@ -14,10 +14,10 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/shared/*": ["src/*"],
-      "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
-      "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
-      "@telegraph/main/*": ["../main/src/*"]
+      "@/apps/shared/*": ["src/*"],
+      "@/packages/services/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
+      "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
+      "@/apps/main/*": ["../main/src/*"]
     }
   },
   "include": ["src/**/*"]

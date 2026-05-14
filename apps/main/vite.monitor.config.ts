@@ -12,11 +12,11 @@ export default defineConfig({
   resolve: {
     mainFields: ['module', 'jsnext:main', 'jsnext'],
     alias: {
-      '@telegraph/monitor': resolve(__dirname, '../monitor/src'),
-      '@telegraph/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
-      '@telegraph/daemon': resolve(__dirname, '../daemon/src'),
-      '@telegraph/main': resolve(__dirname, 'src'),
-      '@telegraph/ui': resolve(__dirname, '../../packages/ui/src'),
+      '@/apps/monitor': resolve(__dirname, '../monitor/src'),
+      '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
+      '@/apps/daemon': resolve(__dirname, '../daemon/src'),
+      '@/apps/main': resolve(__dirname, 'src'),
+      '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
     },
   },
   build: {

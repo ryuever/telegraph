@@ -1,11 +1,11 @@
 import { app } from 'electron';
 import { Container } from '@x-oasis/di';
 
-import registry from '@telegraph/main/application/electron-main/AppApplicationModule';
+import registry from '@/apps/main/application/electron-main/AppApplicationModule';
 import {
   AppApplicationId,
   IAppApplication,
-} from '@telegraph/main/application/electron-main/AppApplication';
+} from '@/apps/main/application/electron-main/AppApplication';
 
 const container = new Container();
 container.load(registry);

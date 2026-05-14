@@ -12,7 +12,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/ui/*": ["./src/*"]
+      "@/packages/ui/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],

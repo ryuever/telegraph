@@ -3,11 +3,11 @@ import {
   DesignPageletWorker,
   DesignPageletWorkerId,
 } from './DesignPageletWorker';
-import { PageletWorkerConfigId } from '@telegraph/pagelet-host/node/PageletWorker';
+import { PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
 import {
   DESIGN_PARTICIPANT_ID,
   RENDERER_PARTICIPANT_ID,
-} from '@telegraph/pagelet-host/common';
+} from '@/packages/services/pagelet-host/common';
 
 const container = new Container();
 container.load(

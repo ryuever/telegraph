@@ -12,7 +12,7 @@
  * - memory_access / memory_update (memory operations)
  */
 
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
 
 /**
  * Timeline entry with timing and context information.

@@ -8,7 +8,7 @@ import { clientHost } from '@x-oasis/async-call-rpc';
 import {
   IMainRpcService,
   MAIN_RPC_SERVICE_PATH,
-} from '@telegraph/pagelet-host/common';
+} from '@/packages/services/pagelet-host/common';
 
 export interface IPageletWorkerConfig {
   selfId: string;

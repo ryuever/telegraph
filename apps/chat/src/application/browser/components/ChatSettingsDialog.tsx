@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { cn } from '@telegraph/ui/lib/utils'
+import { cn } from '@/packages/ui/lib/utils'
 import {
   CATALOG,
   type ChatModelSettings,

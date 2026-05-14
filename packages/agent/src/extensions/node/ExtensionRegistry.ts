@@ -9,7 +9,7 @@ if (typeof window !== 'undefined') {
   throw new Error(
     'ExtensionRegistry is a Node.js-only module and cannot be used in browser environments. ' +
     'This error indicates incorrect module resolution. Ensure ExtensionRegistry is only imported ' +
-    'in Node.js contexts via @telegraph/agent/extensions/node'
+    'in Node.js contexts via @/packages/agent/extensions/node'
   );
 }
 

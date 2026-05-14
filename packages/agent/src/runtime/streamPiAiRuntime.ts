@@ -1,9 +1,9 @@
 import { stream } from '@mariozechner/pi-ai'
 import type { Context, Message } from '@mariozechner/pi-ai'
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@telegraph/runtime-contracts'
-import { resolveModel } from '@telegraph/agent/providers/index'
-import type { AgentRuntimeSettings } from '@telegraph/agent/types'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+import { resolveModel } from '@/packages/agent/providers/index'
+import type { AgentRuntimeSettings } from '@/packages/agent/types'
 
 const PI_AI_DEFAULT_SYSTEM = 'You are a helpful assistant.'
 

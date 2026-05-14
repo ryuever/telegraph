@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { cn } from '@telegraph/ui/lib/utils';
-import { ProcessRow } from '@telegraph/monitor/application/common';
+import { cn } from '@/packages/ui/lib/utils';
+import { ProcessRow } from '@/apps/monitor/application/common';
 
 type SortKey = 'pid' | 'name' | 'type' | 'cpu' | 'memory';
 type SortDir = 'asc' | 'desc';

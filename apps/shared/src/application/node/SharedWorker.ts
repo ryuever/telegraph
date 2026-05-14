@@ -5,7 +5,7 @@ import {
 } from '@x-oasis/async-call-rpc-electron';
 import { serviceHost } from '@x-oasis/async-call-rpc';
 
-import { SHARED_SERVICE_PATH } from '@telegraph/shared/application/common';
+import { SHARED_SERVICE_PATH } from '@/apps/shared/application/common';
 
 export interface ISharedWorker {
   boot(): void;

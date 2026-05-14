@@ -14,14 +14,24 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/connection/*": ["src/*"],
-      "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
-      "@telegraph/shared/*": ["../shared/src/*"],
-      "@telegraph/daemon/*": ["../daemon/src/*"],
-      "@telegraph/main/*": ["../main/src/*"],
-      "@telegraph/ui/*": ["../../packages/ui/src/*"],
-      "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
-      "@telegraph/process/*": ["../../packages/services/src/process/src/*"]
+      "@/apps/connection/*": ["src/*"],
+      "@/packages/services/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
+      "@/apps/shared/*": ["../shared/src/*"],
+      "@/apps/daemon/*": ["../daemon/src/*"],
+      "@/apps/main/*": ["../main/src/*"],
+      "@/apps/design/*": ["../design/src/*"],
+      "@/apps/chat/*": ["../chat/src/*"],
+      "@/apps/monitor/*": ["../monitor/src/*"],
+      "@/apps/setting/*": ["../setting/src/*"],
+      "@/packages/ui/useOrchestratorDashboard": ["../../packages/ui/src/hooks/useOrchestratorDashboard.ts"],
+      "@/packages/ui/*": ["../../packages/ui/src/*"],
+      "@/packages/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
+      "@/packages/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"],
+      "@/packages/stores": ["../../packages/stores/src/index.ts"],
+      "@/packages/stores/*": ["../../packages/stores/src/*"],
+      "@/packages/agent/*": ["../../packages/agent/src/*"],
+      "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
+      "@/packages/services/process/*": ["../../packages/services/src/process/src/*"]
     }
   },
   "include": ["src/**/*"]

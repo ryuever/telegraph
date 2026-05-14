@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
-import { Button } from '@telegraph/ui/components/ui/button'
-import { Textarea } from '@telegraph/ui/components/ui/textarea'
+import { Button } from '@/packages/ui/components/ui/button'
+import { Textarea } from '@/packages/ui/components/ui/textarea'
 
 interface DesignEntryProps {
   onSubmit: (prompt: string) => void

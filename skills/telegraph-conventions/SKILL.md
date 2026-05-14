@@ -13,14 +13,14 @@ Rules that apply to every change in this repo. Each entry is structured as **Rul
 
 ## Imports
 
-### Use the `@telegraph/*` aliases — never reach across packages with relative paths
+### Use the `@/` aliases — never reach across packages with relative paths
 
 **Rule.** Inside a workspace package (e.g. `packages/ui/`), import other files of the *same* package via the package's own alias:
 
 ```ts
 // ✅ correct
-import { cn } from '@telegraph/ui/lib/utils'
-import { Toolbar } from '@telegraph/ui/components/Toolbar'
+import { cn } from '@/packages/ui/lib/utils'
+import { Toolbar } from '@/packages/ui/components/Toolbar'
 
 // ❌ wrong — even though it resolves
 import { cn } from '../../lib/utils'
@@ -38,10 +38,15 @@ The same applies to cross-package imports — always use the alias, never `../..
 **How to apply.**
 
 - Look up the right alias in `AGENTS.md` → "Path aliases" before writing the import.
-- The aliases:
-  - `@telegraph/ui/*` → `packages/ui/src/*` (renderer view layer)
-  - `@telegraph/application/*`, `@telegraph/core/*`, `@telegraph/services/*` → `apps/telegraph/src/{application,core,services}/*`
-  - `@/*` → `apps/telegraph/src/*` (the shadcn idiom — used inside `apps/telegraph` only)
+- The aliases (all use `@/` prefix, `@` = monorepo root, `src/` is elided):
+  - `@/apps/<app>/*` → `apps/<app>/src/*` (e.g. `@/apps/main/…`, `@/apps/design/…`)
+  - `@/packages/ui/*` → `packages/ui/src/*` (renderer view layer)
+  - `@/packages/stores` → `packages/stores/src/index.ts` (barrel import)
+  - `@/packages/runtime-contracts` → `packages/runtime-contracts/src/index.ts` (barrel import)
+  - `@/packages/agent/*` → `packages/agent/src/*`
+  - `@/packages/services/pagelet-host/*` → `packages/services/src/pagelet-host/src/*`
+  - `@/packages/services/main-metrics/*` → `packages/services/src/main-metrics/src/*`
+- **Never use `@telegraph/`** — that prefix has been removed from the codebase.
 - Inside `packages/ui/src/components/foo/Foo.tsx`, importing a sibling file `Bar.tsx` from the same `foo/` directory **may** use a relative path (`./Bar`) — the rule only applies once you cross a top-level boundary like `lib/`, `components/`, or `hooks/`.
 - If you need a new entry on the package's public surface, extend the `exports` map in `packages/ui/package.json` (e.g. add `"./hooks/*": "./src/hooks/*.ts"`). Don't bypass it.
 
@@ -49,8 +54,8 @@ The same applies to cross-package imports — always use the alias, never `../..
 
 **Rule.** Code under `packages/ui/` is renderer-only. It can import:
 
-- Other files in `@telegraph/ui/*`
-- Pure types/constants from `@telegraph/services/*/common` (the `common/` subdirectory is the cross-process contract surface)
+- Other files in `@/packages/ui/*`
+- Pure types/constants from `@/packages/services/*/common` (the `common/` subdirectory is the cross-process contract surface)
 - The preload bridge via `window.telegraph` (typed in `apps/telegraph/src/types.d.ts`)
 
 It must NOT import: `electron`, Node built-ins (`fs`, `path`, `child_process`), or anything from `*/electron-main/` or `*/node/` subdirectories.

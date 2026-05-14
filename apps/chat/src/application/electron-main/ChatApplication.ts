@@ -1,10 +1,10 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 
-import type { IPageletProcess } from '@telegraph/pagelet-host/electron-main/PageletProcess';
-import { PageletProcessId } from '@telegraph/pagelet-host/electron-main/PageletProcess';
-import { AppOrchestratorId } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
-import type { IAppOrchestrator } from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
-import { CHAT_PARTICIPANT_ID } from '@telegraph/pagelet-host/common';
+import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
+import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
+import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
+import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
+import { CHAT_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
 
 export const CHAT_WORKER_FILE = 'chat-worker.js';
 

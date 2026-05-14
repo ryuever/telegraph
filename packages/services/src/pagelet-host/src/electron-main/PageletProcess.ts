@@ -6,12 +6,12 @@ import { join } from 'path';
 
 import type {
   IMainCpServer,
-} from '@telegraph/main/application/electron-main/MainCpServer';
+} from '@/apps/main/application/electron-main/MainCpServer';
 import {
   MainCpServerId,
-} from '@telegraph/main/application/electron-main/MainCpServer';
-import type { IPidNameRegistry } from '@telegraph/main-metrics/common';
-import { PidNameRegistryId } from '@telegraph/main-metrics/common';
+} from '@/apps/main/application/electron-main/MainCpServer';
+import type { IPidNameRegistry } from '@/packages/services/main-metrics/common';
+import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 
 export interface IPageletProcess {
   spawn(pageletId: string, workerFileName: string): Promise<void>;

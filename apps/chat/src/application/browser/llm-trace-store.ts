@@ -1,4 +1,4 @@
-import type { LlmTracePayload } from '@telegraph/chat/application/common'
+import type { LlmTracePayload } from '@/apps/chat/application/common'
 
 export interface LlmTraceRow {
   sessionId: string

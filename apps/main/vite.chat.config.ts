@@ -12,12 +12,12 @@ export default defineConfig({
   resolve: {
     mainFields: ['module', 'jsnext:main', 'jsnext'],
     alias: {
-      '@telegraph/chat': resolve(__dirname, '../chat/src'),
-      '@telegraph/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
-      '@telegraph/daemon': resolve(__dirname, '../daemon/src'),
-      '@telegraph/main': resolve(__dirname, 'src'),
-      '@telegraph/ui': resolve(__dirname, '../../packages/ui/src'),
-      '@telegraph/runtime-contracts': resolve(__dirname, '../../packages/runtime-contracts/src/index.ts'),
+      '@/apps/chat': resolve(__dirname, '../chat/src'),
+      '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
+      '@/apps/daemon': resolve(__dirname, '../daemon/src'),
+      '@/apps/main': resolve(__dirname, 'src'),
+      '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
+      '@/packages/runtime-contracts': resolve(__dirname, '../../packages/runtime-contracts/src/index.ts'),
     },
   },
   build: {

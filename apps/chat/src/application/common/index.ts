@@ -1,4 +1,4 @@
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
 
 export const CHAT_PAGELET_SERVICE_PATH = 'chat-pagelet-api'
 

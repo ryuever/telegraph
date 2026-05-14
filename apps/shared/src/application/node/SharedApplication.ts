@@ -1,7 +1,7 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 
-import type { ISharedProcess } from '@telegraph/shared/application/electron-main/SharedProcess';
-import { SharedProcessId } from '@telegraph/shared/application/electron-main/SharedProcess';
+import type { ISharedProcess } from '@/apps/shared/application/electron-main/SharedProcess';
+import { SharedProcessId } from '@/apps/shared/application/electron-main/SharedProcess';
 
 export interface ISharedApplication {
   start(): Promise<void>;

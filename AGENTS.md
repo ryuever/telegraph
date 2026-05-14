@@ -98,14 +98,14 @@ The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserv
 │   │   │   │   ├── node/                          # DesignApplication (the IDesignService impl), DesignBootstrap (wires UtilityCpClient + serviceHost), DI module
 │   │   │   │   └── browser/                       # DesignPanel (sidebar nav) + DesignEntry + DesignWorkspace + connections/ConnectionsTab
 │   │   │   └── services/                          # design-internal services (placeholder — Phase 5+)
-│   │   ├── tsconfig.json                          # paths: @design/*, @telegraph/services/*, @telegraph/core/*; include limited
+│   │   ├── tsconfig.json                          # paths: @/apps/design/*, @/packages/{ui,services/pagelet-host,services/main-metrics}/*; include limited
 │   │   └── package.json                           # x-oasis + react devDeps; typecheck/lint/test only (built by telegraph's forge config)
 │   │
 │   └── _legacy/                                   # frozen previous codebase — DO NOT IMPORT (see _legacy/README.md)
 │
 ├── packages/
-│   ├── runtime-contracts/                         # @telegraph/runtime-contracts — RunInput / RuntimeEvent / tool & extension types (kept across rewrite)
-│   └── ui/                                        # @telegraph/ui — shared UI component library (React + Tailwind, shadcn-based, no Electron imports)
+│   ├── runtime-contracts/                         # @/packages/runtime-contracts — RunInput / RuntimeEvent / tool & extension types (kept across rewrite)
+│   └── ui/                                        # @/packages/ui — shared UI component library (React + Tailwind, shadcn-based, no Electron imports)
 │
 ├── codebase-wiki/                                 # design + decision archive
 │   ├── roadmap/                                   # active + archived plans (from-zero plan is the active one)
@@ -123,29 +123,57 @@ Keep Alive + DI
 
 ## Path aliases
 
-| Alias                            | Resolves to                                    | Used by                                                                 |
-|----------------------------------|------------------------------------------------|-------------------------------------------------------------------------|
-| `@/*`                            | `apps/telegraph/src/*`                         | Renderer-only code (kept for shadcn idiom)                              |
-| `@telegraph/application/*`       | `apps/telegraph/src/application/*`             | telegraph internal main-process imports                                 |
-| `@telegraph/core/*`              | `apps/telegraph/src/core/*`                    | Cross-process (main + utility + renderer can all hit `core/log`)        |
-| `@telegraph/services/*`          | `apps/telegraph/src/services/*`                | telegraph internal + cross-app (design imports `connection-orchestrator/{common,node}`) |
-| `@telegraph/ui/*`                | `packages/ui/src/*`                            | Shared UI components (shadcn/Tailwind, no Electron imports)             |
-| `@design/*`                      | `apps/design/src/*`                            | telegraph renderer entry imports `@design/application/browser/DesignPanel`; design app self-reference |
+**Rule: `@` = monorepo root. All cross-module imports use `@/<filesystem-path-without-src>`.**
 
-The three `@telegraph/{application,core,services}/*` subroots are explicit prefixes (not a single
-`@telegraph/*` wildcard) so the new design preserves the clean per-area dependency split.
-`@telegraph/ui/*` is the shared component library — any app can import it for UI primitives.
+The `@` prefix points to the project root directory. Import paths mirror the filesystem
+structure, with the `src/` segment elided via tsconfig `paths` / vite `resolve.alias` mapping.
+This makes imports self-documenting — you can always locate a module by its import path.
+
+| Alias pattern                         | Resolves to (filesystem)                          | Example import                                                      |
+|---------------------------------------|---------------------------------------------------|---------------------------------------------------------------------|
+| `@/apps/<app>/*`                      | `apps/<app>/src/*`                                | `import { X } from '@/apps/daemon/application/common'`             |
+| `@/packages/ui/*`                     | `packages/ui/src/*`                               | `import { cn } from '@/packages/ui/lib/utils'`                     |
+| `@/packages/stores`                   | `packages/stores/src/index.ts`                    | `import { useSessionsStore } from '@/packages/stores'`             |
+| `@/packages/stores/*`                 | `packages/stores/src/*`                           | `import type { X } from '@/packages/stores/types'`                 |
+| `@/packages/runtime-contracts`        | `packages/runtime-contracts/src/index.ts`         | `import type { RuntimeEvent } from '@/packages/runtime-contracts'` |
+| `@/packages/runtime-contracts/*`      | `packages/runtime-contracts/src/*`                | `import { X } from '@/packages/runtime-contracts/events'`          |
+| `@/packages/agent/*`                  | `packages/agent/src/*`                            | `import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime'` |
+| `@/packages/services/pagelet-host/*`  | `packages/services/src/pagelet-host/src/*`        | `import { PageletWorker } from '@/packages/services/pagelet-host/node/PageletWorker'` |
+| `@/packages/services/main-metrics/*`  | `packages/services/src/main-metrics/src/*`        | `import { X } from '@/packages/services/main-metrics/common'`      |
+| `@/packages/services/process/*`       | `packages/services/src/process/src/*`             | `import { X } from '@/packages/services/process/common'`           |
+
+### Convention (MUST follow)
+
+1. **Always use `@/` prefix** for any import that crosses a directory boundary (different app or package).
+   Never use `@telegraph/` — that prefix is removed from the codebase.
+2. **The import path mirrors the monorepo root structure**, minus the `src/` segment.
+   - `@/apps/main/application/browser/App` → file at `apps/main/src/application/browser/App.tsx`
+   - `@/packages/ui/lib/utils` → file at `packages/ui/src/lib/utils.ts`
+3. **Self-referencing imports within a package** also use `@/packages/<self>/...`.
+   E.g. inside `packages/agent/`: `import { X } from '@/packages/agent/types'`.
+4. **Bare imports** (no sub-path) for packages with a barrel `index.ts`:
+   - `@/packages/stores` → `packages/stores/src/index.ts`
+   - `@/packages/runtime-contracts` → `packages/runtime-contracts/src/index.ts`
+5. **Never introduce a new alias prefix** (no `@foo/`, `@bar/`, etc.). `@/` is the sole alias.
 
 ### Where each alias is configured
 
 | File                                              | Aliases declared                                                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------|
-| `apps/telegraph/tsconfig.json`                    | `@/*`, `@telegraph/{application,core,services,ui}/*`, `@design/*` |
-| `apps/design/tsconfig.json`                       | `@design/*` (self), `@telegraph/{services,core,ui}/*`        |
-| `apps/telegraph/vite.main.config.ts`              | `@telegraph/{application,core,services}` (no design — main never touches React)   |
-| `apps/telegraph/vite.preload.config.ts`           | minimal                                                                           |
-| `apps/telegraph/vite.design.config.ts`            | `@telegraph/{application,core,services}` for cross-app entry                      |
-| `apps/telegraph/vite.renderer.config.ts`          | `@`, `@telegraph/{application,core,services,ui}`, **`@design`** (cross-app UI bundle) |
+| `apps/main/tsconfig.json`                         | `@/apps/{main,design,connection,daemon,shared,monitor,setting,chat}/*`, `@/packages/{ui,stores,runtime-contracts,agent,services/pagelet-host,services/main-metrics,services/process}/*` |
+| `apps/design/tsconfig.json`                       | `@/apps/design/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
+| `apps/shared/tsconfig.json`                       | `@/apps/shared/*` (self), `@/apps/main/*`, `@/packages/services/{pagelet-host,main-metrics}/*` |
+| `apps/daemon/tsconfig.json`                       | `@/apps/daemon/*` (self), `@/apps/main/*`, `@/packages/services/{pagelet-host,main-metrics,process}/*` |
+| `apps/setting/tsconfig.json`                      | `@/apps/setting/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
+| `apps/monitor/tsconfig.json`                      | `@/apps/monitor/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
+| `apps/connection/tsconfig.json`                   | `@/apps/connection/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/{pagelet-host,main-metrics,process}}/*` |
+| `apps/chat/tsconfig.json`                         | `@/apps/chat/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,stores,runtime-contracts,agent,services/pagelet-host,services/main-metrics}/*` |
+| `packages/ui/tsconfig.json`                       | `@/packages/ui/*` (self) |
+| `packages/services/tsconfig.json`                 | `@/packages/services/*` (self + sub-services), `@/apps/{main,daemon}/*` |
+| `packages/agent/tsconfig.json`                    | `@/packages/agent/*` (self), `@/packages/runtime-contracts/*` |
+| `packages/stores/tsconfig.json`                   | `@/packages/stores/*` (self) |
+| `packages/runtime-contracts/tsconfig.json`        | `@/packages/runtime-contracts/*` (self) |
+| `apps/main/vite.*.config.ts`                      | Mirror tsconfig aliases as `resolve.alias` entries (key = `@/apps/X`, value = `resolve(__dirname, '<rel-path-to-src>')`) |
 
 ## Running and building
 

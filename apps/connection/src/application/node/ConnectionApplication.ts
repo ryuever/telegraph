@@ -2,17 +2,17 @@ import { createId, inject, injectable } from '@x-oasis/di';
 
 import type {
   IPageletProcess,
-} from '@telegraph/pagelet-host/electron-main/PageletProcess';
+} from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import {
   PageletProcessId,
-} from '@telegraph/pagelet-host/electron-main/PageletProcess';
+} from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import type {
   IAppOrchestrator,
-} from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
+} from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import {
   AppOrchestratorId,
-} from '@telegraph/pagelet-host/electron-main/AppOrchestrator';
-import { CONNECTION_PARTICIPANT_ID } from '@telegraph/pagelet-host/common';
+} from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
+import { CONNECTION_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
 
 export const CONNECTION_WORKER_FILE = 'connection-worker.js';
 

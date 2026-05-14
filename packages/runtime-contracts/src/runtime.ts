@@ -2,7 +2,7 @@ import type { RuntimeEvent } from './events.js'
 import type { RuntimeMessage } from './messages.js'
 
 /**
- * Settings snapshot for a run — mirrors `AgentRuntimeSettings` from `@telegraph/agent`
+ * Settings snapshot for a run — mirrors `AgentRuntimeSettings` from `@/packages/agent`
  * without taking a runtime dependency on pi-ai.
  */
 export interface RuntimeSettings {

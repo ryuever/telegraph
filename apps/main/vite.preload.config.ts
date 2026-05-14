@@ -4,13 +4,13 @@ import { resolve } from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@telegraph/main': resolve(__dirname, 'src'),
-      '@telegraph/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
-      '@telegraph/connection': resolve(__dirname, '../connection/src'),
-      '@telegraph/monitor': resolve(__dirname, '../monitor/src'),
-      '@telegraph/setting': resolve(__dirname, '../setting/src'),
-      '@telegraph/design': resolve(__dirname, '../design/src'),
-      '@telegraph/chat': resolve(__dirname, '../chat/src'),
+      '@/apps/main': resolve(__dirname, 'src'),
+      '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
+      '@/apps/connection': resolve(__dirname, '../connection/src'),
+      '@/apps/monitor': resolve(__dirname, '../monitor/src'),
+      '@/apps/setting': resolve(__dirname, '../setting/src'),
+      '@/apps/design': resolve(__dirname, '../design/src'),
+      '@/apps/chat': resolve(__dirname, '../chat/src'),
     },
   },
   build: {

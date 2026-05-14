@@ -1,11 +1,11 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
-import { PageletWorker, PageletWorkerConfigId } from '@telegraph/pagelet-host/node/PageletWorker';
-import type { IPageletWorkerConfig } from '@telegraph/pagelet-host/node/PageletWorker';
-import { SETTING_PAGELET_SERVICE_PATH } from '@telegraph/setting/application/common';
-import { ISharedService } from '@telegraph/shared/application/common';
-import { IDaemonService } from '@telegraph/daemon/application/common';
-import { IMainRpcService } from '@telegraph/pagelet-host/common';
+import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
+import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
+import { SETTING_PAGELET_SERVICE_PATH } from '@/apps/setting/application/common';
+import { ISharedService } from '@/apps/shared/application/common';
+import { IDaemonService } from '@/apps/daemon/application/common';
+import { IMainRpcService } from '@/packages/services/pagelet-host/common';
 
 export const SettingWorkerId = createId('SettingWorker');
 

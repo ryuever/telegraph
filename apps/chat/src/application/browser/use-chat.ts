@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useSessionsStore, getSessionStore } from '@telegraph/stores'
+import { useSessionsStore, getSessionStore } from '@/packages/stores'
 import type { AgentService, ChatConversation, ChatMessage, LlmTracePayload } from './types'
 import { MockAgentService } from './mock-agent-service'
-import type { ChatMessage as CommonChatMessage } from '@telegraph/chat/application/common'
+import type { ChatMessage as CommonChatMessage } from '@/apps/chat/application/common'
 
 function uid(prefix = '') {
   return prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)

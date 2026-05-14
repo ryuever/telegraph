@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { monitorPageletClient } from '@telegraph/main/application/browser/rpc-clients';
-import { MonitorSnapshot } from '@telegraph/monitor/application/common';
+import { monitorPageletClient } from '@/apps/main/application/browser/rpc-clients';
+import { MonitorSnapshot } from '@/apps/monitor/application/common';
 
 const RETRY_INTERVAL_MS = 2000;
 

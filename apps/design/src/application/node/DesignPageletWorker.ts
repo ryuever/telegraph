@@ -1,8 +1,8 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
-import { PageletWorker, PageletWorkerConfigId } from '@telegraph/pagelet-host/node/PageletWorker';
-import type { IPageletWorkerConfig } from '@telegraph/pagelet-host/node/PageletWorker';
-import { DESIGN_PAGELET_SERVICE_PATH } from '@telegraph/design/application/common';
+import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
+import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
+import { DESIGN_PAGELET_SERVICE_PATH } from '@/apps/design/application/common';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');
 

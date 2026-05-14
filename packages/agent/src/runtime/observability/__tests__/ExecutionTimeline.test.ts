@@ -9,7 +9,7 @@
  */
 
 import { ExecutionTimeline } from '../ExecutionTimeline'
-import type { RuntimeEvent } from '@telegraph/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/runtime-contracts'
 
 // Test utilities
 function assert(condition: boolean, message: string): void {

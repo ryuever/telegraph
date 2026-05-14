@@ -13,7 +13,7 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@telegraph/runtime-contracts/*": ["./src/*"]
+      "@/packages/runtime-contracts/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts"]

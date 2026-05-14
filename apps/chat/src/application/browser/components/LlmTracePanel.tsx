@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react'
-import { cn } from '@telegraph/ui/lib/utils'
-import type { LlmTracePayload } from '@telegraph/chat/application/common'
+import { cn } from '@/packages/ui/lib/utils'
+import type { LlmTracePayload } from '@/apps/chat/application/common'
 import type { LlmTraceRow } from '../llm-trace-store'
 
 export type { LlmTraceRow }

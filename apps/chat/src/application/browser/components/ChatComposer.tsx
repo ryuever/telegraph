@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { cn } from '@telegraph/ui/lib/utils'
+import { cn } from '@/packages/ui/lib/utils'
 
 export interface ChatComposerProps {
   sessionId: string

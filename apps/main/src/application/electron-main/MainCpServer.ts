@@ -8,12 +8,12 @@ import { BrowserWindow } from 'electron';
 
 import type {
   IWindowManager,
-} from '@telegraph/main/application/electron-main/WindowManager';
+} from '@/apps/main/application/electron-main/WindowManager';
 import {
   WindowManagerId,
-} from '@telegraph/main/application/electron-main/WindowManager';
-import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@telegraph/main/application/common/cp-config';
-import { RENDERER_PARTICIPANT_ID } from '@telegraph/pagelet-host/common';
+} from '@/apps/main/application/electron-main/WindowManager';
+import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@/apps/main/application/common/cp-config';
+import { RENDERER_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
 
 export interface IMainCpServer {
   start(): void;

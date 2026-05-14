@@ -11,10 +11,10 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@telegraph/ui/components",
-    "utils": "@telegraph/ui/lib/utils",
-    "hooks": "@telegraph/ui/hooks",
-    "lib": "@telegraph/ui/lib",
-    "ui": "@telegraph/ui/components"
+    "components": "@/packages/ui/components",
+    "utils": "@/packages/ui/lib/utils",
+    "hooks": "@/packages/ui/hooks",
+    "lib": "@/packages/ui/lib",
+    "ui": "@/packages/ui/components"
   }
 }

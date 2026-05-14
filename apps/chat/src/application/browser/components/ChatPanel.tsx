@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { Toolbar } from '@telegraph/ui/components/Toolbar'
+import { Toolbar } from '@/packages/ui/components/Toolbar'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatMessages } from './ChatMessages'
 import { ChatComposer } from './ChatComposer'
@@ -13,7 +13,7 @@ import {
   subscribeLlmTraceRows,
 } from '../llm-trace-store'
 import { useChat } from '../use-chat'
-import { useSessionsStore } from '@telegraph/stores'
+import { useSessionsStore } from '@/packages/stores'
 import { MockAgentService } from '../mock-agent-service'
 import {
   loadSettings,

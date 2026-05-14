@@ -1,9 +1,9 @@
 import { getModel, type Api, type Model } from '@mariozechner/pi-ai'
-import type { AgentRuntimeSettings, ModelDescriptor } from '@telegraph/agent/types'
+import type { AgentRuntimeSettings, ModelDescriptor } from '@/packages/agent/types'
 import {
   createMiniMaxOpenAIModel,
   MINIMAX_OPENAI_BASE_URL,
-} from '@telegraph/agent/providers/minimax'
+} from '@/packages/agent/providers/minimax'
 
 /** Provider id used for MiniMax's first-class (Anthropic-messages) entry. */
 export const MINIMAX_PROVIDER_ID = 'minimax'

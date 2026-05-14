@@ -14,12 +14,18 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@telegraph/monitor/*": ["src/*"],
-      "@telegraph/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
-      "@telegraph/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
-      "@telegraph/daemon/*": ["../daemon/src/*"],
-      "@telegraph/main/*": ["../main/src/*"],
-      "@telegraph/ui/*": ["../../packages/ui/src/*"]
+      "@/apps/monitor/*": ["src/*"],
+      "@/packages/services/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
+      "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
+      "@/apps/daemon/*": ["../daemon/src/*"],
+      "@/apps/main/*": ["../main/src/*"],
+      "@/apps/design/*": ["../design/src/*"],
+      "@/apps/chat/*": ["../chat/src/*"],
+      "@/apps/shared/*": ["../shared/src/*"],
+      "@/apps/connection/*": ["../connection/src/*"],
+      "@/packages/ui/*": ["../../packages/ui/src/*"],
+      "@/packages/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
+      "@/packages/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"]
     }
   },
   "include": ["src/**/*"]

@@ -1,14 +1,14 @@
 import { useState, useCallback, useMemo } from 'react';
 import useOrchestratorDashboard, {
   OrchestratorAPI,
-} from '@telegraph/ui/useOrchestratorDashboard';
+} from '@/packages/ui/useOrchestratorDashboard';
 import {
   client,
   connectionPageletClient,
-} from '@telegraph/main/application/browser/rpc-clients';
-import { PageConfig } from '@telegraph/main/application/common/cp-config';
-import { CONNECTION_PARTICIPANT_ID } from '@telegraph/pagelet-host/common';
-import { Button } from '@telegraph/ui/components/ui/button';
+} from '@/apps/main/application/browser/rpc-clients';
+import { PageConfig } from '@/apps/main/application/common/cp-config';
+import { CONNECTION_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
+import { Button } from '@/packages/ui/components/ui/button';
 
 type TabId = 'pagelet' | 'shared' | 'daemon' | 'main';
 
