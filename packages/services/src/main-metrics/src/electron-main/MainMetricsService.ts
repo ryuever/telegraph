@@ -45,6 +45,15 @@ function queryPsForPids(
   return result;
 }
 
+/**
+ * Baseline push interval for `onSupervisorSnapshotsChanged` — catches
+ * field mutations that don't go through `_transition` (e.g. `currentPid`
+ * changing mid-`running` after `_performRestartCore` completes; the
+ * supervisor stays in `running` so no stateChange fires, but the PID
+ * needs to surface to the UI).
+ */
+const SUPERVISOR_BASELINE_PUSH_INTERVAL_MS = 1_000;
+
 @injectable()
 export class MainMetricsService implements IMainMetricsService {
   /**
@@ -57,6 +66,22 @@ export class MainMetricsService implements IMainMetricsService {
    */
   private supervisorProvider: (() => SupervisorInspectorSnapshot[]) | null =
     null;
+
+  /**
+   * Active subscribers of `onSupervisorSnapshotsChanged`. Each call
+   * to `triggerSupervisorSnapshotsChanged` (event-driven) and each
+   * baseline tick fans out to every subscriber.
+   */
+  private supervisorSnapshotsListeners = new Set<
+    (snapshots: SupervisorInspectorSnapshot[]) => void
+  >();
+
+  /**
+   * Baseline `setInterval` handle. Lazily started when the first
+   * subscriber attaches; cleared when the last subscriber detaches
+   * (avoids unnecessary 1Hz aggregation on a quiet system).
+   */
+  private supervisorBaselineTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @inject(PidNameRegistryId)
@@ -76,6 +101,60 @@ export class MainMetricsService implements IMainMetricsService {
     } catch (e) {
       console.error('[MainMetricsService] supervisorProvider threw', e);
       return [];
+    }
+  }
+
+  onSupervisorSnapshotsChanged(
+    callback: (snapshots: SupervisorInspectorSnapshot[]) => void
+  ): () => void {
+    this.supervisorSnapshotsListeners.add(callback);
+    this.startSupervisorBaselineTimer();
+    // Send an initial snapshot immediately so the consumer doesn't
+    // have to wait up to one baseline interval to render the first
+    // frame (matters when the renderer mounts the Supervisors panel
+    // mid-session).
+    try {
+      callback(this.getSupervisorSnapshots());
+    } catch (e) {
+      console.error(
+        '[MainMetricsService] onSupervisorSnapshotsChanged initial push threw',
+        e
+      );
+    }
+    return () => {
+      this.supervisorSnapshotsListeners.delete(callback);
+      if (this.supervisorSnapshotsListeners.size === 0) {
+        this.stopSupervisorBaselineTimer();
+      }
+    };
+  }
+
+  triggerSupervisorSnapshotsChanged(): void {
+    if (this.supervisorSnapshotsListeners.size === 0) return;
+    const snapshots = this.getSupervisorSnapshots();
+    for (const cb of this.supervisorSnapshotsListeners) {
+      try {
+        cb(snapshots);
+      } catch (e) {
+        console.error(
+          '[MainMetricsService] supervisorSnapshotsListener threw',
+          e
+        );
+      }
+    }
+  }
+
+  private startSupervisorBaselineTimer(): void {
+    if (this.supervisorBaselineTimer) return;
+    this.supervisorBaselineTimer = setInterval(() => {
+      this.triggerSupervisorSnapshotsChanged();
+    }, SUPERVISOR_BASELINE_PUSH_INTERVAL_MS);
+  }
+
+  private stopSupervisorBaselineTimer(): void {
+    if (this.supervisorBaselineTimer) {
+      clearInterval(this.supervisorBaselineTimer);
+      this.supervisorBaselineTimer = null;
     }
   }
 

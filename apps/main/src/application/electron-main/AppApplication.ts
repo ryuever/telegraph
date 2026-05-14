@@ -92,9 +92,7 @@ export class AppApplication implements IAppApplication {
         this.daemonProcess.getInspectorSnapshot(),
         this.sharedProcess.getInspectorSnapshot(),
         ...this.pageletProcess.getInspectorSnapshots(),
-      ].filter(
-        (s): s is NonNullable<typeof s> => s !== null
-      )
+      ].filter((s): s is NonNullable<typeof s> => s !== null)
     );
 
     serviceHost.registerServiceHandler(MAIN_METRICS_SERVICE_PATH, {
@@ -103,6 +101,25 @@ export class AppApplication implements IAppApplication {
       getUtilityPidNames: () => this.metricsService.getUtilityPidNames(),
       getSupervisorSnapshots: () =>
         this.metricsService.getSupervisorSnapshots(),
+      onSupervisorSnapshotsChanged: (
+        callback: (snapshots: ReturnType<IMainMetricsService['getSupervisorSnapshots']>) => void
+      ) => this.metricsService.onSupervisorSnapshotsChanged(callback),
+    });
+
+    // Bridge supervisor state transitions → MainMetricsService event
+    // bus so monitor renderer sees transient states (`restarting`,
+    // `failed`, `starting`) even when the transition is shorter than
+    // the baseline poll interval. Each process kind is independent;
+    // any of them firing causes a full snapshot push (cheap — ≤ a few
+    // dozen rows).
+    this.daemonProcess.subscribeStateChange(() => {
+      this.metricsService.triggerSupervisorSnapshotsChanged();
+    });
+    this.sharedProcess.subscribeStateChange(() => {
+      this.metricsService.triggerSupervisorSnapshotsChanged();
+    });
+    this.pageletProcess.subscribeStateChange(() => {
+      this.metricsService.triggerSupervisorSnapshotsChanged();
     });
 
     await Promise.all([this.sharedApp.start(), this.daemonApp.start()]);

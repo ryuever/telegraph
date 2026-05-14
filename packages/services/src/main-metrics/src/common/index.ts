@@ -74,6 +74,42 @@ export interface IMainMetricsService {
   setSupervisorProvider(
     provider: () => SupervisorInspectorSnapshot[]
   ): void;
+  /**
+   * Push channel for supervisor inspector snapshots. The main process
+   * fires this:
+   *   1. on every supervisor `stateChange` event (via
+   *      `triggerSupervisorSnapshotsChanged` — event-driven, captures
+   *      transient `restarting` / `failed` states even if shorter than
+   *      the polling interval)
+   *   2. on a low-frequency `setInterval` baseline (catches field
+   *      mutations that don't go through `_transition`, e.g.
+   *      `currentPid` changing mid-`running` after a restart completes,
+   *      or `lastReadinessProbeAt` ticks)
+   *
+   * The callback runs on every payload — consumers should treat the
+   * array as a complete replacement, not a delta.
+   *
+   * Lives independently from the daemon-driven `MonitorSnapshot`
+   * pipeline so it survives `daemon` itself being kill -9'd: when the
+   * daemon supervisor is the one being supervised, daemon-driven push
+   * cannot report its own restart transitions because the very push
+   * source is dead during that window.
+   *
+   * Returns a disposer.
+   */
+  onSupervisorSnapshotsChanged(
+    callback: (snapshots: SupervisorInspectorSnapshot[]) => void
+  ): () => void;
+  /**
+   * Force an immediate push of `getSupervisorSnapshots()` to all
+   * subscribers of `onSupervisorSnapshotsChanged`. AppApplication
+   * wires every supervisor's `subscribeStateChange` to call this so
+   * UI sees transient states (`restarting`, `failed`) without waiting
+   * for the next baseline tick.
+   *
+   * Cheap to call; no-ops when there are no subscribers.
+   */
+  triggerSupervisorSnapshotsChanged(): void;
 }
 
 export type { IPidNameRegistry } from '../electron-main/PidNameRegistry';

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { monitorPageletClient } from '@/apps/main/application/browser/rpc-clients';
-import { MonitorSnapshot } from '@/apps/monitor/application/common';
+import {
+  MonitorSnapshot,
+  type SupervisorInspectorSnapshot,
+} from '@/apps/monitor/application/common';
 
 const RETRY_INTERVAL_MS = 2000;
 
@@ -94,6 +97,78 @@ export function useSnapshotHistory(
   }, [snapshot, limit]);
 
   return ref.current;
+}
+
+/**
+ * Subscribe to the *independent* supervisor snapshots push channel
+ * (sourced from main, not daemon — see
+ * `IMonitorPageletService.onSupervisorSnapshotsChanged` for why).
+ *
+ * Returns `null` until the first payload arrives. Re-subscribes
+ * automatically if the underlying RPC subscribe call throws (e.g.
+ * pagelet not yet ready) using the same retry cadence as the
+ * monitor-snapshot subscription.
+ */
+export function useSupervisorSnapshots() {
+  const [snapshots, setSnapshots] = useState<
+    SupervisorInspectorSnapshot[] | null
+  >(null);
+  const unsubRef = useRef<(() => void) | null>(null);
+  const subscribedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const subscribe = () => {
+      if (cancelled || subscribedRef.current) return;
+      subscribedRef.current = true;
+      try {
+        const result:
+          | (() => void)
+          | { unsubscribe: () => void }
+          | void = monitorPageletClient.onSupervisorSnapshotsChanged(
+          (snaps: SupervisorInspectorSnapshot[]) => {
+            if (!cancelled) setSnapshots(snaps);
+          }
+        );
+        let unsub: () => void = () => {};
+        if (typeof result === 'function') {
+          unsub = result;
+        } else if (
+          result &&
+          typeof result === 'object' &&
+          'unsubscribe' in result
+        ) {
+          unsub = (
+            result as { unsubscribe: () => void }
+          ).unsubscribe.bind(result);
+        }
+        if (!cancelled) {
+          unsubRef.current = unsub;
+        } else {
+          unsub();
+        }
+      } catch {
+        subscribedRef.current = false;
+        if (!cancelled) {
+          retryTimer = setTimeout(subscribe, RETRY_INTERVAL_MS);
+        }
+      }
+    };
+
+    subscribe();
+
+    return () => {
+      cancelled = true;
+      subscribedRef.current = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      unsubRef.current?.();
+      unsubRef.current = null;
+    };
+  }, []);
+
+  return snapshots;
 }
 
 export function useNowTick(intervalMs = 1000) {

@@ -2,7 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { ProcessesTable } from './ProcessesTable';
 import { Sparkline, cpuColorClass } from './Sparkline';
 import { SupervisorsPanel } from './SupervisorsPanel';
-import { useMonitorSnapshots, useNowTick, useSnapshotHistory } from '../hooks';
+import {
+  useMonitorSnapshots,
+  useNowTick,
+  useSnapshotHistory,
+  useSupervisorSnapshots,
+} from '../hooks';
 import { MonitorSnapshot, ProcessRow } from '@/apps/monitor/application/common';
 import { cn } from '@/packages/ui/lib/utils';
 
@@ -16,6 +21,12 @@ const TABS: { id: TabId; label: string }[] = [
 
 export function MonitorPanel() {
   const { snapshot, updatedAt } = useMonitorSnapshots();
+  // Supervisor snapshots come over an independent push channel
+  // (`onSupervisorSnapshotsChanged`) sourced from main directly. The
+  // `snapshot.supervisorSnapshots` field is left for backward-compat
+  // but the panel below prefers the live channel — see
+  // IMonitorPageletService for the rationale.
+  const supervisorSnapshots = useSupervisorSnapshots();
   const history = useSnapshotHistory(snapshot, 60);
   useNowTick(1000);
   const [query, setQuery] = useState('');
@@ -78,7 +89,9 @@ export function MonitorPanel() {
         ) : (
           <div className="h-full overflow-auto">
             <SupervisorsPanel
-              supervisors={snapshot.supervisorSnapshots}
+              supervisors={
+                supervisorSnapshots ?? snapshot.supervisorSnapshots
+              }
               query={query}
             />
           </div>

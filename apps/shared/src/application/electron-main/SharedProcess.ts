@@ -22,6 +22,11 @@ import { SHARED_PARTICIPANT_ID } from '@/apps/shared/application/common';
 export interface ISharedProcess {
   spawn(): Promise<void>;
   getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
+  /**
+   * See {@link IDaemonProcess.subscribeStateChange} — same contract,
+   * for the shared utility process supervisor.
+   */
+  subscribeStateChange(listener: () => void): () => void;
 }
 
 export const SharedProcessId = createId('SharedProcess');
@@ -30,6 +35,7 @@ export const SharedProcessId = createId('SharedProcess');
 export class SharedProcess implements ISharedProcess {
   private supervisor: UtilityProcessSupervisor | null = null;
   private lastPid: number | null = null;
+  private readonly pendingStateChangeListeners = new Set<() => void>();
 
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
@@ -63,8 +69,26 @@ export class SharedProcess implements ISharedProcess {
       logger: (level: string, msg: string) =>
         console.log(`[SharedProcess:${level}] ${msg}`),
     });
+    for (const listener of this.pendingStateChangeListeners) {
+      this.supervisor.subscribeStateChange(() => listener());
+    }
+    this.pendingStateChangeListeners.clear();
     await this.supervisor.start();
     console.log('[SharedProcess] spawned');
+  }
+
+  subscribeStateChange(listener: () => void): () => void {
+    if (this.supervisor) {
+      return this.supervisor.subscribeStateChange(() => {
+        listener();
+      });
+    }
+    // See DaemonProcess.subscribeStateChange for the buffer/disposer
+    // caveat — same trade-off applies here.
+    this.pendingStateChangeListeners.add(listener);
+    return () => {
+      this.pendingStateChangeListeners.delete(listener);
+    };
   }
 
   getInspectorSnapshot(): SupervisorInspectorSnapshot | null {

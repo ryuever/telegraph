@@ -47,6 +47,21 @@ export interface IPageletProcess {
    * their supervisor entry.
    */
   getInspectorSnapshots(): SupervisorInspectorSnapshot[];
+  /**
+   * Subscribe to state transitions of *any* currently-supervised
+   * pagelet, AND to the spawn/kill of pagelets themselves (the set of
+   * supervisors changing is itself a state-change event from the
+   * outside-in inspector POV).
+   *
+   * The listener is fan-out: every existing supervisor's transitions
+   * notify it, and each future `spawn()` will also wire it onto the
+   * new supervisor. Returns a disposer that removes it from the
+   * application-level set; previously-attached supervisor
+   * registrations remain (they will be discarded when the supervisor
+   * itself is stopped). See {@link IDaemonProcess.subscribeStateChange}
+   * for the same caveat in the single-supervisor case.
+   */
+  subscribeStateChange(listener: () => void): () => void;
 }
 
 export const PageletProcessId = createId('PageletProcess');
@@ -56,6 +71,23 @@ export class PageletProcess implements IPageletProcess {
   private supervisors = new Map<string, UtilityProcessSupervisor>();
   private channels = new Map<string, ElectronUtilityProcessChannel>();
   private lastPids = new Map<string, number>();
+  /**
+   * Application-level state-change subscribers. Wired onto every
+   * existing supervisor and onto each future supervisor created by
+   * {@link spawn}. Also notified whenever a pagelet is spawned or
+   * killed (the supervisor set itself is part of the snapshot).
+   */
+  private readonly stateChangeListeners = new Set<() => void>();
+
+  private notifyStateChange(): void {
+    for (const listener of this.stateChangeListeners) {
+      try {
+        listener();
+      } catch (err) {
+        console.error('[PageletProcess] stateChange listener threw', err);
+      }
+    }
+  }
 
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
@@ -120,8 +152,17 @@ export class PageletProcess implements IPageletProcess {
     });
 
     this.supervisors.set(pageletId, supervisor);
+    // Wire the new supervisor into the application-level fan-out so
+    // every subscriber registered before/after this spawn is notified
+    // on its state transitions.
+    supervisor.subscribeStateChange(() => {
+      this.notifyStateChange();
+    });
     await supervisor.start();
     console.log(`[PageletProcess] spawned ${pageletId}`);
+    // The set of supervisors changed — the inspector view of "who
+    // exists" mutated, so push to subscribers as well.
+    this.notifyStateChange();
   }
 
   kill(pageletId: string): void {
@@ -135,6 +176,19 @@ export class PageletProcess implements IPageletProcess {
       this.pidNameRegistry.unregister(lastPid);
       this.lastPids.delete(pageletId);
     }
+    // Set of supervisors changed; notify so monitor drops the card.
+    this.notifyStateChange();
+  }
+
+  subscribeStateChange(listener: () => void): () => void {
+    // Each underlying supervisor is wired to {@link notifyStateChange}
+    // exactly once at spawn time, so this method is a pure
+    // application-level fan-out registration. Adding/removing
+    // listeners here is O(1) and never touches the supervisors.
+    this.stateChangeListeners.add(listener);
+    return () => {
+      this.stateChangeListeners.delete(listener);
+    };
   }
 
   getChannel(pageletId: string): ElectronUtilityProcessChannel | undefined {
