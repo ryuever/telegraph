@@ -16,8 +16,8 @@
     "@telegraph/daemon": "workspace:*",
     "@telegraph/services": "workspace:*",
     "@telegraph/ui": "workspace:*",
-    "@x-oasis/async-call-rpc": "^0.14.0",
-    "@x-oasis/async-call-rpc-electron": "^0.11.3",
+    "@x-oasis/async-call-rpc": "^0.15.0",
+    "@x-oasis/async-call-rpc-electron": "^0.12.0",
     "@x-oasis/di": "^0.13.2"
   },
   "devDependencies": {
