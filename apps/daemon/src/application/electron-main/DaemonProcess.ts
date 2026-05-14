@@ -12,12 +12,16 @@ import { join } from 'path';
 
 import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
 import { MainCpServerId } from '@/apps/main/application/electron-main/MainCpServer';
-import type { IPidNameRegistry } from '@/packages/services/main-metrics/common';
+import type {
+  IPidNameRegistry,
+  SupervisorInspectorSnapshot,
+} from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 import { DAEMON_PARTICIPANT_ID } from '@/apps/daemon/application/common';
 
 export interface IDaemonProcess {
   spawn(): Promise<void>;
+  getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
 }
 
 export const DaemonProcessId = createId('DaemonProcess');
@@ -64,5 +68,16 @@ export class DaemonProcess implements IDaemonProcess {
     });
     await this.supervisor.start();
     console.log('[DaemonProcess] spawned');
+  }
+
+  getInspectorSnapshot(): SupervisorInspectorSnapshot | null {
+    // The supervisor's InspectorSnapshot type is structurally identical
+    // to SupervisorInspectorSnapshot (we mirror it intentionally to
+    // keep daemon's bundle electron-free); cast through unknown.
+    return (
+      (this.supervisor?.getInspectorSnapshot() as
+        | SupervisorInspectorSnapshot
+        | undefined) ?? null
+    );
   }
 }

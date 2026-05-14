@@ -5,4 +5,5 @@ export type {
   ProcessRow,
   PerformanceTotals,
   PidNodeJson,
+  SupervisorInspectorSnapshot,
 } from './types';

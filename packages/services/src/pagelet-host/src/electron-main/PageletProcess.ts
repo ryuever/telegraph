@@ -13,7 +13,10 @@ import { join } from 'path';
 
 import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
 import { MainCpServerId } from '@/apps/main/application/electron-main/MainCpServer';
-import type { IPidNameRegistry } from '@/packages/services/main-metrics/common';
+import type {
+  IPidNameRegistry,
+  SupervisorInspectorSnapshot,
+} from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 
 /**
@@ -38,6 +41,12 @@ export interface IPageletProcess {
   ): Promise<void>;
   kill(pageletId: string): void;
   getChannel(pageletId: string): ElectronUtilityProcessChannel | undefined;
+  /**
+   * Inspector snapshot for every currently-supervised pagelet (one per
+   * pageletId). Killed pagelets drop out as soon as `kill()` deletes
+   * their supervisor entry.
+   */
+  getInspectorSnapshots(): SupervisorInspectorSnapshot[];
 }
 
 export const PageletProcessId = createId('PageletProcess');
@@ -130,5 +139,16 @@ export class PageletProcess implements IPageletProcess {
 
   getChannel(pageletId: string): ElectronUtilityProcessChannel | undefined {
     return this.channels.get(pageletId);
+  }
+
+  getInspectorSnapshots(): SupervisorInspectorSnapshot[] {
+    const out: SupervisorInspectorSnapshot[] = [];
+    for (const supervisor of this.supervisors.values()) {
+      const snap = supervisor.getInspectorSnapshot() as
+        | SupervisorInspectorSnapshot
+        | undefined;
+      if (snap) out.push(snap);
+    }
+    return out;
   }
 }

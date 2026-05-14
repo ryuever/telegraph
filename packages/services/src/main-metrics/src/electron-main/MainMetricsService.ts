@@ -3,7 +3,11 @@ import { app } from 'electron';
 
 import type { IPidNameRegistry } from './PidNameRegistry';
 import { PidNameRegistryId } from './PidNameRegistry';
-import type { AppMetric, IMainMetricsService } from '../common/index';
+import type {
+  AppMetric,
+  IMainMetricsService,
+  SupervisorInspectorSnapshot,
+} from '../common/index';
 
 export const MainMetricsServiceId = createId('MainMetricsService');
 
@@ -43,10 +47,37 @@ function queryPsForPids(
 
 @injectable()
 export class MainMetricsService implements IMainMetricsService {
+  /**
+   * Closure injected by AppApplication.start() that aggregates
+   * inspector snapshots from DaemonProcess + SharedProcess +
+   * PageletProcess. We can't inject those services directly because
+   * packages/services lives below apps/* in the dependency graph;
+   * AppApplication is the only seam where all three are visible.
+   * Until injection happens, getSupervisorSnapshots returns [].
+   */
+  private supervisorProvider: (() => SupervisorInspectorSnapshot[]) | null =
+    null;
+
   constructor(
     @inject(PidNameRegistryId)
     private readonly pidNameRegistry: IPidNameRegistry
   ) {}
+
+  setSupervisorProvider(
+    provider: () => SupervisorInspectorSnapshot[]
+  ): void {
+    this.supervisorProvider = provider;
+  }
+
+  getSupervisorSnapshots(): SupervisorInspectorSnapshot[] {
+    if (!this.supervisorProvider) return [];
+    try {
+      return this.supervisorProvider();
+    } catch (e) {
+      console.error('[MainMetricsService] supervisorProvider threw', e);
+      return [];
+    }
+  }
 
   getAppMetrics(): AppMetric[] {
     const electronMetrics = app.getAppMetrics();

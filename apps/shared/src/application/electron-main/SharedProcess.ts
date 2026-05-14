@@ -12,12 +12,16 @@ import { join } from 'path';
 
 import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
 import { MainCpServerId } from '@/apps/main/application/electron-main/MainCpServer';
-import type { IPidNameRegistry } from '@/packages/services/main-metrics/common';
+import type {
+  IPidNameRegistry,
+  SupervisorInspectorSnapshot,
+} from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 import { SHARED_PARTICIPANT_ID } from '@/apps/shared/application/common';
 
 export interface ISharedProcess {
   spawn(): Promise<void>;
+  getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
 }
 
 export const SharedProcessId = createId('SharedProcess');
@@ -61,5 +65,13 @@ export class SharedProcess implements ISharedProcess {
     });
     await this.supervisor.start();
     console.log('[SharedProcess] spawned');
+  }
+
+  getInspectorSnapshot(): SupervisorInspectorSnapshot | null {
+    return (
+      (this.supervisor?.getInspectorSnapshot() as
+        | SupervisorInspectorSnapshot
+        | undefined) ?? null
+    );
   }
 }

@@ -25,6 +25,12 @@ import { MAIN_RPC_SERVICE_PATH, MAIN_WINDOW_SERVICE_PATH } from '@/packages/serv
 import { MAIN_METRICS_SERVICE_PATH } from '@/packages/services/main-metrics/common';
 import type { IMainMetricsService } from '@/packages/services/main-metrics/common';
 import { MainMetricsServiceId } from '@/packages/services/main-metrics/common';
+import type { IDaemonProcess } from '@/apps/daemon/application/electron-main/DaemonProcess';
+import { DaemonProcessId } from '@/apps/daemon/application/electron-main/DaemonProcess';
+import type { ISharedProcess } from '@/apps/shared/application/electron-main/SharedProcess';
+import { SharedProcessId } from '@/apps/shared/application/electron-main/SharedProcess';
+import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
+import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 
 export interface IAppApplication {
   start(): Promise<void>;
@@ -52,7 +58,13 @@ export class AppApplication implements IAppApplication {
     @inject(AppOrchestratorId)
     private readonly appOrchestrator: IAppOrchestrator,
     @inject(MainMetricsServiceId)
-    private readonly metricsService: IMainMetricsService
+    private readonly metricsService: IMainMetricsService,
+    @inject(DaemonProcessId)
+    private readonly daemonProcess: IDaemonProcess,
+    @inject(SharedProcessId)
+    private readonly sharedProcess: ISharedProcess,
+    @inject(PageletProcessId)
+    private readonly pageletProcess: IPageletProcess
   ) {}
 
   async start(): Promise<void> {
@@ -72,10 +84,25 @@ export class AppApplication implements IAppApplication {
       },
     });
 
+    // Wire the supervisor inspector aggregator. Done here (the only seam
+    // where all three process families are visible) rather than inside
+    // MainMetricsService because packages/services cannot import apps/*.
+    this.metricsService.setSupervisorProvider(() =>
+      [
+        this.daemonProcess.getInspectorSnapshot(),
+        this.sharedProcess.getInspectorSnapshot(),
+        ...this.pageletProcess.getInspectorSnapshots(),
+      ].filter(
+        (s): s is NonNullable<typeof s> => s !== null
+      )
+    );
+
     serviceHost.registerServiceHandler(MAIN_METRICS_SERVICE_PATH, {
       getAppMetrics: () => this.metricsService.getAppMetrics(),
       getMainPid: () => this.metricsService.getMainPid(),
       getUtilityPidNames: () => this.metricsService.getUtilityPidNames(),
+      getSupervisorSnapshots: () =>
+        this.metricsService.getSupervisorSnapshots(),
     });
 
     await Promise.all([this.sharedApp.start(), this.daemonApp.start()]);

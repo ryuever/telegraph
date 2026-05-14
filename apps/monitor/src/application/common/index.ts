@@ -3,6 +3,7 @@ export type {
   PerformanceTotals,
   MonitorSnapshot,
   IDiagnosticsService,
+  SupervisorInspectorSnapshot,
 } from '@/apps/daemon/diagnostics/common';
 
 export const MONITOR_PAGELET_SERVICE_PATH = 'monitor-pagelet-api';
