@@ -63,11 +63,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -109,11 +109,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -131,11 +131,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -159,11 +159,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -196,14 +196,14 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/async-call-rpc-web':
-        specifier: ^0.11.2
-        version: 0.11.2
+        specifier: ^0.11.3
+        version: 0.11.3
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -302,11 +302,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -330,11 +330,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -352,11 +352,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -387,11 +387,11 @@ importers:
   packages/services:
     dependencies:
       '@x-oasis/async-call-rpc':
-        specifier: ^0.13.2
-        version: 0.13.2
+        specifier: ^0.14.0
+        version: 0.14.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.11.2
-        version: 0.11.2(electron@41.5.1)
+        specifier: ^0.11.3
+        version: 0.11.3(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -2365,49 +2365,52 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@x-oasis/async-call-rpc-electron@0.11.2':
-    resolution: {integrity: sha512-KFFhVe3/cdrzXxVQt/YLHK1Mv0Ad/wzM3UYUM1s/zOuwn1pCa9h00f7Ubhgly6oEJ8FxzNQt3K83w4bK7u26mA==}
+  '@x-oasis/async-call-rpc-electron@0.11.3':
+    resolution: {integrity: sha512-+Ib4jO5I2xmmf5l7MwOQeA9rKdYWI3ouwO5HR15ufM1XfTVsxyoI4/0038cxxp3SuyDEBYIFpy5RTGqD74IeLQ==}
     peerDependencies:
       electron: '>=20.0.0'
     peerDependenciesMeta:
       electron:
         optional: true
 
-  '@x-oasis/async-call-rpc-web@0.11.2':
-    resolution: {integrity: sha512-QPCySDzO0mFIHLrIqv099JYsSazDAC1fCgeTzka/ZkSnNDwMKmlAywkK5RJkj8WIxX60MQ0J3kQ4OfOJHzRCow==}
+  '@x-oasis/async-call-rpc-web@0.11.3':
+    resolution: {integrity: sha512-MA5F8Fih9vfIAwB1XwDnelc7jNqijIeAi75tq3g0MfytR5oHg0X9XgG51T3a69YDUDF5A8V59mkggKQx0cXtwA==}
 
-  '@x-oasis/async-call-rpc@0.13.2':
-    resolution: {integrity: sha512-i4nuP5O9EX2g6/dyJWTFnWpV6+UnWTWC514yWhh8LBMdtsD7hVQ+jbVjwDDqSLMQAQo/MQCnJRsCsyseIE2FlA==}
+  '@x-oasis/async-call-rpc@0.14.0':
+    resolution: {integrity: sha512-7tgIrVb2R8pmnBtuLat+o7iGJmdxyHCoKCvsMhzqNX9XmV9JDNIPiEkmGOOssGEaVHFtdUts91jCorGqVq+f/w==}
 
-  '@x-oasis/deferred@0.13.2':
-    resolution: {integrity: sha512-/tFvPklGV/H1n7NY8C0t7YvcjUE+UcJ696FboaRWkrJ4eexFrX3g3VJ1+KzOdxhiVhIh3dCFg6yZtF1UttjRag==}
+  '@x-oasis/deferred@0.13.3':
+    resolution: {integrity: sha512-Q8l1xMTiHtrTw8mnpWugdG0ZNnlxR/NqOQfJ+ak2aI4yZSlDaNn+GstJnXymr84U8dE6GSI/MRbxor1ZqFMBJA==}
 
   '@x-oasis/di@0.13.2':
     resolution: {integrity: sha512-d9LkC7geqOkcPlELhGeVWPXZbfQFQQVuYoHGPSgMNFLPRzsWIsEz/MdY2KA6aPSlJyPDFa6WjTLuvMYg5QhXGg==}
 
-  '@x-oasis/disposable@0.13.2':
-    resolution: {integrity: sha512-z480SVpFpO561OFOEcUagiWjo0cRet08hWAJKDXVoYkHrXur/CmwPKhVCCuBNLkwbGjw8cGBIwi8qcwhM9Cfaw==}
+  '@x-oasis/disposable@0.13.3':
+    resolution: {integrity: sha512-eSRJ5bX+asuytsWj/UC6dJ6a4b1MLBIuoq4MLjnsSQoA3QrkA4X0JVNQydbtT2swVF4XKcLpta+7616eDJvw2w==}
 
-  '@x-oasis/emitter@0.13.2':
-    resolution: {integrity: sha512-or8ziplgcs2znnXg3YQl2R8zS6zwsM9TvYaiUND1VXLyUu/w1NRFsU3PDy2xqSi8UfEAPfbOa5OyIXyQT0bNDQ==}
+  '@x-oasis/emitter@0.13.3':
+    resolution: {integrity: sha512-TddT3PlpR0+9LnrLtHFphoDlZDl5ASJ8GaS0QsuoqpItIfXF7Ev0nybwKLUzbp6jMWnh10TT0yNB5j/ywSkN1g==}
 
-  '@x-oasis/id@0.13.2':
-    resolution: {integrity: sha512-chHPe2XSeTmcqP9Srzak7hHMMA/AELfdgIj/s5MzkDNJZMcKkQt5BxOOP1m59hfJfZYXbxNGTHWHDY+m0qK4dw==}
+  '@x-oasis/id@0.13.3':
+    resolution: {integrity: sha512-SvkK1D/r+qLXml5BG+FFRVPzWIStwnltPmMGXlbk6xlguU9sYRKggAwwAnIXRS0nM6RAiJVzUnr/f/OetkLbdg==}
 
-  '@x-oasis/is-ascii@0.13.2':
-    resolution: {integrity: sha512-sv/SHdB5aJMmnJcEpYqx/dw5IainGoSHAzLiGBrMNYs4VjnxXwOKoyNIrvwo/AyyBzomX7c5R3KTjXY3rl0ppw==}
+  '@x-oasis/is-ascii@0.13.3':
+    resolution: {integrity: sha512-08QSIqtIPaNR/o317iI0rEFBnkVEl0429OUf2k4JUH6lZfz8RtGnAOh4bZrO9viYq87qwEtjHJnLWY2gXWaBrw==}
 
   '@x-oasis/is-function@0.13.2':
     resolution: {integrity: sha512-BCvageUNEwEZBCoIT8VHJtTwZmYwksN6Rs6XDmI14Qkoik8/hxaboTxaC/MIpmWTo0N4EMH05h8+SQA2O9DJNw==}
 
-  '@x-oasis/is-object@0.13.2':
-    resolution: {integrity: sha512-m7oe3xsX2UB9Vk36ryouwJ2X8KxeI+qWx4SBSX7R/w8DeMehldjurdnNeskWpECwLfTkey9jfGRDYW7PnkCGmQ==}
+  '@x-oasis/is-function@0.13.3':
+    resolution: {integrity: sha512-WS6Y3xuXQA5arYDy0uSkF8CNcDj/ZcH3tyq9ZXr4/yxz1Yu3fiO6V3vNxbqr1HBHhv58zyj7SHF7q87XDjf1sA==}
 
-  '@x-oasis/is-promise@0.13.2':
-    resolution: {integrity: sha512-h4pMlhdVh4pAP0+iUs9Kw7QQe+o04TUd40D+BTn79gZMKXBPiHGIqzUXevCJn97GWweUAxlIPuQ1/zgShd4b3w==}
+  '@x-oasis/is-object@0.13.3':
+    resolution: {integrity: sha512-LRaG6VQqECA4hUQjJOIzz5xBAyFvCnLIH/M0wVBnSTI0jlc/SyY6XdgisZfE2aUezGJiSdTwDzSFk9sBGE2QRA==}
 
-  '@x-oasis/to-string@0.13.2':
-    resolution: {integrity: sha512-Xqzp3p6vzQtNyC/wMMqDrIfoQaHmYodr1Q/jQFbIprbMlAEcpGTwO/sSqhoTYrfxwVx0J6IyTzI+podk5kXV/w==}
+  '@x-oasis/is-promise@0.13.3':
+    resolution: {integrity: sha512-XCpybsXWgk8DAHeGVVmJT1UFqERO+mnQGGtmJJJPNYfnv8vMyEIxsRN6ox+FUvAtdlgvGglwhd1eo1tSqLuIRA==}
+
+  '@x-oasis/to-string@0.13.3':
+    resolution: {integrity: sha512-79QYIFbYyEDUpzgAKt3AjSB2Is7iZxL/ccJZ19p/eqaLID7/vKQOUtkrvvEDZNZXBTPW8X0vqtRThA2r0eYWeg==}
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
@@ -8295,59 +8298,61 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@x-oasis/async-call-rpc-electron@0.11.2(electron@41.5.1)':
+  '@x-oasis/async-call-rpc-electron@0.11.3(electron@41.5.1)':
     dependencies:
-      '@x-oasis/async-call-rpc': 0.13.2
-      '@x-oasis/async-call-rpc-web': 0.11.2
+      '@x-oasis/async-call-rpc': 0.14.0
+      '@x-oasis/async-call-rpc-web': 0.11.3
     optionalDependencies:
       electron: 41.5.1
 
-  '@x-oasis/async-call-rpc-web@0.11.2':
+  '@x-oasis/async-call-rpc-web@0.11.3':
     dependencies:
-      '@x-oasis/async-call-rpc': 0.13.2
+      '@x-oasis/async-call-rpc': 0.14.0
 
-  '@x-oasis/async-call-rpc@0.13.2':
+  '@x-oasis/async-call-rpc@0.14.0':
     dependencies:
-      '@x-oasis/deferred': 0.13.2
-      '@x-oasis/disposable': 0.13.2
-      '@x-oasis/emitter': 0.13.2
-      '@x-oasis/id': 0.13.2
-      '@x-oasis/is-ascii': 0.13.2
-      '@x-oasis/is-function': 0.13.2
-      '@x-oasis/is-object': 0.13.2
-      '@x-oasis/is-promise': 0.13.2
+      '@x-oasis/deferred': 0.13.3
+      '@x-oasis/disposable': 0.13.3
+      '@x-oasis/emitter': 0.13.3
+      '@x-oasis/id': 0.13.3
+      '@x-oasis/is-ascii': 0.13.3
+      '@x-oasis/is-function': 0.13.3
+      '@x-oasis/is-object': 0.13.3
+      '@x-oasis/is-promise': 0.13.3
 
-  '@x-oasis/deferred@0.13.2': {}
+  '@x-oasis/deferred@0.13.3': {}
 
   '@x-oasis/di@0.13.2':
     dependencies:
       '@x-oasis/is-function': 0.13.2
 
-  '@x-oasis/disposable@0.13.2':
+  '@x-oasis/disposable@0.13.3':
     dependencies:
-      '@x-oasis/is-function': 0.13.2
-      '@x-oasis/is-object': 0.13.2
+      '@x-oasis/is-function': 0.13.3
+      '@x-oasis/is-object': 0.13.3
 
-  '@x-oasis/emitter@0.13.2':
+  '@x-oasis/emitter@0.13.3':
     dependencies:
-      '@x-oasis/disposable': 0.13.2
-      '@x-oasis/is-object': 0.13.2
+      '@x-oasis/disposable': 0.13.3
+      '@x-oasis/is-object': 0.13.3
 
-  '@x-oasis/id@0.13.2': {}
+  '@x-oasis/id@0.13.3': {}
 
-  '@x-oasis/is-ascii@0.13.2': {}
+  '@x-oasis/is-ascii@0.13.3': {}
 
   '@x-oasis/is-function@0.13.2': {}
 
-  '@x-oasis/is-object@0.13.2':
-    dependencies:
-      '@x-oasis/to-string': 0.13.2
+  '@x-oasis/is-function@0.13.3': {}
 
-  '@x-oasis/is-promise@0.13.2':
+  '@x-oasis/is-object@0.13.3':
     dependencies:
-      '@x-oasis/to-string': 0.13.2
+      '@x-oasis/to-string': 0.13.3
 
-  '@x-oasis/to-string@0.13.2': {}
+  '@x-oasis/is-promise@0.13.3':
+    dependencies:
+      '@x-oasis/to-string': 0.13.3
+
+  '@x-oasis/to-string@0.13.3': {}
 
   '@xmldom/xmldom@0.9.10': {}
 

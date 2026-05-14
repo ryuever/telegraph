@@ -22,9 +22,9 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.0",
     "@telegraph/ui": "workspace:*",
-    "@x-oasis/async-call-rpc": "^0.13.2",
-    "@x-oasis/async-call-rpc-electron": "^0.11.2",
-    "@x-oasis/async-call-rpc-web": "^0.11.2",
+    "@x-oasis/async-call-rpc": "^0.14.0",
+    "@x-oasis/async-call-rpc-electron": "^0.11.3",
+    "@x-oasis/async-call-rpc-web": "^0.11.3",
     "@x-oasis/di": "^0.13.2",
     "lucide-react": "^1.14.0",
     "react": "^18.2.0",
