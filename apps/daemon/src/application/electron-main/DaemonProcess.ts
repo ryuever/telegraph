@@ -1,6 +1,9 @@
 import { createId, inject, injectable } from '@x-oasis/di';
-import { utilityProcess } from 'electron';
-import { ElectronUtilityProcessChannel } from '@x-oasis/async-call-rpc-electron';
+import {
+  UtilityProcessSupervisor,
+  type SpawnInfo,
+  type ChannelReadyInfo,
+} from '@x-oasis/async-call-rpc-electron';
 import { serviceHost } from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
@@ -18,27 +21,34 @@ export const DaemonProcessId = createId('DaemonProcess');
 
 @injectable()
 export class DaemonProcess implements IDaemonProcess {
+  private supervisor: UtilityProcessSupervisor | null = null;
+  private lastPid: number | null = null;
+
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
     @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
   ) {}
 
   async spawn(): Promise<void> {
-    const proc = utilityProcess.fork(
-      join(__dirname, '../preload/daemon-worker.js')
-    );
-    const channel = new ElectronUtilityProcessChannel({
-      process: proc,
-      description: 'main→daemon IPC channel',
+    this.supervisor = new UtilityProcessSupervisor({
+      orchestrator: this.cpServer.getOrchestrator(),
+      participantId: DAEMON_PARTICIPANT_ID,
+      entry: join(__dirname, '../preload/daemon-worker.js'),
+      role: 'utility',
+      onSpawn: ({ pid, isRestart }: SpawnInfo) => {
+        if (isRestart && this.lastPid !== null) {
+          this.pidNameRegistry.unregister(this.lastPid);
+        }
+        this.pidNameRegistry.register(pid, 'Daemon');
+        this.lastPid = pid;
+      },
+      onChannelReady: ({ channel }: ChannelReadyInfo) => {
+        channel.setServiceHost(serviceHost);
+      },
+      logger: (level: string, msg: string) =>
+        console.log(`[DaemonProcess:${level}] ${msg}`),
     });
-    channel.setServiceHost(serviceHost);
-
-    this.cpServer
-      .getOrchestrator()
-      .registerParticipant(DAEMON_PARTICIPANT_ID, channel, 'utility');
-
-    this.pidNameRegistry.register(proc, 'Daemon');
-
+    await this.supervisor.start();
     console.log('[DaemonProcess] spawned');
   }
 }
