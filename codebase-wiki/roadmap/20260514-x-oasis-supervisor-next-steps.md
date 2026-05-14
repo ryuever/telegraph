@@ -244,7 +244,20 @@ BaseConnectionOrchestrator.ts:441-559) 和 `ParticipantOrchestratorProxy.request
 
 ---
 
-### 3.C — handleRequest 优先级契约文档化
+### 3.C — handleRequest 优先级契约文档化 ✅ DONE (2026-05-14)
+
+**已交付**（x-oasis main commit `0e8c010b`）：
+
+- `RPCService.setChannel`：加 JSDoc 警告「与 setServiceHost 互斥，会被 silently override」
+- `AbstractChannelProtocol.setService`：加完整 caveat（含 ParticipantOrchestratorProxy trap）
+- `AbstractChannelProtocol.setServiceHost`：扩充已有 JSDoc，加入 asymmetric-priority 段 + 2d8648c 历史引用
+- `handleRequest.ts`：内联注释升级为「routing priority contract」块，作为上游 JSDoc 的 anchor
+
+无行为改动，纯文档；包级 typecheck/test 与基线一致（async-call-rpc transferable-args 1 个失败、async-call-rpc-electron 9 个失败均为 §3.F/§3.G 已记录的基线问题）。
+
+---
+
+### 3.C （原内容存档）— handleRequest 优先级契约文档化
 
 **目标**：在 `RPCService.setChannel()` 和 `AbstractChannelProtocol.setService/setServiceHost` 的 JSDoc 加警告。
 
