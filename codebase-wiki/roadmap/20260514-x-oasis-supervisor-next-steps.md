@@ -300,7 +300,47 @@ setServiceHost(host: RPCServiceHost): void { ... }
 
 ---
 
-### 3.D — Supervisor 健康度字段扩充
+### 3.D — Supervisor 健康度字段扩充 ✅ DONE (2026-05-14)
+
+**已交付**（x-oasis main 上 2 个 commit + CI release）：
+
+- `1b59ab03 feat(supervisor): add §3.D health snapshot fields`
+  - `InspectorSnapshot` 加 3 字段：`lastChannelReadyAt` / `lastReadinessProbeAt` /
+    `consecutiveProbeFailures`，`getInspectorSnapshot()` 透传
+  - `_fireChannelReady`（spawn + restart 路径都走）记 `lastChannelReadyAt = Date.now()`
+  - `_awaitReadiness` 在 `'firstMessage'` 模式下成功 / 超时 / 异常分别更新
+    `lastReadinessProbeAt` 和 `consecutiveProbeFailures`（成功归 0 / 失败 +1）
+  - `'spawn'` 模式按设计**永远不更新** `lastReadinessProbeAt`（保持 null）和
+    `consecutiveProbeFailures`（保持 0）—— example UI 显示 "n/a" 区分语义
+  - 新增 `describe('§3.D health snapshot fields')` 4 用例（spawn 模式 / firstMessage
+    成功 / firstMessage 超时累计 / 成功归零 via 第二个 supervisor 实例）
+  - minor changeset
+- `ff519bfe feat(example/monitor): display §3.D health snapshot fields in SupervisorsPanel`
+  - `apps/daemon/diagnostics/common/types.ts` 镜像 3 字段到跨进程 RPC 形状
+  - `SupervisorsPanel.tsx` `SupervisorCard` 新增 3-col stat 行（含 rose 高亮 +
+    ISO timestamp tooltip）
+  - 新增 `formatTimeAgo` helper（< 60s `Ns ago` / < 60min `Nm ago` / 否则 `HH:MM:SS`，
+    与 `RestartRow` 现有风格一致）
+  - `Stat` 组件加可选 `tone` / `title` 入参；零数据流改动（main 侧已 spread 整个
+    `getInspectorSnapshot()`）
+- CI 在 `1b59ab03` 后自动 release（次 minor 升 `@x-oasis/async-call-rpc-electron` 版本，
+  待 telegraph 后续 bump 时一并消费）
+
+**Discovery**：
+
+- `_fireChannelReady` 是 spawn / restart 共用的 ready 出口，比在每条具体路径埋点更稳
+- vitest `vi.useFakeTimers()` 下 `Date.now()` 跟 `vi.advanceTimersByTime` 推进，可断言
+  时间戳严格递增；但 `'firstMessage'` 超时路径会把 supervisor 推进到 `failed` 状态后
+  禁止再 `start()`，所以"成功后归零"用例必须 new 第二个 supervisor 实例
+
+**红线兑现**：
+
+- ✅ 没引入新 RPC 调用 / 不改造 channel 协议（纯本地状态扩充）
+- ✅ `'spawn'` 模式语义保持向后兼容（不存在的 probe 字段保持 null/0）
+
+---
+
+### 3.D （原内容存档）— Supervisor 健康度字段扩充
 
 **关键文件**：
 
