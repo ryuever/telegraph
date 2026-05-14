@@ -2,7 +2,7 @@
 id: R-001
 title: x-oasis 本地 source link 配置手册（telegraph）
 description: >
-  把 telegraph workspace 的 4 个 app 全部指向本地 /Users/ryu/Documents/code/red/x-oasis/
+  把 telegraph workspace 的 4 个 app 全部指向本地 /Users/ryuyutyo/Documents/code/red/x-oasis/
   的 source（而非 dist）的完整步骤：上游 12 个包改 main 字段 + telegraph pnpm.overrides
   + 移除 vite external + tsconfig paths。
   

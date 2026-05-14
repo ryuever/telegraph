@@ -42,7 +42,7 @@ sources:
 
 ## 0. 信息源
 
-- x-oasis 仓库：`/Users/ryu/Documents/code/red/x-oasis/`
+- x-oasis 仓库：`/Users/ryuyutyo/Documents/code/red/x-oasis/`
   - `packages/async/async-call-rpc/src/orchestrator/`
   - `packages/async/async-call-rpc-electron/src/electron-main/`
   - `packages/async/async-call-rpc-electron/docs/{index,orchestrator,scenario-orchestration,context-bridge-channel}.md`

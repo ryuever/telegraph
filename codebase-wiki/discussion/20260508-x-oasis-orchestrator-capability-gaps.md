@@ -39,7 +39,7 @@ references:
 
 ## 来源
 
-- x-oasis 仓库：`/Users/ryu/Documents/code/red/x-oasis/`
+- x-oasis 仓库：`/Users/ryuyutyo/Documents/code/red/x-oasis/`
 - 相关源文件：
   - `packages/async/async-call-rpc/src/orchestrator/BaseConnectionOrchestrator.ts`
   - `packages/async/async-call-rpc-electron/src/ElectronConnectionOrchestrator.ts`

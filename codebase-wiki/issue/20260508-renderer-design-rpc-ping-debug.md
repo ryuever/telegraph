@@ -184,7 +184,7 @@ const isHandlerMap = Object.values(instanceOrHandlers).every(v => typeof v === '
 
 ### 修复
 
-**修复位置**：`/Users/ryu/Documents/code/red/x-oasis/packages/async/async-call-rpc/src/endpoint/RPCServiceHost.ts`
+**修复位置**：`/Users/ryuyutyo/Documents/code/red/x-oasis/packages/async/async-call-rpc/src/endpoint/RPCServiceHost.ts`
 
 ```typescript
 // 修复后

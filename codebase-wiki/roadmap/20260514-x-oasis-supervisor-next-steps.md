@@ -30,6 +30,10 @@
 | `43969fd` | D-004 §6: UtilityProcessSupervisor + manual restart + readiness probe + onStateChange + InspectorSnapshot | async-call-rpc-electron |
 | `9146f33` | example: filter nullish pids before `ps` | example |
 | `860d246` | example: pull supervisor snapshots via main-metrics（替换错误的 push 模型） | example |
+| `f819527` | feat: add trace（含上述 G2/G3/Supervisor 的 changeset 汇总，patch bump） | async-call-rpc / async-call-rpc-electron |
+| `ab44fdc` | [ci] release (#95) — 已发版 | async-call-rpc@0.13.2 / async-call-rpc-electron@0.11.2 / di@0.13.2 |
+
+> 2026-05-14 后续：telegraph 主仓已经把所有 app + `packages/services` 的 `@x-oasis/async-call-rpc{,-electron,-web}` / `@x-oasis/di` 升级到 `^0.13.2` / `^0.11.2`，`pnpm -r typecheck` 全绿，无适配代价。
 
 ### 1.2 关键设计文档（已落地）
 
@@ -74,11 +78,7 @@
 
 > 用户已经看过这份清单，**不要重新罗列让用户挑**。直接问"要做哪一项"，并提示 §2.A 是 Recommended。
 
-### A. 发 changesets release ⭐ Recommended（先把成果固化）
-
-**为什么**：本轮 G2/G3/Supervisor MVP 已经稳定，外部使用者还拿不到。先发版本能让其他人用上，也能让 telegraph 主仓升级 lockfile。
-
-**代价**：约 30 分钟。详细步骤见 §3.A。
+### A. ~~发 changesets release~~ ✅ 已完成（commit `f819527` + release `ab44fdc`，npm 已发 0.13.2/0.11.2/0.13.2；telegraph 已升级适配）
 
 ### B. D-006 Gap 1 — Forwarding Proxy
 
@@ -117,6 +117,30 @@
 **为什么**：当前靠 example 手动验证。spawn → kill → restart → inspector 状态序列应自动化。
 
 **代价**：中等（1 天）。
+
+### I. SpawnInfo.pid 类型契约收紧（x-oasis 主仓）
+
+**为什么**：当前 `SpawnInfo.pid: number`（`UtilityProcessSupervisor.ts:55-59`）但实际传的是
+`Electron.UtilityProcess.pid`，后者是 `number | undefined`（Electron 类型声明）。下游
+（telegraph `MainMetricsService` / x-oasis example `queryPsForPids`）必须重复做 nullish 兜底，
+2026-05-14 已经在 example 修过一次（commit `9146f33a`），telegraph 主仓 5-14 又修一次。
+
+**两个选项**：
+
+- A. 收紧类型 + 在 supervisor 里只在 `child.pid != null` 才触发 `onSpawn`（pid 还没就绪就跳过本次回调），
+     调用方拿到的 pid 100% 有效。下游全部去掉防御代码。
+- B. 类型改成 `pid: number | null`，强制下游 narrow。语义更诚实但破坏性更大。
+
+**推荐 A**：onSpawn 本来就语义"已成功 spawn"，pid 拿不到时本来就不该说"spawn 成功"。
+
+**代价**：小（半天）。要更新：
+
+- `SpawnInfo` / `ChannelReadyInfo` 两个类型
+- `UtilityProcessSupervisor._spawn` 里 `child.pid` 的 guard
+- example `queryPsForPids` 可以去掉 `validPids` 兜底（telegraph 同步去）
+- changeset patch bump
+
+---
 
 ### H. example 崩溃恢复演示按钮 + 历史曲线
 

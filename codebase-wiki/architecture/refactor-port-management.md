@@ -82,7 +82,7 @@ export { default } from '@chat/main'
 
 ### 如何改造
 
-现在对于 shared process, daemon process, pagelet process 的维护以及port的管理主要是在 /Users/ryu/Documents/code/modules/ai/telegraph/apps/telegraph/src/services 中的 port-manager, process文件夹；但是现在的port 建联方式过于繁琐，这个具体可以看下 /Users/ryu/Documents/code/red/x-oasis/ASYNC_CALL_RPC_CONNECTION_ORCHESTRATOR.md 中有参数，为了解决概念过多的问题，我其实将 @x-oasis/aysnc-call-rpc, @x-oasis/aysnc-call-rpc-electron 等增加 connection orchestrator 概念；具体如何高效的创建 renderer 和 utility process, utility process 之间的port建联，可以参考 /Users/ryu/Documents/code/red/x-oasis/packages/async/async-call-rpc-electron/docs/scenario-orchestration.md;
+现在对于 shared process, daemon process, pagelet process 的维护以及port的管理主要是在 /Users/ryuyutyo/Documents/code/modules/ai/telegraph/apps/telegraph/src/services 中的 port-manager, process文件夹；但是现在的port 建联方式过于繁琐，这个具体可以看下 /Users/ryuyutyo/Documents/code/red/x-oasis/ASYNC_CALL_RPC_CONNECTION_ORCHESTRATOR.md 中有参数，为了解决概念过多的问题，我其实将 @x-oasis/aysnc-call-rpc, @x-oasis/aysnc-call-rpc-electron 等增加 connection orchestrator 概念；具体如何高效的创建 renderer 和 utility process, utility process 之间的port建联，可以参考 /Users/ryuyutyo/Documents/code/red/x-oasis/packages/async/async-call-rpc-electron/docs/scenario-orchestration.md;
 
 ## 验证方式
 

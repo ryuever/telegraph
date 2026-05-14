@@ -45,8 +45,8 @@ references:
 ## 来源
 
 - 用户原始需求：`codebase-wiki/architecture/refactor-port-management.md`
-- x-oasis 设计方案：`/Users/ryu/Documents/code/red/x-oasis/ASYNC_CALL_RPC_CONNECTION_ORCHESTRATOR.md`
-- x-oasis 场景文档：`/Users/ryu/Documents/code/red/x-oasis/packages/async/async-call-rpc-electron/docs/scenario-orchestration.md`
+- x-oasis 设计方案：`/Users/ryuyutyo/Documents/code/red/x-oasis/ASYNC_CALL_RPC_CONNECTION_ORCHESTRATOR.md`
+- x-oasis 场景文档：`/Users/ryuyutyo/Documents/code/red/x-oasis/packages/async/async-call-rpc-electron/docs/scenario-orchestration.md`
 
 ## 1. 目标与非目标
 
