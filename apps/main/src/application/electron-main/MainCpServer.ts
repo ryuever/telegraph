@@ -22,6 +22,18 @@ export interface IMainCpServer {
   getRendererIpcChannel(): IPCMainChannel;
   getSettingIpcChannel(): IPCMainChannel | null;
   registerSettingWindow(win: BrowserWindow): IPCMainChannel;
+  /**
+   * Returns the orchestrators a freshly-spawned pagelet should be registered
+   * with **in addition to** the default `getOrchestrator()`.
+   *
+   * This replaces the prior `if (pageletId === 'setting')` hardcode in
+   * `PageletProcess.spawn`. New windows that need their own orchestrator
+   * (e.g. an additional standalone window) extend this method instead of
+   * touching `PageletProcess`.
+   */
+  getAdditionalOrchestratorsFor(
+    pageletId: string
+  ): ElectronConnectionOrchestrator[];
 }
 
 export const MainCpServerId = createId('MainCpServer');
@@ -91,6 +103,19 @@ export class MainCpServer implements IMainCpServer {
 
   getSettingOrchestrator(): ElectronConnectionOrchestrator {
     return this.settingOrchestrator;
+  }
+
+  getAdditionalOrchestratorsFor(
+    pageletId: string
+  ): ElectronConnectionOrchestrator[] {
+    // The setting pagelet is the sole renderer for the setting window's
+    // orchestrator, so it must be registered on both the main orchestrator
+    // (for cross-pagelet RPC) and the setting orchestrator (for its own
+    // renderer→pagelet RPC).
+    if (pageletId === 'setting') {
+      return [this.settingOrchestrator];
+    }
+    return [];
   }
 
   registerSettingWindow(win: BrowserWindow): IPCMainChannel {

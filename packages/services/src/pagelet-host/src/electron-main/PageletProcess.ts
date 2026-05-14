@@ -13,20 +13,31 @@ import {
 import type { IPidNameRegistry } from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 
+/**
+ * Optional spawn-time metadata for a pagelet utility process.
+ *
+ * Today only `displayName` is consumed (by the metrics PidNameRegistry).
+ * `additionalOrchestrators` is reserved as the explicit alternative to the
+ * `MainCpServer.getAdditionalOrchestratorsFor()` host-side hook — see the
+ * follow-up note in `codebase-wiki/discussion/20260514-x-oasis-capability-gaps-v2.md`
+ * §"PageletProcess manifest".
+ */
+export interface PageletSpawnOptions {
+  /** Human-readable name reported to PidNameRegistry. Falls back to capitalised pageletId. */
+  displayName?: string;
+}
+
 export interface IPageletProcess {
-  spawn(pageletId: string, workerFileName: string): Promise<void>;
+  spawn(
+    pageletId: string,
+    workerFileName: string,
+    options?: PageletSpawnOptions
+  ): Promise<void>;
   kill(pageletId: string): void;
   getChannel(pageletId: string): ElectronUtilityProcessChannel | undefined;
 }
 
 export const PageletProcessId = createId('PageletProcess');
-
-const PAGELET_NAMES: Record<string, string> = {
-  connection: 'Connection',
-  monitor: 'Monitor',
-  setting: 'Setting',
-  design: 'Design',
-};
 
 @injectable()
 export class PageletProcess implements IPageletProcess {
@@ -38,7 +49,11 @@ export class PageletProcess implements IPageletProcess {
     @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
   ) {}
 
-  async spawn(pageletId: string, workerFileName: string): Promise<void> {
+  async spawn(
+    pageletId: string,
+    workerFileName: string,
+    options: PageletSpawnOptions = {}
+  ): Promise<void> {
     const proc = utilityProcess.fork(
       join(__dirname, `../preload/${workerFileName}`)
     );
@@ -51,20 +66,21 @@ export class PageletProcess implements IPageletProcess {
     this.processes.set(pageletId, proc);
     this.channels.set(pageletId, channel);
 
-    if (pageletId === 'setting') {
-      this.cpServer
-        .getOrchestrator()
-        .registerParticipant(pageletId, channel, 'utility');
-      this.cpServer
-        .getSettingOrchestrator()
-        .registerParticipant(pageletId, channel, 'utility');
-    } else {
-      this.cpServer
-        .getOrchestrator()
-        .registerParticipant(pageletId, channel, 'utility');
+    // Register on the default main orchestrator + any additional orchestrators
+    // declared by MainCpServer.getAdditionalOrchestratorsFor(). This replaces
+    // the prior `if (pageletId === 'setting')` hardcode in this file.
+    const orchestrators = [
+      this.cpServer.getOrchestrator(),
+      ...this.cpServer.getAdditionalOrchestratorsFor(pageletId),
+    ];
+    for (const orch of orchestrators) {
+      orch.registerParticipant(pageletId, channel, 'utility');
     }
 
-    this.pidNameRegistry.register(proc, PAGELET_NAMES[pageletId] || pageletId);
+    const displayName =
+      options.displayName ??
+      pageletId.charAt(0).toUpperCase() + pageletId.slice(1);
+    this.pidNameRegistry.register(proc, displayName);
 
     console.log(`[PageletProcess] spawned ${pageletId}`);
   }
