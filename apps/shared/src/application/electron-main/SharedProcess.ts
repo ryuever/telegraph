@@ -4,7 +4,10 @@ import {
   type SpawnInfo,
   type ChannelReadyInfo,
 } from '@x-oasis/async-call-rpc-electron';
-import { serviceHost } from '@x-oasis/async-call-rpc';
+import {
+  ExponentialBackoffPolicy,
+  serviceHost,
+} from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
 import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
@@ -35,6 +38,14 @@ export class SharedProcess implements ISharedProcess {
       participantId: SHARED_PARTICIPANT_ID,
       entry: join(__dirname, '../preload/shared-worker.js'),
       role: 'utility',
+      // See DaemonProcess for the rationale; shared process hosts
+      // global singleton services so the conservative policy applies
+      // identically.
+      restartPolicy: new ExponentialBackoffPolicy({
+        initialDelayMs: 1_000,
+        maxDelayMs: 30_000,
+        maxRetries: 10,
+      }),
       onSpawn: ({ pid, isRestart }: SpawnInfo) => {
         if (isRestart && this.lastPid !== null) {
           this.pidNameRegistry.unregister(this.lastPid);

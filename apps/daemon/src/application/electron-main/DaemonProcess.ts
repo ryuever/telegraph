@@ -4,7 +4,10 @@ import {
   type SpawnInfo,
   type ChannelReadyInfo,
 } from '@x-oasis/async-call-rpc-electron';
-import { serviceHost } from '@x-oasis/async-call-rpc';
+import {
+  ExponentialBackoffPolicy,
+  serviceHost,
+} from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
 import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
@@ -35,6 +38,17 @@ export class DaemonProcess implements IDaemonProcess {
       participantId: DAEMON_PARTICIPANT_ID,
       entry: join(__dirname, '../preload/daemon-worker.js'),
       role: 'utility',
+      // Without restartPolicy the supervisor transitions straight to
+      // `failed` on any unexpected child exit
+      // (UtilityProcessSupervisor.ts:762-764). Use ExponentialBackoff
+      // with conservative settings — daemon hosts diagnostics & metrics
+      // aggregation, a hard-broken entry should give up after 10 tries
+      // and 5 minutes rather than restart-loop forever.
+      restartPolicy: new ExponentialBackoffPolicy({
+        initialDelayMs: 1_000,
+        maxDelayMs: 30_000,
+        maxRetries: 10,
+      }),
       onSpawn: ({ pid, isRestart }: SpawnInfo) => {
         if (isRestart && this.lastPid !== null) {
           this.pidNameRegistry.unregister(this.lastPid);

@@ -5,7 +5,10 @@ import {
   type SpawnInfo,
   type ChannelReadyInfo,
 } from '@x-oasis/async-call-rpc-electron';
-import { serviceHost } from '@x-oasis/async-call-rpc';
+import {
+  ExponentialBackoffPolicy,
+  serviceHost,
+} from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
 import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
@@ -81,6 +84,16 @@ export class PageletProcess implements IPageletProcess {
       participantId: pageletId,
       entry: join(__dirname, `../preload/${workerFileName}`),
       role: 'utility',
+      // Pagelet processes are user-facing and lazily spawned, so a
+      // crash should attempt several quick restarts (user might still
+      // be on the tab) before giving up. ExponentialBackoffPolicy with
+      // tighter initial delay than daemon/shared (which are critical
+      // singletons that can wait a beat).
+      restartPolicy: new ExponentialBackoffPolicy({
+        initialDelayMs: 500,
+        maxDelayMs: 10_000,
+        maxRetries: 10,
+      }),
       onSpawn: ({ pid, isRestart }: SpawnInfo) => {
         const lastPid = this.lastPids.get(pageletId);
         if (isRestart && lastPid !== undefined) {
