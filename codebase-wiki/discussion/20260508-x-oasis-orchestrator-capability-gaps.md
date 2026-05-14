@@ -24,6 +24,10 @@ references:
     rel: extended-by
     file: ../architecture/20260509-telegraph-final-process-architecture.md
     note: A-008 §5.6 把本文 P0 缺口锁定为最终架构的硬依赖
+  - id: D-007
+    rel: extended-by
+    file: ./20260514-x-oasis-capability-gaps-v2.md
+    note: D-007 是本文在 P0 三项落地后的演进版本，重新分类盘点
 ---
 
 # x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角）
