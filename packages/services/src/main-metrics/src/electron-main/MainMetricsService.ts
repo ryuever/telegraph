@@ -11,10 +11,17 @@ function queryPsForPids(
   pids: number[]
 ): Map<number, { cpu: number; mem: number }> {
   const result = new Map<number, { cpu: number; mem: number }>();
-  if (pids.length === 0) return result;
+  // Drop nullish / non-positive pids — PidNameRegistry occasionally
+  // hands us entries whose pid is still undefined (registered before
+  // the OS pid was known) and `ps -p undefined` floods stderr.
+  // Mirrors the upstream fix in x-oasis example (commit 9146f33a).
+  const validPids = pids.filter(
+    (p): p is number => typeof p === 'number' && Number.isFinite(p) && p > 0
+  );
+  if (validPids.length === 0) return result;
   try {
     const cp = require('child_process');
-    const pidArgs = pids.map((p) => `-p ${p}`).join(' ');
+    const pidArgs = validPids.map((p) => `-p ${p}`).join(' ');
     const out = cp.execSync(`ps ${pidArgs} -o pid=,pcpu=,pmem=`, {
       encoding: 'utf-8',
       timeout: 3000,
@@ -44,8 +51,16 @@ export class MainMetricsService implements IMainMetricsService {
   getAppMetrics(): AppMetric[] {
     const electronMetrics = app.getAppMetrics();
     const knownPids = new Set(electronMetrics.map((m) => m.pid));
+    // Filter out entries whose pid is still pending — they will appear
+    // in a later tick once the spawned process reports its pid.
+    const registryEntries = this.pidNameRegistry
+      .getAll()
+      .filter(
+        (e): e is { pid: number; name: string } =>
+          typeof e.pid === 'number' && Number.isFinite(e.pid) && e.pid > 0
+      );
     const utilityByName = new Map<number, string>();
-    for (const entry of this.pidNameRegistry.getAll()) {
+    for (const entry of registryEntries) {
       utilityByName.set(entry.pid, entry.name);
     }
 
@@ -70,9 +85,9 @@ export class MainMetricsService implements IMainMetricsService {
       };
     });
 
-    const utilityEntries = this.pidNameRegistry
-      .getAll()
-      .filter((e) => !knownPids.has(e.pid));
+    const utilityEntries = registryEntries.filter(
+      (e) => !knownPids.has(e.pid)
+    );
 
     if (utilityEntries.length > 0) {
       const utilityPids = utilityEntries.map((e) => e.pid);
@@ -99,7 +114,13 @@ export class MainMetricsService implements IMainMetricsService {
   getUtilityPidNames(): Record<number, string> {
     const result: Record<number, string> = {};
     for (const entry of this.pidNameRegistry.getAll()) {
-      result[entry.pid] = entry.name;
+      if (
+        typeof entry.pid === 'number' &&
+        Number.isFinite(entry.pid) &&
+        entry.pid > 0
+      ) {
+        result[entry.pid] = entry.name;
+      }
     }
     return result;
   }
