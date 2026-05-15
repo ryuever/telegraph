@@ -4,7 +4,11 @@ import {
   ElectronMessagePortMainChannel,
   createParticipantProxy,
 } from '@x-oasis/async-call-rpc-electron';
-import { clientHost } from '@x-oasis/async-call-rpc';
+import {
+  clientHost,
+  ConnectionConfigSpec,
+  ConnectOptions,
+} from '@x-oasis/async-call-rpc';
 
 import {
   IMainRpcService,
@@ -109,6 +113,38 @@ export class PageletWorker<
    */
   protected readonly peerConnectTimeoutMs: number = 5000;
 
+  /**
+   * Per-peer connection config (cross-process-safe spec) sent to the
+   * main-process orchestrator alongside `proxy.connect()`.
+   *
+   * Defaults to `undefined` — the orchestrator falls back to its own
+   * `defaultConnectionConfig()` (exponential-backoff, 1s–30s, 10
+   * retries, 5min cap). Override in subclasses to customise per-pagelet
+   * reconnect behaviour.
+   *
+   * Called once per peer during `boot()`. The return value is passed
+   * through to `ParticipantOrchestratorProxy.connect(toId, config)`,
+   * which ships it over RPC. The orchestrator unmarshals
+   * `ReconnectPolicySpec` back into a class instance via
+   * `instantiateReconnectPolicy()` — see x-oasis G7.
+   */
+  protected peerConnectionConfig(
+    _peerLabel: string
+  ): ConnectionConfigSpec | undefined {
+    return undefined;
+  }
+
+  /**
+   * Per-peer first-attempt activation options. Defaults to
+   * `undefined` (the orchestrator uses its own defaults — see
+   * `defaultConnectOptions()` in AppOrchestrator).
+   */
+  protected peerConnectOptions(
+    _peerLabel: string
+  ): ConnectOptions | undefined {
+    return undefined;
+  }
+
   async boot(): Promise<void> {
     if (!process.parentPort) {
       throw new Error('parentPort is not available');
@@ -196,7 +232,11 @@ export class PageletWorker<
     install: (channel: ElectronMessagePortMainChannel) => void
   ): Promise<void> {
     const connectPromise = proxy
-      .connect(peerLabel)
+      .connect(
+        peerLabel,
+        this.peerConnectionConfig(peerLabel),
+        this.peerConnectOptions(peerLabel)
+      )
       .then((conn) => conn.getChannel());
 
     // Always install when connect resolves, even if the outer race
@@ -254,4 +294,31 @@ export class PageletWorker<
 
   /** See {@link onSharedClientReady}. Symmetric for daemon. */
   protected onDaemonClientReady(_channel: ElectronMessagePortMainChannel): void {}
+}
+
+/**
+ * Convenience factory that mirrors the main-process
+ * `defaultConnectionConfig()` parameters but as a cross-process-safe
+ * `ConnectionConfigSpec`. Use in subclasses:
+ *
+ * ```ts
+ * protected peerConnectionConfig(peerLabel: string) {
+ *   return defaultConnectionConfigSpec();
+ * }
+ * ```
+ */
+export function defaultConnectionConfigSpec(): ConnectionConfigSpec {
+  return {
+    reconnectPolicy: {
+      kind: 'exponential-backoff',
+      options: {
+        initialDelayMs: 1_000,
+        maxDelayMs: 30_000,
+        multiplier: 2,
+        jitterFactor: 0.3,
+        maxRetries: 10,
+        maxElapsedMs: 5 * 60_000,
+      },
+    },
+  };
 }
