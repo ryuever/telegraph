@@ -1,4 +1,7 @@
-import type { SupervisorInspectorSnapshot } from '@/apps/daemon/diagnostics/common';
+import type {
+  MonitorSnapshot,
+  SupervisorInspectorSnapshot,
+} from '@/apps/daemon/diagnostics/common';
 
 export type {
   ProcessRow,
@@ -12,8 +15,8 @@ export const MONITOR_PAGELET_SERVICE_PATH = 'monitor-pagelet-api';
 
 export interface IMonitorPageletService {
   info(): Promise<string>;
-  getSnapshot(): Promise<any>;
-  onPerformanceUpdate(callback: (snapshot: any) => void): () => void;
+  getSnapshot(): Promise<MonitorSnapshot>;
+  onPerformanceUpdate(callback: (snapshot: MonitorSnapshot) => void): () => void;
   /**
    * Independent push channel for supervisor inspector snapshots. The
    * monitor pagelet forwards this from main's

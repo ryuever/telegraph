@@ -24,10 +24,27 @@ export interface IPageletWorker {
 
 export const PageletWorkerId = createId('PageletWorker');
 
+/**
+ * Generic over the shared & daemon RPC service interfaces so concrete
+ * pagelets type-narrow the proxies without per-call `as ISharedService`
+ * / `as IDaemonService` casts.
+ *
+ * The clients are nullable because they are populated asynchronously
+ * during `boot()`. Subclasses must guard with `?.` and treat absence as
+ * "peer not yet ready" — see `apps/setting/.../SettingWorker.ts` for
+ * the canonical fallback pattern.
+ *
+ * Default `unknown` keeps the contract opt-in: pagelets that don't talk
+ * to shared/daemon (e.g. design) can ignore the type parameters.
+ */
 @injectable()
-export class PageletWorker implements IPageletWorker {
-  protected sharedClient: any = null;
-  protected daemonClient: any = null;
+export class PageletWorker<
+  TSharedService = unknown,
+  TDaemonService = unknown,
+> implements IPageletWorker
+{
+  protected sharedClient: TSharedService | null = null;
+  protected daemonClient: TDaemonService | null = null;
   protected mainClient: IMainRpcService | null = null;
   /**
    * The pagelet→main control channel (UtilityProcess parentPort).
@@ -102,11 +119,11 @@ export class PageletWorker implements IPageletWorker {
 
     this.sharedClient = clientHost
       .registerClient('shared-rpc', { channel: sharedChannel })
-      .createProxy();
+      .createProxy() as unknown as TSharedService;
 
     this.daemonClient = clientHost
       .registerClient('daemon-rpc', { channel: daemonChannel })
-      .createProxy();
+      .createProxy() as unknown as TDaemonService;
 
     console.log(
       `[${this.config.selfId}-worker] connected to shared & daemon, waiting for ${this.config.rendererParticipantId} to connect`

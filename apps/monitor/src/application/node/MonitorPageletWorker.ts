@@ -4,7 +4,10 @@ import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagele
 import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
 import { MONITOR_PAGELET_SERVICE_PATH } from '@/apps/monitor/application/common';
 import type { SupervisorInspectorSnapshot } from '@/apps/monitor/application/common';
-import { IDaemonService } from '@/apps/daemon/application/common';
+import type {
+  IDaemonService,
+  MonitorSnapshot,
+} from '@/apps/daemon/application/common';
 import {
   MAIN_METRICS_SERVICE_PATH,
   type IMainMetricsService,
@@ -12,13 +15,13 @@ import {
 
 export const MonitorPageletWorkerId = createId('MonitorPageletWorker');
 
-type SnapshotCallback = (snapshot: unknown) => void;
+type SnapshotCallback = (snapshot: MonitorSnapshot) => void;
 type SupervisorSnapshotCallback = (
   snapshots: SupervisorInspectorSnapshot[]
 ) => void;
 
 @injectable()
-export class MonitorPageletWorker extends PageletWorker {
+export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService> {
   /**
    * Renderer-supplied performance-update callbacks. We keep our own
    * registry (instead of forwarding straight to daemon) so we can
@@ -132,7 +135,7 @@ export class MonitorPageletWorker extends PageletWorker {
       );
       for (const cb of this.snapshotListeners) {
         try {
-          (this.daemonClient as IDaemonService)?.onPerformanceUpdate(cb);
+          this.daemonClient?.onPerformanceUpdate(cb);
         } catch (err) {
           console.warn(
             `[monitor-worker] re-subscribe failed: ${
@@ -150,8 +153,7 @@ export class MonitorPageletWorker extends PageletWorker {
       serviceHost,
       handlers: {
         info: (): string => `monitor-pagelet ready (pid=${process.pid})`,
-        getSnapshot: (): unknown =>
-          (this.daemonClient as IDaemonService)?.getPerformanceSnapshot(),
+        getSnapshot: () => this.daemonClient?.getPerformanceSnapshot(),
         onPerformanceUpdate: (callback: SnapshotCallback) => {
           // Track the callback locally so we can re-subscribe on
           // daemon reconnect. The daemon-side disposer returned by the
@@ -160,7 +162,7 @@ export class MonitorPageletWorker extends PageletWorker {
           // returning the original disposer interface to the renderer
           // (the renderer treats it as "stop receiving updates").
           this.snapshotListeners.add(callback);
-          (this.daemonClient as IDaemonService)?.onPerformanceUpdate(callback);
+          this.daemonClient?.onPerformanceUpdate(callback);
           return () => {
             this.snapshotListeners.delete(callback);
             // We intentionally do NOT propagate disposer to daemon —

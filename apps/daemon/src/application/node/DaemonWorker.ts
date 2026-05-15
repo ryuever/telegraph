@@ -6,6 +6,7 @@ import {
 import { clientHost, RPCServiceHost } from '@x-oasis/async-call-rpc';
 
 import { DAEMON_SERVICE_PATH } from '@/apps/daemon/application/common';
+import type { MonitorSnapshot } from '@/apps/daemon/diagnostics/common/types';
 import { Diagnostics } from '@/apps/daemon/diagnostics/node/Diagnostics';
 import {
   MAIN_METRICS_SERVICE_PATH,
@@ -80,7 +81,7 @@ export class DaemonWorker implements IDaemonWorker {
         return () => clearInterval(interval);
       },
       getPerformanceSnapshot: () => diagnostics.getPerformanceSnapshot(),
-      onPerformanceUpdate: (callback: (snapshot: any) => void) =>
+      onPerformanceUpdate: (callback: (snapshot: MonitorSnapshot) => void) =>
         diagnostics.onPerformanceUpdate(callback),
     };
 
