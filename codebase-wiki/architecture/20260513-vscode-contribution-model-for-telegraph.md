@@ -8,7 +8,7 @@ description: >
   使新 Pagelet / Extension 的接入从"改 6 处代码"收敛到"写 1 份 manifest"。
 category: architecture
 created: 2026-05-13
-updated: 2026-05-14
+updated: 2026-05-15
 tags:
   - contribution-points
   - manifest
@@ -35,6 +35,10 @@ references:
     rel: related-to
     file: ../discussion/20260514-x-oasis-capability-gaps-v2.md
     note: D-007 G4 (OrchestratorRegistry) 是本文 manifest 化的 x-oasis 侧前置条件
+  - id: D-009
+    rel: related-to
+    file: ../discussion/20260515-renderer-spa-framework-selection.md
+    note: D-009 PageletHost 的 pagelets[] 注册表是本文 TelegraphManifest 在 renderer 侧的最小落点
 ---
 
 # VS Code Contribution 模型对 Telegraph 可扩展架构的启示与落地路径

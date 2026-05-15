@@ -90,6 +90,10 @@ export const wikiSidebar = {
         {
           "text": "D-008 apps/ 框架层短板审查（D-007 类别 A 落地后视角）",
           "link": "/discussion/20260515-apps-framework-gap-review-after-supervisor"
+        },
+        {
+          "text": "D-009 Renderer SPA 框架选型（React Router v7 + 自实现 KeepAlive）",
+          "link": "/discussion/20260515-renderer-spa-framework-selection"
         }
       ]
     }

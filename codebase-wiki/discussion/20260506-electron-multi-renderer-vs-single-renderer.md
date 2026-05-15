@@ -4,7 +4,7 @@ title: Electron 多 Renderer vs 单 Renderer 面板架构调研与 Telegraph 迁
 description: 调研主流开源 Electron 应用的多面板架构选型，分析 Telegraph 从 BrowserView 多 renderer 迁移到单 renderer 的可行性、影响面与实施路径。
 category: discussion
 created: 2026-05-06
-updated: 2026-05-06
+updated: 2026-05-15
 tags: [electron, architecture, performance, BrowserView, renderer, migration]
 status: draft
 references:
@@ -14,6 +14,10 @@ references:
   - id: A-007
     rel: extends
     note: Panel/Pagelet/PageletProcess 三层机制的详细描述
+  - id: D-009
+    rel: derives
+    file: ./20260515-renderer-spa-framework-selection.md
+    note: D-009 在本文"单 renderer"结论之上进一步选定前端框架（React Router v7 + 自实现 PageletHost KeepAlive）
 ---
 
 # Electron 多 Renderer vs 单 Renderer 面板架构调研与 Telegraph 迁移方案

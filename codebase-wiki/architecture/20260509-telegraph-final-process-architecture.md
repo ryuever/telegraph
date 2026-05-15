@@ -8,7 +8,7 @@ description: >
   所有 channel 经由 x-oasis ConnectionOrchestrator 编排。
 category: architecture
 created: 2026-05-09
-updated: 2026-05-14
+updated: 2026-05-15
 tags:
   - architecture
   - process-topology
@@ -43,6 +43,10 @@ references:
     rel: related-to
     file: ../discussion/20260514-x-oasis-capability-gaps-v2.md
     note: D-007 §5 给出本文 §5（进程换链）/§6（Inspector）的 telegraph 侧改造清单与当前实施进度
+  - id: D-009
+    rel: extended-by
+    file: ../discussion/20260515-renderer-spa-framework-selection.md
+    note: D-009 在本文 §6 "Chat/Design 通过路由切换或 BrowserView 叠加" 的 hook 上确定 renderer 侧采用 React Router v7 + 自实现 PageletHost (KeepAlive)，并定义了与 §6 direct channel 的协作约定
 ---
 
 # Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）
