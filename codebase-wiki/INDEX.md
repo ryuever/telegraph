@@ -64,6 +64,7 @@ features:
 | D-005 | [20260508-renderer-pagelet-channel-convergence.md](./discussion/20260508-renderer-pagelet-channel-convergence.md) | Renderer ↔ Pagelet 通道收敛设计（Forwarding Proxy） | 对比 renderer 通道收敛三种方案，确定 "1 条 direct port + pagelet Forwarding Proxy" 方案 A，给出 exposeRemoteService 工具函数草稿。 |
 | D-006 | [20260508-x-oasis-orchestrator-capability-gaps.md](./discussion/20260508-x-oasis-orchestrator-capability-gaps.md) | x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角） | 盘点 @x-oasis/async-call-rpc-electron v0.3.0 的 8 项能力缺口，分 P0/P1/P2 三档，给出 API 草案与 telegraph 阻塞 Phase。 |
 | D-007 | [20260514-x-oasis-capability-gaps-v2.md](./discussion/20260514-x-oasis-capability-gaps-v2.md) | x-oasis 能力差距盘点 v2（telegraph apps/ 实际落地视角） | D-006 P0 三项落地后的演进版：把 9 项"已就绪未使用" vs 7 项"上游真实缺失"分开，重点指出 CircuitBreaker 接入 RPC 调用栈缺失（空壳 bug）与 UtilityProcessSupervisor 缺失，给 x-oasis ROI 排序需求清单与 telegraph 第一波改造清单。 |
+| D-008 | [20260515-apps-framework-gap-review-after-supervisor.md](./discussion/20260515-apps-framework-gap-review-after-supervisor.md) | apps/ 框架层短板审查（D-007 类别 A 落地后视角） | D-007 类别 A 落地后对 apps/ + packages/services/ 的重新盘点：列出 7 项已稳固能力 + 11 项短板（H1-H11，🔴/🟡/🟢 分级）+ 3 项必须等 x-oasis 上游 + 6 步第一波改造建议。 |
 
 ### issue/ — Issue 记录
 

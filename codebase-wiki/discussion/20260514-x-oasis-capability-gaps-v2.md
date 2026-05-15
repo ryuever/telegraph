@@ -8,7 +8,7 @@ description: >
   团队按 ROI 排序的需求清单。
 category: discussion
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-15
 tags: [x-oasis, async-call-rpc, orchestrator, capability-gap, telegraph, supervisor, circuit-breaker]
 status: draft
 references:
@@ -16,6 +16,10 @@ references:
     rel: extends
     file: ./20260508-x-oasis-orchestrator-capability-gaps.md
     note: 本文是 D-006 在 P0 三项落地后的版本演进，重新分类盘点
+  - id: D-008
+    rel: extended-by
+    file: ./20260515-apps-framework-gap-review-after-supervisor.md
+    note: D-008 是本文"类别 A 落地后"的 telegraph 侧改造清单具体化
   - id: A-008
     rel: related-to
     file: ../architecture/20260509-telegraph-final-process-architecture.md

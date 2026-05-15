@@ -43,6 +43,10 @@ export const wikiSidebar = {
         {
           "text": "A-009 Telegraph 运行时目录分层与文件结构约定",
           "link": "/architecture/20260512-runtime-directory-convention-and-file-structure"
+        },
+        {
+          "text": "A-010 VS Code Contribution 模型对 Telegraph 可扩展架构的启示与落地路径",
+          "link": "/architecture/20260513-vscode-contribution-model-for-telegraph"
         }
       ]
     }
@@ -78,6 +82,14 @@ export const wikiSidebar = {
         {
           "text": "D-006 x-oasis ConnectionOrchestrator 能力缺口分析（telegraph 视角）",
           "link": "/discussion/20260508-x-oasis-orchestrator-capability-gaps"
+        },
+        {
+          "text": "D-007 x-oasis 能力差距盘点 v2（telegraph apps/ 实际落地视角）",
+          "link": "/discussion/20260514-x-oasis-capability-gaps-v2"
+        },
+        {
+          "text": "D-008 apps/ 框架层短板审查（D-007 类别 A 落地后视角）",
+          "link": "/discussion/20260515-apps-framework-gap-review-after-supervisor"
         }
       ]
     }
