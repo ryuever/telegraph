@@ -97,6 +97,18 @@ export class PageletWorker<
     protected readonly config: IPageletWorkerConfig
   ) {}
 
+  /**
+   * Per-peer initial connect timeout (ms). Hitting it does NOT abort
+   * boot; the connection promise is left running in the background and
+   * fills in `{shared,daemon}Client` whenever it eventually resolves.
+   * Until then, `this.shared` / `this.daemon` forwarding proxies
+   * return 'X not ready' so renderer-side handlers can still respond.
+   *
+   * Override in subclasses if a particular pagelet has stricter
+   * latency requirements.
+   */
+  protected readonly peerConnectTimeoutMs: number = 5000;
+
   async boot(): Promise<void> {
     if (!process.parentPort) {
       throw new Error('parentPort is not available');
@@ -130,25 +142,96 @@ export class PageletWorker<
       .registerClient(MAIN_RPC_SERVICE_PATH, { channel: mainChannel })
       .createProxy() as unknown as IMainRpcService;
 
-    const sharedConn = await proxy.connect('shared');
-    const daemonConn = await proxy.connect('daemon');
-
-    const sharedChannel = sharedConn.getChannel();
-    const daemonChannel = daemonConn.getChannel();
-    this.sharedChannel = sharedChannel;
-    this.daemonChannel = daemonChannel;
-
-    this.sharedClient = clientHost
-      .registerClient('shared-rpc', { channel: sharedChannel })
-      .createProxy() as unknown as TSharedService;
-
-    this.daemonClient = clientHost
-      .registerClient('daemon-rpc', { channel: daemonChannel })
-      .createProxy() as unknown as TDaemonService;
+    // Connect to shared & daemon in PARALLEL with a per-peer timeout.
+    // Previous implementation awaited them serially with no timeout —
+    // a daemon that's still being spawned (or in supervisor-restart
+    // window) would freeze every pagelet's boot indefinitely. Now boot
+    // returns once both connect attempts settle (success or timeout);
+    // late-arriving connections install their client in the background
+    // and the forwarding proxies serve 'X not ready' until then.
+    await Promise.allSettled([
+      this.connectPeer('shared', proxy, (channel) => {
+        this.sharedChannel = channel;
+        this.sharedClient = clientHost
+          .registerClient('shared-rpc', { channel })
+          .createProxy() as unknown as TSharedService;
+        this.onSharedClientReady(channel);
+      }),
+      this.connectPeer('daemon', proxy, (channel) => {
+        this.daemonChannel = channel;
+        this.daemonClient = clientHost
+          .registerClient('daemon-rpc', { channel })
+          .createProxy() as unknown as TDaemonService;
+        this.onDaemonClientReady(channel);
+      }),
+    ]);
 
     console.log(
-      `[${this.config.selfId}-worker] connected to shared & daemon, waiting for ${this.config.rendererParticipantId} to connect`
+      `[${this.config.selfId}-worker] boot complete (shared=${
+        this.sharedClient ? 'connected' : 'pending'
+      }, daemon=${
+        this.daemonClient ? 'connected' : 'pending'
+      }), waiting for ${this.config.rendererParticipantId}`
     );
+  }
+
+  /**
+   * Race `proxy.connect(peerId)` against {@link peerConnectTimeoutMs}.
+   * On success — within the timeout — `install(channel)` runs and the
+   * outer promise resolves. On timeout the outer promise rejects so
+   * `Promise.allSettled` upstream lets boot() return; the underlying
+   * connect promise is **not** cancelled (x-oasis exposes no
+   * cancellation primitive) and `install(channel)` runs late when the
+   * connect eventually completes.
+   *
+   * @param peerLabel  Participant id ('shared' | 'daemon').
+   * @param proxy      The participant proxy from createParticipantProxy.
+   * @param install    Synchronous callback that wires the resolved
+   *                   channel into the worker (sets {@link sharedChannel}
+   *                   / {@link sharedClient} or the daemon equivalents).
+   */
+  protected async connectPeer(
+    peerLabel: string,
+    proxy: ReturnType<typeof createParticipantProxy>,
+    install: (channel: ElectronMessagePortMainChannel) => void
+  ): Promise<void> {
+    const connectPromise = proxy
+      .connect(peerLabel)
+      .then((conn) => conn.getChannel());
+
+    // Always install when connect resolves, even if the outer race
+    // already lost to the timeout. Failures are logged but not
+    // re-thrown — the timeout path already surfaced the problem.
+    void connectPromise.then(install, (err: unknown) => {
+      console.warn(
+        `[${this.config.selfId}-worker] background connect to '${peerLabel}' failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    });
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          new Error(
+            `[${this.config.selfId}-worker] connect to '${peerLabel}' timed out after ${String(this.peerConnectTimeoutMs)}ms`
+          )
+        );
+      }, this.peerConnectTimeoutMs);
+    });
+
+    try {
+      await Promise.race([connectPromise, timeoutPromise]);
+      if (timer) clearTimeout(timer);
+    } catch (err) {
+      console.warn(
+        `[${this.config.selfId}-worker] ${
+          err instanceof Error ? err.message : String(err)
+        } — forwarding proxy will return '${peerLabel} not ready' until the background connect wins`
+      );
+      throw err;
+    }
   }
 
   protected onRendererConnection(
@@ -156,4 +239,19 @@ export class PageletWorker<
       ReturnType<typeof createParticipantProxy>['getChannelFor']
     >
   ): void {}
+
+  /**
+   * Hook fired immediately after {@link sharedClient} (and the
+   * underlying {@link sharedChannel}) is installed, including the
+   * late-install path when the initial connect timed out and the
+   * background recovery eventually wins. Subclasses use this to wire
+   * `channel.onDidConnected` for push-RPC re-subscribe on supervisor
+   * restart of the peer — without this hook, late installs would
+   * silently miss the wiring (the boot() override path runs once and
+   * by then channels are still null on the timeout branch).
+   */
+  protected onSharedClientReady(_channel: ElectronMessagePortMainChannel): void {}
+
+  /** See {@link onSharedClientReady}. Symmetric for daemon. */
+  protected onDaemonClientReady(_channel: ElectronMessagePortMainChannel): void {}
 }

@@ -57,8 +57,23 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
 
   override async boot(): Promise<void> {
     await super.boot();
-    this.attachDaemonReconnectHandler();
+    // Daemon-channel reconnect wiring is delegated to the
+    // onDaemonClientReady hook below, which fires whether the initial
+    // connect succeeded inside boot() or only later via the late-install
+    // recovery path. Main never restarts but its supervisor subscription
+    // still rides the same channel — safe to register here directly.
     this.attachMainSupervisorSubscription();
+  }
+
+  /**
+   * Fires once daemon client is installed (initial boot or late
+   * recovery after a connect timeout). Wires reconnect re-subscribe
+   * exactly once: the channel object is preserved across
+   * `replaceParticipantChannel` so a single onDidConnected handler
+   * covers all future daemon supervisor restarts.
+   */
+  protected override onDaemonClientReady(): void {
+    this.attachDaemonReconnectHandler();
   }
 
   /**
