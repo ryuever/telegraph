@@ -10,6 +10,7 @@ import {
   IMainRpcService,
   MAIN_RPC_SERVICE_PATH,
 } from '@/packages/services/pagelet-host/common';
+import { createForwardingProxy } from '@/packages/services/pagelet-host/node/createForwardingProxy';
 
 export interface IPageletWorkerConfig {
   selfId: string;
@@ -70,6 +71,26 @@ export class PageletWorker<
    * applies.
    */
   protected sharedChannel: ElectronMessagePortMainChannel | null = null;
+
+  /**
+   * Forwarding proxy over {@link sharedClient}. Lets subclasses write
+   * `this.shared.echo(msg)` without per-call null check; falls back to
+   * `Promise.resolve('shared not ready')` while the channel is still
+   * being established or while the supervisor is restarting the peer.
+   * See {@link createForwardingProxy} for the rationale.
+   */
+  protected readonly shared: TSharedService = createForwardingProxy<
+    TSharedService & object
+  >(() => this.sharedClient as TSharedService & object, 'shared');
+
+  protected readonly daemon: TDaemonService = createForwardingProxy<
+    TDaemonService & object
+  >(() => this.daemonClient as TDaemonService & object, 'daemon');
+
+  protected readonly main: IMainRpcService = createForwardingProxy<IMainRpcService>(
+    () => this.mainClient,
+    'main'
+  );
 
   constructor(
     @inject(PageletWorkerConfigId)

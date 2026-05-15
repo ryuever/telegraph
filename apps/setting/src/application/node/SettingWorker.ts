@@ -21,20 +21,16 @@ export class SettingWorker extends PageletWorker<ISharedService, IDaemonService>
       handlers: {
         info: (): string => `${this.config.selfId} ready (pid=${process.pid})`,
         callSharedEcho: (msg: string): Promise<string> =>
-          this.sharedClient?.echo(msg) ?? Promise.resolve('shared not ready'),
+          this.shared.echo(msg),
         callSharedGetConfig: (key: string): Promise<string> =>
-          this.sharedClient?.getConfig(key) ??
-          Promise.resolve('shared not ready'),
+          this.shared.getConfig(key),
         callSharedSetConfig: (key: string, value: string): Promise<string> =>
-          this.sharedClient?.setConfig(key, value) ??
-          Promise.resolve('shared not ready'),
+          this.shared.setConfig(key, value),
         callDaemonEcho: (msg: string): Promise<string> =>
-          this.daemonClient?.echo(msg) ?? Promise.resolve('daemon not ready'),
+          this.daemon.echo(msg),
         callDaemonSystemStatus: (): Promise<string> =>
-          this.daemonClient?.systemStatus() ??
-          Promise.resolve('daemon not ready'),
-        callMainPing: (msg: string): Promise<string> =>
-          this.mainClient?.mainPing(msg) ?? Promise.resolve('main not ready'),
+          this.daemon.systemStatus(),
+        callMainPing: (msg: string): Promise<string> => this.main.mainPing(msg),
       },
     });
   }
