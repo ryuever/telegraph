@@ -74,6 +74,16 @@ export class AppApplication implements IAppApplication {
 
     this.mainCpServer.start();
 
+    // Declare the setting pagelet's extra orchestrator binding here, in
+    // the host's start() flow, instead of inside MainCpServer (which
+    // used to hardcode `if (pageletId === 'setting')`). Adding another
+    // window-bound pagelet means another attach call here, no framework
+    // changes — see IMainCpServer.attachOrchestratorToPagelet docs (H5).
+    this.mainCpServer.attachOrchestratorToPagelet(
+      'setting',
+      this.mainCpServer.getSettingOrchestrator()
+    );
+
     const rendererIpcChannel = this.mainCpServer.getRendererIpcChannel();
 
     let mainCallCount = 0;

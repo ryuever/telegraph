@@ -26,6 +26,19 @@ export class MainCpServer implements IMainCpServer {
   private rendererIpcChannel!: IPCMainChannel;
   private settingOrchestrator!: ElectronConnectionOrchestrator;
   private settingIpcChannel: IPCMainChannel | null = null;
+  /**
+   * pagelet-id → extra orchestrators it should be registered into on spawn.
+   * Populated by `attachOrchestratorToPagelet()`; consumed by
+   * `getAdditionalOrchestratorsFor()` (called from PageletProcess.spawn).
+   *
+   * H5 (D-008): replaces the old hardcoded `if (pageletId === 'setting')`
+   * branch — apps now declare these bindings from their start() flow
+   * instead of the framework carrying a switch statement.
+   */
+  private readonly additionalOrchestrators = new Map<
+    string,
+    ElectronConnectionOrchestrator[]
+  >();
 
   constructor(
     @inject(WindowManagerId) private readonly windowManager: IWindowManager
@@ -87,17 +100,28 @@ export class MainCpServer implements IMainCpServer {
     return this.settingOrchestrator;
   }
 
+  attachOrchestratorToPagelet(
+    pageletId: string,
+    orchestrator: ElectronConnectionOrchestrator
+  ): void {
+    let list = this.additionalOrchestrators.get(pageletId);
+    if (!list) {
+      list = [];
+      this.additionalOrchestrators.set(pageletId, list);
+    }
+    if (!list.includes(orchestrator)) {
+      list.push(orchestrator);
+    }
+  }
+
   getAdditionalOrchestratorsFor(
     pageletId: string
   ): ElectronConnectionOrchestrator[] {
-    // The setting pagelet is the sole renderer for the setting window's
-    // orchestrator, so it must be registered on both the main orchestrator
-    // (for cross-pagelet RPC) and the setting orchestrator (for its own
-    // renderer→pagelet RPC).
-    if (pageletId === 'setting') {
-      return [this.settingOrchestrator];
-    }
-    return [];
+    // Returns the orchestrators previously declared via
+    // attachOrchestratorToPagelet(). Returns a defensive copy so the
+    // PageletProcess spawn loop can't mutate our internal list.
+    const list = this.additionalOrchestrators.get(pageletId);
+    return list ? [...list] : [];
   }
 
   registerSettingWindow(win: BrowserWindow): IPCMainChannel {

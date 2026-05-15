@@ -27,13 +27,31 @@ export interface IMainCpServer {
   getSettingIpcChannel(): IPCMainChannel | null;
   registerSettingWindow(win: BrowserWindow): IPCMainChannel;
   /**
-   * Returns the orchestrators a freshly-spawned pagelet should be registered
-   * with **in addition to** the default `getOrchestrator()`.
+   * Declare that whenever pagelet `pageletId` is spawned, it must also be
+   * registered into `orchestrator` (in addition to the default
+   * `getOrchestrator()`).
    *
-   * Used by `PageletProcess.spawn` to wire pagelets like `setting` into a
-   * second window-scoped orchestrator without `if (pageletId === 'setting')`
-   * hardcodes inside the pagelet-host framework. Apps add new windows by
-   * extending their `IMainCpServer` implementation, not by patching here.
+   * This is the only seam through which a host app teaches the framework
+   * about extra window-scoped orchestrators — e.g. apps/main wires
+   * `'setting'` → settingOrchestrator here, instead of the framework
+   * carrying an `if (pageletId === 'setting')` branch. Adding a third
+   * window-bound pagelet now means **one extra call from the host**, not a
+   * patch inside `packages/services`.
+   *
+   * Multiple calls with the same `pageletId` accumulate. Must be invoked
+   * before `PageletProcess.spawn(pageletId, …)` for the binding to take
+   * effect on that spawn.
+   */
+  attachOrchestratorToPagelet(
+    pageletId: string,
+    orchestrator: ElectronConnectionOrchestrator
+  ): void;
+  /**
+   * Returns the orchestrators a freshly-spawned pagelet should be
+   * registered with **in addition to** the default `getOrchestrator()`.
+   *
+   * Driven by `attachOrchestratorToPagelet()`. Returns `[]` if no extra
+   * orchestrators have been attached. Called by `PageletProcess.spawn`.
    */
   getAdditionalOrchestratorsFor(
     pageletId: string
