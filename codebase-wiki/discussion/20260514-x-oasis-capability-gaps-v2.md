@@ -10,7 +10,7 @@ category: discussion
 created: 2026-05-14
 updated: 2026-05-15
 tags: [x-oasis, async-call-rpc, orchestrator, capability-gap, telegraph, supervisor, circuit-breaker]
-status: draft
+status: updated
 references:
   - id: D-006
     rel: extends
@@ -77,6 +77,16 @@ sources:
 "telegraph 第一波改造"。
 
 ## 2. 类别 B — x-oasis 真实缺口（必须由 x-oasis 团队建设）
+
+> **⚠ 2026-05-15 勘误**：本文写于 2026-05-14，以下 gap 的上游状态已发生变化：
+>
+> | Gap | 原文描述 | 当前上游真实状态 |
+> |-----|---------|----------------|
+> | **G1** | "x-oasis 没提供 supervisor" | ✅ **`UtilityProcessSupervisor` 已完整实现**（`BaseConnectionOrchestrator.ts:281-340` 含 `replaceParticipantChannel` + autoReconnect + subscription rebind），telegraph 已通过 `PageletProcess` / `DaemonProcess` 全面接入 |
+> | **G2** | "0 处使用空壳" | ✅ **连接级已接入**：`connect` 路径 `CircuitBreaker` + `_handleConnectionLost` 路径均调用 `recordFailure`/`recordSuccess`/`reset`；❌ **调用级未接入**（`sendRequest` 中间件无 breaker，经评估决定不做） |
+> | **G7** | "跨进程序列化不可行" | ✅ **已交付**：`ReconnectPolicySpec` discriminated union + `ConnectionConfigSpec` interface + `instantiateReconnectPolicy()` factory + `_unmarshalConnectionConfig()` unmarshal path，telegraph 已升到 x-oasis 0.16.0 / 0.13.0 并在 `PageletWorker.connectPeer` 中传 `ConnectionConfigSpec` |
+>
+> 下面保留原文以供历史参考，但 G1/G2/G7 已不再是阻塞项。
 
 按 ROI 排序：
 
@@ -307,16 +317,18 @@ function bootstrapRendererForWindow(opts: {
 
 ## 4. 给 x-oasis 团队的需求清单（按 ROI 排序）
 
-| 优先级 | Gap | 类型 | 阻塞场景 |
-|--------|-----|------|----------|
-| 🔴 P0 | G2 CircuitBreaker 接入 RPC 调用栈 | bug fix | 已有 config 字段但实际不工作，会误导使用方 |
-| 🔴 P0 | G1 UtilityProcessSupervisor | new feature | A-008 §5 进程换链流程的执行者 |
-| 🟡 P1 | G3 Inspector 数据模型扩展 | enhancement | A-008 §6 Inspector |
-| 🟡 P1 | G4 OrchestratorRegistry | new feature | telegraph apps/main 已用 |
-| 🟡 P1 | G5 Forwarding Proxy helper | new feature | 高频但可绕过 |
-| 🟡 P1 | G7 跨进程 ConnectionConfig 序列化 | enhancement | telegraph worker 侧 6+ 处 connect 受限 |
-| 🟡 P2 | G6 Per-conn ServiceHost 默认化 | enhancement | 防御性 |
-| 🟢 P3 | G8 多窗口模板 | doc + helper | 影响小 |
+> **⚠ 2026-05-15 更新**：G1/G2/G7 已关闭或降级，当前有效需求清单如下。
+
+| 优先级 | Gap | 类型 | 状态 | 说明 |
+|--------|-----|------|------|------|
+| ~~🔴 P0~~ | ~~G1 UtilityProcessSupervisor~~ | ~~new feature~~ | ✅ **已交付** | telegraph 已全面接入 |
+| ~~🔴 P0~~ | ~~G2 CircuitBreaker 空壳~~ | ~~bug fix~~ | 🟡 **部分修复** | 连接级已接；调用级经评估决定不做 |
+| 🟡 P1 | G3 Inspector 数据模型扩展 | enhancement | ⏳ 待做 | A-008 §6 Inspector |
+| 🟡 P1 | G4 OrchestratorRegistry | new feature | ⏳ 待做 | telegraph apps/main 已用 |
+| 🟡 P1 | G5 Forwarding Proxy helper | new feature | ✅ **telegraph 侧已自建** | `createForwardingProxy()` 在 `packages/services/` |
+| ~~🟡 P1~~ | ~~G7 跨进程 ConnectionConfig 序列化~~ | ~~enhancement~~ | ✅ **已交付** | `ReconnectPolicySpec` + `ConnectionConfigSpec`，x-oasis 0.16.0 |
+| 🟡 P2 | G6 Per-conn ServiceHost 默认化 | enhancement | ⏳ 待做 | 防御性 |
+| 🟢 P3 | G8 多窗口模板 | doc + helper | ⏳ 待做 | 影响小 |
 
 ## 5. 给 telegraph 团队的清单（不依赖 x-oasis）
 
