@@ -1,7 +1,5 @@
 import type { SupervisorInspectorSnapshot } from '@/packages/services/main-metrics/common';
 
-export const DIAGNOSTICS_SERVICE_PATH = 'monitor-rpc';
-
 export interface ProcessRow {
   pid: number;
   name: string | null;
@@ -40,10 +38,3 @@ export interface MonitorSnapshot {
 // Re-export so monitor common (and any other app-side consumer)
 // doesn't have to know the canonical home is in packages/services.
 export type { SupervisorInspectorSnapshot };
-
-export interface IDiagnosticsService {
-  getPerformanceSnapshot(): Promise<MonitorSnapshot>;
-  onPerformanceUpdate(
-    callback: (snapshot: MonitorSnapshot) => void
-  ): () => void;
-}
