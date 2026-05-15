@@ -14,18 +14,18 @@ import type {
 
 import type {
   IMainCpServer,
-} from '@/apps/main/application/electron-main/MainCpServer';
+} from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import {
   MainCpServerId,
-} from '@/apps/main/application/electron-main/MainCpServer';
+} from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import type {
   IPageletProcess,
 } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import {
   PageletProcessId,
 } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
-import { ORCHESTRATOR_SERVICE_PATH } from '@/apps/main/application/common/types';
 import {
+  ORCHESTRATOR_SERVICE_PATH,
   RENDERER_PARTICIPANT_ID,
   CONNECTION_PARTICIPANT_ID,
   SETTING_PARTICIPANT_ID,

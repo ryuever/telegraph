@@ -3,8 +3,8 @@ import { serviceHost } from '@x-oasis/async-call-rpc';
 
 import type { IWindowManager } from '@/apps/main/application/electron-main/WindowManager';
 import { WindowManagerId } from '@/apps/main/application/electron-main/WindowManager';
-import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
-import { MainCpServerId } from '@/apps/main/application/electron-main/MainCpServer';
+import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
+import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import type { IDaemonApplication } from '@/apps/daemon/application/node/DaemonApplication';
 import { DaemonApplicationId } from '@/apps/daemon/application/node/DaemonApplication';
 import type { ISharedApplication } from '@/apps/shared/application/node/SharedApplication';

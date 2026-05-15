@@ -10,6 +10,19 @@ export const DESIGN_PARTICIPANT_ID = 'design';
 
 export const CHAT_PARTICIPANT_ID = 'chat';
 
+/**
+ * Application-layer RPC service path for the orchestrator dashboard
+ * (renderer ↔ main, exposes connect/disconnect/getStatus + 7 events).
+ *
+ * Distinct from x-oasis's internal `__x_oasis_orchestrator__` channel —
+ * this one is the user-facing IOrchestratorService that AppOrchestrator
+ * registers and the renderer's OrchestratorAPI consumes.
+ *
+ * H4 (D-008): moved here from `apps/main/application/common/types.ts` so
+ * packages/services owns the path it actually registers.
+ */
+export const ORCHESTRATOR_SERVICE_PATH = 'orchestrator';
+
 export const MAIN_RPC_SERVICE_PATH = 'main-rpc';
 
 export interface IMainRpcService {

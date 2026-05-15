@@ -1,4 +1,4 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 import {
   IPCMainChannel,
   ElectronConnectionOrchestrator,
@@ -14,29 +14,11 @@ import {
 } from '@/apps/main/application/electron-main/WindowManager';
 import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@/apps/main/application/common/cp-config';
 import { RENDERER_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
-
-export interface IMainCpServer {
-  start(): void;
-  getOrchestrator(): ElectronConnectionOrchestrator;
-  getSettingOrchestrator(): ElectronConnectionOrchestrator;
-  getRendererIpcChannel(): IPCMainChannel;
-  getSettingIpcChannel(): IPCMainChannel | null;
-  registerSettingWindow(win: BrowserWindow): IPCMainChannel;
-  /**
-   * Returns the orchestrators a freshly-spawned pagelet should be registered
-   * with **in addition to** the default `getOrchestrator()`.
-   *
-   * This replaces the prior `if (pageletId === 'setting')` hardcode in
-   * `PageletProcess.spawn`. New windows that need their own orchestrator
-   * (e.g. an additional standalone window) extend this method instead of
-   * touching `PageletProcess`.
-   */
-  getAdditionalOrchestratorsFor(
-    pageletId: string
-  ): ElectronConnectionOrchestrator[];
-}
-
-export const MainCpServerId = createId('MainCpServer');
+// IMainCpServer interface + MainCpServerId DI token now live in
+// packages/services/pagelet-host/electron-main/IMainCpServer (H4, D-008)
+// so the framework owns its own contract. Apps that need the token
+// import it directly from there alongside this concrete implementation.
+import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 
 @injectable()
 export class MainCpServer implements IMainCpServer {

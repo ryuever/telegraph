@@ -10,8 +10,8 @@ import {
 } from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
-import type { IMainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
-import { MainCpServerId } from '@/apps/main/application/electron-main/MainCpServer';
+import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
+import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import type {
   IPidNameRegistry,
   SupervisorInspectorSnapshot,

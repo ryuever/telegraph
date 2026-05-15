@@ -17,9 +17,7 @@
       "@/packages/services/*": ["src/*"],
       "@/packages/services/main-metrics/*": ["src/main-metrics/src/*"],
       "@/packages/services/pagelet-host/*": ["src/pagelet-host/src/*"],
-      "@/packages/services/process/*": ["src/process/src/*"],
-      "@/apps/main/*": ["../../apps/main/src/*"],
-      "@/apps/daemon/*": ["../../apps/daemon/src/*"]
+      "@/packages/services/process/*": ["src/process/src/*"]
     }
   },
   "include": ["src/**/*"]

@@ -1,9 +1,7 @@
 import { Registry } from '@x-oasis/di';
 
-import {
-  MainCpServer,
-  MainCpServerId,
-} from '@/apps/main/application/electron-main/MainCpServer';
+import { MainCpServer } from '@/apps/main/application/electron-main/MainCpServer';
+import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import {
   WindowManager,
   WindowManagerId,
