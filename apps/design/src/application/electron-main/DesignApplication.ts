@@ -1,18 +1,17 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { DESIGN_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
+import type { IDesignApplication } from '@/apps/design/application/common';
+import { DesignApplicationId } from '@/apps/design/application/common';
 
 export const DESIGN_WORKER_FILE = 'design-worker.js';
 
-export interface IDesignApplication {
-  start(): Promise<void>;
-}
-
-export const DesignApplicationId = createId('DesignApplication');
+export type { IDesignApplication };
+export { DesignApplicationId };
 
 @injectable()
 export class DesignApplication implements IDesignApplication {

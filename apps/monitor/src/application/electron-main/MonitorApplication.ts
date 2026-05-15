@@ -1,18 +1,17 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { MONITOR_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
+import type { IMonitorApplication } from '@/apps/monitor/application/common';
+import { MonitorApplicationId } from '@/apps/monitor/application/common';
 
 export const MONITOR_WORKER_FILE = 'monitor-worker.js';
 
-export interface IMonitorApplication {
-  start(): Promise<void>;
-}
-
-export const MonitorApplicationId = createId('MonitorApplication');
+export type { IMonitorApplication };
+export { MonitorApplicationId };
 
 @injectable()
 export class MonitorApplication implements IMonitorApplication {

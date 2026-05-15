@@ -1,13 +1,11 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
-import type { ISharedProcess } from '@/apps/shared/application/electron-main/SharedProcess';
-import { SharedProcessId } from '@/apps/shared/application/electron-main/SharedProcess';
+import type { ISharedProcess } from '@/apps/shared/application/common';
+import { SharedProcessId } from '@/apps/shared/application/common';
+import { ISharedApplication, SharedApplicationId } from '@/apps/shared/application/common';
 
-export interface ISharedApplication {
-  start(): Promise<void>;
-}
-
-export const SharedApplicationId = createId('SharedApplication');
+export type { ISharedApplication };
+export { SharedApplicationId };
 
 @injectable()
 export class SharedApplication implements ISharedApplication {

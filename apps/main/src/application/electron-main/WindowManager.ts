@@ -1,17 +1,12 @@
-import { createId, injectable } from '@x-oasis/di';
+import { injectable } from '@x-oasis/di';
 import { BrowserWindow, Menu, app } from 'electron';
 import { join } from 'path';
 
-export interface IWindowManager {
-  openMainWindow(): BrowserWindow;
-  getMainWindow(): BrowserWindow | null;
-  openSettingWindow(): BrowserWindow | null;
-  getSettingWindow(): BrowserWindow | null;
-  onSettingWindowCreated(callback: (win: BrowserWindow) => void): void;
-  setSwitchPageCallback(callback: (pageId: string) => void): void;
-}
+import type { IWindowManager } from '@/apps/main/application/common';
+import { WindowManagerId } from '@/apps/main/application/common';
 
-export const WindowManagerId = createId('WindowManager');
+export type { IWindowManager };
+export { WindowManagerId };
 
 @injectable()
 export class WindowManager implements IWindowManager {

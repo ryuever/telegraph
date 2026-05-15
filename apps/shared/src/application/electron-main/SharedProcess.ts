@@ -1,4 +1,4 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 import {
   UtilityProcessSupervisor,
   type SpawnInfo,
@@ -18,18 +18,11 @@ import type {
 } from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 import { SHARED_PARTICIPANT_ID } from '@/apps/shared/application/common';
+import type { ISharedProcess } from '@/apps/shared/application/common';
+import { SharedProcessId } from '@/apps/shared/application/common';
 
-export interface ISharedProcess {
-  spawn(): Promise<void>;
-  getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
-  /**
-   * See {@link IDaemonProcess.subscribeStateChange} — same contract,
-   * for the shared utility process supervisor.
-   */
-  subscribeStateChange(listener: () => void): () => void;
-}
-
-export const SharedProcessId = createId('SharedProcess');
+export type { ISharedProcess };
+export { SharedProcessId };
 
 @injectable()
 export class SharedProcess implements ISharedProcess {

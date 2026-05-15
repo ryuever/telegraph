@@ -1,3 +1,5 @@
+import { createId } from '@x-oasis/di';
+
 import type {
   MonitorSnapshot,
   SupervisorInspectorSnapshot,
@@ -31,3 +33,9 @@ export interface IMonitorPageletService {
     callback: (snapshots: SupervisorInspectorSnapshot[]) => void
   ): () => void;
 }
+
+export interface IMonitorApplication {
+  start(): Promise<void>;
+}
+
+export const MonitorApplicationId = createId('MonitorApplication');

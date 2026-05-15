@@ -1,18 +1,17 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { SETTING_PARTICIPANT_ID } from '@/apps/setting/application/common';
+import type { ISettingApplication } from '@/apps/setting/application/common';
+import { SettingApplicationId } from '@/apps/setting/application/common';
 
 export const SETTING_WORKER_FILE = 'setting-worker.js';
 
-export interface ISettingApplication {
-  start(): Promise<void>;
-}
-
-export const SettingApplicationId = createId('SettingApplication');
+export type { ISettingApplication };
+export { SettingApplicationId };
 
 @injectable()
 export class SettingApplication implements ISettingApplication {

@@ -4,24 +4,24 @@ import { MainCpServer } from '@/apps/main/application/electron-main/MainCpServer
 import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import {
   WindowManager,
-  WindowManagerId,
 } from '@/apps/main/application/electron-main/WindowManager';
+import { WindowManagerId } from '@/apps/main/application/common';
 import {
   DaemonProcess,
-  DaemonProcessId,
 } from '@/apps/daemon/application/electron-main/DaemonProcess';
+import { DaemonProcessId } from '@/apps/daemon/application/common';
 import {
   DaemonApplication,
-  DaemonApplicationId,
 } from '@/apps/daemon/application/node/DaemonApplication';
+import { DaemonApplicationId } from '@/apps/daemon/application/common';
 import {
   SharedProcess,
-  SharedProcessId,
 } from '@/apps/shared/application/electron-main/SharedProcess';
+import { SharedProcessId } from '@/apps/shared/application/common';
 import {
   SharedApplication,
-  SharedApplicationId,
 } from '@/apps/shared/application/node/SharedApplication';
+import { SharedApplicationId } from '@/apps/shared/application/common';
 import {
   PageletProcess,
   PageletProcessId,
@@ -32,24 +32,24 @@ import {
 } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import {
   ConnectionApplication,
-  ConnectionApplicationId,
 } from '@/apps/connection/application/node/ConnectionApplication';
+import { ConnectionApplicationId } from '@/apps/connection/application/common';
 import {
   MonitorApplication,
-  MonitorApplicationId,
 } from '@/apps/monitor/application/electron-main/MonitorApplication';
+import { MonitorApplicationId } from '@/apps/monitor/application/common';
 import {
   SettingApplication,
-  SettingApplicationId,
 } from '@/apps/setting/application/electron-main/SettingApplication';
+import { SettingApplicationId } from '@/apps/setting/application/common';
 import {
   DesignApplication,
-  DesignApplicationId,
 } from '@/apps/design/application/electron-main/DesignApplication';
+import { DesignApplicationId } from '@/apps/design/application/common';
 import {
   ChatApplication,
-  ChatApplicationId,
 } from '@/apps/chat/application/electron-main/ChatApplication';
+import { ChatApplicationId } from '@/apps/chat/application/common';
 import {
   AppApplication,
   AppApplicationId,

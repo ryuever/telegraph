@@ -1,3 +1,5 @@
+import { createId } from '@x-oasis/di';
+
 export const CONNECTION_PAGELET_SERVICE_PATH = 'pagelet-api';
 
 export interface IConnectionPageletService {
@@ -9,3 +11,9 @@ export interface IConnectionPageletService {
   callDaemonSystemStatus(): Promise<string>;
   callMainPing(msg: string): Promise<string>;
 }
+
+export interface IConnectionApplication {
+  start(): Promise<void>;
+}
+
+export const ConnectionApplicationId = createId('ConnectionApplication');

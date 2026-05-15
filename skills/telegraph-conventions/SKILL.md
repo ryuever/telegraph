@@ -66,6 +66,42 @@ It must NOT import: `electron`, Node built-ins (`fs`, `path`, `child_process`), 
 
 ---
 
+## DI tokens & cross-process contracts
+
+### DI tokens (`createId`) and interfaces consumed outside the owning module must live in `common/`
+
+**Rule.** Any symbol that is (a) a DI injection token created with `createId()`, or (b) a TypeScript `interface` that other processes / modules inject against, must be defined in the `common/` directory of the owning app or package — never inside `electron-main/`, `node/`, or `browser/`.
+
+```ts
+// ✅ correct — token + interface in common/
+// apps/shared/src/application/common/index.ts
+export interface ISharedApplication {
+  start(): Promise<void>;
+}
+export const SharedApplicationId = createId('SharedApplication');
+
+// ❌ wrong — token in implementation file
+// apps/shared/src/application/node/SharedApplication.ts
+export const SharedApplicationId = createId('SharedApplication');  // moved out
+```
+
+The implementation file re-exports from `common/` for backward compatibility only if needed; new consumers should import directly from `common/`.
+
+**Why.** Three reasons:
+
+1. **Dependency direction.** External consumers (e.g. `AppApplication` in `apps/main/`) should depend on the contract (`interface` + token), not on the concrete implementation class. Placing the token in `node/SharedApplication.ts` forces every consumer to import the implementation file, creating hidden coupling.
+2. **Cross-process safety.** `common/` is the only subdirectory safe to import from any process role (main, browser, utility). Tokens in `electron-main/` or `node/` are invisible or illegal to import from the renderer or another utility process.
+3. **Discoverability.** All injectable contracts in one place (`common/`) makes the app's public surface scannable. Scattering tokens across implementation files hides the dependency graph.
+
+**How to apply.**
+
+- When adding a new `createId()` call or a new injectable `interface`, place both in the owning module's `common/index.ts` (or `common/types.ts` if the module already splits them).
+- The implementation class (`@injectable()`) stays in its process-specific directory (`electron-main/`, `node/`, `browser/`) and imports the token from `common/`.
+- When refactoring an existing token out of an implementation file, also update all external import sites to point at `common/`. The implementation file may re-export for a transitional period.
+- Constants and types that are *only* consumed internally (e.g. a private class-scoped helper) do not need to move — only symbols that cross the module boundary or are used by the DI container.
+
+---
+
 ## Renderer routing
 
 ### Hash routes must subscribe to `hashchange` — don't compute the route at module load

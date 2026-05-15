@@ -1,4 +1,4 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 import {
   UtilityProcessSupervisor,
   type SpawnInfo,
@@ -10,33 +10,19 @@ import {
 } from '@x-oasis/async-call-rpc';
 import { join } from 'path';
 
-import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
-import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import type {
   IPidNameRegistry,
   SupervisorInspectorSnapshot,
 } from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
 import { DAEMON_PARTICIPANT_ID } from '@/apps/daemon/application/common';
+import type { IDaemonProcess } from '@/apps/daemon/application/common';
+import { DaemonProcessId } from '@/apps/daemon/application/common';
+import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
+import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 
-export interface IDaemonProcess {
-  spawn(): Promise<void>;
-  getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
-  /**
-   * Subscribe to supervisor state transitions (e.g.
-   * `running` → `restarting` → `running`). Used by AppApplication to
-   * trigger an immediate `triggerSupervisorSnapshotsChanged` push so
-   * UI sees transient states even when the transition lasts well
-   * under the baseline polling interval.
-   *
-   * The listener payload is intentionally void — consumers just need
-   * a notification, the up-to-date snapshot is fetched via
-   * `getInspectorSnapshot()` (or the aggregator).
-   */
-  subscribeStateChange(listener: () => void): () => void;
-}
-
-export const DaemonProcessId = createId('DaemonProcess');
+export type { IDaemonProcess };
+export { DaemonProcessId };
 
 @injectable()
 export class DaemonProcess implements IDaemonProcess {

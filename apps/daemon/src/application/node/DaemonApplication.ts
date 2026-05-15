@@ -1,13 +1,12 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
-import type { IDaemonProcess } from '@/apps/daemon/application/electron-main/DaemonProcess';
-import { DaemonProcessId } from '@/apps/daemon/application/electron-main/DaemonProcess';
+import type { IDaemonProcess } from '@/apps/daemon/application/common';
+import { DaemonProcessId } from '@/apps/daemon/application/common';
+import type { IDaemonApplication } from '@/apps/daemon/application/common';
+import { DaemonApplicationId } from '@/apps/daemon/application/common';
 
-export interface IDaemonApplication {
-  start(): Promise<void>;
-}
-
-export const DaemonApplicationId = createId('DaemonApplication');
+export type { IDaemonApplication };
+export { DaemonApplicationId };
 
 @injectable()
 export class DaemonApplication implements IDaemonApplication {

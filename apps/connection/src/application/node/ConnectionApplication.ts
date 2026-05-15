@@ -1,4 +1,4 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
 import type {
   IPageletProcess,
@@ -13,14 +13,13 @@ import {
   AppOrchestratorId,
 } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { CONNECTION_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
+import type { IConnectionApplication } from '@/apps/connection/application/common';
+import { ConnectionApplicationId } from '@/apps/connection/application/common';
 
 export const CONNECTION_WORKER_FILE = 'connection-worker.js';
 
-export interface IConnectionApplication {
-  start(): Promise<void>;
-}
-
-export const ConnectionApplicationId = createId('ConnectionApplication');
+export type { IConnectionApplication };
+export { ConnectionApplicationId };
 
 @injectable()
 export class ConnectionApplication implements IConnectionApplication {

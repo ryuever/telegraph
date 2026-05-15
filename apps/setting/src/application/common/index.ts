@@ -1,3 +1,5 @@
+import { createId } from '@x-oasis/di';
+
 export const SETTING_PARTICIPANT_ID = 'setting';
 
 export const SETTING_PAGELET_SERVICE_PATH = 'setting-pagelet-api';
@@ -11,3 +13,9 @@ export interface ISettingPageletService {
   callDaemonSystemStatus(): Promise<string>;
   callMainPing(msg: string): Promise<string>;
 }
+
+export interface ISettingApplication {
+  start(): Promise<void>;
+}
+
+export const SettingApplicationId = createId('SettingApplication');

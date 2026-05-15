@@ -1,18 +1,17 @@
-import { createId, inject, injectable } from '@x-oasis/di';
+import { inject, injectable } from '@x-oasis/di';
 
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { CHAT_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
+import type { IChatApplication } from '@/apps/chat/application/common';
+import { ChatApplicationId } from '@/apps/chat/application/common';
 
 export const CHAT_WORKER_FILE = 'chat-worker.js';
 
-export interface IChatApplication {
-  start(): Promise<void>;
-}
-
-export const ChatApplicationId = createId('ChatApplication');
+export type { IChatApplication };
+export { ChatApplicationId };
 
 @injectable()
 export class ChatApplication implements IChatApplication {

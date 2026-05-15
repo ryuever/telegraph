@@ -1,3 +1,4 @@
+import { createId } from '@x-oasis/di'
 import type { RuntimeEvent } from '@/packages/runtime-contracts'
 
 export const CHAT_PAGELET_SERVICE_PATH = 'chat-pagelet-api'
@@ -162,3 +163,9 @@ export interface ChatConversation {
   updatedAt: number
   messages: ChatMessage[]
 }
+
+export interface IChatApplication {
+  start(): Promise<void>
+}
+
+export const ChatApplicationId = createId('ChatApplication')
