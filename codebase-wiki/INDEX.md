@@ -52,6 +52,7 @@ features:
 | A-008 | [20260509-telegraph-final-process-architecture.md](./architecture/20260509-telegraph-final-process-architecture.md) | Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet） | 不背历史包袱的目标态权威定义：Renderer 只与 Pagelet 直连；Shared/Daemon/Main 能力由 Pagelet ForwardingProxy 透明转发；Daemon 仅监控、Main 独占进程治理；所有 channel 经 x-oasis ConnectionOrchestrator 编排；进程崩溃通过 `replaceParticipantChannel` 透明换链。 |
 | A-009 | [20260512-runtime-directory-convention-and-file-structure.md](./architecture/20260512-runtime-directory-convention-and-file-structure.md) | Telegraph 运行时目录分层与文件结构约定 | 以 VS Code 的 node/electron-browser/browser-common/browser 范式为参照，系统梳理 Telegraph 的 common / electron-main / electron-browser / browser / node 五层运行时目录含义、代码边界、完整文件映射与跨目录 import 规则矩阵。 |
 | A-010 | [20260513-vscode-contribution-model-for-telegraph.md](./architecture/20260513-vscode-contribution-model-for-telegraph.md) | VS Code Contribution 模型对 Telegraph 可扩展架构的启示与落地路径 | 以 VS Code extension 的 contributes 声明式贡献点为参照，分析 apps-v2 中 4 套隐式注册模式（participant ID / service path / PageConfig / DI Registry），提出 TelegraphManifest 声明式契约设计与三层贡献模型（Static Manifest → DI Registration → Runtime Binding），使新 Pagelet 接入从改 6 处代码收敛到写 1 份 manifest。 |
+| A-011 | [20260515-connection-topology-and-patterns.md](./architecture/20260515-connection-topology-and-patterns.md) | Telegraph 连接拓扑与通信模式 | 三层通信模型（IPC / Direct / Utility Control）的全局拓扑、各进程启动建连时序、Pagelet 全生命周期连接演变、重连策略、以及跨 Pagelet 高频交互的 Shared 服务发现 + P2P 直连方案。 |
 
 ### discussion/ — 技术讨论
 
@@ -66,6 +67,7 @@ features:
 | D-007 | [20260514-x-oasis-capability-gaps-v2.md](./discussion/20260514-x-oasis-capability-gaps-v2.md) | x-oasis 能力差距盘点 v2（telegraph apps/ 实际落地视角） | D-006 P0 三项落地后的演进版：把 9 项"已就绪未使用" vs 7 项"上游真实缺失"分开，重点指出 CircuitBreaker 接入 RPC 调用栈缺失（空壳 bug）与 UtilityProcessSupervisor 缺失，给 x-oasis ROI 排序需求清单与 telegraph 第一波改造清单。 |
 | D-008 | [20260515-apps-framework-gap-review-after-supervisor.md](./discussion/20260515-apps-framework-gap-review-after-supervisor.md) | apps/ 框架层短板审查（D-007 类别 A 落地后视角） | D-007 类别 A 落地后对 apps/ + packages/services/ 的重新盘点：列出 7 项已稳固能力 + 11 项短板（H1-H11，🔴/🟡/🟢 分级）+ 3 项必须等 x-oasis 上游 + 6 步第一波改造建议。 |
 | D-009 | [20260515-renderer-spa-framework-selection.md](./discussion/20260515-renderer-spa-framework-selection.md) | Renderer SPA 框架选型（React Router v7 + 自实现 KeepAlive） | 从"侧边栏多入口/切换不丢状态/路由级 lazy"诉求出发对比 Remix / Next.js / RR v7 / TanStack Router，决定 Vite + React Router v7 (data mode, SPA) + 自实现 PageletHost (display 切换) 方案，并定义与 A-008 ConnectionOrchestrator + Pagelet 的协作约定。 |
+| D-010 | [20260515-react-native-mobile-monorepo-integration.md](./discussion/20260515-react-native-mobile-monorepo-integration.md) | React Native Mobile 接入 Monorepo 调研 | 调研在现有 Electron + pnpm monorepo 基础上接入 Expo RN 移动端的目录结构、包共享边界（runtime-contracts/stores 可共享，services/ui 不可共享）、NativeWind vs Tamagui 选型、Metro 配置要点、服务接口抽象层设计（IChatService 等），以及 Bluesky / Solito / Tamagui starter 三个可借鉴项目。 |
 
 ### issue/ — Issue 记录
 
