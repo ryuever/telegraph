@@ -94,7 +94,7 @@ export class AppApplication implements IAppApplication {
     serviceHost.registerServiceHandler(MAIN_RPC_SERVICE_PATH, {
       mainPing(msg: string): string {
         mainCallCount++;
-        return `pong from main (#${mainCallCount}): ${msg}`;
+        return `pong from main (#${String(mainCallCount)}): ${msg}`;
       },
     });
 

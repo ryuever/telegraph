@@ -3,4 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '@/packages/ui/styles/globals.css';
 import SettingApp from './SettingApp';
 
-createRoot(document.getElementById('app')!).render(<SettingApp />);
+const rootEl = document.getElementById('app');
+if (rootEl) {
+  createRoot(rootEl).render(<SettingApp />);
+}

@@ -164,7 +164,7 @@ function SupervisorCard({
                 entry: SupervisorInspectorSnapshot['restartHistory'][number],
                 i: number
               ) => (
-                <RestartRow key={`${entry.triggeredAt}-${i}`} entry={entry} />
+                <RestartRow key={`${String(entry.triggeredAt)}-${String(i)}`} entry={entry} />
               )
             )}
           </ul>
@@ -212,9 +212,9 @@ function formatTimeAgo(ts: number | null): string {
   const deltaMs = Date.now() - ts;
   if (deltaMs < 0) return 'just now';
   const sec = Math.floor(deltaMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return `${String(sec)}s ago`;
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return `${String(min)}m ago`;
   const t = new Date(ts);
   return `${String(t.getHours()).padStart(2, '0')}:${String(
     t.getMinutes()
@@ -257,7 +257,7 @@ function RestartRow({
       </span>
       <span className="font-mono text-[10px] text-zinc-500">
         pid {entry.prevPid ?? '—'}
-        {entry.newPid ? ` → ${entry.newPid}` : ''}
+        {entry.newPid ? ` → ${String(entry.newPid)}` : ''}
       </span>
     </li>
   );

@@ -40,7 +40,7 @@ export const ChatComposer = React.memo(function ChatComposer({
     if (!el) return
     el.style.height = '0px'
     const next = Math.min(MAX_HEIGHT, el.scrollHeight)
-    el.style.height = next + 'px'
+    el.style.height = String(next) + 'px'
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
   }, [text])
 
@@ -74,7 +74,7 @@ export const ChatComposer = React.memo(function ChatComposer({
             ref={textareaRef}
             value={text}
             readOnly={!sessionId}
-            onChange={e => setText(e.target.value)}
+            onChange={e => { setText(e.target.value); }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             rows={1}

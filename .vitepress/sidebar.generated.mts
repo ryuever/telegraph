@@ -94,6 +94,10 @@ export const wikiSidebar = {
         {
           "text": "D-009 Renderer SPA 框架选型（React Router v7 + 自实现 KeepAlive）",
           "link": "/discussion/20260515-renderer-spa-framework-selection"
+        },
+        {
+          "text": "D-010 React Native Mobile 接入 Monorepo 调研（目录结构 + 跨平台共享策略）",
+          "link": "/discussion/20260515-react-native-mobile-monorepo-integration"
         }
       ]
     }

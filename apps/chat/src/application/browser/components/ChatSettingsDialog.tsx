@@ -38,30 +38,27 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
   useEffect(() => {
     if (open) {
       setDraft(settings)
-      loadEnvModels().then(models => {
-        setEnvModels(models)
-        testAllConnections(models)
-      })
+      const models = loadEnvModels()
+      setEnvModels(models)
+      testAllConnections(models)
     }
   }, [open, settings])
 
-  const testAllConnections = async (models: EnvModelConfig[]) => {
+  const testAllConnections = (models: EnvModelConfig[]) => {
     if (models.length === 0) return
     setIsTesting(true)
     const results = new Map<string, ModelConnectionStatus>()
-    await Promise.all(
-      models.map(async model => {
-        if (model.apiKey) {
-          const status = await testModelConnection(
-            model.provider,
-            model.modelId,
-            model.apiKey,
-            model.baseUrl
-          )
-          results.set(`${model.provider}:${model.modelId}`, status)
-        }
-      })
-    )
+    for (const model of models) {
+      if (model.apiKey) {
+        const status = testModelConnection(
+          model.provider,
+          model.modelId,
+          model.apiKey,
+          model.baseUrl
+        )
+        results.set(`${model.provider}:${model.modelId}`, status)
+      }
+    }
     setConnectionStatus(results)
     setIsTesting(false)
   }
@@ -90,24 +87,24 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
     }))
   }
 
-  const setModel = (id: string) => setDraft(d => ({ ...d, modelId: id }))
+  const setModel = (id: string) => { setDraft(d => ({ ...d, modelId: id })); }
   const setBackend = (backend: ChatModelSettings['backend']) =>
-    setDraft(d => ({ ...d, backend }))
+    { setDraft(d => ({ ...d, backend })); }
   const setOrchestration = (orchestration: ChatModelSettings['orchestration']) =>
-    setDraft(d => ({ ...d, orchestration }))
+    { setDraft(d => ({ ...d, orchestration })); }
   const setOrchestrationPattern = (
     orchestrationPattern: ChatModelSettings['orchestrationPattern']
-  ) => setDraft(d => ({ ...d, orchestrationPattern }))
+  ) => { setDraft(d => ({ ...d, orchestrationPattern })); }
   const setWorktreeIsolation = (worktreeIsolation: boolean) =>
-    setDraft(d => ({ ...d, worktreeIsolation }))
+    { setDraft(d => ({ ...d, worktreeIsolation })); }
   const setExtensionBlocklistText = (raw: string) =>
-    setDraft(d => ({
+    { setDraft(d => ({
       ...d,
       extensionBlocklist: raw
         .split(/[,\n]+/)
         .map(s => s.trim())
         .filter(Boolean),
-    }))
+    })); }
 
   const save = () => {
     onSave(draft)
@@ -148,7 +145,7 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); }}
               className={cn(
                 'relative px-3 py-2 text-[11.5px] font-medium tracking-wide transition-colors',
                 activeTab === tab.id
@@ -226,7 +223,7 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
 
 function ModelTab({
   draft,
-  envModels,
+  envModels: _envModels,
   availableEnvModels,
   connectionStatus,
   currentStatus,
@@ -296,7 +293,7 @@ function ModelTab({
       <Field label="Provider">
         <select
           value={draft.provider}
-          onChange={e => onSetProvider(e.target.value)}
+          onChange={e => { onSetProvider(e.target.value); }}
           className={selectClass}
         >
           {providerOptions.map(p => (
@@ -311,7 +308,7 @@ function ModelTab({
         <div className="flex items-center gap-2">
           <select
             value={draft.modelId}
-            onChange={e => onSetModel(e.target.value)}
+            onChange={e => { onSetModel(e.target.value); }}
             className={cn(selectClass, 'flex-1')}
           >
             {modelOptions.map(m => {
@@ -339,7 +336,7 @@ function ModelTab({
                 )}
               />
               {currentStatus.connected
-                ? `Connected (${currentStatus.latency}ms)`
+                ? `Connected (${String(currentStatus.latency)}ms)`
                 : 'Disconnected'}
             </div>
           )}
@@ -352,7 +349,7 @@ function ModelTab({
       <Field label="Execution backend">
         <select
           value={draft.backend}
-          onChange={e => onSetBackend(e.target.value as ChatModelSettings['backend'])}
+          onChange={e => { onSetBackend(e.target.value as ChatModelSettings['backend']); }}
           className={selectClass}
         >
           <option value="pi-ai">pi-ai (default)</option>
@@ -382,7 +379,7 @@ function OrchestrationTab({
         <select
           value={draft.orchestration}
           onChange={e =>
-            onSetOrchestration(e.target.value as ChatModelSettings['orchestration'])
+            { onSetOrchestration(e.target.value as ChatModelSettings['orchestration']); }
           }
           className={selectClass}
         >
@@ -397,9 +394,9 @@ function OrchestrationTab({
             <select
               value={draft.orchestrationPattern}
               onChange={e =>
-                onSetOrchestrationPattern(
+                { onSetOrchestrationPattern(
                   e.target.value as ChatModelSettings['orchestrationPattern']
-                )
+                ); }
               }
               className={selectClass}
             >
@@ -412,7 +409,7 @@ function OrchestrationTab({
             <input
               type="checkbox"
               checked={draft.worktreeIsolation}
-              onChange={e => onSetWorktreeIsolation(e.target.checked)}
+              onChange={e => { onSetWorktreeIsolation(e.target.checked); }}
               className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
             />
             Enable worktree isolation hint (recommended for parallel code edits)
@@ -444,7 +441,7 @@ function ExtensionsTab({
         <input
           type="text"
           value={draft.extensionBlocklist.join(', ')}
-          onChange={e => onSetBlocklist(e.target.value)}
+          onChange={e => { onSetBlocklist(e.target.value); }}
           placeholder="pi-subagents"
           className={inputClass}
           autoComplete="off"

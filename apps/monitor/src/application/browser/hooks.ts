@@ -7,40 +7,44 @@ import {
 
 const RETRY_INTERVAL_MS = 2000;
 
+function createCancelledFlag(): { isCancelled: () => boolean; cancel: () => void } {
+  let cancelled = false;
+  return {
+    isCancelled: () => cancelled,
+    cancel: () => { cancelled = true; },
+  };
+}
+
 export function useMonitorSnapshots() {
   const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
-  const subscribedRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const { isCancelled, cancel } = createCancelledFlag();
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const subscribe = async () => {
-      if (cancelled || subscribedRef.current) return;
-      subscribedRef.current = true;
+      if (isCancelled()) return;
 
       try {
         const snap = await getMonitorPageletClient().getSnapshot();
-        if (!cancelled && snap) {
+        if (!isCancelled()) {
           setSnapshot(snap);
           setUpdatedAt(Date.now());
         }
       } catch {
-        subscribedRef.current = false;
-        if (!cancelled) {
-          retryTimer = setTimeout(subscribe, RETRY_INTERVAL_MS);
+        if (!isCancelled()) {
+          retryTimer = setTimeout(() => { void subscribe(); }, RETRY_INTERVAL_MS);
         }
         return;
       }
 
       try {
-        if (cancelled) return;
-        const result: (() => void) | { unsubscribe: () => void } | void =
+        const result: (() => void) | { unsubscribe: () => void } | undefined =
           getMonitorPageletClient().onPerformanceUpdate(
           (snap: MonitorSnapshot) => {
-            if (!cancelled) {
+            if (!isCancelled()) {
               setSnapshot(snap);
               setUpdatedAt(Date.now());
             }
@@ -49,27 +53,25 @@ export function useMonitorSnapshots() {
         let unsub: () => void = () => {};
         if (typeof result === 'function') {
           unsub = result;
-        } else if (result && typeof result === 'object' && 'unsubscribe' in result) {
+        } else if (typeof result === 'object') {
           unsub = (result as { unsubscribe: () => void }).unsubscribe.bind(result);
         }
-        if (!cancelled) {
+        if (!isCancelled()) {
           unsubRef.current = unsub;
         } else {
           unsub();
         }
       } catch {
-        subscribedRef.current = false;
-        if (!cancelled) {
-          retryTimer = setTimeout(subscribe, RETRY_INTERVAL_MS);
+        if (!isCancelled()) {
+          retryTimer = setTimeout(() => { void subscribe(); }, RETRY_INTERVAL_MS);
         }
       }
     };
 
-    subscribe();
+    void subscribe();
 
     return () => {
-      cancelled = true;
-      subscribedRef.current = false;
+      cancel();
       if (retryTimer) clearTimeout(retryTimer);
       unsubRef.current?.();
       unsubRef.current = null;
@@ -88,9 +90,9 @@ export function useSnapshotHistory(
 
   useEffect(() => {
     if (!snapshot) return;
-    const last = ref.current[ref.current.length - 1];
-    if (last && last.timestamp === snapshot.timestamp) return;
-    const next = ref.current.concat(snapshot);
+    const arr = ref.current;
+    if (arr.length > 0 && arr[arr.length - 1].timestamp === snapshot.timestamp) return;
+    const next = arr.concat(snapshot);
     if (next.length > limit) next.splice(0, next.length - limit);
     ref.current = next;
     setVersion((v) => v + 1);
@@ -114,44 +116,37 @@ export function useSupervisorSnapshots() {
     SupervisorInspectorSnapshot[] | null
   >(null);
   const unsubRef = useRef<(() => void) | null>(null);
-  const subscribedRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const { isCancelled, cancel } = createCancelledFlag();
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const subscribe = () => {
-      if (cancelled || subscribedRef.current) return;
-      subscribedRef.current = true;
+      if (isCancelled()) return;
       try {
         const result:
           | (() => void)
           | { unsubscribe: () => void }
-          | void = getMonitorPageletClient().onSupervisorSnapshotsChanged(
+          | undefined = getMonitorPageletClient().onSupervisorSnapshotsChanged(
           (snaps: SupervisorInspectorSnapshot[]) => {
-            if (!cancelled) setSnapshots(snaps);
+            if (!isCancelled()) setSnapshots(snaps);
           }
         );
         let unsub: () => void = () => {};
         if (typeof result === 'function') {
           unsub = result;
-        } else if (
-          result &&
-          typeof result === 'object' &&
-          'unsubscribe' in result
-        ) {
+        } else if (typeof result === 'object') {
           unsub = (
             result as { unsubscribe: () => void }
           ).unsubscribe.bind(result);
         }
-        if (!cancelled) {
+        if (!isCancelled()) {
           unsubRef.current = unsub;
         } else {
           unsub();
         }
       } catch {
-        subscribedRef.current = false;
-        if (!cancelled) {
+        if (!isCancelled()) {
           retryTimer = setTimeout(subscribe, RETRY_INTERVAL_MS);
         }
       }
@@ -160,8 +155,7 @@ export function useSupervisorSnapshots() {
     subscribe();
 
     return () => {
-      cancelled = true;
-      subscribedRef.current = false;
+      cancel();
       if (retryTimer) clearTimeout(retryTimer);
       unsubRef.current?.();
       unsubRef.current = null;
@@ -174,7 +168,7 @@ export function useSupervisorSnapshots() {
 export function useNowTick(intervalMs = 1000) {
   const [, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
+    const id = setInterval(() => { setNow(Date.now()); }, intervalMs);
+    return () => { clearInterval(id); };
   }, [intervalMs]);
 }

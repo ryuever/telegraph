@@ -41,7 +41,9 @@ export class Diagnostics {
     if (this.metricsProvider) {
       try {
         appMetrics = await this.metricsProvider.getAppMetrics();
-      } catch {}
+      } catch {
+        // noop
+      }
     }
 
     const processes: ProcessRow[] = [
@@ -81,11 +83,13 @@ export class Diagnostics {
   private startRoutine(): void {
     if (this.interval) return;
     this.interval = setInterval(() => {
-      this.collectSnapshot().then((snapshot) => {
+      void this.collectSnapshot().then((snapshot) => {
         for (const cb of this.listeners) {
           try {
             cb(snapshot);
-          } catch {}
+          } catch {
+            // noop
+          }
         }
       });
     }, 2000);

@@ -63,10 +63,10 @@ export class SharedProcess implements ISharedProcess {
         channel.setServiceHost(serviceHost);
       },
       logger: (level: string, msg: string) =>
-        this.logger.info(`[SharedProcess:${level}] ${msg}`),
+        { this.logger.info(`[SharedProcess:${level}] ${msg}`); },
     });
     for (const listener of this.pendingStateChangeListeners) {
-      this.supervisor.subscribeStateChange(() => listener());
+      this.supervisor.subscribeStateChange(() => { listener(); });
     }
     this.pendingStateChangeListeners.clear();
     await this.supervisor.start();

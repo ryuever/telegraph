@@ -52,7 +52,7 @@ export class MainCpServer implements IMainCpServer {
     });
 
     this.orchestrator = new ElectronConnectionOrchestrator({
-      logger: (level, msg) => this.logger.info(`[orchestrator:${level}] ${msg}`),
+      logger: (level, msg) => { this.logger.info(`[orchestrator:${level}] ${msg}`); return; },
       enableStats: true,
       heartbeat: {
         enabled: true,
@@ -71,7 +71,7 @@ export class MainCpServer implements IMainCpServer {
 
     this.settingOrchestrator = new ElectronConnectionOrchestrator({
       logger: (level, msg) =>
-        this.logger.info(`[setting-orchestrator:${level}] ${msg}`),
+        { this.logger.info(`[setting-orchestrator:${level}] ${msg}`); return; },
       enableStats: true,
     });
 

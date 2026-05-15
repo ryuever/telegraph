@@ -11,7 +11,7 @@ let rows: LlmTraceRow[] = []
 const listeners = new Set<() => void>()
 
 function emit() {
-  listeners.forEach(fn => fn())
+  listeners.forEach(fn => { fn(); })
 }
 
 export function subscribeLlmTraceRows(listener: () => void) {

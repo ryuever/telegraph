@@ -157,7 +157,7 @@ function ThinkingIndicator() {
         <span
           key={d}
           className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500"
-          style={{ animationDelay: `${d}ms` }}
+          style={{ animationDelay: `${String(d)}ms` }}
         />
       ))}
     </div>

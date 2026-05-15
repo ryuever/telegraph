@@ -26,4 +26,4 @@ container.load(
 const worker = container.get(MonitorPageletWorkerId) as MonitorPageletWorker;
 worker
   .boot()
-  .catch((err) => logger.error('[monitor-worker] boot failed:', err));
+  .catch((err: unknown) => { logger.error('[monitor-worker] boot failed:', err); });

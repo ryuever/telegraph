@@ -18,11 +18,9 @@ import { MockAgentService } from '../mock-agent-service'
 import {
   loadSettings,
   saveSettings,
-  toRuntimeSettings,
   loadEnvModels,
   getDefaultModelFromEnv,
   type ChatModelSettings,
-  type EnvModelConfig,
 } from '../model-settings'
 import type { AgentService, LlmTracePayload } from '../types'
 
@@ -49,9 +47,9 @@ const SUGGESTIONS = [
 
 export function ChatPanel({ agent }: Props) {
   const [settings, setSettings] = useState<ChatModelSettings>(() => loadSettings())
-  const [envModels, setEnvModels] = useState<EnvModelConfig[]>([])
+  const [_envModels, setEnvModels] = useState<import('../model-settings').EnvModelConfig[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [isLoadingEnv, setIsLoadingEnv] = useState(true)
+  const [_isLoadingEnv, setIsLoadingEnv] = useState(true)
   const [tracePanelOpen, setTracePanelOpenInner] = useState(readLlmTraceOpenFromStorage)
 
   const setTracePanelOpen = useCallback((next: React.SetStateAction<boolean>) => {
@@ -59,7 +57,7 @@ export function ChatPanel({ agent }: Props) {
       const resolved = typeof next === 'function' ? next(prev) : next
       try {
         sessionStorage.setItem(LLM_TRACE_OPEN_KEY, resolved ? '1' : '0')
-      } catch {}
+      } catch { /* noop */ }
       return resolved
     })
   }, [])
@@ -74,9 +72,9 @@ export function ChatPanel({ agent }: Props) {
   useEffect(() => {
     let isMounted = true
 
-    async function initEnvConfig() {
+    function initEnvConfig() {
       try {
-        const models = await loadEnvModels()
+        const models = loadEnvModels()
         if (!isMounted) return
 
         setEnvModels(models)
@@ -180,7 +178,7 @@ export function ChatPanel({ agent }: Props) {
           onCreate={createConversation}
           onDelete={deleteConversation}
           onRename={renameConversation}
-          onToggleCollapse={() => setCollapsed(c => !c)}
+          onToggleCollapse={() => { setCollapsed(c => !c); }}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1">
@@ -192,8 +190,8 @@ export function ChatPanel({ agent }: Props) {
               provider={settings.provider}
               modelId={settings.modelId}
               tracePanelOpen={tracePanelOpen}
-              onToggleTracePanel={() => setTracePanelOpen(o => !o)}
-              onOpenSettings={() => setSettingsOpen(true)}
+              onToggleTracePanel={() => { setTracePanelOpen(o => !o); }}
+              onOpenSettings={() => { setSettingsOpen(true); }}
             />
             <div className="min-h-0 flex-1">
               {active.messages.length === 0 ? (
@@ -212,7 +210,7 @@ export function ChatPanel({ agent }: Props) {
               )}
             </div>
             <ChatComposer
-              key={`${composerKey}|${composerRemountKey}`}
+              key={`${composerKey}|${String(composerRemountKey)}`}
               sessionId={composerKey}
               seedText={seedText}
               onPersistSessionDraft={persistSessionDraft}
@@ -228,7 +226,7 @@ export function ChatPanel({ agent }: Props) {
             scopeAllChats={traceScopeAllChats}
             onScopeAllChatsChange={setTraceScopeAllChats}
             onClear={clearVisibleTraces}
-            onClose={() => setTracePanelOpen(false)}
+            onClose={() => { setTracePanelOpen(false); }}
           />
         </div>
       </div>
@@ -236,7 +234,7 @@ export function ChatPanel({ agent }: Props) {
       <ChatSettingsDialog
         open={settingsOpen}
         settings={settings}
-        onClose={() => setSettingsOpen(false)}
+        onClose={() => { setSettingsOpen(false); }}
         onSave={handleSaveSettings}
       />
     </div>
@@ -271,7 +269,7 @@ function Header({
         <span className="shrink-0 text-[11px] text-zinc-500">
           {messageCount === 0
             ? 'no messages yet'
-            : `${messageCount} message${messageCount === 1 ? '' : 's'}`}
+            : `${String(messageCount)} message${messageCount === 1 ? '' : 's'}`}
         </span>
       </div>
       <div className="flex items-center gap-2 text-[11px] text-zinc-500">
@@ -334,7 +332,7 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
             <button
               key={s}
               type="button"
-              onClick={() => onSuggest(s)}
+              onClick={() => { onSuggest(s); }}
               className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5 text-left text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100"
             >
               {s}

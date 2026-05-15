@@ -7,6 +7,7 @@ import {
 import type {
   IPageletWorkerConfig,
 } from '@/packages/services/pagelet-host/node/PageletWorker';
+import { createParticipantProxy } from '@x-oasis/async-call-rpc-electron';
 import { CONNECTION_PAGELET_SERVICE_PATH } from '@/apps/connection/application/common';
 import type { ISharedService } from '@/apps/shared/application/common';
 import type { IDaemonService } from '@/apps/daemon/application/common';
@@ -21,12 +22,12 @@ export class ConnectionWorker extends PageletWorker<
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
   }
-  protected override onRendererConnection(channel: any): void {
+  protected override onRendererConnection(channel: ReturnType<ReturnType<typeof createParticipantProxy>['getChannelFor']>): void {
     serviceHost.registerService(CONNECTION_PAGELET_SERVICE_PATH, {
       channel,
       serviceHost,
       handlers: {
-        info: (): string => `${this.config.selfId} ready (pid=${process.pid})`,
+        info: (): string => `${this.config.selfId} ready (pid=${String(process.pid)})`,
         callSharedEcho: (msg: string): Promise<string> =>
           this.shared.echo(msg),
         callSharedGetConfig: (key: string): Promise<string> =>

@@ -41,7 +41,7 @@ class PidNode {
   }
 
   addNode(node: PidNode) {
-    this._children[`${node.pid}`] = node;
+    this._children[node.pid] = node;
     node._parent = this;
   }
 
@@ -60,7 +60,7 @@ class PidNode {
 }
 
 export default class PidTree {
-  private group: Record<string, PidNode> = {};
+  private group: Record<string, PidNode | undefined> = {};
 
   load(records: PidRecord[]) {
     for (const record of records) {
@@ -77,10 +77,12 @@ export default class PidTree {
 
   addNode(node: PidNode) {
     const ppid = node.ppid;
-    if (!this.group[ppid]) {
-      this.group[ppid] = new PidNode();
+    let parent = this.group[ppid];
+    if (!parent) {
+      parent = new PidNode();
+      this.group[ppid] = parent;
     }
-    this.group[ppid].addNode(node);
+    parent.addNode(node);
     this.group[node.pid] = node;
   }
 

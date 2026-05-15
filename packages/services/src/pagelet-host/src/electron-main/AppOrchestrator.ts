@@ -246,14 +246,14 @@ export class AppOrchestrator implements IAppOrchestrator {
           'simulated process exit'
         );
       },
-      getStatus: async (): Promise<StatusView | null> => {
+      getStatus: (): Promise<StatusView | null> => {
         const info = orchestrator.getConnectionInfo(
           RENDERER_PARTICIPANT_ID,
           utilityParticipantId
         );
-        if (!info) return null;
+        if (!info) return Promise.resolve(null);
         const stats = orchestrator.getConnectionStats(info.connectionId);
-        return formatStatusView(info, stats);
+        return Promise.resolve(formatStatusView(info, stats));
       },
       killUtility: (): void => {
         this.pageletProcess.kill(utilityParticipantId);

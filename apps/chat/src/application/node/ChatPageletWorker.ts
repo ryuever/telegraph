@@ -2,9 +2,9 @@ import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
 import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
 import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
+import { createParticipantProxy } from '@x-oasis/async-call-rpc-electron';
 import {
   CHAT_PAGELET_SERVICE_PATH,
-  type IChatPageletService,
   type ChatSendRequest,
   type ChatSendResult,
   type ChatStreamEvent,
@@ -20,15 +20,15 @@ export class ChatPageletWorker extends PageletWorker {
     super(config);
   }
 
-  protected override onRendererConnection(channel: any): void {
+  protected override onRendererConnection(channel: ReturnType<ReturnType<typeof createParticipantProxy>['getChannelFor']>): void {
     serviceHost.registerService(CHAT_PAGELET_SERVICE_PATH, {
       channel,
       serviceHost,
       handlers: {
-        info: (): string => `chat-pagelet ready (pid=${process.pid})`,
+        info: (): string => `chat-pagelet ready (pid=${String(process.pid)})`,
 
-        send: async (req: ChatSendRequest): Promise<ChatSendResult> => {
-          return this.handleSend(req);
+        send: (req: ChatSendRequest): Promise<ChatSendResult> => {
+          return Promise.resolve(this.handleSend(req));
         },
 
         onStreamEvent: (callback: (event: ChatStreamEvent) => void): (() => void) => {
@@ -51,7 +51,7 @@ export class ChatPageletWorker extends PageletWorker {
     }
   }
 
-  private async handleSend(req: ChatSendRequest): Promise<ChatSendResult> {
+  private handleSend(req: ChatSendRequest): ChatSendResult {
     const { runId, sessionId, message, settings } = req;
 
     this.emitStreamEvent({ type: 'run_queued', runId });

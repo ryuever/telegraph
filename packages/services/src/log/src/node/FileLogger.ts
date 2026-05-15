@@ -22,9 +22,9 @@ function getDefaultLogDir(): string {
 
 function formatTimestamp(): string {
   const d = new Date();
-  const pad2 = (n: number) => n < 10 ? `0${n}` : `${n}`;
-  const pad3 = (n: number) => n < 10 ? `00${n}` : n < 100 ? `0${n}` : `${n}`;
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const pad3 = (n: number) => String(n).padStart(3, '0');
+  return `${String(d.getFullYear())}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
 }
 
 function stringifyLevel(level: LogLevel): string {
@@ -48,7 +48,7 @@ function formatArgs(args: unknown[]): string {
       try {
         return JSON.stringify(a);
       } catch {
-        return String(a);
+        return JSON.stringify(a);
       }
     }
     return String(a);
@@ -89,10 +89,8 @@ export class FileLogger extends Logger implements ILogger {
   }
 
   private startFlushTimer(): void {
-    this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
-    if (this.flushTimer.unref) {
-      this.flushTimer.unref();
-    }
+    this.flushTimer = setInterval(() => { this.flush(); }, FLUSH_INTERVAL_MS);
+    this.flushTimer.unref();
   }
 
   private enqueue(level: LogLevel, message: string, ...args: unknown[]): void {
@@ -148,7 +146,7 @@ export class FileLogger extends Logger implements ILogger {
       this.backupIndex = this.backupIndex > MAX_BACKUP_FILES ? 1 : this.backupIndex;
       const backupPath = path.join(
         this.logDir,
-        `${this.label}_${this.backupIndex++}.log`
+        `${this.label}_${String(this.backupIndex++)}.log`
       );
       try {
         if (fs.existsSync(backupPath)) {

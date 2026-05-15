@@ -59,6 +59,19 @@ Two cooperating Electron-runtime apps live under `apps/`:
 The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserved in
 `apps/_legacy/` for documentation purposes only — see `apps/_legacy/README.md`.
 
+## Skill placement
+
+Project-related skills live in `skills/` (not `.agents/skills/`, which is reserved for generic / tool-provided skills).
+
+| Skill type | Location | Rule |
+|------------|----------|------|
+| **Conventions** (coding rules, style) | `skills/telegraph-conventions/SKILL.md` | Start as a section there; split out only if > ~30 lines or needs assets |
+| **Workflows** (multi-step procedures) | `skills/<workflow-name>/SKILL.md` | Always its own folder — e.g. `skills/add-pagelet/` |
+
+When creating a new project skill, add it under `skills/` and update `skills/README.md`.
+
+---
+
 ## Workspace layout
 
 ```

@@ -149,12 +149,10 @@ export class PageletWorker<
   }
 
   async boot(): Promise<void> {
-    if (!process.parentPort) {
-      throw new Error('parentPort is not available');
-    }
+    const parentPort = process.parentPort;
 
     const mainChannel = new ElectronUtilityProcessChannel({
-      parentPort: process.parentPort as any,
+      parentPort: parentPort as unknown as ConstructorParameters<typeof ElectronUtilityProcessChannel>[0] extends { parentPort: infer P } ? P : never,
       description: `${this.config.selfId}→main IPC channel`,
     });
     this.mainChannel = mainChannel;

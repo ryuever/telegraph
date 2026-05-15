@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/browser';
+import type {
+  StateChangeEvent,
+  ConnectionStats,
+} from '@x-oasis/async-call-rpc';
 import {
   SETTING_PAGELET_SERVICE_PATH,
   ISettingPageletService,
@@ -10,9 +14,11 @@ const client = createOrchestratorClient({
   ipcChannelDescription: 'setting-page↔preload:ipc',
 });
 
-const settingClient = client.getProxy<any>(
+type SettingServiceProxy = Record<string, (...args: unknown[]) => Promise<string>>;
+
+const settingClient = client.getProxy<SettingServiceProxy>(
   SETTING_PAGELET_SERVICE_PATH
-) as ISettingPageletService;
+) as unknown as ISettingPageletService;
 
 interface LogEntry {
   id: number;
@@ -21,6 +27,12 @@ interface LogEntry {
   latencyMs: number;
   error?: string;
   timestamp: number;
+}
+
+interface StatusInfo {
+  fromId: string;
+  toId: string;
+  stats?: ConnectionStats;
 }
 
 type ConnectionState =
@@ -33,23 +45,27 @@ type ConnectionState =
 
 let logIdCounter = 0;
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 function SettingApp() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('IDLE');
-  const [statusInfo, setStatusInfo] = useState<any>(null);
+  const [statusInfo, setStatusInfo] = useState<StatusInfo | null>(null);
 
   const isReady = connectionState === 'READY';
 
   const addLog = useCallback(
-    (method: string, result: any, latencyMs: number, error?: string) => {
+    (method: string, result: unknown, latencyMs: number, error?: string) => {
       setLogs((prev) => [
         {
           id: ++logIdCounter,
           method,
           result:
-            typeof result === 'object'
+            typeof result === 'object' && result !== null
               ? JSON.stringify(result)
               : String(result),
           latencyMs,
@@ -66,8 +82,8 @@ function SettingApp() {
     const subs: { unsubscribe: () => void }[] = [];
 
     subs.push(
-      client.onStateChange((event: any) => {
-        setConnectionState(event.state || 'IDLE');
+      client.onStateChange((event: StateChangeEvent) => {
+        setConnectionState(event.currentState);
       })
     );
     subs.push(
@@ -103,23 +119,23 @@ function SettingApp() {
 
     client
       .connect()
-      .then(() => setConnectionState('READY'))
-      .catch((err: any) => {
+      .then(() => { setConnectionState('READY'); })
+      .catch((err: unknown) => {
         setConnectionState('IDLE');
-        addLog('connect', null, 0, err.message);
+        addLog('connect', null, 0, getErrorMessage(err));
       });
 
     const pollStatus = setInterval(() => {
       client
         .getStatus()
-        .then((info: any) => {
-          if (info) setStatusInfo(info);
+        .then((info: unknown) => {
+          if (isStatusInfo(info)) setStatusInfo(info);
         })
         .catch(() => {});
     }, 2000);
 
     return () => {
-      subs.forEach((s) => s.unsubscribe());
+      subs.forEach((s) => { s.unsubscribe(); });
       clearInterval(pollStatus);
     };
   }, []);
@@ -129,9 +145,9 @@ function SettingApp() {
     try {
       await client.connect();
       setConnectionState('READY');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setConnectionState('IDLE');
-      addLog('connect', null, 0, err.message);
+      addLog('connect', null, 0, getErrorMessage(err));
     }
   }, [addLog]);
 
@@ -140,8 +156,8 @@ function SettingApp() {
     try {
       await client.disconnect();
       setConnectionState('CLOSED');
-    } catch (err: any) {
-      addLog('disconnect', null, 0, err.message);
+    } catch (err: unknown) {
+      addLog('disconnect', null, 0, getErrorMessage(err));
     }
   }, [addLog]);
 
@@ -150,20 +166,24 @@ function SettingApp() {
   }, []);
 
   const callMethod = useCallback(
-    async (method: string, ...args: any[]) => {
+    async (method: string, ...args: unknown[]) => {
       if (!isReady) return;
       setLoading(method);
       const start = performance.now();
       try {
-        const result = await (settingClient as any)[method](...args);
+        const serviceProxy = settingClient as unknown as Record<
+          string,
+          (...args: unknown[]) => Promise<string>
+        >;
+        const result = await serviceProxy[method](...args);
         addLog(method, result, Math.round(performance.now() - start));
         return result;
-      } catch (err: any) {
+      } catch (err: unknown) {
         addLog(
           method,
           null,
           Math.round(performance.now() - start),
-          err.message
+          getErrorMessage(err)
         );
       } finally {
         setLoading(null);
@@ -341,14 +361,14 @@ function SettingApp() {
               }}
             >
               {[
-                { l: 'Calls', v: stats?.totalRpcCalls ?? 0 },
-                { l: 'Success', v: stats?.successfulCalls ?? 0 },
-                { l: 'Failed', v: stats?.failedCalls ?? 0 },
+                { l: 'Calls', v: String(stats?.totalRpcCalls ?? 0) },
+                { l: 'Success', v: String(stats?.successfulCalls ?? 0) },
+                { l: 'Failed', v: String(stats?.failedCalls ?? 0) },
                 {
                   l: 'Latency',
                   v: `${(stats?.avgLatencyMs ?? 0).toFixed(0)}ms`,
                 },
-                { l: 'Reconnects', v: stats?.totalReconnects ?? 0 },
+                { l: 'Reconnects', v: String(stats?.totalReconnects ?? 0) },
                 {
                   l: 'Rate',
                   v:
@@ -408,7 +428,7 @@ function SettingApp() {
               Actions
             </div>
             <button
-              onClick={handleConnect}
+              onClick={() => { void handleConnect(); }}
               disabled={isReady}
               style={{
                 padding: '5px 14px',
@@ -424,7 +444,7 @@ function SettingApp() {
               Connect
             </button>
             <button
-              onClick={handleDisconnect}
+              onClick={() => { void handleDisconnect(); }}
               disabled={!isReady}
               style={{
                 padding: '5px 14px',
@@ -481,19 +501,19 @@ function SettingApp() {
               label="Get Config"
               loading={loading === 'callSharedGetConfig'}
               disabled={!isReady}
-              onClick={() => callMethod('callSharedGetConfig', 'theme')}
+              onClick={() => { void callMethod('callSharedGetConfig', 'theme'); }}
             />
             <ActionBtn
               label="Set Config"
               loading={loading === 'callSharedSetConfig'}
               disabled={!isReady}
-              onClick={() => callMethod('callSharedSetConfig', 'theme', 'dark')}
+              onClick={() => { void callMethod('callSharedSetConfig', 'theme', 'dark'); }}
             />
             <ActionBtn
               label="Echo Shared"
               loading={loading === 'callSharedEcho'}
               disabled={!isReady}
-              onClick={() => callMethod('callSharedEcho', 'hello from setting')}
+              onClick={() => { void callMethod('callSharedEcho', 'hello from setting'); }}
             />
           </div>
         </div>
@@ -521,13 +541,13 @@ function SettingApp() {
               label="System Status"
               loading={loading === 'callDaemonSystemStatus'}
               disabled={!isReady}
-              onClick={() => callMethod('callDaemonSystemStatus')}
+              onClick={() => { void callMethod('callDaemonSystemStatus'); }}
             />
             <ActionBtn
               label="Echo Daemon"
               loading={loading === 'callDaemonEcho'}
               disabled={!isReady}
-              onClick={() => callMethod('callDaemonEcho', 'hello from setting')}
+              onClick={() => { void callMethod('callDaemonEcho', 'hello from setting'); }}
             />
           </div>
         </div>
@@ -555,13 +575,13 @@ function SettingApp() {
               label="Main Ping"
               loading={loading === 'callMainPing'}
               disabled={!isReady}
-              onClick={() => callMethod('callMainPing', 'hello from setting')}
+              onClick={() => { void callMethod('callMainPing', 'hello from setting'); }}
             />
             <ActionBtn
               label="Pagelet Info"
               loading={loading === 'info'}
               disabled={!isReady}
-              onClick={() => callMethod('info')}
+              onClick={() => { void callMethod('info'); }}
             />
           </div>
         </div>
@@ -587,7 +607,7 @@ function SettingApp() {
               Call Log ({logs.length})
             </span>
             <button
-              onClick={() => setLogs([])}
+              onClick={() => { setLogs([]); }}
               style={{
                 fontSize: 10,
                 border: '1px solid #374151',
@@ -656,6 +676,15 @@ function SettingApp() {
         </div>
       </div>
     </div>
+  );
+}
+
+function isStatusInfo(value: unknown): value is StatusInfo {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fromId' in value &&
+    'toId' in value
   );
 }
 

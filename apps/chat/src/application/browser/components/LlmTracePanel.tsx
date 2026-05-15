@@ -9,7 +9,7 @@ function formatJson(trace: LlmTracePayload): string {
   try {
     return JSON.stringify(trace, null, 2)
   } catch {
-    return String(trace)
+    return JSON.stringify(trace)
   }
 }
 
@@ -98,7 +98,7 @@ export function LlmTracePanel({
         <input
           type="checkbox"
           checked={scopeAllChats}
-          onChange={e => onScopeAllChatsChange(e.target.checked)}
+          onChange={e => { onScopeAllChatsChange(e.target.checked); }}
           className="rounded border-zinc-600 bg-zinc-900"
         />
         <span>
@@ -136,11 +136,11 @@ export function LlmTracePanel({
                     let evType = ''
                     if (isContract) {
                       const ev = (tr as { kind: 'runtime_event'; event: { type?: string } }).event
-                      evType = typeof ev?.type === 'string' ? ev.type : ''
+                      evType = typeof ev.type === 'string' ? ev.type : ''
                     }
                     return (
                       <li
-                        key={`${row.sessionId}-${row.runId}-${row.ts}-${i}`}
+                        key={`${row.sessionId}-${row.runId}-${String(row.ts)}-${String(i)}`}
                         className="rounded-md border border-zinc-800/80 bg-zinc-900/40 p-2"
                       >
                         <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">

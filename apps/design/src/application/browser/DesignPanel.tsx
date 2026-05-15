@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { JSX } from 'react'
 import { Palette } from 'lucide-react'
 import { cn } from '@/packages/ui/lib/utils'
@@ -17,8 +16,6 @@ const SUB_NAV: SubNavItem[] = [
 ]
 
 export function DesignPanel(): JSX.Element {
-  const [active] = useState<SubPanelId>('design')
-
   return (
     <div className="flex h-full">
       <nav className="flex w-12 flex-col items-center gap-1 border-r border-border bg-zinc-950 py-3">
@@ -31,9 +28,7 @@ export function DesignPanel(): JSX.Element {
               title={item.label}
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
-                active === item.id
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
+                'bg-accent text-accent-foreground',
               )}
             >
               <Icon size={18} />

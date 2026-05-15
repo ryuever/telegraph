@@ -10,6 +10,18 @@ import { createLogger } from '@/packages/services/log/node/logger';
 
 const logger = createLogger('shared');
 
+interface ConfigChangeEvent {
+  key: string;
+  oldValue: string;
+  newValue: string;
+  configVersion: number;
+  timestamp: number;
+}
+
+type UtilityProcessParentPort = NodeJS.EventEmitter & {
+  postMessage(message: unknown): void;
+};
+
 export interface ISharedWorker {
   boot(): void;
 }
@@ -26,35 +38,31 @@ export class SharedWorker implements ISharedWorker {
   };
 
   boot(): void {
-    if (!process.parentPort) {
-      throw new Error('parentPort is not available');
-    }
-
     const SELF_ID = 'shared';
     const mainChannel = new ElectronUtilityProcessChannel({
-      parentPort: process.parentPort as any,
+      parentPort: process.parentPort as unknown as UtilityProcessParentPort,
       description: 'shared→main IPC channel',
     });
 
     const handlers = {
       getConfig: (key: string): string => {
         this.configVersion++;
-        return `config[${key}] = ${this.configStore[key] || 'undefined'} (v${
+        return `config[${key}] = ${this.configStore[key] || 'undefined'} (v${String(
           this.configVersion
-        })`;
+        )})`;
       },
       setConfig: (key: string, value: string): string => {
         this.configVersion++;
         this.configStore[key] = value;
-        return `config[${key}] set to ${value} (v${this.configVersion})`;
+        return `config[${key}] set to ${value} (v${String(this.configVersion)})`;
       },
       echo: (msg: string): string => `shared echo: ${msg}`,
-      onConfigChange: (callback: (event: any) => void) => {
+      onConfigChange: (callback: (event: ConfigChangeEvent) => void) => {
         const interval = setInterval(() => {
           const keys = Object.keys(this.configStore);
           const randomKey = keys[Math.floor(Math.random() * keys.length)];
           const oldVal = this.configStore[randomKey];
-          const newVal = `${oldVal}-updated-${Date.now() % 1000}`;
+          const newVal = `${oldVal}-updated-${String(Date.now() % 1000)}`;
           this.configStore[randomKey] = newVal;
           this.configVersion++;
           callback({
@@ -65,7 +73,7 @@ export class SharedWorker implements ISharedWorker {
             timestamp: Date.now(),
           });
         }, 3000);
-        return () => clearInterval(interval);
+        return () => { clearInterval(interval); };
       },
     };
 

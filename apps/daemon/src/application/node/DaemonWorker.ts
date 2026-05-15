@@ -16,6 +16,24 @@ import { createLogger } from '@/packages/services/log/node/logger';
 
 const logger = createLogger('daemon');
 
+interface SystemStatusEvent {
+  timestamp: number;
+  uptime: number;
+  memoryUsage: NodeJS.MemoryUsage;
+  monitorCount: number;
+}
+
+interface LogEvent {
+  timestamp: string;
+  level: string;
+  message: string;
+  pid: number;
+}
+
+type UtilityProcessParentPort = NodeJS.EventEmitter & {
+  postMessage(message: unknown): void;
+};
+
 export interface IDaemonWorker {
   boot(): void;
 }
@@ -28,13 +46,9 @@ export class DaemonWorker implements IDaemonWorker {
   private diagnostics = new Diagnostics();
 
   boot(): void {
-    if (!process.parentPort) {
-      throw new Error('parentPort is not available');
-    }
-
     const SELF_ID = 'daemon';
     const mainChannel = new ElectronUtilityProcessChannel({
-      parentPort: process.parentPort as any,
+      parentPort: process.parentPort as unknown as UtilityProcessParentPort,
       description: 'daemon→main IPC channel',
     });
 
@@ -49,12 +63,12 @@ export class DaemonWorker implements IDaemonWorker {
     const daemonHandlers = {
       systemStatus: (): string => {
         this.monitorCount++;
-        return `system OK (#${this.monitorCount}), uptime=${Math.floor(
+        return `system OK (#${String(this.monitorCount)}), uptime=${String(Math.floor(
           process.uptime()
-        )}s`;
+        ))}s`;
       },
       echo: (msg: string): string => `daemon echo: ${msg}`,
-      onSystemStatusChange: (callback: (status: any) => void) => {
+      onSystemStatusChange: (callback: (status: SystemStatusEvent) => void) => {
         const interval = setInterval(() => {
           callback({
             timestamp: Date.now(),
@@ -63,9 +77,9 @@ export class DaemonWorker implements IDaemonWorker {
             monitorCount: this.monitorCount,
           });
         }, 2000);
-        return () => clearInterval(interval);
+        return () => { clearInterval(interval); };
       },
-      onLogEvent: (callback: (log: any) => void) => {
+      onLogEvent: (callback: (log: LogEvent) => void) => {
         const levels = ['INFO', 'WARN', 'DEBUG', 'ERROR'] as const;
         const messages = [
           'Health check passed',
@@ -81,7 +95,7 @@ export class DaemonWorker implements IDaemonWorker {
             pid: process.pid,
           });
         }, 1500);
-        return () => clearInterval(interval);
+        return () => { clearInterval(interval); };
       },
       getPerformanceSnapshot: () => diagnostics.getPerformanceSnapshot(),
       onPerformanceUpdate: (callback: (snapshot: MonitorSnapshot) => void) =>

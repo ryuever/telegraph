@@ -74,11 +74,11 @@ export class DaemonProcess implements IDaemonProcess {
         channel.setServiceHost(serviceHost);
       },
       logger: (level: string, msg: string) =>
-        this.logger.info(`[DaemonProcess:${level}] ${msg}`),
+        { this.logger.info(`[DaemonProcess:${level}] ${msg}`); },
     });
     // Drain any subscribers registered before spawn().
     for (const listener of this.pendingStateChangeListeners) {
-      this.supervisor.subscribeStateChange(() => listener());
+      this.supervisor.subscribeStateChange(() => { listener(); });
     }
     this.pendingStateChangeListeners.clear();
     await this.supervisor.start();

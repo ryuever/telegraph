@@ -56,7 +56,7 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
       })
     })
     return () => {
-      unsubscribers.forEach((unsub: () => void) => unsub())
+      unsubscribers.forEach((unsub: () => void) => { unsub(); })
     }
   }, [sessionIdsKey])
 
@@ -102,7 +102,7 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
       }
 
       const run = async () => {
-        const store = getSessionStore(targetSessionId!, listTitle(targetSessionId!))
+        const store = getSessionStore(targetSessionId, listTitle(targetSessionId))
 
         const userMsg: ChatMessage = {
           id: uid('m_'),
@@ -124,7 +124,7 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
         store.addMessage(userMsg)
         if (isFirst) {
           store.updateTitle(deriveTitle(trimmed))
-          renameSession(targetSessionId!, deriveTitle(trimmed))
+          renameSession(targetSessionId, deriveTitle(trimmed))
         }
         bumpUi()
 
@@ -133,7 +133,7 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
 
         try {
           const snapshot: ChatConversation = {
-            id: targetSessionId!,
+            id: targetSessionId,
             title: store.getState().title,
             createdAt: store.getState().createdAt,
             updatedAt: store.getState().updatedAt,
@@ -151,7 +151,6 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
                 if (status === 'queued') return { ...m, status: 'streaming' }
                 if (status === 'running') return { ...m, status: 'streaming' }
                 if (status === 'completed') return { ...m, status: 'done' }
-                if (status === 'failed') return { ...m, status: 'error' }
                 return { ...m, status: 'error' }
               })
             },
@@ -170,7 +169,7 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
             },
             onLlmTrace: info =>
               onLlmTraceRef.current?.({
-                sessionId: info.sessionId || targetSessionId!,
+                sessionId: info.sessionId || targetSessionId,
                 runId: info.runId,
                 trace: info.trace,
               }),
@@ -196,7 +195,7 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
         }
       }
 
-      const sid = targetSessionId!
+      const sid = targetSessionId
       const prev = sendChainsRef.current.get(sid) ?? Promise.resolve()
       const next = prev.then(run)
       sendChainsRef.current.set(sid, next.catch(() => {}))

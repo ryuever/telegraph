@@ -166,7 +166,7 @@ function SortableHead({
     <th className={cn('px-3 py-2', align === 'right' && 'text-right')}>
       <button
         type="button"
-        onClick={() => onClick(sortKey)}
+        onClick={() => { onClick(sortKey); }}
         className={cn(
           'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors',
           isActive ? 'text-sky-300' : 'text-zinc-500 hover:text-zinc-300'

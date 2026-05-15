@@ -24,6 +24,10 @@ references:
     rel: related-to
     file: ../architecture/20260513-vscode-contribution-model-for-telegraph.md
     note: A-010 提出 TelegraphManifest 声明式贡献模型，本文 PageletHost 的 pagelet 注册表是其在 renderer 侧的最小落点。
+  - id: D-010
+    rel: derives
+    file: ./20260515-react-native-mobile-monorepo-integration.md
+    note: D-010 在本文 desktop renderer 选型基础上扩展 mobile RN 端，提出 packages/shared 服务接口抽象层
 ---
 
 # Renderer SPA 框架选型（React Router v7 + 自实现 KeepAlive）

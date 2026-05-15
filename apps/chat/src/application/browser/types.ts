@@ -1,5 +1,4 @@
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
-import type { LlmTracePayload as CommonLlmTracePayload, ChatMessage, ChatConversation } from '@/apps/chat/application/common'
+import type { LlmTracePayload as CommonLlmTracePayload, ChatConversation } from '@/apps/chat/application/common'
 
 export type { LlmTracePayload, ChatMessage, ChatConversation, ChatToolCall, ChatRole, ChatMessageStatus } from '@/apps/chat/application/common'
 

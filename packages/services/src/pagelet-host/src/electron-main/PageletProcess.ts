@@ -151,7 +151,7 @@ export class PageletProcess implements IPageletProcess {
         this.channels.set(pageletId, channel);
       },
       logger: (level: string, msg: string) =>
-        this.logger.info(`[PageletProcess:${pageletId}:${level}] ${msg}`),
+        { this.logger.info(`[PageletProcess:${pageletId}:${level}] ${msg}`); },
     });
 
     this.supervisors.set(pageletId, supervisor);
@@ -171,7 +171,7 @@ export class PageletProcess implements IPageletProcess {
   kill(pageletId: string): void {
     const supervisor = this.supervisors.get(pageletId);
     if (!supervisor) return;
-    void supervisor.stop();
+    supervisor.stop();
     this.supervisors.delete(pageletId);
     this.channels.delete(pageletId);
     const lastPid = this.lastPids.get(pageletId);

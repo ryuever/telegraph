@@ -51,7 +51,7 @@ export interface SupervisorInspectorSnapshot {
 }
 
 export interface IMainMetricsService {
-  getAppMetrics(): AppMetric[];
+  getAppMetrics(): AppMetric[] | Promise<AppMetric[]>;
   getMainPid(): number;
   getUtilityPidNames(): Record<number, string>;
   /**

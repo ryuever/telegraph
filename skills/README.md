@@ -1,6 +1,6 @@
 # skills/
 
-Project-local skills that capture **Telegraph's development conventions**.
+Project-local skills that capture **Telegraph's development conventions and workflows**.
 
 These are written in Claude Code's [skill format](https://docs.claude.com/en/docs/claude-code/skills) (a `SKILL.md` file with frontmatter inside each skill folder), so any agent working on this repo can load them and follow the same rules.
 
@@ -9,14 +9,24 @@ These are written in Claude Code's [skill format](https://docs.claude.com/en/doc
 ```
 skills/
 ├── README.md                          # this file
-└── telegraph-conventions/
-    └── SKILL.md                       # umbrella skill — all repo conventions live here
+├── telegraph-conventions/
+│   └── SKILL.md                       # umbrella skill — repo-wide coding conventions
+├── add-pagelet/
+│   └── SKILL.md                       # workflow skill — new app → pagelet wiring
+└── <future-skill>/
+    └── SKILL.md                       # …more as needed
 ```
 
-Start with one umbrella skill (`telegraph-conventions`) and grow it section-by-section. Split a section into its own skill folder only when:
+## Skill categories
 
-- It becomes long enough that the umbrella file is hard to scan, or
-- It needs its own bundled assets (templates, scripts, references) that don't belong in the main `SKILL.md`.
+| Category | What goes here | Example |
+|----------|---------------|---------|
+| **Conventions** | Coding rules, style, import constraints | `telegraph-conventions/` |
+| **Workflows** | Multi-step procedures for common tasks | `add-pagelet/` (new app → pagelet wiring) |
+
+**Conventions** start as sections inside `telegraph-conventions/SKILL.md` and split into their own skill folder only when they become too long or need bundled assets.
+
+**Workflows** always get their own skill folder from the start — they describe a repeatable multi-file procedure (create X files, edit Y configs, verify with Z commands).
 
 ## When to add a new convention
 

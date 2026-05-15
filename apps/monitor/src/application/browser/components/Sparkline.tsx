@@ -35,16 +35,16 @@ export function Sparkline({
   const linePath = points.join(' ');
   const areaPath =
     safeValues.length > 1
-      ? `M ${points.join(' L ')} L ${width - padding},${
-          height - padding
-        } L ${padding},${height - padding} Z`
+      ? `M ${points.join(' L ')} L ${String(width - padding)},${
+          String(height - padding)
+        } L ${String(padding)},${String(height - padding)} Z`
       : '';
 
   const gridLines = [0.25, 0.5, 0.75];
 
   return (
     <svg
-      viewBox={`0 0 ${width} ${height}`}
+      viewBox={`0 0 ${String(width)} ${String(height)}`}
       preserveAspectRatio="none"
       className={cn('w-full', className)}
       style={{ height }}

@@ -14,7 +14,7 @@ interface MethodDef {
   name: string;
   description: string;
   params?: { key: string; label: string; defaultValue: string }[];
-  invoke: (params: Record<string, string>) => Promise<any>;
+  invoke: (params: Record<string, string>) => Promise<unknown>;
 }
 
 interface TabDef {
@@ -28,7 +28,7 @@ interface CallResult {
   method: string;
   tabId: TabId;
   params: Record<string, string>;
-  value: any;
+  value: unknown;
   latencyMs: number;
   timestamp: number;
   error?: string;
@@ -55,7 +55,7 @@ function createPageApi(): OrchestratorAPI {
   };
 }
 
-function PageView({ page }: PageViewProps): JSX.Element {
+function PageView({ page }: PageViewProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>('pagelet');
   const [results, setResults] = useState<CallResult[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
@@ -139,7 +139,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
     },
   ];
 
-  const currentTab = TABS.find((t) => t.id === activeTab)!;
+  const currentTab = TABS.find((t) => t.id === activeTab);
 
   const dashboard = useOrchestratorDashboard({
     participants: [
@@ -181,7 +181,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
             ...prev,
           ]);
         })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           setResults((prev) => [
             {
               method: method.name,
@@ -190,12 +190,12 @@ function PageView({ page }: PageViewProps): JSX.Element {
               value: null,
               latencyMs: Math.round(performance.now() - start),
               timestamp: Date.now(),
-              error: err.message,
+              error: err instanceof Error ? err.message : String(err),
             },
             ...prev,
           ]);
         })
-        .finally(() => setLoading(null));
+        .finally(() => { setLoading(null); });
     },
     [isReady, paramValues, activeTab]
   );
@@ -474,7 +474,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
           <Button
             key={tab.id}
             variant="ghost"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => { setActiveTab(tab.id); }}
             className="flex-1"
             style={{
               fontWeight: activeTab === tab.id ? 600 : 400,
@@ -503,7 +503,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
         <div
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}
         >
-          {currentTab.methods.map((method) => {
+          {currentTab && currentTab.methods.map((method) => {
             const latest = latestForMethod(method.name);
             return (
               <div
@@ -547,7 +547,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
                     </span>
                   </div>
                   <Button
-                    onClick={() => handleCall(method)}
+                    onClick={() => { handleCall(method); }}
                     disabled={!isReady || loading === method.name}
                     size="sm"
                     style={{
@@ -603,10 +603,10 @@ function PageView({ page }: PageViewProps): JSX.Element {
                             p.defaultValue
                           }
                           onChange={(e) =>
-                            setParamValues((prev) => ({
+                            { setParamValues((prev) => ({
                               ...prev,
                               [`${method.name}_${p.key}`]: e.target.value,
-                            }))
+                            })); }
                           }
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleCall(method);
@@ -653,9 +653,11 @@ function PageView({ page }: PageViewProps): JSX.Element {
                     >
                       {latest.error
                         ? latest.error
-                        : typeof latest.value === 'object'
+                        : typeof latest.value === 'object' || typeof latest.value === 'function'
                         ? JSON.stringify(latest.value)
-                        : String(latest.value)}
+                        : latest.value == null
+                        ? ''
+                        : JSON.stringify(latest.value)}
                     </span>
                     <span
                       style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}

@@ -161,6 +161,58 @@ packages/ui/src/components/<feature>/
 
 ---
 
+## TypeScript strictness
+
+### Zero `any` — use proper types, generics, or `unknown`
+
+**Rule.** Never write `any` in application or library code. If the type is genuinely unknown at write time, use `unknown` and narrow it; if it's a generic placeholder, write a proper generic parameter.
+
+```ts
+// ✅ correct
+function parse<T>(raw: string, schema: ZodSchema<T>): T { … }
+function handleEvent(event: unknown) {
+  if (typeof event === 'object' && event !== null && 'type' in event) { … }
+}
+
+// ❌ wrong
+function parse(raw: string): any { … }
+function handleEvent(event: any) { … }
+const data: any = response.body;
+```
+
+The only acceptable `any` is in third-party `.d.ts` declarations or `declare module` augmentation shims that you don't control — never in your own `.ts` / `.tsx` files.
+
+**Why.** `any` silently disables the type checker: typos, missing fields, and contract drift all pass without error, turning compile-time guarantees into runtime surprises. In an Electron app with cross-process RPC, a single `any` at a serialization boundary can mask bugs that only appear in production when a field is missing or renamed.
+
+**How to apply.**
+
+- When tempted to write `any`, ask: "Do I not know the shape, or do I not want to spell it out?" If the former, use `unknown` + narrowing. If the latter, take the time to define the type.
+- For JSON / API boundaries, define a Zod (or equivalent) schema and infer the type from it: `type MyData = z.infer<typeof mySchema>`.
+- For overly broad library types, extend or narrow them with utility types (`Pick`, `Omit`, `Partial`, `Extract`) instead of casting to `any`.
+- If a third-party type is wrong, use `// @ts-expect-error` with a comment explaining why — never `as any`.
+
+### `pnpm -r typecheck` and `pnpm -r lint` must both pass with zero errors
+
+**Rule.** Every code change must leave both `pnpm -r typecheck` and `pnpm -r lint` green (zero errors). These are the authoritative quality gates — not the IDE's LSP.
+
+**Why.** `tsc --noEmit` catches structural type errors; ESLint with `strict-type-checked` catches semantic issues that tsc cannot (e.g. `no-unsafe-*`, `no-floating-promises`, `restrict-template-expressions`, `no-explicit-any`). Both must pass to guarantee the codebase is free of type-safety regressions. IDE language servers sometimes show stale errors (especially referencing `apps/_legacy/` paths that are excluded from compilation); the CLI gates are deterministic.
+
+**How to apply.**
+
+- Run `pnpm -r typecheck && pnpm -r lint` after any non-trivial change and before considering the task done.
+- If the IDE shows red squiggles but both gates pass, it's an LSP cache issue — restart the TS server in your IDE, don't "fix" phantom errors.
+- Never suppress a real typecheck or lint error with `@ts-ignore`, `as any`, or `eslint-disable`. Fix the root cause. Use `@ts-expect-error` with a TODO comment only if a proper fix requires a larger refactor.
+- Common ESLint fix patterns:
+  - `no-explicit-any` / `no-unsafe-*` → define proper types or use `unknown` + narrowing
+  - `restrict-template-expressions` → wrap numbers with `String(x)`
+  - `no-floating-promises` → prefix with `void` or add `await`
+  - `no-confusing-void-expression` → add braces: `() => { someFunc(); }`
+  - `no-misused-promises` → wrap async handlers: `onClick={() => { void asyncFn(); }}`
+  - `no-non-null-assertion` → use proper null guards instead of `!`
+  - `no-empty` → add `// noop` or `// best effort` in catch blocks
+
+---
+
 ## Adding a new convention to this skill
 
 When you add an entry below, follow the same shape:

@@ -72,16 +72,16 @@ export const DEFAULT_SETTINGS: ChatModelSettings = {
   ...DEFAULT_EXTENSION,
 }
 
-export async function loadEnvModels(): Promise<EnvModelConfig[]> {
+export function loadEnvModels(): EnvModelConfig[] {
   return []
 }
 
-export async function testModelConnection(
+export function testModelConnection(
   _provider: string,
   _modelId: string,
   _apiKey: string,
   _baseUrl?: string
-): Promise<ModelConnectionStatus> {
+): ModelConnectionStatus {
   return { provider: _provider, modelId: _modelId, connected: false, error: 'Not implemented in pagelet mode' }
 }
 
@@ -120,7 +120,7 @@ export function saveSettings(settings: ChatModelSettings) {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-  } catch {}
+  } catch { /* noop */ }
 }
 
 export function toRuntimeSettings(

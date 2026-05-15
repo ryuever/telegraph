@@ -1,4 +1,4 @@
-import type { AgentSendOptions, AgentService, ChatConversation, ChatMessage, LlmTracePayload } from './types'
+import type { AgentSendOptions, AgentService } from './types'
 import {
   type ChatSendRequest,
   type ChatStreamEvent,
@@ -54,9 +54,9 @@ export class PageletAgentService implements AgentService {
       } else if (event.type === 'llm_trace') {
         const sid = event.sessionId || conversation.id
         if (event.trace) {
-          onLlmTrace?.({ runId, sessionId: sid, trace: event.trace as LlmTracePayload })
+          onLlmTrace?.({ runId, sessionId: sid, trace: event.trace })
         }
-      } else if (event.type === 'runtime_event') {
+      } else {
         const sid = event.sessionId || conversation.id
         if (event.event) {
           onLlmTrace?.({
@@ -86,7 +86,7 @@ export class PageletAgentService implements AgentService {
 
       if (result.status === 'completed') {
         onStatus?.('completed')
-      } else if (result.status === 'failed') {
+      } else {
         onStatus?.('failed')
       }
     } catch (err) {
@@ -99,19 +99,21 @@ export class PageletAgentService implements AgentService {
     const raw = localStorage.getItem('telegraph.chat.modelSettings')
     if (raw) {
       try {
-        const parsed = JSON.parse(raw)
+        const parsed: Record<string, unknown> = JSON.parse(raw) as Record<string, unknown>
+        const str = (v: unknown, fallback: string): string => typeof v === 'string' ? v : fallback
+        const bool = (v: unknown, fallback: boolean): boolean => typeof v === 'boolean' ? v : fallback
         return {
-          provider: parsed.provider ?? 'minimax-cn',
-          modelId: parsed.modelId ?? 'MiniMax-M2.7',
+          provider: str(parsed.provider, 'minimax-cn'),
+          modelId: str(parsed.modelId, 'MiniMax-M2.7'),
           apiKey: '',
-          baseUrl: parsed.baseUrl,
-          backend: parsed.backend ?? 'pi-ai',
-          orchestration: parsed.orchestration ?? 'none',
-          orchestrationPattern: parsed.orchestrationPattern ?? 'chain',
-          worktreeIsolation: parsed.worktreeIsolation ?? false,
-          extensionBlocklist: parsed.extensionBlocklist ?? [],
+          baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
+          backend: str(parsed.backend, 'pi-ai') as ChatSendRequest['settings']['backend'],
+          orchestration: str(parsed.orchestration, 'none') as ChatSendRequest['settings']['orchestration'],
+          orchestrationPattern: str(parsed.orchestrationPattern, 'chain') as ChatSendRequest['settings']['orchestrationPattern'],
+          worktreeIsolation: bool(parsed.worktreeIsolation, false),
+          extensionBlocklist: Array.isArray(parsed.extensionBlocklist) ? parsed.extensionBlocklist as string[] : [],
         }
-      } catch {}
+      } catch { /* noop */ }
     }
     return {
       provider: 'minimax-cn',

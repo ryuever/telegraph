@@ -1,5 +1,6 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost, clientHost } from '@x-oasis/async-call-rpc';
+import { createParticipantProxy } from '@x-oasis/async-call-rpc-electron';
 import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
 import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
 import { MONITOR_PAGELET_SERVICE_PATH } from '@/apps/monitor/application/common';
@@ -149,11 +150,11 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
       if (this.snapshotListeners.size === 0) return;
       logger.info(
         `[monitor-worker] daemon channel reconnected — re-subscribing ` +
-          `${this.snapshotListeners.size} snapshot listener(s)`
+          `${String(this.snapshotListeners.size)} snapshot listener(s)`
       );
       for (const cb of this.snapshotListeners) {
         try {
-          this.daemonClient?.onPerformanceUpdate(cb);
+          void this.daemonClient?.onPerformanceUpdate(cb);
         } catch (err) {
           logger.warn(
             `[monitor-worker] re-subscribe failed: ${
@@ -165,22 +166,16 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
     });
   }
 
-  protected override onRendererConnection(channel: any): void {
+  protected override onRendererConnection(channel: ReturnType<ReturnType<typeof createParticipantProxy>['getChannelFor']>): void {
     serviceHost.registerService(MONITOR_PAGELET_SERVICE_PATH, {
       channel,
       serviceHost,
       handlers: {
-        info: (): string => `monitor-pagelet ready (pid=${process.pid})`,
+        info: (): string => `monitor-pagelet ready (pid=${String(process.pid)})`,
         getSnapshot: () => this.daemonClient?.getPerformanceSnapshot(),
         onPerformanceUpdate: (callback: SnapshotCallback) => {
-          // Track the callback locally so we can re-subscribe on
-          // daemon reconnect. The daemon-side disposer returned by the
-          // first subscribe targets the OLD daemon process — after
-          // reconnect a fresh subscribe handle is created but we keep
-          // returning the original disposer interface to the renderer
-          // (the renderer treats it as "stop receiving updates").
           this.snapshotListeners.add(callback);
-          this.daemonClient?.onPerformanceUpdate(callback);
+          void this.daemonClient?.onPerformanceUpdate(callback);
           return () => {
             this.snapshotListeners.delete(callback);
             // We intentionally do NOT propagate disposer to daemon —
@@ -195,9 +190,6 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
           callback: SupervisorSnapshotCallback
         ) => {
           this.supervisorSnapshotListeners.add(callback);
-          // Replay the latest payload immediately so the renderer
-          // doesn't have to wait for the next push to populate. If
-          // main hasn't pushed yet, the next event will hit it.
           if (this.latestSupervisorSnapshots !== null) {
             try {
               callback(this.latestSupervisorSnapshots);

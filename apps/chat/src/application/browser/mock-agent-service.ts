@@ -45,6 +45,6 @@ export class MockAgentService implements AgentService {
 function sleep(ms: number) {
   return new Promise<void>(resolve => {
     const t = setTimeout(resolve, ms)
-    if (typeof t === 'object' && t && 'unref' in t) (t as any).unref?.()
+    if ('unref' in (t as object)) (t as ReturnType<typeof setTimeout> & { unref(): void }).unref()
   })
 }

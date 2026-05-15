@@ -23,4 +23,4 @@ container.load(
 const worker = container.get(ConnectionWorkerId) as ConnectionWorker;
 worker
   .boot()
-  .catch((err) => logger.error(`[${SELF_ID}-worker] boot failed:`, err));
+  .catch((err: unknown) => { logger.error(`[${SELF_ID}-worker] boot failed:`, err); });

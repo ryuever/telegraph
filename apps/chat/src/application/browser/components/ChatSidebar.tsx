@@ -67,9 +67,9 @@ export function ChatSidebar({
               key={c.id}
               conversation={c}
               active={c.id === activeId}
-              onSelect={() => onSelect(c.id)}
-              onDelete={() => onDelete(c.id)}
-              onRename={title => onRename(c.id, title)}
+              onSelect={() => { onSelect(c.id); }}
+              onDelete={() => { onDelete(c.id); }}
+              onRename={title => { onRename(c.id, title); }}
             />
           ))}
         </ul>
@@ -122,7 +122,7 @@ function ConversationRow({
         <input
           autoFocus
           value={draft}
-          onChange={e => setDraft(e.target.value)}
+          onChange={e => { setDraft(e.target.value); }}
           onBlur={commit}
           onKeyDown={e => {
             if (e.key === 'Enter') commit()
@@ -137,7 +137,7 @@ function ConversationRow({
         <button
           type="button"
           onClick={onSelect}
-          onDoubleClick={() => setEditing(true)}
+          onDoubleClick={() => { setEditing(true); }}
           className="min-w-0 flex-1 truncate text-left"
           title={conversation.title}
         >

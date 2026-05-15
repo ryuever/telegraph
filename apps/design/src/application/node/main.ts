@@ -26,4 +26,4 @@ container.load(
 const worker = container.get(DesignPageletWorkerId) as DesignPageletWorker;
 worker
   .boot()
-  .catch((err) => logger.error('[design-worker] boot failed:', err));
+  .catch((err: unknown) => { logger.error('[design-worker] boot failed:', err); });

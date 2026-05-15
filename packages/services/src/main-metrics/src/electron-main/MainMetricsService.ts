@@ -1,5 +1,6 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { app } from 'electron';
+import { execSync } from 'child_process';
 
 import type { IPidNameRegistry } from './PidNameRegistry';
 import { PidNameRegistryId } from './PidNameRegistry';
@@ -17,18 +18,13 @@ function queryPsForPids(
   pids: number[]
 ): Map<number, { cpu: number; mem: number }> {
   const result = new Map<number, { cpu: number; mem: number }>();
-  // Drop nullish / non-positive pids — PidNameRegistry occasionally
-  // hands us entries whose pid is still undefined (registered before
-  // the OS pid was known) and `ps -p undefined` floods stderr.
-  // Mirrors the upstream fix in x-oasis example (commit 9146f33a).
   const validPids = pids.filter(
     (p): p is number => typeof p === 'number' && Number.isFinite(p) && p > 0
   );
   if (validPids.length === 0) return result;
   try {
-    const cp = require('child_process');
-    const pidArgs = validPids.map((p) => `-p ${p}`).join(' ');
-    const out = cp.execSync(`ps ${pidArgs} -o pid=,pcpu=,pmem=`, {
+    const pidArgs = validPids.map((p) => `-p ${String(p)}`).join(' ');
+    const out: string = execSync(`ps ${pidArgs} -o pid=,pcpu=,pmem=`, {
       encoding: 'utf-8',
       timeout: 3000,
     });
@@ -43,7 +39,9 @@ function queryPsForPids(
         }
       }
     }
-  } catch {}
+  } catch {
+    // best effort — ps may not be available or pids may have exited
+  }
   return result;
 }
 
