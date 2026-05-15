@@ -8,6 +8,9 @@ import {
   CHAT_PARTICIPANT_ID,
   RENDERER_PARTICIPANT_ID,
 } from '@/packages/services/pagelet-host/common';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('chat');
 
 const container = new Container();
 container.load(
@@ -23,4 +26,4 @@ container.load(
 const worker = container.get(ChatPageletWorkerId) as ChatPageletWorker;
 worker
   .boot()
-  .catch((err) => console.error('[chat-worker] boot failed:', err));
+  .catch((err) => logger.error('[chat-worker] boot failed:', err));

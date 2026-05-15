@@ -9,10 +9,10 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@/packages/stores/*": ["./src/*"]
+      "@/packages/stores/*": ["./src/*"],
+      "@/packages/services/log/*": ["../services/src/log/src/*"]
     },
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "composite": false
   },
   "include": ["src"],
   "exclude": ["node_modules"]

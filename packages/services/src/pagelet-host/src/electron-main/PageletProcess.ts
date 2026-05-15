@@ -18,6 +18,8 @@ import type {
   SupervisorInspectorSnapshot,
 } from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 /**
  * Optional spawn-time metadata for a pagelet utility process.
@@ -84,14 +86,15 @@ export class PageletProcess implements IPageletProcess {
       try {
         listener();
       } catch (err) {
-        console.error('[PageletProcess] stateChange listener threw', err);
+        this.logger.error('[PageletProcess] stateChange listener threw', err);
       }
     }
   }
 
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
-    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
+    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   async spawn(
@@ -148,7 +151,7 @@ export class PageletProcess implements IPageletProcess {
         this.channels.set(pageletId, channel);
       },
       logger: (level: string, msg: string) =>
-        console.log(`[PageletProcess:${pageletId}:${level}] ${msg}`),
+        this.logger.info(`[PageletProcess:${pageletId}:${level}] ${msg}`),
     });
 
     this.supervisors.set(pageletId, supervisor);
@@ -159,7 +162,7 @@ export class PageletProcess implements IPageletProcess {
       this.notifyStateChange();
     });
     await supervisor.start();
-    console.log(`[PageletProcess] spawned ${pageletId}`);
+    this.logger.info(`[PageletProcess] spawned ${pageletId}`);
     // The set of supervisors changed — the inspector view of "who
     // exists" mutated, so push to subscribers as well.
     this.notifyStateChange();

@@ -31,6 +31,8 @@ import type { ISharedProcess } from '@/apps/shared/application/common';
 import { SharedProcessId } from '@/apps/shared/application/common';
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 export interface IAppApplication {
   start(): Promise<void>;
@@ -64,11 +66,13 @@ export class AppApplication implements IAppApplication {
     @inject(SharedProcessId)
     private readonly sharedProcess: ISharedProcess,
     @inject(PageletProcessId)
-    private readonly pageletProcess: IPageletProcess
+    private readonly pageletProcess: IPageletProcess,
+    @inject(LogServiceId)
+    private readonly logger: ILogger
   ) {}
 
   async start(): Promise<void> {
-    console.log('[AppApplication] start()');
+    this.logger.info('[AppApplication] start()');
 
     this.windowManager.openMainWindow();
 
@@ -155,6 +159,6 @@ export class AppApplication implements IAppApplication {
       this.appOrchestrator.registerSettingOrchestratorService();
     });
 
-    console.log('[AppApplication] start() done');
+    this.logger.info('[AppApplication] start() done');
   }
 }

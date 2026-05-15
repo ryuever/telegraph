@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
+      '@/packages/services/log': resolve(__dirname, '../../packages/services/src/log/src'),
       '@/apps/connection': resolve(__dirname, '../connection/src'),
       '@/apps/monitor': resolve(__dirname, '../monitor/src'),
       '@/apps/setting': resolve(__dirname, '../setting/src'),

@@ -17,6 +17,7 @@
       "@/apps/monitor/*": ["src/*"],
       "@/packages/services/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
       "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
+      "@/packages/services/log/*": ["../../packages/services/src/log/src/*"],
       "@/apps/daemon/*": ["../daemon/src/*"],
       "@/apps/main/*": ["../main/src/*"],
       "@/apps/design/*": ["../design/src/*"],

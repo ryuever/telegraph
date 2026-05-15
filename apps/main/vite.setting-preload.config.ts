@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@/apps/setting': resolve(__dirname, '../setting/src'),
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
+      '@/packages/services/log': resolve(__dirname, '../../packages/services/src/log/src'),
     },
   },
   build: {

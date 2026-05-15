@@ -8,6 +8,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Session, Message } from '../runtime/sessionManagement/Session';
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
 
 export interface StoredSession {
   sessionId: string;
@@ -83,7 +85,7 @@ export class SessionRepository {
       const stored = JSON.parse(content) as StoredSession;
       return stored;
     } catch (error) {
-      console.error(`Failed to load session ${sessionId}:`, error);
+      logger.error(`Failed to load session ${sessionId}`, error as Error);
       return null;
     }
   }
@@ -255,12 +257,12 @@ export class SessionRepository {
             const session = JSON.parse(content) as StoredSession;
             this.sessionIndex.set(session.sessionId, filePath);
           } catch {
-            console.warn(`Failed to load session index from ${filePath}`);
+            logger.warn(`Failed to load session index from ${filePath}`);
           }
         }
       }
     } catch (error) {
-      console.error('Failed to load session index:', error);
+      logger.error('Failed to load session index', error as Error);
     }
   }
 }
@@ -303,7 +305,7 @@ export namespace SessionRepositoryMigration {
         await repo.importSession(line);
         imported++;
       } catch (error) {
-        console.error('Failed to import session:', error);
+        logger.error('Failed to import session', error as Error);
       }
     }
 

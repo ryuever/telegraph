@@ -4,6 +4,8 @@
  */
 
 import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
 
 export interface Message {
   role: 'user' | 'assistant' | 'tool'
@@ -69,7 +71,7 @@ export class Session {
 
     // Prevent unbounded growth
     if (this.messages.length > this.maxMessages) {
-      console.warn(
+      logger.warn(
         `[Session] Message count (${this.messages.length}) exceeded limit (${this.maxMessages}), consider pruning`
       )
     }

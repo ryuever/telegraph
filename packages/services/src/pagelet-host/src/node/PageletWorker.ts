@@ -15,6 +15,9 @@ import {
   MAIN_RPC_SERVICE_PATH,
 } from '@/packages/services/pagelet-host/common';
 import { createForwardingProxy } from '@/packages/services/pagelet-host/node/createForwardingProxy';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('pagelet');
 
 export interface IPageletWorkerConfig {
   selfId: string;
@@ -160,14 +163,14 @@ export class PageletWorker<
       selfId: this.config.selfId,
       controlChannel: mainChannel,
       onConnection: (conn) => {
-        console.log(
+        logger.info(
           `[${this.config.selfId}-worker] connection: ${conn.connectionId}, peer=${conn.peerId}, role=${conn.role}`
         );
         const ch = proxy.getChannelFor(conn.peerId);
 
         if (ch && conn.peerId === this.config.rendererParticipantId) {
           this.onRendererConnection(ch);
-          console.log(
+          logger.info(
             `[${this.config.selfId}-worker] service registered on ${conn.peerId} channel`
           );
         }
@@ -202,7 +205,7 @@ export class PageletWorker<
       }),
     ]);
 
-    console.log(
+    logger.info(
       `[${this.config.selfId}-worker] boot complete (shared=${
         this.sharedClient ? 'connected' : 'pending'
       }, daemon=${
@@ -243,7 +246,7 @@ export class PageletWorker<
     // already lost to the timeout. Failures are logged but not
     // re-thrown — the timeout path already surfaced the problem.
     void connectPromise.then(install, (err: unknown) => {
-      console.warn(
+      logger.warn(
         `[${this.config.selfId}-worker] background connect to '${peerLabel}' failed: ${
           err instanceof Error ? err.message : String(err)
         }`
@@ -265,7 +268,7 @@ export class PageletWorker<
       await Promise.race([connectPromise, timeoutPromise]);
       if (timer) clearTimeout(timer);
     } catch (err) {
-      console.warn(
+      logger.warn(
         `[${this.config.selfId}-worker] ${
           err instanceof Error ? err.message : String(err)
         } — forwarding proxy will return '${peerLabel} not ready' until the background connect wins`

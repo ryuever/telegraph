@@ -19,6 +19,8 @@ import { RENDERER_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common
 // so the framework owns its own contract. Apps that need the token
 // import it directly from there alongside this concrete implementation.
 import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 @injectable()
 export class MainCpServer implements IMainCpServer {
@@ -26,22 +28,14 @@ export class MainCpServer implements IMainCpServer {
   private rendererIpcChannel!: IPCMainChannel;
   private settingOrchestrator!: ElectronConnectionOrchestrator;
   private settingIpcChannel: IPCMainChannel | null = null;
-  /**
-   * pagelet-id → extra orchestrators it should be registered into on spawn.
-   * Populated by `attachOrchestratorToPagelet()`; consumed by
-   * `getAdditionalOrchestratorsFor()` (called from PageletProcess.spawn).
-   *
-   * H5 (D-008): replaces the old hardcoded `if (pageletId === 'setting')`
-   * branch — apps now declare these bindings from their start() flow
-   * instead of the framework carrying a switch statement.
-   */
   private readonly additionalOrchestrators = new Map<
     string,
     ElectronConnectionOrchestrator[]
   >();
 
   constructor(
-    @inject(WindowManagerId) private readonly windowManager: IWindowManager
+    @inject(WindowManagerId) private readonly windowManager: IWindowManager,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   start(): void {
@@ -58,7 +52,7 @@ export class MainCpServer implements IMainCpServer {
     });
 
     this.orchestrator = new ElectronConnectionOrchestrator({
-      logger: (level, msg) => console.log(`[orchestrator:${level}] ${msg}`),
+      logger: (level, msg) => this.logger.info(`[orchestrator:${level}] ${msg}`),
       enableStats: true,
       heartbeat: {
         enabled: true,
@@ -77,11 +71,11 @@ export class MainCpServer implements IMainCpServer {
 
     this.settingOrchestrator = new ElectronConnectionOrchestrator({
       logger: (level, msg) =>
-        console.log(`[setting-orchestrator:${level}] ${msg}`),
+        this.logger.info(`[setting-orchestrator:${level}] ${msg}`),
       enableStats: true,
     });
 
-    console.log('[MainCpServer] started');
+    this.logger.info('[MainCpServer] started');
   }
 
   getOrchestrator(): ElectronConnectionOrchestrator {
@@ -139,7 +133,7 @@ export class MainCpServer implements IMainCpServer {
 
     this.settingOrchestrator.registerProxyService(serviceHost);
 
-    console.log('[MainCpServer] setting window registered');
+    this.logger.info('[MainCpServer] setting window registered');
 
     return this.settingIpcChannel;
   }

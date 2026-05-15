@@ -20,6 +20,8 @@ import type { IDaemonProcess } from '@/apps/daemon/application/common';
 import { DaemonProcessId } from '@/apps/daemon/application/common';
 import type { IMainCpServer } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
 import { MainCpServerId } from '@/packages/services/pagelet-host/electron-main/IMainCpServer';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 export type { IDaemonProcess };
 export { DaemonProcessId };
@@ -40,7 +42,8 @@ export class DaemonProcess implements IDaemonProcess {
 
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
-    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
+    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   async spawn(): Promise<void> {
@@ -71,7 +74,7 @@ export class DaemonProcess implements IDaemonProcess {
         channel.setServiceHost(serviceHost);
       },
       logger: (level: string, msg: string) =>
-        console.log(`[DaemonProcess:${level}] ${msg}`),
+        this.logger.info(`[DaemonProcess:${level}] ${msg}`),
     });
     // Drain any subscribers registered before spawn().
     for (const listener of this.pendingStateChangeListeners) {
@@ -79,7 +82,7 @@ export class DaemonProcess implements IDaemonProcess {
     }
     this.pendingStateChangeListeners.clear();
     await this.supervisor.start();
-    console.log('[DaemonProcess] spawned');
+    this.logger.info('[DaemonProcess] spawned');
   }
 
   subscribeStateChange(listener: () => void): () => void {

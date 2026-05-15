@@ -16,6 +16,7 @@ export default defineConfig({
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/services/main-metrics': resolve(__dirname, '../../packages/services/src/main-metrics/src'),
+      '@/packages/services/log': resolve(__dirname, '../../packages/services/src/log/src'),
     },
   },
   build: {

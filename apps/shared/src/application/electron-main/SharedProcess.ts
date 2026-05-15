@@ -17,6 +17,8 @@ import type {
   SupervisorInspectorSnapshot,
 } from '@/packages/services/main-metrics/common';
 import { PidNameRegistryId } from '@/packages/services/main-metrics/common';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 import { SHARED_PARTICIPANT_ID } from '@/apps/shared/application/common';
 import type { ISharedProcess } from '@/apps/shared/application/common';
 import { SharedProcessId } from '@/apps/shared/application/common';
@@ -32,7 +34,8 @@ export class SharedProcess implements ISharedProcess {
 
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
-    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry
+    @inject(PidNameRegistryId) private readonly pidNameRegistry: IPidNameRegistry,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   async spawn(): Promise<void> {
@@ -60,14 +63,14 @@ export class SharedProcess implements ISharedProcess {
         channel.setServiceHost(serviceHost);
       },
       logger: (level: string, msg: string) =>
-        console.log(`[SharedProcess:${level}] ${msg}`),
+        this.logger.info(`[SharedProcess:${level}] ${msg}`),
     });
     for (const listener of this.pendingStateChangeListeners) {
       this.supervisor.subscribeStateChange(() => listener());
     }
     this.pendingStateChangeListeners.clear();
     await this.supervisor.start();
-    console.log('[SharedProcess] spawned');
+    this.logger.info('[SharedProcess] spawned');
   }
 
   subscribeStateChange(listener: () => void): () => void {

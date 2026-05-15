@@ -19,6 +19,8 @@ import type { ToolRegistry, ToolDefinition as RegistryToolDefinition } from '../
 import type { ExtensionManifest, ToolDefinition as ManifestToolDefinition } from '../ExtensionManifest';
 import { assertValidManifest } from '../ExtensionManifest';
 import { createExecutor, type ToolExecutor } from './ExecutableFactory';
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
 
 export interface LoadedExtension {
   manifest: ExtensionManifest;
@@ -51,14 +53,14 @@ export class ExtensionRegistry {
   async loadExtensionsFromDirs(): Promise<void> {
     for (const dir of this.extensionDirs) {
       if (!fs.existsSync(dir)) {
-        console.warn(`Extension directory not found: ${dir}`);
+        logger.warn(`Extension directory not found: ${dir}`);
         continue;
       }
 
       try {
         await this.scanDir(dir);
       } catch (error) {
-        console.error(`Failed to scan extension directory ${dir}:`, error);
+        logger.error(`Failed to scan extension directory ${dir}`, error as Error);
       }
     }
   }
@@ -80,7 +82,7 @@ export class ExtensionRegistry {
         try {
           await this.loadExtensionFromPath(jsonPath);
         } catch (error) {
-          console.error(`Failed to load extension from ${jsonPath}:`, error);
+          logger.error(`Failed to load extension from ${jsonPath}`, error as Error);
         }
         continue;
       }
@@ -88,7 +90,7 @@ export class ExtensionRegistry {
       // Look for extension.yml or extension.yaml
       const ymlPath = path.join(extensionDir, 'extension.yml');
       if (fs.existsSync(ymlPath)) {
-        console.warn(
+        logger.warn(
           `YAML manifest found at ${ymlPath}, but YAML parser not implemented; use JSON format`
         );
         continue;
@@ -96,7 +98,7 @@ export class ExtensionRegistry {
 
       const yamlPath = path.join(extensionDir, 'extension.yaml');
       if (fs.existsSync(yamlPath)) {
-        console.warn(
+        logger.warn(
           `YAML manifest found at ${yamlPath}, but YAML parser not implemented; use JSON format`
         );
         continue;
@@ -135,13 +137,13 @@ export class ExtensionRegistry {
         this.toolRegistry.register(tool);
         this.toolToExtension.set(toolDef.id, manifest.name);
       } catch (error) {
-        console.error(`Failed to create tool ${toolDef.id}:`, error);
+        logger.error(`Failed to create tool ${toolDef.id}`, error as Error);
         // Continue loading other tools
       }
     }
 
     this.extensions.set(manifest.name, extension);
-    console.log(
+    logger.info(
       `Loaded extension '${manifest.name}' with ${extension.tools.size} tools from ${baseDir}`
     );
   }
@@ -218,9 +220,8 @@ export class ExtensionRegistry {
 
           if (attempt < maxAttempts - 1) {
             const backoffMs = baseBackoff * Math.pow(2, attempt);
-            console.warn(
-              `Tool execution attempt ${attempt + 1} failed, retrying in ${backoffMs}ms:`,
-              lastError.message
+            logger.warn(
+              `Tool execution attempt ${attempt + 1} failed, retrying in ${backoffMs}ms: ${lastError.message}`
             );
             await new Promise(resolve => setTimeout(resolve, backoffMs));
           }
@@ -247,7 +248,7 @@ export class ExtensionRegistry {
 
     ext.status = 'unloaded';
     this.extensions.delete(name);
-    console.log(`Unloaded extension '${name}'`);
+    logger.info(`Unloaded extension '${name}'`);
   }
 
   /**

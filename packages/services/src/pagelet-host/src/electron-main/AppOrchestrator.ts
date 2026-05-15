@@ -31,6 +31,8 @@ import {
   SETTING_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
 } from '@/packages/services/pagelet-host/common';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,7 +141,8 @@ export class AppOrchestrator implements IAppOrchestrator {
 
   constructor(
     @inject(MainCpServerId) private readonly cpServer: IMainCpServer,
-    @inject(PageletProcessId) private readonly pageletProcess: IPageletProcess
+    @inject(PageletProcessId) private readonly pageletProcess: IPageletProcess,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   registerOrchestratorService(): void {
@@ -156,7 +159,7 @@ export class AppOrchestrator implements IAppOrchestrator {
   registerSettingOrchestratorService(): void {
     const channel = this.cpServer.getSettingIpcChannel();
     if (!channel) {
-      console.warn('[AppOrchestrator] setting IPC channel not ready yet');
+      this.logger.warn('[AppOrchestrator] setting IPC channel not ready yet');
       return;
     }
     this.registerScopedOrchestratorService({
@@ -166,7 +169,7 @@ export class AppOrchestrator implements IAppOrchestrator {
       utilityParticipantId: SETTING_PARTICIPANT_ID,
       serviceLabel: 'setting',
     });
-    console.log('[AppOrchestrator] setting orchestrator service registered');
+    this.logger.info('[AppOrchestrator] setting orchestrator service registered');
   }
 
   /**
@@ -206,7 +209,7 @@ export class AppOrchestrator implements IAppOrchestrator {
         try {
           cb(event);
         } catch (err) {
-          console.warn(
+          this.logger.warn(
             `[AppOrchestrator:${serviceLabel}] remote ${event.type} callback threw`,
             err
           );
@@ -279,7 +282,7 @@ export class AppOrchestrator implements IAppOrchestrator {
       defaultConnectionConfig(),
       defaultConnectOptions()
     );
-    console.log('[AppOrchestrator] monitor direct connection established');
+    this.logger.info('[AppOrchestrator] monitor direct connection established');
   }
 
   async connectSetting(): Promise<void> {
@@ -290,7 +293,7 @@ export class AppOrchestrator implements IAppOrchestrator {
       defaultConnectionConfig(),
       defaultConnectOptions()
     );
-    console.log('[AppOrchestrator] setting direct connection established');
+    this.logger.info('[AppOrchestrator] setting direct connection established');
   }
 
   async connectDesign(): Promise<void> {
@@ -301,7 +304,7 @@ export class AppOrchestrator implements IAppOrchestrator {
       defaultConnectionConfig(),
       defaultConnectOptions()
     );
-    console.log('[AppOrchestrator] design direct connection established');
+    this.logger.info('[AppOrchestrator] design direct connection established');
   }
 }
 

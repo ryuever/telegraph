@@ -8,6 +8,8 @@ import type {
   IMainMetricsService,
   SupervisorInspectorSnapshot,
 } from '../common/index';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 export const MainMetricsServiceId = createId('MainMetricsService');
 
@@ -85,7 +87,8 @@ export class MainMetricsService implements IMainMetricsService {
 
   constructor(
     @inject(PidNameRegistryId)
-    private readonly pidNameRegistry: IPidNameRegistry
+    private readonly pidNameRegistry: IPidNameRegistry,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   setSupervisorProvider(
@@ -99,7 +102,7 @@ export class MainMetricsService implements IMainMetricsService {
     try {
       return this.supervisorProvider();
     } catch (e) {
-      console.error('[MainMetricsService] supervisorProvider threw', e);
+      this.logger.error('[MainMetricsService] supervisorProvider threw', e);
       return [];
     }
   }
@@ -116,7 +119,7 @@ export class MainMetricsService implements IMainMetricsService {
     try {
       callback(this.getSupervisorSnapshots());
     } catch (e) {
-      console.error(
+      this.logger.error(
         '[MainMetricsService] onSupervisorSnapshotsChanged initial push threw',
         e
       );
@@ -136,7 +139,7 @@ export class MainMetricsService implements IMainMetricsService {
       try {
         cb(snapshots);
       } catch (e) {
-        console.error(
+        this.logger.error(
           '[MainMetricsService] supervisorSnapshotsListener threw',
           e
         );

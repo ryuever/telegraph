@@ -12,6 +12,9 @@ import {
   MAIN_METRICS_SERVICE_PATH,
   IMainMetricsService,
 } from '@/packages/services/main-metrics/common';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('daemon');
 
 export interface IDaemonWorker {
   boot(): void;
@@ -89,7 +92,7 @@ export class DaemonWorker implements IDaemonWorker {
       selfId: SELF_ID,
       controlChannel: mainChannel,
       onConnection: (conn) => {
-        console.log(
+        logger.info(
           `[daemon-worker] connection from ${conn.peerId} (role=${conn.role})`
         );
         const ch = proxy.getChannelFor(conn.peerId);
@@ -100,13 +103,13 @@ export class DaemonWorker implements IDaemonWorker {
             daemonHandlers
           );
           ch.setServiceHost(perConnHost);
-          console.log(
+          logger.info(
             `[daemon-worker] ${DAEMON_SERVICE_PATH} registered for ${conn.peerId}`
           );
         }
       },
     });
 
-    console.log('[daemon-worker] initialized, waiting for pagelet connections');
+    logger.info('[daemon-worker] initialized, waiting for pagelet connections');
   }
 }

@@ -4,6 +4,8 @@
  */
 
 import { Session } from './Session'
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
 
 export interface SessionStoreConfig {
   maxSessions?: number
@@ -143,7 +145,7 @@ export class SessionStore {
     }
 
     for (const sessionId of toDelete) {
-      console.log(`[SessionStore] Cleaning up inactive session '${sessionId}'`)
+      logger.info(`[SessionStore] Cleaning up inactive session '${sessionId}'`)
       this.close(sessionId)
     }
   }
@@ -165,7 +167,7 @@ export class SessionStore {
 
     if (lruSession) {
       const sessionId = lruSession.getSessionId()
-      console.warn(`[SessionStore] Evicting LRU session '${sessionId}' due to capacity`)
+      logger.warn(`[SessionStore] Evicting LRU session '${sessionId}' due to capacity`)
       this.close(sessionId)
     }
   }

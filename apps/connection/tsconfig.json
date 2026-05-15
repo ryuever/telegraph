@@ -31,7 +31,8 @@
       "@/packages/stores/*": ["../../packages/stores/src/*"],
       "@/packages/agent/*": ["../../packages/agent/src/*"],
       "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],
-      "@/packages/services/process/*": ["../../packages/services/src/process/src/*"]
+      "@/packages/services/process/*": ["../../packages/services/src/process/src/*"],
+      "@/packages/services/log/*": ["../../packages/services/src/log/src/*"]
     }
   },
   "include": ["src/**/*"]

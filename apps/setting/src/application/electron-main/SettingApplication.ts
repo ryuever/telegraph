@@ -7,6 +7,8 @@ import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron
 import { SETTING_PARTICIPANT_ID } from '@/apps/setting/application/common';
 import type { ISettingApplication } from '@/apps/setting/application/common';
 import { SettingApplicationId } from '@/apps/setting/application/common';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import type { ILogger } from '@/packages/services/log/common/types';
 
 export const SETTING_WORKER_FILE = 'setting-worker.js';
 
@@ -18,7 +20,8 @@ export class SettingApplication implements ISettingApplication {
   constructor(
     @inject(PageletProcessId) private readonly pageletProcess: IPageletProcess,
     @inject(AppOrchestratorId)
-    private readonly appOrchestrator: IAppOrchestrator
+    private readonly appOrchestrator: IAppOrchestrator,
+    @inject(LogServiceId) private readonly logger: ILogger
   ) {}
 
   async start(): Promise<void> {
@@ -26,6 +29,6 @@ export class SettingApplication implements ISettingApplication {
       SETTING_PARTICIPANT_ID,
       SETTING_WORKER_FILE
     );
-    console.log('[SettingApplication] started');
+    this.logger.info('[SettingApplication] started');
   }
 }

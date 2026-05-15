@@ -3,6 +3,9 @@ import { SettingWorker, SettingWorkerId } from './SettingWorker';
 import { PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
 import { SETTING_PARTICIPANT_ID } from '@/apps/setting/application/common';
 import { RENDERER_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('setting');
 
 const SELF_ID = SETTING_PARTICIPANT_ID;
 
@@ -20,4 +23,4 @@ container.load(
 const worker = container.get(SettingWorkerId) as SettingWorker;
 worker
   .boot()
-  .catch((err) => console.error(`[${SELF_ID}-worker] boot failed:`, err));
+  .catch((err) => logger.error(`[${SELF_ID}-worker] boot failed:`, err));

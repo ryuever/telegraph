@@ -7,6 +7,9 @@
  * - Clear state transitions for tracing
  * - Fallback handling for edge cases (timeout, unexpected end)
  */
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
+
 export class RunLifecycleManager {
   private state: 'initial' | 'running' | 'terminal' = 'initial'
   private terminalEvent: any | null = null
@@ -41,14 +44,14 @@ export class RunLifecycleManager {
     // Terminal event
     if (this.state === 'terminal') {
       // Already reached terminal, ignore duplicate
-      console.warn(
+      logger.warn(
         `[RunLifecycleManager] Ignoring duplicate terminal event type='${ev.type}' for run '${this.runId}'`
       )
       return null
     }
 
     if (this.state !== 'running') {
-      console.warn(
+      logger.warn(
         `[RunLifecycleManager] Terminal event in unexpected state '${this.state}' for run '${this.runId}'`
       )
     }

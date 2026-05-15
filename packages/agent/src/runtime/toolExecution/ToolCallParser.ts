@@ -8,6 +8,9 @@
  * - Function calling (OpenAI format): {"type": "function", "function": {...}}
  */
 
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
+
 export interface ParsedToolCall {
   callId: string       // Unique identifier for this tool invocation
   toolName: string     // Tool name
@@ -64,7 +67,7 @@ export class ToolCallParser {
           rawText: fullMatch,
         })
       } catch (e) {
-        console.warn(`[ToolCallParser] Failed to parse XML tool_use input: ${inputStr}`)
+        logger.warn(`[ToolCallParser] Failed to parse XML tool_use input: ${inputStr}`)
       }
     }
 

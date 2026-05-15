@@ -11,7 +11,8 @@
     "paths": {
       "@/packages/agent/*": ["./src/*"],
       "@/packages/runtime-contracts": ["../runtime-contracts/src/index.ts"],
-      "@/packages/runtime-contracts/*": ["../runtime-contracts/src/*"]
+      "@/packages/runtime-contracts/*": ["../runtime-contracts/src/*"],
+      "@/packages/services/log/*": ["../services/src/log/src/*"]
     }
   },
   "include": ["."],

@@ -62,8 +62,14 @@ import {
   PidNameRegistry,
   PidNameRegistryId,
 } from '@/packages/services/main-metrics/common';
+import { LogServiceId } from '@/packages/services/log/common/LogService';
+import { createLogger } from '@/packages/services/log/node/logger';
+import type { ILogger } from '@/packages/services/log/common/types';
+
+const logger: ILogger = createLogger('telegraph');
 
 export default new Registry((bind) => {
+  bind(LogServiceId).toConstantValue(logger);
   bind(WindowManagerId).to(WindowManager);
   bind(MainCpServerId).to(MainCpServer);
 

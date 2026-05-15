@@ -15,6 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@/packages/services/*": ["src/*"],
+      "@/packages/services/log/*": ["src/log/src/*"],
       "@/packages/services/main-metrics/*": ["src/main-metrics/src/*"],
       "@/packages/services/pagelet-host/*": ["src/pagelet-host/src/*"],
       "@/packages/services/process/*": ["src/process/src/*"]

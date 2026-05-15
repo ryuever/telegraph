@@ -4,6 +4,8 @@
  */
 
 import { ToolRegistry, type ToolDefinition, type ToolResultEvent } from './ToolRegistry'
+import { createLogger } from '@/packages/services/log/node/logger'
+const logger = createLogger('agent')
 
 export interface ToolCallInput {
   toolId: string
@@ -101,7 +103,7 @@ export class ToolExecutor {
     // Check for unexpected fields
     for (const key in args) {
       if (!(key in parameters.properties)) {
-        console.warn(`[ToolExecutor] Unexpected argument '${key}' passed to tool`)
+        logger.warn(`[ToolExecutor] Unexpected argument '${key}' passed to tool`)
       }
     }
 

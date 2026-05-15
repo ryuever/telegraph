@@ -12,6 +12,9 @@ import {
   MAIN_METRICS_SERVICE_PATH,
   type IMainMetricsService,
 } from '@/packages/services/main-metrics/common';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('monitor');
 
 export const MonitorPageletWorkerId = createId('MonitorPageletWorker');
 
@@ -102,7 +105,7 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
               try {
                 cb(snapshots);
               } catch (err) {
-                console.warn(
+                logger.warn(
                   `[monitor-worker] supervisor snapshot listener threw: ${
                     err instanceof Error ? err.message : String(err)
                   }`
@@ -112,7 +115,7 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
           }
         );
       } catch (err) {
-        console.warn(
+        logger.warn(
           `[monitor-worker] main supervisor subscribe failed: ${
             err instanceof Error ? err.message : String(err)
           }`
@@ -122,7 +125,7 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
 
     subscribe();
     this.mainChannel.onDidConnected(() => {
-      console.log(
+      logger.info(
         `[monitor-worker] main channel reconnected — re-subscribing supervisor snapshots`
       );
       subscribe();
@@ -144,7 +147,7 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
     this.daemonSubscriptionAttached = true;
     this.daemonChannel.onDidConnected(() => {
       if (this.snapshotListeners.size === 0) return;
-      console.log(
+      logger.info(
         `[monitor-worker] daemon channel reconnected — re-subscribing ` +
           `${this.snapshotListeners.size} snapshot listener(s)`
       );
@@ -152,7 +155,7 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
         try {
           this.daemonClient?.onPerformanceUpdate(cb);
         } catch (err) {
-          console.warn(
+          logger.warn(
             `[monitor-worker] re-subscribe failed: ${
               err instanceof Error ? err.message : String(err)
             }`
@@ -199,7 +202,7 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
             try {
               callback(this.latestSupervisorSnapshots);
             } catch (err) {
-              console.warn(
+              logger.warn(
                 `[monitor-worker] supervisor replay to new subscriber threw: ${
                   err instanceof Error ? err.message : String(err)
                 }`

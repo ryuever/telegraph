@@ -14,6 +14,7 @@ export default defineConfig({
     alias: {
       '@/apps/setting': resolve(__dirname, '../setting/src'),
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
+      '@/packages/services/log': resolve(__dirname, '../../packages/services/src/log/src'),
       '@/apps/shared': resolve(__dirname, '../shared/src'),
       '@/apps/daemon': resolve(__dirname, '../daemon/src'),
       '@/apps/main': resolve(__dirname, 'src'),

@@ -8,6 +8,9 @@ import {
   MONITOR_PARTICIPANT_ID,
   RENDERER_PARTICIPANT_ID,
 } from '@/packages/services/pagelet-host/common';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('monitor');
 
 const container = new Container();
 container.load(
@@ -23,4 +26,4 @@ container.load(
 const worker = container.get(MonitorPageletWorkerId) as MonitorPageletWorker;
 worker
   .boot()
-  .catch((err) => console.error('[monitor-worker] boot failed:', err));
+  .catch((err) => logger.error('[monitor-worker] boot failed:', err));

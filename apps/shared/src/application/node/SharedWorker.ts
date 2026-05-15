@@ -6,6 +6,9 @@ import {
 import { serviceHost } from '@x-oasis/async-call-rpc';
 
 import { SHARED_SERVICE_PATH } from '@/apps/shared/application/common';
+import { createLogger } from '@/packages/services/log/node/logger';
+
+const logger = createLogger('shared');
 
 export interface ISharedWorker {
   boot(): void;
@@ -70,7 +73,7 @@ export class SharedWorker implements ISharedWorker {
       selfId: SELF_ID,
       controlChannel: mainChannel,
       onConnection: (conn) => {
-        console.log(
+        logger.info(
           `[shared-worker] connection from ${conn.peerId} (role=${conn.role})`
         );
         const ch = proxy.getChannelFor(conn.peerId);
@@ -80,13 +83,13 @@ export class SharedWorker implements ISharedWorker {
             serviceHost,
             handlers,
           });
-          console.log(
+          logger.info(
             `[shared-worker] ${SHARED_SERVICE_PATH} registered for ${conn.peerId}`
           );
         }
       },
     });
 
-    console.log('[shared-worker] initialized, waiting for pagelet connections');
+    logger.info('[shared-worker] initialized, waiting for pagelet connections');
   }
 }

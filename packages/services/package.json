@@ -5,6 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
+    "./log/*": "./src/log/src/*",
     "./main-metrics/*": "./src/main-metrics/src/*",
     "./pagelet-host/*": "./src/pagelet-host/src/*",
     "./process/*": "./src/process/src/*"
