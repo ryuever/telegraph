@@ -21,11 +21,12 @@ const TABS: { id: TabId; label: string }[] = [
 
 export function MonitorPanel() {
   const { snapshot, updatedAt } = useMonitorSnapshots();
-  // Supervisor snapshots come over an independent push channel
-  // (`onSupervisorSnapshotsChanged`) sourced from main directly. The
-  // `snapshot.supervisorSnapshots` field is left for backward-compat
-  // but the panel below prefers the live channel — see
-  // IMonitorPageletService for the rationale.
+  // Supervisor snapshots arrive on their own push channel
+  // (`onSupervisorSnapshotsChanged`) sourced from main directly —
+  // intentionally decoupled from the daemon-driven `MonitorSnapshot`
+  // pipeline so daemon being down doesn't blind us to supervisor
+  // `restarting` transitions. See IMonitorPageletService for the
+  // full rationale.
   const supervisorSnapshots = useSupervisorSnapshots();
   const history = useSnapshotHistory(snapshot, 60);
   useNowTick(1000);
@@ -89,9 +90,7 @@ export function MonitorPanel() {
         ) : (
           <div className="h-full overflow-auto">
             <SupervisorsPanel
-              supervisors={
-                supervisorSnapshots ?? snapshot.supervisorSnapshots
-              }
+              supervisors={supervisorSnapshots ?? []}
               query={query}
             />
           </div>

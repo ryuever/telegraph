@@ -1,8 +1,4 @@
-import {
-  MonitorSnapshot,
-  ProcessRow,
-  SupervisorInspectorSnapshot,
-} from '../common/types';
+import { MonitorSnapshot, ProcessRow } from '../common/types';
 import { AppMetric, IMainMetricsService } from '@/packages/services/main-metrics/common';
 
 export class Diagnostics {
@@ -42,14 +38,9 @@ export class Diagnostics {
     };
 
     let appMetrics: AppMetric[] = [];
-    let supervisorSnapshots: SupervisorInspectorSnapshot[] = [];
     if (this.metricsProvider) {
       try {
         appMetrics = await this.metricsProvider.getAppMetrics();
-      } catch {}
-      try {
-        supervisorSnapshots =
-          await this.metricsProvider.getSupervisorSnapshots();
       } catch {}
     }
 
@@ -84,7 +75,6 @@ export class Diagnostics {
       },
       processes,
       pidTree: null,
-      supervisorSnapshots,
     };
   }
 

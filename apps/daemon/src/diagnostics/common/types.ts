@@ -22,17 +22,22 @@ export interface PidNodeJson {
   children: PidNodeJson[];
 }
 
+/**
+ * Resource-level snapshot of every Electron process the daemon can see.
+ *
+ * Supervisor health used to be embedded here as `supervisorSnapshots`
+ * but that path was removed — supervisor data now flows on its own
+ * push channel (`IMonitorPageletService.onSupervisorSnapshotsChanged`),
+ * sourced directly from `IMainMetricsService` in main. Keeping the two
+ * pipelines separate means daemon being down doesn't blind the monitor
+ * to supervisor `restarting` transitions, and avoids a 2 s detour
+ * through daemon for data that already streams at 1 s from main.
+ */
 export interface MonitorSnapshot {
   timestamp: number;
   totals: PerformanceTotals;
   processes: ProcessRow[];
   pidTree: PidNodeJson | null;
-  /**
-   * Per-utility-process supervisor health pulled from main via
-   * IMainMetricsService.getSupervisorSnapshots(). Empty array until
-   * the first MAIN_METRICS roundtrip succeeds.
-   */
-  supervisorSnapshots: SupervisorInspectorSnapshot[];
 }
 
 // Re-export so monitor common (and any other app-side consumer)
