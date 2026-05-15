@@ -1,23 +1,9 @@
 import type { AgentSendOptions, AgentService, ChatConversation, ChatMessage, LlmTracePayload } from './types'
 import {
-  CHAT_PAGELET_SERVICE_PATH,
   type ChatSendRequest,
   type ChatStreamEvent,
-  type IChatPageletService,
 } from '@/apps/chat/application/common'
-
-let chatPageletClient: IChatPageletService | null = null
-
-function getChatPageletClient(): IChatPageletService {
-  if (!chatPageletClient) {
-    throw new Error('Chat pagelet client not initialized. Call initChatPageletClient first.')
-  }
-  return chatPageletClient
-}
-
-export function initChatPageletClient(client: IChatPageletService): void {
-  chatPageletClient = client
-}
+import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
 
 export class PageletAgentService implements AgentService {
   private listeners = new Map<string, (event: ChatStreamEvent) => void>()

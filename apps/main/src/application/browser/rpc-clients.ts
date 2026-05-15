@@ -1,46 +1,29 @@
 import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/browser';
 import { clientHost } from '@x-oasis/async-call-rpc';
 import {
-  CONNECTION_PAGELET_SERVICE_PATH,
-  IConnectionPageletService,
-} from '@/apps/connection/application/common';
-import {
-  MONITOR_PAGELET_SERVICE_PATH,
-  IMonitorPageletService,
-} from '@/apps/monitor/application/common';
-import {
-  DESIGN_PAGELET_SERVICE_PATH,
-  IDesignPageletService,
-} from '@/apps/design/application/common';
-import {
-  CHAT_PAGELET_SERVICE_PATH,
-  IChatPageletService,
-} from '@/apps/chat/application/common';
-import {
   MAIN_WINDOW_SERVICE_PATH,
   type IMainWindowService,
 } from '@/packages/services/pagelet-host/common';
 
+/**
+ * The single OrchestratorClient instance for the main renderer.
+ *
+ * Owns the renderer↔preload direct + IPC channels and is the source of
+ * `getProxy()` for every pagelet's service. Per-pagelet proxy accessors
+ * live next to each pagelet (see `apps/<pagelet>/.../browser/getClient.ts`)
+ * and pull `client` from here so they all share the same channel and
+ * `clientHost` registration.
+ *
+ * H7 (D-008): the per-pagelet proxies that used to be eager top-level
+ * `client.getProxy(...)` exports here moved out into per-app lazy
+ * getters. This file now only owns the things that genuinely belong to
+ * the main window scope: the OrchestratorClient itself and the
+ * main-window IPC service (which is window-scoped, not pagelet-scoped).
+ */
 export const client = createOrchestratorClient({
   directChannelDescription: 'renderer↔preload',
   ipcChannelDescription: 'renderer↔preload:ipc',
 });
-
-export const connectionPageletClient = client.getProxy(
-  CONNECTION_PAGELET_SERVICE_PATH
-) as unknown as IConnectionPageletService;
-
-export const monitorPageletClient = client.getProxy(
-  MONITOR_PAGELET_SERVICE_PATH
-) as unknown as IMonitorPageletService;
-
-export const designPageletClient = client.getProxy(
-  DESIGN_PAGELET_SERVICE_PATH
-) as unknown as IDesignPageletService;
-
-export const chatPageletClient = client.getProxy(
-  CHAT_PAGELET_SERVICE_PATH
-) as unknown as IChatPageletService;
 
 export const mainWindowClient = clientHost
   .registerClient(MAIN_WINDOW_SERVICE_PATH, { channel: client.ipcChannel })

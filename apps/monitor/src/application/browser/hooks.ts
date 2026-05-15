@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { monitorPageletClient } from '@/apps/main/application/browser/rpc-clients';
+import { getMonitorPageletClient } from '@/apps/monitor/application/browser/getClient';
 import {
   MonitorSnapshot,
   type SupervisorInspectorSnapshot,
@@ -22,7 +22,7 @@ export function useMonitorSnapshots() {
       subscribedRef.current = true;
 
       try {
-        const snap = await monitorPageletClient.getSnapshot();
+        const snap = await getMonitorPageletClient().getSnapshot();
         if (!cancelled && snap) {
           setSnapshot(snap);
           setUpdatedAt(Date.now());
@@ -38,7 +38,7 @@ export function useMonitorSnapshots() {
       try {
         if (cancelled) return;
         const result: (() => void) | { unsubscribe: () => void } | void =
-          monitorPageletClient.onPerformanceUpdate(
+          getMonitorPageletClient().onPerformanceUpdate(
           (snap: MonitorSnapshot) => {
             if (!cancelled) {
               setSnapshot(snap);
@@ -127,7 +127,7 @@ export function useSupervisorSnapshots() {
         const result:
           | (() => void)
           | { unsubscribe: () => void }
-          | void = monitorPageletClient.onSupervisorSnapshotsChanged(
+          | void = getMonitorPageletClient().onSupervisorSnapshotsChanged(
           (snaps: SupervisorInspectorSnapshot[]) => {
             if (!cancelled) setSnapshots(snaps);
           }

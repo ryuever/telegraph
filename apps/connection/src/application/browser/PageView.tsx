@@ -2,10 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import useOrchestratorDashboard, {
   OrchestratorAPI,
 } from '@/packages/ui/useOrchestratorDashboard';
-import {
-  client,
-  connectionPageletClient,
-} from '@/apps/main/application/browser/rpc-clients';
+import { client } from '@/apps/main/application/browser/rpc-clients';
+import { getConnectionPageletClient } from '@/apps/connection/application/browser/getClient';
 import { PageConfig } from '@/apps/main/application/common/cp-config';
 import { CONNECTION_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
 import { Button } from '@/packages/ui/components/ui/button';
@@ -75,7 +73,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
         {
           name: 'info',
           description: `Get ${pageletId} process info`,
-          invoke: () => connectionPageletClient.info(),
+          invoke: () => getConnectionPageletClient().info(),
         },
       ],
     },
@@ -88,13 +86,13 @@ function PageView({ page }: PageViewProps): JSX.Element {
           name: 'echo',
           description: 'Echo a message through shared process',
           params: [{ key: 'msg', label: 'Message', defaultValue: 'hello' }],
-          invoke: (p) => connectionPageletClient.callSharedEcho(p.msg),
+          invoke: (p) => getConnectionPageletClient().callSharedEcho(p.msg),
         },
         {
           name: 'getConfig',
           description: 'Get config value by key',
           params: [{ key: 'key', label: 'Config Key', defaultValue: 'theme' }],
-          invoke: (p) => connectionPageletClient.callSharedGetConfig(p.key),
+          invoke: (p) => getConnectionPageletClient().callSharedGetConfig(p.key),
         },
         {
           name: 'setConfig',
@@ -104,7 +102,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
             { key: 'value', label: 'Value', defaultValue: 'light' },
           ],
           invoke: (p) =>
-            connectionPageletClient.callSharedSetConfig(p.key, p.value),
+            getConnectionPageletClient().callSharedSetConfig(p.key, p.value),
         },
       ],
     },
@@ -117,12 +115,12 @@ function PageView({ page }: PageViewProps): JSX.Element {
           name: 'echo',
           description: 'Echo a message through daemon process',
           params: [{ key: 'msg', label: 'Message', defaultValue: 'hello' }],
-          invoke: (p) => connectionPageletClient.callDaemonEcho(p.msg),
+          invoke: (p) => getConnectionPageletClient().callDaemonEcho(p.msg),
         },
         {
           name: 'systemStatus',
           description: 'Get daemon system status',
-          invoke: () => connectionPageletClient.callDaemonSystemStatus(),
+          invoke: () => getConnectionPageletClient().callDaemonSystemStatus(),
         },
       ],
     },
@@ -135,7 +133,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
           name: 'mainPing',
           description: 'Ping the main process',
           params: [{ key: 'msg', label: 'Message', defaultValue: 'hello' }],
-          invoke: (p) => connectionPageletClient.callMainPing(p.msg),
+          invoke: (p) => getConnectionPageletClient().callMainPing(p.msg),
         },
       ],
     },
@@ -152,7 +150,7 @@ function PageView({ page }: PageViewProps): JSX.Element {
     ],
     api: pageApi,
     sendRpc: async (message: string) =>
-      connectionPageletClient.callSharedEcho(message),
+      getConnectionPageletClient().callSharedEcho(message),
   });
 
   const state = dashboard.connectionStatus?.state || 'IDLE';
