@@ -15,8 +15,8 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@x-oasis/async-call-rpc": "^0.16.0",
-    "@x-oasis/async-call-rpc-electron": "^0.13.0",
+    "@x-oasis/async-call-rpc": "^0.17.0",
+    "@x-oasis/async-call-rpc-electron": "^0.14.0",
     "@x-oasis/di": "^0.13.2"
   },
   "devDependencies": {

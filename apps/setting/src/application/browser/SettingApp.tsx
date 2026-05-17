@@ -3,7 +3,7 @@ import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/brows
 import type {
   StateChangeEvent,
   ConnectionStats,
-} from '@x-oasis/async-call-rpc';
+} from '@x-oasis/async-call-rpc/orchestrator';
 import {
   SETTING_PAGELET_SERVICE_PATH,
   ISettingPageletService,

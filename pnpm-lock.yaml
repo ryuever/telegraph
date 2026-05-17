@@ -63,11 +63,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -109,11 +109,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -131,11 +131,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -159,11 +159,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -199,14 +199,14 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/async-call-rpc-web':
-        specifier: ^0.12.1
-        version: 0.12.1
+        specifier: ^0.13.0
+        version: 0.13.0
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -305,11 +305,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -333,11 +333,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -355,11 +355,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -390,11 +390,11 @@ importers:
   packages/services:
     dependencies:
       '@x-oasis/async-call-rpc':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@x-oasis/async-call-rpc-electron':
-        specifier: ^0.13.0
-        version: 0.13.0(electron@41.5.1)
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
       '@x-oasis/di':
         specifier: ^0.13.2
         version: 0.13.2
@@ -2368,19 +2368,19 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@x-oasis/async-call-rpc-electron@0.13.0':
-    resolution: {integrity: sha512-ZEzMjaW+gM3LYVEewhGWy7hXI04bzkTKFxK50G0ifpRkFBeqc+9EvMkLySX1SbD8iZeQ3aM8McqQ6/TvgaE83Q==}
+  '@x-oasis/async-call-rpc-electron@0.14.0':
+    resolution: {integrity: sha512-ClPm6QxnNxY27RKYyLyJafASINqY+jNEgSFipE8Kl4x3oGe2JhCapmm6naJr/njOKOcYbvapbvDLoU1rx4Pokw==}
     peerDependencies:
       electron: '>=20.0.0'
     peerDependenciesMeta:
       electron:
         optional: true
 
-  '@x-oasis/async-call-rpc-web@0.12.1':
-    resolution: {integrity: sha512-HR/clZ3BWoAR38bj012yf29uilwj3SE1k9PlcK+++D4bQWXFyJ7BiCM3NY+C/AmHnD6JdeBC0hVWEzyrZc+o9A==}
+  '@x-oasis/async-call-rpc-web@0.13.0':
+    resolution: {integrity: sha512-uv4WcNv+BfgYhhl7Jc4xhJtUfCNyE3lyxPXRj80ZUXzMkfSTDt6qWPrxZ7HGkpDRXqI7zcaCU9mpoZxPFYsjaA==}
 
-  '@x-oasis/async-call-rpc@0.16.0':
-    resolution: {integrity: sha512-ov3SXsr3x6mNnSOdRQ4Uo4S0YpcXmWxRYA+MLiR7ppKrwqEnJN/bqEjjPizkSHoPEaK3lkV6wf5GVJHcFaxxlw==}
+  '@x-oasis/async-call-rpc@0.17.0':
+    resolution: {integrity: sha512-ob6Dw9CVuVsMfR+xH5pDHp5G3bDxCjhusH5Aw5Y+T4zES8lsw4IPqIw4bdfGeMcPSupq9s4IhrgojgpOcpi2yQ==}
 
   '@x-oasis/deferred@0.14.0':
     resolution: {integrity: sha512-NFCQr8IbkqXeOV3PtJv80NxkT67NYkpnVFLvv6nlQOF5GjlfJWPa5Thjy4Na48rlEXOqHljjJ4rgAIv0VMU5ZQ==}
@@ -8301,18 +8301,18 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@x-oasis/async-call-rpc-electron@0.13.0(electron@41.5.1)':
+  '@x-oasis/async-call-rpc-electron@0.14.0(electron@41.5.1)':
     dependencies:
-      '@x-oasis/async-call-rpc': 0.16.0
-      '@x-oasis/async-call-rpc-web': 0.12.1
+      '@x-oasis/async-call-rpc': 0.17.0
+      '@x-oasis/async-call-rpc-web': 0.13.0
     optionalDependencies:
       electron: 41.5.1
 
-  '@x-oasis/async-call-rpc-web@0.12.1':
+  '@x-oasis/async-call-rpc-web@0.13.0':
     dependencies:
-      '@x-oasis/async-call-rpc': 0.16.0
+      '@x-oasis/async-call-rpc': 0.17.0
 
-  '@x-oasis/async-call-rpc@0.16.0':
+  '@x-oasis/async-call-rpc@0.17.0':
     dependencies:
       '@x-oasis/deferred': 0.14.0
       '@x-oasis/disposable': 0.14.0

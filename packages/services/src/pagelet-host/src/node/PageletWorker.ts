@@ -6,9 +6,11 @@ import {
 } from '@x-oasis/async-call-rpc-electron';
 import {
   clientHost,
+} from '@x-oasis/async-call-rpc';
+import type {
   ConnectionConfigSpec,
   ConnectOptions,
-} from '@x-oasis/async-call-rpc';
+} from '@x-oasis/async-call-rpc/orchestrator';
 
 import {
   IMainRpcService,

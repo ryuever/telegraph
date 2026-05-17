@@ -1,12 +1,15 @@
 import { createId, inject, injectable } from '@x-oasis/di';
-import { RPCServiceHost, ExponentialBackoffPolicy } from '@x-oasis/async-call-rpc';
+import { RPCServiceHost } from '@x-oasis/async-call-rpc';
+import {
+  ExponentialBackoffPolicy,
+} from '@x-oasis/async-call-rpc/orchestrator';
 import type {
   ConnectionInfo,
   ConnectionStats,
   OrchestratorEvent,
   ConnectionConfig,
   ConnectOptions,
-} from '@x-oasis/async-call-rpc';
+} from '@x-oasis/async-call-rpc/orchestrator';
 import type {
   ElectronConnectionOrchestrator,
   IPCMainChannel,

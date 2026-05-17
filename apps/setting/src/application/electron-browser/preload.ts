@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { createPageBridge } from '@x-oasis/async-call-rpc-electron';
+import { createPageBridge } from '@x-oasis/async-call-rpc-electron/electron-browser/core';
 import { clientHost } from '@x-oasis/async-call-rpc';
 
 import { SETTING_PAGELET_SERVICE_PATH } from '@/apps/setting/application/common';
