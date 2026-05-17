@@ -8,9 +8,17 @@ import {
   type ChatSendRequest,
   type ChatSendResult,
   type ChatStreamEvent,
+  type AgentRuntimeSettings,
 } from '@/apps/chat/application/common';
+import { createRuntime } from '@/packages/agent/runtime/createRuntime';
+import type { RuntimeEvent } from '@/packages/runtime-contracts';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
+
+/**
+ * Active run tracking — allows cancellation via AbortController.
+ */
+const activeRuns = new Map<string, AbortController>();
 
 @injectable()
 export class ChatPageletWorker extends PageletWorker {
@@ -27,8 +35,18 @@ export class ChatPageletWorker extends PageletWorker {
       handlers: {
         info: (): string => `chat-pagelet ready (pid=${String(process.pid)})`,
 
-        send: (req: ChatSendRequest): Promise<ChatSendResult> => {
-          return Promise.resolve(this.handleSend(req));
+        send: async (req: ChatSendRequest): Promise<ChatSendResult> => {
+          return this.handleSend(req);
+        },
+
+        cancel: (runId: string): boolean => {
+          const ctrl = activeRuns.get(runId);
+          if (ctrl) {
+            ctrl.abort();
+            activeRuns.delete(runId);
+            return true;
+          }
+          return false;
         },
 
         onStreamEvent: (callback: (event: ChatStreamEvent) => void): (() => void) => {
@@ -51,46 +69,89 @@ export class ChatPageletWorker extends PageletWorker {
     }
   }
 
-  private handleSend(req: ChatSendRequest): ChatSendResult {
+  /**
+   * Core agent execution: create a RuntimeExecutor from settings,
+   * stream RuntimeEvents, and forward them as ChatStreamEvents.
+   */
+  private async handleSend(req: ChatSendRequest): Promise<ChatSendResult> {
     const { runId, sessionId, message, settings } = req;
 
+    const abortController = new AbortController();
+    activeRuns.set(runId, abortController);
+
     this.emitStreamEvent({ type: 'run_queued', runId });
-    this.emitStreamEvent({ type: 'run_started', runId });
 
     try {
-      this.emitStreamEvent({
-        type: 'llm_trace',
+      const executor = createRuntime(settings as AgentRuntimeSettings);
+      this.emitStreamEvent({ type: 'run_started', runId });
+
+      const runtimeEvents = executor.run({
         runId,
         sessionId,
-        trace: {
-          kind: 'telegraph_turn_context',
-          messages: [{ id: 'user-msg', role: 'user', content: message }],
-          runtimeSettingsSummary: {
-            provider: settings.provider,
-            modelId: settings.modelId,
-            backend: settings.backend ?? 'pi-ai',
-            orchestration: settings.orchestration ?? 'none',
-            pattern: settings.orchestrationPattern ?? null,
-          },
-        },
+        message,
+        settings: settings as any,
+        signal: abortController.signal,
       });
 
-      const tokens = message.split(/(\s+)/);
-      for (const token of tokens) {
-        this.emitStreamEvent({ type: 'text_delta', runId, text: token });
+      for await (const ev of runtimeEvents) {
+        if (abortController.signal.aborted) break;
+
+        const chatEvent = this.runtimeEventToChatStream(ev, runId, sessionId);
+        if (chatEvent) {
+          this.emitStreamEvent(chatEvent);
+        }
       }
 
-      this.emitStreamEvent({ type: 'run_completed', runId });
+      if (abortController.signal.aborted) {
+        this.emitStreamEvent({ type: 'run_failed', runId, error: 'Cancelled' });
+        activeRuns.delete(runId);
+        return { runId, status: 'failed', error: 'Cancelled' };
+      }
 
-      return {
-        runId,
-        status: 'completed',
-        text: `[chat-pagelet mock] Echo: ${message}`,
-      };
+      activeRuns.delete(runId);
+      return { runId, status: 'completed' };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       this.emitStreamEvent({ type: 'run_failed', runId, error: errorMsg });
+      activeRuns.delete(runId);
       return { runId, status: 'failed', error: errorMsg };
+    }
+  }
+
+  /**
+   * Map a RuntimeEvent to a ChatStreamEvent for the renderer.
+   */
+  private runtimeEventToChatStream(
+    ev: RuntimeEvent,
+    runId: string,
+    sessionId?: string,
+  ): ChatStreamEvent | null {
+    switch (ev.type) {
+      case 'run_started':
+        return null; // already emitted before the loop
+
+      case 'assistant_delta': {
+        const delta = ev as any;
+        return { type: 'text_delta', runId, sessionId, text: delta.text ?? '' };
+      }
+
+      case 'run_completed':
+        return { type: 'run_completed', runId, sessionId };
+
+      case 'run_failed': {
+        const failed = ev as any;
+        return {
+          type: 'run_failed', runId, sessionId,
+          error: failed.error?.message ?? 'Unknown error',
+        };
+      }
+
+      case 'run_cancelled':
+        return { type: 'run_failed', runId, sessionId, error: 'Cancelled' };
+
+      // All other events forwarded as runtime_event for trace
+      default:
+        return { type: 'runtime_event', runId, sessionId, event: ev };
     }
   }
 }

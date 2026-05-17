@@ -105,6 +105,7 @@ export type LlmTracePayload =
 export interface IChatPageletService {
   info(): Promise<string>
   send(request: ChatSendRequest): Promise<ChatSendResult>
+  cancel(runId: string): Promise<boolean>
   onStreamEvent(callback: (event: ChatStreamEvent) => void): () => void
 }
 

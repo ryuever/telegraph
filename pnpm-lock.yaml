@@ -50,6 +50,9 @@ importers:
 
   apps/chat:
     dependencies:
+      '@telegraph/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@telegraph/runtime-contracts':
         specifier: workspace:*
         version: link:../../packages/runtime-contracts

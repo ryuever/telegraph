@@ -15,6 +15,7 @@ import {
 import { useChat } from '../use-chat'
 import { useSessionsStore } from '@/packages/stores'
 import { MockAgentService } from '../mock-agent-service'
+import { PageletAgentService } from '../pagelet-agent-service'
 import {
   loadSettings,
   saveSettings,
@@ -108,7 +109,7 @@ export function ChatPanel({ agent }: Props) {
 
   const agentService = useMemo<AgentService>(() => {
     if (agent) return agent
-    return new MockAgentService()
+    return new PageletAgentService()
   }, [agent])
 
   const {

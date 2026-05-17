@@ -19,6 +19,7 @@ export default defineConfig({
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
       '@/packages/runtime-contracts': resolve(__dirname, '../../packages/runtime-contracts/src/index.ts'),
+      '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
     },
   },
   build: {

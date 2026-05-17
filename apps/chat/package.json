@@ -17,6 +17,7 @@
     "@telegraph/services": "workspace:*",
     "@telegraph/stores": "workspace:*",
     "@telegraph/ui": "workspace:*",
+    "@telegraph/agent": "workspace:*",
     "@x-oasis/async-call-rpc": "^0.17.0",
     "@x-oasis/async-call-rpc-electron": "^0.14.0",
     "@x-oasis/di": "^0.13.2"
