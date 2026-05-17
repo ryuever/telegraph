@@ -24,7 +24,7 @@ description: "在 apps/ 下创建新 app 并将其连接到自己的 pagelet（u
 
 ---
 
-## 完整步骤（11 步）
+## 完整步骤（12 步）
 
 ### Step 1: 添加 Participant ID 常量
 
@@ -173,6 +173,8 @@ export class <AppName>PageletWorker extends PageletWorker<ISharedService, IDaemo
 import { createId, inject, injectable } from '@x-oasis/di';
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
+import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
+import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { <APPNAME>_PARTICIPANT_ID } from '@/packages/services/pagelet-host/common';
 
 export const <APPNAME>_WORKER_FILE = '<appname>-worker.js';
@@ -187,6 +189,8 @@ export const <AppName>ApplicationId = createId('<AppName>Application');
 export class <AppName>Application implements I<AppName>Application {
   constructor(
     @inject(PageletProcessId) private readonly pageletProcess: IPageletProcess,
+    @inject(AppOrchestratorId)
+    private readonly appOrchestrator: IAppOrchestrator,
   ) {}
 
   async start(): Promise<void> {
@@ -194,11 +198,58 @@ export class <AppName>Application implements I<AppName>Application {
       <APPNAME>_PARTICIPANT_ID,
       <APPNAME>_WORKER_FILE
     );
+    // Eager connection: spawn 后立即建立 renderer ↔ pagelet 的 RPC 通道。
+    // 这样 renderer 侧的 RPC proxy 在调用时通道已就绪。
+    // 参照 DesignApplication / ChatApplication。
+    await this.appOrchestrator.connect<AppName>();
   }
 }
 ```
 
-> 如果需要 eager 连接（debug/演示），可额外注入 `AppOrchestratorId` 并调用 `appOrchestrator.connect<AppName>()`，参照 `DesignApplication`。
+> **为什么 eager connect 是必需的？** pagelet utility process 异步启动，spawn 返回只表示进程已 fork。
+> 若不在 main process 侧主动 connect，renderer 端的 RPC proxy 会因为端口未绑定而失败。
+> 所有需要 renderer ↔ pagelet 通信的场景都应使用此模式。
+
+---
+
+### Step 6.5: 注册 Eager Connect 方法到 AppOrchestrator
+
+**编辑** `packages/services/src/pagelet-host/src/electron-main/AppOrchestrator.ts`
+
+1. 在顶部导入中添加新的 PARTICIPANT_ID：
+
+```typescript
+import {
+  // ...existing imports...
+  <APPNAME>_PARTICIPANT_ID,
+} from '@/packages/services/pagelet-host/common';
+```
+
+2. 在 `IAppOrchestrator` 接口中声明方法：
+
+```typescript
+export interface IAppOrchestrator {
+  // ...existing methods...
+  connect<AppName>(): Promise<void>;
+}
+```
+
+3. 在 `AppOrchestrator` 类中实现方法：
+
+```typescript
+async connect<AppName>(): Promise<void> {
+  const orchestrator = this.cpServer.getOrchestrator();
+  await orchestrator.connect(
+    RENDERER_PARTICIPANT_ID,
+    <APPNAME>_PARTICIPANT_ID,
+    defaultConnectionConfig(),
+    defaultConnectOptions()
+  );
+  this.logger.info('[AppOrchestrator] <appname> direct connection established');
+}
+```
+
+> 参照 `connectDesign()` / `connectChat()` 的实现。所有 pagelet 使用相同的模板。
 
 ---
 
@@ -248,6 +299,37 @@ export default defineConfig({
 - `entryFileNames` **必须**与 Step 6 的 `_WORKER_FILE` 一致
 - 格式必须为 `cjs`（Electron utility process 要求）
 - alias 要覆盖 worker 代码中所有 `@/` 跨模块 import
+
+**⚠️ Vite 构建陷阱 — 禁止动态 require / import**：
+
+Pagelet worker 代码由 Vite 构建（`vite.<appname>.config.ts`）。Vite 在 build time **无法 rewrite** 动态的 `require()` 或 `import()` 调用。如果 worker 中使用了类似以下的代码：
+
+```typescript
+// ❌ 禁止 — 运行时 MODULE_NOT_FOUND
+const mod = require('@/packages/agent/runtime/PiAiRuntime');
+const mod = await import('@/packages/agent/runtime/PiAiRuntime');
+```
+
+打包后的 worker `.js` 会保留原始路径字符串，运行时 Electron utility process 找不到该模块，直接 crash。
+
+**正确做法**：使用 static import（Vite 会在 build time rewrite 为正确路径）：
+
+```typescript
+// ✅ 正确 — static import，Vite 可 rewrite
+import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
+import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
+```
+
+如果需要按条件选择实现，在 worker 类内写 factory 方法：
+
+```typescript
+private createExecutor(backend: string): RuntimeExecutor {
+  if (backend === 'pi-embedded') return new PiEmbeddedRuntime();
+  return new PiAiRuntime();
+}
+```
+
+参照 `ChatPageletWorker.createExecutor()`。
 
 ---
 
@@ -432,6 +514,7 @@ clientHost.registerClient(path, { channel }).createProxy()
 | **创建** | `apps/<appname>/package.json` |
 | **创建** | `apps/<appname>/tsconfig.json` |
 | **创建** | `apps/telegraph/vite.<appname>.config.ts` |
+| **编辑** | `packages/services/src/pagelet-host/src/electron-main/AppOrchestrator.ts` — 添加 PARTICIPANT_ID import + `connect<AppName>()` 接口声明 + 实现 |
 | **编辑** | `apps/telegraph/forge.config.ts` — 添加 build entry |
 | **编辑** | `apps/telegraph/tsconfig.json` — 添加 path alias |
 | **编辑** | `apps/telegraph/src/application/electron-main/AppApplicationModule.ts` — 添加 binding |
@@ -443,11 +526,76 @@ clientHost.registerClient(path, { channel }).createProxy()
 
 | App | 复杂度 | 特点 |
 |-----|--------|------|
-| `apps/design/` | 最小 | 仅 ping/info，无 shared/daemon |
+| `apps/design/` | 最小 | 仅 ping/info，无 shared/daemon；eager connect 标准模式 |
 | `apps/connection/` | 中等 | 带 `PageletWorker<ISharedService, IDaemonService>` 泛型，演示跨进程调用 |
-| `apps/chat/` | 复杂 | 有状态 streaming，streamListeners 回调模式 |
+| `apps/chat/` | 复杂 | 有状态 streaming，streamListeners 回调模式，browser 侧 `waitForPageletReady` 探测，static import factory 模式 |
 
 新建 app 建议从 `design` 复制起手，按需参照 `connection` 和 `chat` 增加功能。
+
+---
+
+## Browser 侧 RPC 就绪等待（`waitForPageletReady` 模式）
+
+> **适用场景**：renderer 需要主动调用 pagelet RPC（如 chat 发送消息），且调用时机可能在 pagelet utility process 尚未完全启动时。
+
+### 问题根因
+
+即使 Step 6 中 eager connect 已在 main process 侧发起，pagelet utility process 的启动是异步的。
+在以下时间窗口内，renderer 端的 RPC proxy 对应的 `MessagePort` 尚未绑定：
+
+1. Main process `spawn()` 返回（只代表子进程已 fork）
+2. 子进程加载 `main.ts` → `PageletWorker.boot()` → 创建 channel → 注册 service host
+3. Main process `connect()` 建立 renderer ↔ pagelet 的 MessagePort 桥接
+4. Renderer preload bridge 收到 port 并绑定到 RPC proxy
+
+在 step 3→4 之间，x-oasis 的 `RPCMessageChannel` 会**静默丢弃 send 调用**（仅打 `"send called before port was bound"` 警告），**promise 永远不会 settle**，导致调用 hang forever。
+
+### 解决方案：探测 + 重试
+
+在 browser 侧调用 pagelet RPC 前，先用一个轻量探测（如 `info()`）确认通道已就绪：
+
+```typescript
+const READY_ATTEMPTS = 40
+const READY_INTERVAL_MS = 500
+const PROBE_TIMEOUT_MS = 3000
+
+async function waitForPageletReady(): Promise<void> {
+  const client = get<AppName>PageletClient()
+  for (let attempt = 0; attempt < READY_ATTEMPTS; attempt++) {
+    try {
+      await withTimeout(client.info(), PROBE_TIMEOUT_MS)
+      return // port is bound — pagelet is ready
+    } catch {
+      await sleep(READY_INTERVAL_MS)
+    }
+  }
+  throw new Error('<AppName> pagelet is not ready. Please try again in a moment.')
+}
+```
+
+**关键**：`withTimeout` 包装不可省略，因为裸 `client.info()` 在端口未绑定时 promise 永远不 settle，必须靠 timeout 中断等待后重试。
+
+在发送业务 RPC 前调用：
+
+```typescript
+async send(options): Promise<void> {
+  onStatus?.('queued')
+  await waitForPageletReady()
+
+  const client = get<AppName>PageletClient()
+  // ... 正常 RPC 调用
+}
+```
+
+参照 `apps/chat/src/application/browser/pagelet-agent-service.ts` 的完整实现。
+
+### 何时需要此模式
+
+| 场景 | 是否需要 waitForReady |
+|------|----------------------|
+| 用户手动点击按钮后才调用 RPC | 通常不需要（页面加载到用户操作之间 pagelet 已启动） |
+| 页面加载时自动调用 RPC（如刷新后恢复会话） | **需要** |
+| 任何可能在 app 启动后很短时间内调用 RPC 的场景 | **建议加**（防御性编程） |
 
 ---
 
@@ -456,10 +604,12 @@ clientHost.registerClient(path, { channel }).createProxy()
 ```
 AppApplication.start()
   └─ <AppName>Application.start()
-       └─ pageletProcess.spawn('<appname>', '<appname>-worker.js')
-            ├─ 创建 UtilityProcessSupervisor
-            ├─ Spawn child process
-            └─ 注册到 orchestrator
+       ├─ pageletProcess.spawn('<appname>', '<appname>-worker.js')
+       │    ├─ 创建 UtilityProcessSupervisor
+       │    ├─ Spawn child process
+       │    └─ 注册到 orchestrator
+       └─ appOrchestrator.connect<AppName>()        ← eager connect
+            └─ orchestrator.connect(RENDERER, <APPNAME>)
 
 Child process 加载 <appname>-worker.js
   └─ main.ts: Container → <AppName>PageletWorker.boot()
@@ -468,9 +618,12 @@ Child process 加载 <appname>-worker.js
        ├─ 并行连接 shared + daemon（5s timeout，超时不阻塞）
        └─ 等待 renderer 连接
 
-Renderer 连接
-  └─ orchestrator.connect('renderer', '<appname>')
-       └─ onRendererConnection(channel) 被调用
-            └─ serviceHost.registerService(servicePath, { handlers })
-                 └─ RPC 就绪 ✅
+Renderer 连接（由 eager connect 触发）
+  └─ onRendererConnection(channel) 被调用
+       └─ serviceHost.registerService(servicePath, { handlers })
+            └─ RPC 就绪 ✅
+
+Browser 侧调用（如 chat send）
+  └─ waitForPageletReady()                          ← 探测就绪
+       └─ client.info() probe 成功 → 正常 RPC 调用
 ```
