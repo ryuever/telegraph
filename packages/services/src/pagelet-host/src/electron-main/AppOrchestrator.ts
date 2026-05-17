@@ -33,6 +33,7 @@ import {
   CONNECTION_PARTICIPANT_ID,
   SETTING_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
+  CHAT_PARTICIPANT_ID,
 } from '@/packages/services/pagelet-host/common';
 import { LogServiceId } from '@/packages/services/log/common/LogService';
 import type { ILogger } from '@/packages/services/log/common/types';
@@ -88,6 +89,7 @@ export interface IAppOrchestrator {
   connectMonitor(): Promise<void>;
   connectDesign(): Promise<void>;
   connectSetting(): Promise<void>;
+  connectChat(): Promise<void>;
 }
 
 export const AppOrchestratorId = createId('AppOrchestrator');
@@ -308,6 +310,17 @@ export class AppOrchestrator implements IAppOrchestrator {
       defaultConnectOptions()
     );
     this.logger.info('[AppOrchestrator] design direct connection established');
+  }
+
+  async connectChat(): Promise<void> {
+    const orchestrator = this.cpServer.getOrchestrator();
+    await orchestrator.connect(
+      RENDERER_PARTICIPANT_ID,
+      CHAT_PARTICIPANT_ID,
+      defaultConnectionConfig(),
+      defaultConnectOptions()
+    );
+    this.logger.info('[AppOrchestrator] chat direct connection established');
   }
 }
 

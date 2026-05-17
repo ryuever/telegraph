@@ -90,6 +90,10 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
   const setModel = (id: string) => { setDraft(d => ({ ...d, modelId: id })); }
   const setBackend = (backend: ChatModelSettings['backend']) =>
     { setDraft(d => ({ ...d, backend })); }
+  const setApiKey = (apiKey: string) =>
+    { setDraft(d => ({ ...d, apiKey })); }
+  const setBaseUrl = (baseUrl: string) =>
+    { setDraft(d => ({ ...d, baseUrl: baseUrl || undefined })); }
   const setOrchestration = (orchestration: ChatModelSettings['orchestration']) =>
     { setDraft(d => ({ ...d, orchestration })); }
   const setOrchestrationPattern = (
@@ -174,6 +178,8 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
               onSetProvider={setProvider}
               onSetModel={setModel}
               onSetBackend={setBackend}
+              onSetApiKey={setApiKey}
+              onSetBaseUrl={setBaseUrl}
             />
           )}
           {activeTab === 'orchestration' && (
@@ -232,6 +238,8 @@ function ModelTab({
   onSetProvider,
   onSetModel,
   onSetBackend,
+  onSetApiKey,
+  onSetBaseUrl,
 }: {
   draft: ChatModelSettings
   envModels: EnvModelConfig[]
@@ -243,6 +251,8 @@ function ModelTab({
   onSetProvider: (id: string) => void
   onSetModel: (id: string) => void
   onSetBackend: (backend: ChatModelSettings['backend']) => void
+  onSetApiKey: (apiKey: string) => void
+  onSetBaseUrl: (baseUrl: string) => void
 }) {
   return (
     <div className="space-y-4">
@@ -357,6 +367,43 @@ function ModelTab({
           <option value="langgraph" disabled>langgraph (not validated)</option>
           <option value="vercel-ai" disabled>vercel-ai (not validated)</option>
         </select>
+      </Field>
+
+      <Field label="API Key" hint="Stored in localStorage (MVP)">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={draft.apiKey}
+            onChange={e => { onSetApiKey(e.target.value); }}
+            placeholder="Enter your API key"
+            className={cn(inputClass, 'flex-1')}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.readText()
+                .then(text => { onSetApiKey(text.trim()); })
+                .catch(() => { /* clipboard read denied */ });
+            }}
+            className="shrink-0 rounded-md border border-zinc-700 bg-zinc-800/80 px-2 py-1.5 text-[11px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100"
+          >
+            Paste
+          </button>
+        </div>
+      </Field>
+
+      <Field label="Base URL" hint="Optional — override the default endpoint">
+        <input
+          type="text"
+          value={draft.baseUrl ?? ''}
+          onChange={e => { onSetBaseUrl(e.target.value); }}
+          placeholder="https://api.example.com/v1"
+          className={inputClass}
+          autoComplete="off"
+          spellCheck={false}
+        />
       </Field>
     </div>
   )

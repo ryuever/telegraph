@@ -5,6 +5,59 @@ import {
 } from '@/apps/chat/application/common'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
 
+const READY_ATTEMPTS = 40
+const READY_INTERVAL_MS = 500
+const PROBE_TIMEOUT_MS = 3000
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => { setTimeout(resolve, ms) })
+}
+
+/**
+ * Race an RPC call against a timeout.  The x-oasis RPCMessageChannel
+ * logs "send called before port was bound" and silently returns **without
+ * settling the call promise** when the port isn't ready, so a bare
+ * `client.info()` would hang forever.  Wrapping it in a timeout lets us
+ * detect that situation and retry.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => { reject(new Error('probe timed out')) },
+      ms,
+    )
+    promise
+      .then(value => { clearTimeout(timer); resolve(value) })
+      .catch((err: unknown) => {
+        clearTimeout(timer)
+        reject(err instanceof Error ? err : new Error(String(err)))
+      })
+  })
+}
+
+/**
+ * Wait for the chat pagelet RPC channel to be ready.
+ *
+ * The chat utility process boots asynchronously after spawn.  During
+ * that window the preload bridge hasn't received a MessagePort for the
+ * `chat` participant yet.  x-oasis's RPCMessageChannel silently drops
+ * sends in that state (warns but never settles the promise), so we
+ * probe `info()` with a per-attempt timeout and retry until the call
+ * succeeds.
+ */
+async function waitForPageletReady(): Promise<void> {
+  const client = getChatPageletClient()
+  for (let attempt = 0; attempt < READY_ATTEMPTS; attempt++) {
+    try {
+      await withTimeout(client.info(), PROBE_TIMEOUT_MS)
+      return // port is bound — pagelet is ready
+    } catch {
+      await sleep(READY_INTERVAL_MS)
+    }
+  }
+  throw new Error('Chat pagelet is not ready. Please try again in a moment.')
+}
+
 export class PageletAgentService implements AgentService {
   private listeners = new Map<string, (event: ChatStreamEvent) => void>()
   private unsub: (() => void) | null = null
@@ -14,6 +67,8 @@ export class PageletAgentService implements AgentService {
     if (!lastMessage) throw new Error('Last message must be from user')
 
     const runId = globalThis.crypto.randomUUID()
+
+    const settings = this.getSettings()
 
     onLlmTrace?.({
       runId,
@@ -27,11 +82,11 @@ export class PageletAgentService implements AgentService {
           status: m.status,
         })),
         runtimeSettingsSummary: {
-          provider: 'mock',
-          modelId: '',
-          backend: 'pi-ai',
-          orchestration: 'none',
-          pattern: null,
+          provider: settings.provider,
+          modelId: settings.modelId,
+          backend: settings.backend ?? 'pi-ai',
+          orchestration: settings.orchestration ?? 'none',
+          pattern: settings.orchestrationPattern ?? null,
         },
       },
     })
@@ -69,10 +124,15 @@ export class PageletAgentService implements AgentService {
     }
 
     try {
+      // Wait for the pagelet RPC channel to be bound before sending.
+      // The chat utility process boots asynchronously after spawn; the
+      // renderer may try to call RPC methods before the channel is ready.
+      onStatus?.('queued')
+      await waitForPageletReady()
+
       const client = getChatPageletClient()
       client.onStreamEvent(streamListener)
 
-      const settings = this.getSettings()
       const request: ChatSendRequest = {
         message: lastMessage.content,
         settings,
@@ -105,7 +165,7 @@ export class PageletAgentService implements AgentService {
         return {
           provider: str(parsed.provider, 'minimax-cn'),
           modelId: str(parsed.modelId, 'MiniMax-M2.7'),
-          apiKey: '',
+          apiKey: str(parsed.apiKey, ''),
           baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
           backend: str(parsed.backend, 'pi-ai') as ChatSendRequest['settings']['backend'],
           orchestration: str(parsed.orchestration, 'none') as ChatSendRequest['settings']['orchestration'],

@@ -28,10 +28,16 @@ export interface ExtensionSettings {
   extensionBlocklist: string[]
 }
 
+export interface ApiKeySettings {
+  apiKey: string
+  baseUrl?: string
+}
+
 export interface ChatModelSettings
   extends ModelSelection,
     OrchestrationSettings,
-    ExtensionSettings {}
+    ExtensionSettings,
+    ApiKeySettings {}
 
 export interface EnvModelConfig {
   provider: string
@@ -66,10 +72,16 @@ export const DEFAULT_EXTENSION: ExtensionSettings = {
   extensionBlocklist: [],
 }
 
+export const DEFAULT_API_KEY: ApiKeySettings = {
+  apiKey: '',
+  baseUrl: undefined,
+}
+
 export const DEFAULT_SETTINGS: ChatModelSettings = {
   ...DEFAULT_MODEL_SELECTION,
   ...DEFAULT_ORCHESTRATION,
   ...DEFAULT_EXTENSION,
+  ...DEFAULT_API_KEY,
 }
 
 export function loadEnvModels(): EnvModelConfig[] {
@@ -104,6 +116,8 @@ export function loadSettings(): ChatModelSettings {
       provider: parsed.provider ?? DEFAULT_SETTINGS.provider,
       modelId: parsed.modelId ?? DEFAULT_SETTINGS.modelId,
       backend: parsed.backend ?? DEFAULT_SETTINGS.backend,
+      apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : DEFAULT_SETTINGS.apiKey,
+      baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : DEFAULT_SETTINGS.baseUrl,
       orchestration: parsed.orchestration ?? DEFAULT_SETTINGS.orchestration,
       orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
       worktreeIsolation: parsed.worktreeIsolation ?? DEFAULT_SETTINGS.worktreeIsolation,
@@ -136,8 +150,8 @@ export function toRuntimeSettings(
   return {
     provider: settings.provider,
     modelId: settings.modelId,
-    apiKey: env?.apiKey ?? '',
-    baseUrl: env?.baseUrl,
+    apiKey: settings.apiKey || env?.apiKey || '',
+    baseUrl: settings.baseUrl ?? env?.baseUrl,
     backend: settings.backend,
     orchestration: settings.orchestration,
     orchestrationPattern: settings.orchestrationPattern,

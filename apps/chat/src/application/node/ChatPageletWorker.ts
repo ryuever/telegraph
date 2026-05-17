@@ -8,9 +8,10 @@ import {
   type ChatSendRequest,
   type ChatSendResult,
   type ChatStreamEvent,
-  type AgentRuntimeSettings,
 } from '@/apps/chat/application/common';
-import { createRuntime } from '@/packages/agent/runtime/createRuntime';
+import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
+import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
+import type { RuntimeExecutor } from '@/packages/agent/runtime/AgentRuntime';
 import type { RuntimeEvent } from '@/packages/runtime-contracts';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
@@ -70,6 +71,21 @@ export class ChatPageletWorker extends PageletWorker {
   }
 
   /**
+   * Create a RuntimeExecutor from settings.
+   * Uses direct imports instead of createRuntime() to avoid the dynamic
+   * require('@/packages/...') in createRuntime.ts that Vite cannot rewrite
+   * at build time — that require causes MODULE_NOT_FOUND at runtime and
+   * crashes the worker process.
+   */
+  private createExecutor(backend: string): RuntimeExecutor {
+    if (backend === 'pi-embedded') {
+      return new PiEmbeddedRuntime()
+    }
+    // Default: pi-ai
+    return new PiAiRuntime()
+  }
+
+  /**
    * Core agent execution: create a RuntimeExecutor from settings,
    * stream RuntimeEvents, and forward them as ChatStreamEvents.
    */
@@ -82,14 +98,14 @@ export class ChatPageletWorker extends PageletWorker {
     this.emitStreamEvent({ type: 'run_queued', runId });
 
     try {
-      const executor = createRuntime(settings as AgentRuntimeSettings);
+      const executor = this.createExecutor(settings.backend ?? 'pi-ai');
       this.emitStreamEvent({ type: 'run_started', runId });
 
       const runtimeEvents = executor.run({
         runId,
         sessionId,
         message,
-        settings: settings as any,
+        settings,
         signal: abortController.signal,
       });
 
@@ -131,18 +147,18 @@ export class ChatPageletWorker extends PageletWorker {
         return null; // already emitted before the loop
 
       case 'assistant_delta': {
-        const delta = ev as any;
-        return { type: 'text_delta', runId, sessionId, text: delta.text ?? '' };
+        const text = 'text' in ev ? (ev as { text: string }).text : ''
+        return { type: 'text_delta', runId, sessionId, text };
       }
 
       case 'run_completed':
         return { type: 'run_completed', runId, sessionId };
 
       case 'run_failed': {
-        const failed = ev as any;
+        const error = 'error' in ev ? (ev as { error: { message?: string } }).error : undefined
         return {
           type: 'run_failed', runId, sessionId,
-          error: failed.error?.message ?? 'Unknown error',
+          error: error?.message ?? 'Unknown error',
         };
       }
 

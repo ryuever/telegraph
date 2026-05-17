@@ -26,5 +26,6 @@ export class ChatApplication implements IChatApplication {
       CHAT_PARTICIPANT_ID,
       CHAT_WORKER_FILE
     );
+    await this.appOrchestrator.connectChat();
   }
 }

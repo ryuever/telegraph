@@ -14,7 +14,6 @@ import {
 } from '../llm-trace-store'
 import { useChat } from '../use-chat'
 import { useSessionsStore } from '@/packages/stores'
-import { MockAgentService } from '../mock-agent-service'
 import { PageletAgentService } from '../pagelet-agent-service'
 import {
   loadSettings,
