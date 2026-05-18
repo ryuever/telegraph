@@ -43,6 +43,9 @@ references:
   - id: A-010
     rel: extended-by
     file: ./20260513-vscode-contribution-model-for-telegraph.md
+  - id: P-006
+    rel: extended-by
+    file: ../roadmap/20260518-harness-capability-extension-plan.md
 ---
 
 # Telegraph Agent Runtime 与 Extension Host 理论基础

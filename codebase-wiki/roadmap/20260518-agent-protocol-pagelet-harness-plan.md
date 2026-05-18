@@ -19,6 +19,9 @@ references:
   - id: P-005
     rel: extended-by
     file: ./20260518-orchestrator-core-controlled-migration-plan.md
+  - id: P-006
+    rel: extended-by
+    file: ./20260518-harness-capability-extension-plan.md
 ---
 
 # Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划

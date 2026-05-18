@@ -163,6 +163,10 @@ export const wikiSidebar = {
         {
           "text": "P-005 Orchestrator Core 受控迁入与 Agent Harness 接入计划",
           "link": "/roadmap/20260518-orchestrator-core-controlled-migration-plan"
+        },
+        {
+          "text": "P-006 Harness Capability 与 Extension 分层执行计划",
+          "link": "/roadmap/20260518-harness-capability-extension-plan"
         }
       ]
     }
