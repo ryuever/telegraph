@@ -25,7 +25,7 @@
 > - new runtime adapter (pi-ai / pi-cli / langgraph / ai-sdk / mastra / custom)
 > - new tool / extension / hook / trace plumbing
 > - workflow / pattern / DSL design
-> - any reference to `apps/_legacy/` runtime code
+
 >
 > **Hard red lines** (never write these in business code):
 >
@@ -39,7 +39,7 @@
 >
 > *Agent runtime:*
 > ```
-> import … from 'apps/_legacy/…'                     // never; legacy is read-only history
+
 > runtime.run(input)  in main / daemon / shared      // runtime only lives in pagelet
 > type Event = PiJsonLine | LangGraphNodeEvent       // framework types stay in adapters
 > await traceSink.push(ev)  blocking model stream    // I-002 deadlock pattern
@@ -56,8 +56,7 @@ Two cooperating Electron-runtime apps live under `apps/`:
 - **`apps/design`** — a utility process hosting the design pagelet's services, plus its
   React UI surface (rendered inside telegraph's renderer bundle).
 
-The legacy codebase (port-manager based, ad-hoc MessagePort plumbing) is preserved in
-`apps/_legacy/` for documentation purposes only — see `apps/_legacy/README.md`.
+
 
 ## Skill placement
 
@@ -114,8 +113,6 @@ When creating a new project skill, add it under `skills/` and update `skills/REA
 │   │   ├── tsconfig.json                          # paths: @/apps/design/*, @/packages/{ui,services/pagelet-host,services/main-metrics}/*; include limited
 │   │   └── package.json                           # x-oasis + react devDeps; typecheck/lint/test only (built by telegraph's forge config)
 │   │
-│   └── _legacy/                                   # frozen previous codebase — DO NOT IMPORT (see _legacy/README.md)
-│
 ├── packages/
 │   ├── agent-protocol/                            # @/packages/agent-protocol — AgentEvent / RuntimeEvent / run / tool / extension protocol types
 │   ├── agent/                                     # @/packages/agent — harness, runtime adapters, tool/trace implementation kit
@@ -127,7 +124,7 @@ When creating a new project skill, add it under `skills/` and update `skills/REA
 │   └── reference/                                 # R-001 x-oasis link-to-source setup, etc.
 │
 ├── package.json                                   # workspace root (proxy scripts only)
-├── pnpm-workspace.yaml                            # apps/* + packages/*; excludes apps/_legacy/**
+├── pnpm-workspace.yaml                            # apps/* + packages/*
 └── AGENTS.md                                      # this file
 ```
 
@@ -205,7 +202,7 @@ Per-app scripts available inside `apps/telegraph/` and `apps/design/`.
 
 - **TypeScript strict** + ESLint 9 flat config (typescript-eslint strict-type-checked) +
   vitest 2.1.x workspace.
-- LSP in IDEs sometimes shows stale errors pointing to legacy paths under `apps/_legacy/`;
+- LSP in IDEs sometimes shows stale errors;
   the source of truth is `pnpm -r typecheck`. If that's green, the IDE is wrong.
 - vitest is pinned to `2.x` because vitest 4 is incompatible with vite 5 in this project.
 
@@ -238,4 +235,3 @@ forge swallows stdout when not attached to a TTY; tail the files above instead o
 - **x-oasis capability gaps** — `codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md`
   (D-006). Phase 2.5 closed Gap 2 + Gap 3 upstream; Gap 1 is queued for Phase 6.
 - **x-oasis link-to-source (archived)** — `codebase-wiki/reference/20260508-x-oasis-link-to-source-setup.md` (R-001, no longer used).
-- **Legacy code** — `apps/_legacy/README.md` (rules: do not import; treat as historical literature).

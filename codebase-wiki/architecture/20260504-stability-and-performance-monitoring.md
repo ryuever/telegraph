@@ -9,7 +9,7 @@ category: architecture
 created: 2026-05-04
 updated: 2026-05-04
 tags: [monitoring, observability, crash-report, sentry, diagnostics, ping, log]
-status: final
+status: superseded
 references:
   - id: A-001
     rel: related-to

@@ -195,7 +195,7 @@ The only acceptable `any` is in third-party `.d.ts` declarations or `declare mod
 
 **Rule.** Every code change must leave both `pnpm -r typecheck` and `pnpm -r lint` green (zero errors). These are the authoritative quality gates — not the IDE's LSP.
 
-**Why.** `tsc --noEmit` catches structural type errors; ESLint with `strict-type-checked` catches semantic issues that tsc cannot (e.g. `no-unsafe-*`, `no-floating-promises`, `restrict-template-expressions`, `no-explicit-any`). Both must pass to guarantee the codebase is free of type-safety regressions. IDE language servers sometimes show stale errors (especially referencing `apps/_legacy/` paths that are excluded from compilation); the CLI gates are deterministic.
+**Why.** `tsc --noEmit` catches structural type errors; ESLint with `strict-type-checked` catches semantic issues that tsc cannot (e.g. `no-unsafe-*`, `no-floating-promises`, `restrict-template-expressions`, `no-explicit-any`). Both must pass to guarantee the codebase is free of type-safety regressions. IDE language servers sometimes show stale errors; the CLI gates are deterministic.
 
 **How to apply.**
 

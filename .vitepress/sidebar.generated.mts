@@ -157,12 +157,12 @@ export const wikiSidebar = {
           "link": "/roadmap/20260505-agent-runtime-extension-host-phase-gates"
         },
         {
-          "text": "P-003 Port Management → ConnectionOrchestrator 迁移计划（design 先行）",
-          "link": "/roadmap/20260508-port-management-orchestrator-migration-plan"
-        },
-        {
           "text": "P-004 Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划",
           "link": "/roadmap/20260518-agent-protocol-pagelet-harness-plan"
+        },
+        {
+          "text": "P-005 Orchestrator Core 受控迁入与 Agent Harness 接入计划",
+          "link": "/roadmap/20260518-orchestrator-core-controlled-migration-plan"
         }
       ]
     }

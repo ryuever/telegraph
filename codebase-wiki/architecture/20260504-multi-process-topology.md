@@ -9,7 +9,7 @@ category: architecture
 created: 2026-05-04
 updated: 2026-05-05
 tags: [process, ipc, electron, utility-process, message-port, port-broker]
-status: final
+status: superseded
 references:
   - id: A-001
     rel: related-to

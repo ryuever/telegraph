@@ -55,17 +55,17 @@ references:
 
 ### 0.1 当前实现状态
 
-`from-zero` 重写（2026-05-08，见 `roadmap/20260508-from-zero-design-only-electron-app-plan.md`）将仓库归零，本文 §10 路线图中**已经做完的实现全部回退到 `apps/_legacy/`**，新仓库里 agent runtime 体系的存量是：
+`from-zero` 重写（2026-05-08，见 `roadmap/20260508-from-zero-design-only-electron-app-plan.md`）将仓库归零，新仓库里 agent runtime 体系的存量是：
 
 | 资产 | 状态 | 位置 |
 |------|------|------|
 | `packages/runtime-contracts/` 类型骨架 | ✅ 保留（runtime / events / tools / extensions / hooks / permissions / messages / errors / workflow / version / fixtures） | `packages/runtime-contracts/src/` |
-| `PiAiRuntime` / `PiCliRuntime` / `PiEmbeddedRuntime` | ⚠️ 仅在 `apps/_legacy` 中存在，**禁止 import** | `apps/_legacy/packages/agent/src/runtime/` |
-| `LangGraphRuntime` / `PiSubagentsRuntime` / `ExecutionTimeline` | ⚠️ 同上 | 同上 |
-| `AgentStreamService` / `RuntimeEventForwarder` / `LlmTracePanel` | ⚠️ 同上 | `apps/_legacy/telegraph/...`、`apps/_legacy/packages/ui/...` |
+| `PiAiRuntime` / `PiCliRuntime` / `PiEmbeddedRuntime` | ❌ 尚未实现 | — |
+| `LangGraphRuntime` / `PiSubagentsRuntime` / `ExecutionTimeline` | ❌ 尚未实现 | — |
+| `AgentStreamService` / `RuntimeEventForwarder` / `LlmTracePanel` | ❌ 尚未实现 | — |
 | 新仓库内 runtime-contracts 的活跃消费者 | ❌ **零**（`apps/telegraph` / `apps/design` 都没接入） | — |
 
-**结论**：本文 §10 的"Phase 0 已完成"只在 _legacy 时代成立。新仓库视角下 Phase 0 的**类型层骨架仍在**，但 Phase 1+ 的实现需要在新进程拓扑下重新接入。
+**结论**：新仓库视角下 Phase 0 的**类型层骨架仍在**，但 Phase 1+ 的实现需要在当前进程拓扑下重新接入。
 
 ### 0.2 进程归属变更
 

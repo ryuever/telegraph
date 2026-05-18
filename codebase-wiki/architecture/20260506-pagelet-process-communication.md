@@ -6,7 +6,7 @@ category: architecture
 created: 2026-05-06
 updated: 2026-05-06
 tags: [architecture, pagelet, daemon, MessagePort, IPC, resume, monitor, chat, design, Panel, BrowserView, lifecycle]
-status: active
+status: superseded
 references:
   - id: A-002
     rel: extends

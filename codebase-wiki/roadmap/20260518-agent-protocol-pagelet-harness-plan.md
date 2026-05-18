@@ -15,6 +15,10 @@ tags:
   - multi-agent
   - runtime-event
 status: phase-1-complete
+references:
+  - id: P-005
+    rel: extended-by
+    file: ./20260518-orchestrator-core-controlled-migration-plan.md
 ---
 
 # Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划

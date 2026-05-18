@@ -115,7 +115,6 @@
 ### 4.4 不触碰的红线
 - ❌ 不在 renderer 中 import `packages/agent`
 - ❌ 不在 main process 中执行 `runtime.run()`
-- ❌ 不从 `apps/_legacy` import 任何东西
 - ❌ 不使用裸 IPC（ipcMain/ipcRenderer）
 
 ---

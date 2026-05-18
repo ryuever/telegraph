@@ -4,7 +4,7 @@ title: "@orchestrator/core 作为 Harness Control 接入可行性分析"
 description: "评估 langgraphjs/libs/orchestrator 零依赖 Pregel 图编排引擎接入 Telegraph 的可行性。"
 category: discussion
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-05-18
 tags: [orchestrator, langgraph, pregel, harness, runtime, workflow, feasibility]
 status: draft
 references:
@@ -17,6 +17,9 @@ references:
   - id: A-008
     rel: related-to
     file: ../architecture/20260509-telegraph-final-process-architecture.md
+  - id: P-005
+    rel: derives
+    file: ../roadmap/20260518-orchestrator-core-controlled-migration-plan.md
 ---
 
 # `@orchestrator/core` 作为 Harness Control 接入可行性分析
@@ -214,7 +217,6 @@ Fork patch（或向上游 PR）：`invoke()` 透传 `onStep` + `NodeConfig.emit`
 
 - [x] 改动触发 AT7 + AT2 → 已读 A-005 §3 + §4.1 + §6
 - [x] 新代码落在 pagelet 内，不在 main / daemon
-- [x] 无 `_legacy/` import
 - [x] 复用现有 RuntimeEvent 类型，不新增
 - [x] trace 不阻塞业务 RPC
 - [x] orchestrator 概念封装在 adapter 内，不泄漏到 contracts / UI

@@ -11,7 +11,6 @@ export default tseslint.config(
   {
     // Global ignores must be in their own object with no other keys.
     ignores: [
-      'apps/_legacy/**',
       '**/node_modules/**',
       '**/.vite/**',
       '**/dist/**',

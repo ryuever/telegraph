@@ -182,7 +182,7 @@ const client = createRPCClient<IFoo>({ channel, servicePath })
 | [`D-005`](../codebase-wiki/discussion/20260508-renderer-pagelet-channel-convergence.md) | Forwarding Proxy 决策推导 | 想理解"为什么 renderer 只连 pagelet"时 |
 | [`D-006`](../codebase-wiki/discussion/20260508-x-oasis-orchestrator-capability-gaps.md) | x-oasis 能力缺口 | 实现重连 / `replaceParticipantChannel` 遇到问题时 |
 | [`P-003`](../codebase-wiki/roadmap/20260508-port-management-orchestrator-migration-plan.md) | Orchestrator 迁移分阶段路线 | 不确定当前 phase 该做什么时 |
-| [`A-007`](../codebase-wiki/architecture/20260506-pagelet-process-communication.md) | **历史**架构（已被 A-008 替代） | **默认不读**；只在排查"为什么旧代码这么写"时参考 |
+| [`A-007`](../codebase-wiki/architecture/20260506-pagelet-process-communication.md) | **历史**架构（已被 A-008 替代） | **默认不读**；只在排查"为什么旧代码这么写"时参考（旧代码已清理） |
 
 ---
 
