@@ -12,6 +12,8 @@
       "@/packages/agent/*": ["./src/*"],
       "@/packages/agent-protocol": ["../agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../agent-protocol/src/*"],
+      "@/packages/orchestrator-core": ["../orchestrator-core/src/index.ts"],
+      "@/packages/orchestrator-core/*": ["../orchestrator-core/src/*"],
       "@/packages/services/log/*": ["../services/src/log/src/*"]
     }
   },

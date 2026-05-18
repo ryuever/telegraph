@@ -15,6 +15,8 @@
     "docs:wiki:dev": "vitepress dev",
     "docs:wiki:build": "vitepress build",
     "docs:wiki:preview": "vitepress preview",
+    "cleanup:dev": "node scripts/cleanup-dev-processes.mjs",
+    "cleanup:dev:dry-run": "node scripts/cleanup-dev-processes.mjs --dry-run",
     "clean:build": "pnpm -r exec rm -rf out dist .vite",
     "clean": "pnpm run clean:build && pnpm run clean:modules",
     "clean:modules": "rm -rf node_modules && pnpm -r exec rm -rf node_modules"

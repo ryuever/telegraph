@@ -120,4 +120,27 @@ describe('projectAgentEventToChat', () => {
     expect(project(failed).statuses).toEqual(['failed'])
     expect(project(cancelled).statuses).toEqual(['failed'])
   })
+
+  it('keeps orchestrator step and edge events visible in the trace stream', () => {
+    const step: AgentEvent = {
+      type: 'step_started',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1',
+      stepId: 'planner',
+      label: 'Planner',
+      kind: 'worker',
+      ts: 1,
+    }
+    const edge: AgentEvent = {
+      type: 'edge_taken',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1',
+      from: 'planner',
+      to: 'executor',
+      ts: 2,
+    }
+
+    expect(project(step).traces).toEqual([{ kind: 'runtime_event', event: step }])
+    expect(project(edge).traces).toEqual([{ kind: 'runtime_event', event: edge }])
+  })
 })

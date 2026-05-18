@@ -19,7 +19,7 @@ export interface AgentRuntimeSettings {
   extensionBlocklist?: string[]
 }
 
-export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'pi-subagents' | 'langgraph' | 'vercel-ai'
+export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'pi-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
 export type AgentOrchestrationMode = 'none' | 'pi-subagents'
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 

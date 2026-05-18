@@ -385,12 +385,21 @@ importers:
       '@telegraph/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
+      '@telegraph/orchestrator-core':
+        specifier: workspace:*
+        version: link:../orchestrator-core
     devDependencies:
       typescript:
         specifier: ^5.3.0
         version: 5.9.3
 
   packages/agent-protocol:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/orchestrator-core:
     devDependencies:
       typescript:
         specifier: ^5.3.0

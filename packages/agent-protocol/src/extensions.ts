@@ -1,5 +1,6 @@
 import type { PermissionRequest } from './permissions.js'
 import type { ToolDefinition } from './tools.js'
+import type { HookName } from './hooks.js'
 
 export type ExtensionCapability = 'tools' | 'commands' | 'panels' | 'hooks' | 'runtime' | 'model-provider'
 
@@ -33,7 +34,7 @@ export interface RuntimeContribution {
 
 export interface HookContribution {
   id: string
-  hook: string
+  hook: HookName
 }
 
 export interface ExtensionManifest {

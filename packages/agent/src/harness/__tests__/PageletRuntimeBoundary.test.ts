@@ -19,6 +19,14 @@ const FORBIDDEN_IMPORTS = [
     code: 'agent_package_import',
     pattern: /from\s+['"]@telegraph\/agent(?:\/[^'"]*)?['"]/,
   },
+  {
+    code: 'orchestrator_core_import',
+    pattern: /from\s+['"]@\/packages\/orchestrator-core(?:\/[^'"]*)?['"]/,
+  },
+  {
+    code: 'orchestrator_core_package_import',
+    pattern: /from\s+['"]@telegraph\/orchestrator-core(?:\/[^'"]*)?['"]/,
+  },
 ]
 
 describe('pagelet runtime boundary', () => {

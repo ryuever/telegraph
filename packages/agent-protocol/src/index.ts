@@ -41,6 +41,27 @@ export type {
   ToolExecutionContext,
   ToolResult,
 } from './tools.js'
-export type { HookHandler, HookName } from './hooks.js'
+export type {
+  AfterRunHookPayload,
+  BeforeRunHookPayload,
+  FeedbackConfirmationRequest,
+  FeedbackEvent,
+  FeedbackLevel,
+  FeedbackProgressEvent,
+  HookHandler,
+  HookName,
+  HookPayload,
+  HookPayloadMap,
+  HookResult,
+  HookResultMap,
+  InputHookEvent,
+  InputHookResult,
+  MessageCommittedHookPayload,
+  ModelEventHookPayload,
+  ModelRequestHookPayload,
+  RuntimeEventHookPayload,
+  ToolCallHookPayload,
+  ToolResultHookPayload,
+} from './hooks.js'
 export { RUNTIME_CONTRACT_SCHEMA_VERSION } from './version.js'
 export type { RuntimeCompatibilityLevel, RuntimeContractSchemaVersion } from './version.js'

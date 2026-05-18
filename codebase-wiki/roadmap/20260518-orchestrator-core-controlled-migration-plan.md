@@ -119,30 +119,30 @@ flowchart TB
 
 ### Phase 0：迁入前快照
 
-- [ ] 记录来源路径、当前 package name、版本、核心导出。
-- [ ] 记录排除清单，确保不会复制 `node_modules` / `dist`。
-- [ ] 建立 `packages/orchestrator-core` package 边界。
+- [x] 记录来源路径、当前 package name、版本、核心导出。
+- [x] 记录排除清单，确保不会复制 `node_modules` / `dist`。
+- [x] 建立 `packages/orchestrator-core` package 边界。
 
 ### Phase 1：源码受控迁入
 
-- [ ] 复制 `src/` 与必要测试。
-- [ ] 复制 README 并改写为 Telegraph workspace 内部包说明。
-- [ ] 调整 package name 为 `@telegraph/orchestrator-core`。
-- [ ] 将 TypeScript / Vitest 配置调整到 Telegraph workspace 规范。
-- [ ] 确保该包不依赖 Electron、React、x-oasis、agent-protocol。
+- [x] 复制 `src/` 与必要测试。
+- [x] 复制 README 并改写为 Telegraph workspace 内部包说明。
+- [x] 调整 package name 为 `@telegraph/orchestrator-core`。
+- [x] 将 TypeScript / Vitest 配置调整到 Telegraph workspace 规范。
+- [x] 确保该包不依赖 Electron、React、x-oasis、agent-protocol。
 
 ### Phase 2：Agent adapter 接入
 
-- [ ] 在 `packages/agent` 增加 `OrchestratorCoreRunner`。
-- [ ] 将 node start/end、edge taken、checkpoint、interrupt 映射为 `TelegraphOrchestratorSignal`。
-- [ ] 通过现有 `TelegraphOrchestratorRuntime` 输出 `AgentEvent`。
-- [ ] 增加最小 graph conformance test：linear chain、conditional edge、parallel fan-out/fan-in、interrupt/cancel。
+- [x] 在 `packages/agent` 增加 `OrchestratorCoreRunner`。
+- [x] 将 node start/end、edge taken、checkpoint、interrupt 映射为 `TelegraphOrchestratorSignal`。
+- [x] 通过现有 `TelegraphOrchestratorRuntime` 输出 `AgentEvent`。
+- [x] 增加最小 graph conformance test：linear chain、conditional edge、parallel fan-out/fan-in、interrupt/cancel。
 
 ### Phase 3：Pagelet 验证
 
-- [ ] 在 chat pagelet 增加隐藏/测试入口 runtime selection，不先暴露正式产品开关。
-- [ ] 用同一 `AgentEvent` projector 验证 trace timeline 可展示 orchestrator step。
-- [ ] 确认 main/shared/daemon 不 import `@/packages/orchestrator-core` 或 runtime implementation。
+- [x] 在 chat pagelet 增加隐藏/测试入口 runtime selection，不先暴露正式产品开关。
+- [x] 用同一 `AgentEvent` projector 验证 trace timeline 可展示 orchestrator step。
+- [x] 确认 main/shared/daemon 不 import `@/packages/orchestrator-core` 或 runtime implementation。
 
 ### Phase 4：产品化评估
 
@@ -178,8 +178,8 @@ flowchart TB
 
 ## Follow-up Tracking
 
-- [ ] 建立 `packages/orchestrator-core`
-- [ ] 接入 `packages/agent` adapter
-- [ ] 打通最小 graph run
-- [ ] 打通 trace timeline
+- [x] 建立 `packages/orchestrator-core`
+- [x] 接入 `packages/agent` adapter
+- [x] 打通最小 graph run
+- [x] 打通 trace timeline
 - [ ] 评估是否拆出独立 repo/package

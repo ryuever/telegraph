@@ -56,6 +56,14 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['scripts/**/*.{js,cjs,mjs}'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+      },
+    },
+  },
 
   // React (renderer code).
   {

@@ -19,6 +19,7 @@ export default defineConfig({
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
+      '@/packages/orchestrator-core': resolve(__dirname, '../../packages/orchestrator-core/src'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
     },
   },

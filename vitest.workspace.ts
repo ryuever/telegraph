@@ -6,5 +6,6 @@ export default [
   'apps/chat',
   'apps/design',
   'packages/agent-protocol',
+  'packages/orchestrator-core',
   'packages/services',
 ];

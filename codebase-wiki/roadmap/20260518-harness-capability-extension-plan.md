@@ -254,41 +254,41 @@ interface ProcessCapability {
 
 ### Phase 0：协议与边界收束
 
-- [ ] 将 `packages/agent-protocol/src/hooks.ts` 从字符串 hook 扩展为 typed hook payload/result。
-- [ ] 在 `packages/agent-protocol` 中补 `InputHookEvent`、`InputHookResult`、`FeedbackEvent` 的可序列化类型。
-- [ ] 保持协议层不出现 Pi 专有类型；Pi 只出现在 adapter metadata/raw 中。
+- [x] 将 `packages/agent-protocol/src/hooks.ts` 从字符串 hook 扩展为 typed hook payload/result。
+- [x] 在 `packages/agent-protocol` 中补 `InputHookEvent`、`InputHookResult`、`FeedbackEvent` 的可序列化类型。
+- [x] 保持协议层不出现 Pi 专有类型；Pi 只出现在 adapter metadata/raw 中。
 
 ### Phase 1：Harness Core Capability Model
 
-- [ ] 新增 `CapabilityHost`，负责注册 process/filesystem/feedback/tool/hook capability。
-- [ ] 新增 `TaskCapabilityProfile`，把 pagelet base capability 与 run/session 级 integration 拆开。
-- [ ] 新增 typed `HookBus`，支持顺序执行 input transforms。
-- [ ] 将 `AgentHarness.run()` 的 message 构造前置到 input hook pipeline。
-- [ ] input hook 支持 `continue`、`transform`、`block`。
-- [ ] 所有 hook failure normalize 为 `run_failed` 或 `runtime_log`，不得让 trace 阻塞主流。
+- [x] 新增 `CapabilityHost`，负责注册 process/filesystem/feedback/tool/hook capability。
+- [x] 新增 `TaskCapabilityProfile`，把 pagelet base capability 与 run/session 级 integration 拆开。
+- [x] 新增 typed `HookBus`，支持顺序执行 input transforms。
+- [x] 将 `AgentHarness.run()` 的 message 构造前置到 input hook pipeline。
+- [x] input hook 支持 `continue`、`transform`、`block`。
+- [x] 所有 hook failure normalize 为 `run_failed` 或 `runtime_log`，不得让 trace 阻塞主流。
 
 ### Phase 2：Permission 与 Trace
 
-- [ ] 新增 `PermissionBroker` MVP，先支持 shell/filesystem/network 三类 request。
-- [ ] `process.exec` 必须带 permission、timeout、cwd、env allowlist。
-- [ ] shell/filesystem capability emit `tool_call` / `tool_result` / `tool_error` 或 `runtime_log`。
-- [ ] feedback notify emit `runtime_log`，UI 可以投影但业务不依赖 UI ack。
-- [ ] PermissionBroker 根据 pagelet、run profile、用户意图、workspace policy、risk level 综合判定 grant/deny。
+- [x] 新增 `PermissionBroker` MVP，先支持 shell/filesystem/network 三类 request。
+- [x] `process.exec` 必须带 permission、timeout、cwd、env allowlist。
+- [x] shell/filesystem capability emit `tool_call` / `tool_result` / `tool_error` 或 `runtime_log`。
+- [x] feedback notify emit `runtime_log`，UI 可以投影但业务不依赖 UI ack。
+- [x] PermissionBroker 根据 pagelet、run profile、用户意图、workspace policy、risk level 综合判定 grant/deny。
 
 ### Phase 3：Pagelet Capability Packs
 
-- [ ] 实现 `chatCapabilities()`，只启用轻量 input hooks 与 chat feedback adapter。
-- [ ] 实现 `designCapabilities()`，注入 canvas/artifact context 和 design feedback adapter。
-- [ ] 实现 `codingCapabilities()`，注入 workspace、shell、filesystem、patch apply、coding feedback adapter。
-- [ ] chat/design base pack 默认不启用 shell/filesystem write/Pi compat，但允许通过 explicit task profile 临时启用 shell/filesystem/patch integration。
+- [x] 实现 `chatCapabilities()`，只启用轻量 input hooks 与 chat feedback adapter。
+- [x] 实现 `designCapabilities()`，注入 canvas/artifact context 和 design feedback adapter。
+- [x] 实现 `codingCapabilities()`，注入 workspace、shell、filesystem、patch apply、coding feedback adapter。
+- [x] chat/design base pack 默认不启用 shell/filesystem write/Pi compat，但允许通过 explicit task profile 临时启用 shell/filesystem/patch integration。
 
 ### Phase 4：Pi Extension Compatibility
 
-- [ ] 实现 `PiExtensionCompatHost`，提供伪 `ExtensionAPI`：`pi.on`、`pi.exec`、必要 `ctx`。
-- [ ] 首个兼容测试跑通 inline bash extension。
-- [ ] `ctx.hasUI` 根据当前 feedback adapter 决定。
-- [ ] `ctx.ui.notify` 映射到 `ctx.feedback.notify`。
-- [ ] 不支持的 Pi API 明确返回 unsupported error，并进入 trace。
+- [x] 实现 `PiExtensionCompatHost`，提供伪 `ExtensionAPI`：`pi.on`、`pi.exec`、必要 `ctx`。
+- [x] 首个兼容测试跑通 inline bash extension。
+- [x] `ctx.hasUI` 根据当前 feedback adapter 决定。
+- [x] `ctx.ui.notify` 映射到 `ctx.feedback.notify`。
+- [x] 不支持的 Pi API 明确返回 unsupported error，并进入 trace。
 
 ### Phase 5：Product Wiring
 

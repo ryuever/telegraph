@@ -66,6 +66,11 @@ export {
   type TelegraphOrchestratorSignal,
 } from '@/packages/agent/runtime/TelegraphOrchestratorRuntime'
 export {
+  createDemoOrchestratorRuntime,
+  OrchestratorCoreRunner,
+  type OrchestratorCoreRunnerOptions,
+} from '@/packages/agent/runtime/OrchestratorCoreRunner'
+export {
   VercelAiRuntime,
   TELEGRAPH_VERCEL_AI_PRODUCER_VERSION,
   createVercelAiRuntime,
@@ -90,6 +95,28 @@ export {
   type AgentRuntimeFactory,
   type AgentTraceSink,
   type RuntimeRegistration,
+} from '@/packages/agent/harness'
+export {
+  CapabilityHost,
+  HookBus,
+  HookExecutionError,
+  InputHookBlockedError,
+  chatCapabilities,
+  codingCapabilities,
+  designCapabilities,
+  feedbackCapability,
+  type AgentCapability,
+  type AgentCapabilityContext,
+  type CapabilityKind,
+  type FeedbackAPI,
+  type FilesystemCapability,
+  type PatchApplyResult,
+  type PatchCapability,
+  type PatchFileOperation,
+  type PatchPreview,
+  type ProcessCapability,
+  type ProcessExecResult,
+  type ToolCapability,
 } from '@/packages/agent/harness'
 export {
   PermissionBroker,
@@ -153,6 +180,15 @@ export {
   type ExecutableType,
   type LLMHints,
 } from '@/packages/agent/extensions/ExtensionManifest'
+export {
+  PiExtensionCompatHost,
+  piExtensionCompatProfile,
+  type PiExtensionCompatAPI,
+  type PiExtensionCompatHostOptions,
+  type PiExtensionContext,
+  type PiInputEvent,
+  type PiInputHandler,
+} from '@/packages/agent/extensions/pi-compat'
 export { SessionRepository, type StoredSession, type StoredMessage, SessionRepositoryMigration } from '@/packages/agent/persistence/SessionRepository'
 export {
   DependencyGraph,

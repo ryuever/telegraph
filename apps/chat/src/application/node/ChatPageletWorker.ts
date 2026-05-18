@@ -12,7 +12,8 @@ import {
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
-import { createAgentHarness } from '@/packages/agent/harness';
+import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
+import { chatCapabilities, createAgentHarness } from '@/packages/agent/harness';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
@@ -31,7 +32,16 @@ export class ChatPageletWorker extends PageletWorker {
       { id: 'pi-ai', create: () => new PiAiRuntime() },
       { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
       { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
+      { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
     ],
+    capabilities: chatCapabilities({
+      feedback: {
+        notify: input => {
+          if (!input.runId) return;
+          this.emitStreamEvent({ type: 'runtime_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
+        },
+      },
+    }),
   });
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
@@ -173,6 +183,20 @@ export class ChatPageletWorker extends PageletWorker {
         return null;
     }
   }
+}
+
+function feedbackRuntimeLog(input: { runId?: string; level: 'debug' | 'info' | 'warn' | 'error'; message: string; raw?: unknown; ts?: number }): AgentEvent {
+  return {
+    type: 'runtime_log',
+    schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+    producerVersion: 'telegraph-chat-pagelet@0.0.0',
+    origin: { framework: 'telegraph', runtimeId: 'chat-feedback' },
+    runId: input.runId,
+    level: input.level,
+    message: input.message,
+    raw: input.raw,
+    ts: input.ts ?? Date.now(),
+  };
 }
 
 function cancelledAgentEvent(runId: string): AgentEvent {

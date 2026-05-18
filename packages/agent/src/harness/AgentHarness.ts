@@ -1,11 +1,23 @@
 import type {
   AgentEvent,
   AgentRunRequest,
+  HookHandler,
   HookName,
+  HookPayload,
+  InputHookEvent,
   RuntimeSettings,
 } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
+import {
+  CapabilityHost,
+  type AgentCapability,
+} from './CapabilityHost'
+import {
+  HookBus,
+  HookExecutionError,
+  InputHookBlockedError,
+} from './HookBus'
 
 export type AgentRuntimeFactory = (request: AgentRunRequest) => RuntimeExecutor
 
@@ -24,6 +36,7 @@ export interface AgentHarnessOptions {
   runtimes: RuntimeRegistration[]
   traceSink?: AgentTraceSink
   hooks?: AgentHarnessHooks
+  capabilities?: AgentCapability[]
 }
 
 export interface AgentRunOptions {
@@ -31,12 +44,15 @@ export interface AgentRunOptions {
 }
 
 export interface AgentHarness {
+  readonly capabilities: CapabilityHost
   run(request: AgentRunRequest, options?: AgentRunOptions): AsyncIterable<AgentEvent>
 }
 
-export type AgentHarnessHookHandler = (payload: unknown) => void | Promise<void>
+export type AgentHarnessHookHandler<N extends HookName = HookName> = HookHandler<N>
 
-export type AgentHarnessHooks = Partial<Record<HookName, AgentHarnessHookHandler | AgentHarnessHookHandler[]>>
+export type AgentHarnessHooks = {
+  [N in HookName]?: HookHandler<N> | HookHandler<N>[]
+}
 
 export class RuntimeRegistry {
   private readonly factories = new Map<string, AgentRuntimeFactory>()
@@ -99,23 +115,36 @@ class DefaultAgentHarness implements AgentHarness {
   private readonly registry: RuntimeRegistry
   private readonly defaultRuntimeId: string
   private readonly traceSink?: AgentTraceSink
-  private readonly hooks?: AgentHarnessHooks
+  private readonly hookBus = new HookBus()
+  private readonly capabilitiesReady: Promise<void>
+  readonly capabilities: CapabilityHost
 
   constructor(options: AgentHarnessOptions) {
     this.registry = new RuntimeRegistry(options.runtimes)
     this.defaultRuntimeId = options.defaultRuntimeId ?? 'pi-ai'
     this.traceSink = options.traceSink
-    this.hooks = options.hooks
+    this.capabilities = new CapabilityHost(this.hookBus)
+    this.registerHooks(options.hooks)
+    this.capabilitiesReady = this.registerCapabilities(options.capabilities ?? [])
   }
 
   async *run(request: AgentRunRequest, options: AgentRunOptions = {}): AsyncIterable<AgentEvent> {
-    const runtimeId = selectRuntimeId(request.settings, this.defaultRuntimeId)
-    const runtime = this.registry.create(runtimeId, request)
-    const input = toRuntimeInput(request, options.signal)
+    let preparedRequest: AgentRunRequest
+    try {
+      await this.capabilitiesReady
+      preparedRequest = await this.prepareRequest(request)
+    } catch (error) {
+      yield failureEvent(request.runId, normalizeHookError(error))
+      return
+    }
+
+    const runtimeId = selectRuntimeId(preparedRequest.settings, this.defaultRuntimeId)
+    const runtime = this.registry.create(runtimeId, preparedRequest)
+    const input = toRuntimeInput(preparedRequest, options.signal)
     let sawTerminal = false
     let lastEvent: AgentEvent | undefined
 
-    this.dispatchHook('beforeRun', { request, runtimeId })
+    this.dispatchHook('beforeRun', { request: preparedRequest, runtimeId })
 
     try {
       for await (const rawEvent of runtime.run(input)) {
@@ -124,8 +153,8 @@ class DefaultAgentHarness implements AgentHarness {
         if (isTerminalAgentEvent(event)) {
           sawTerminal = true
         }
-        this.pushTrace(event, request)
-        this.dispatchHook('onRuntimeEvent', { event, request, runtimeId })
+        this.pushTrace(event, preparedRequest)
+        this.dispatchHook('onRuntimeEvent', { event, request: preparedRequest, runtimeId })
         yield event
         if (sawTerminal) break
       }
@@ -134,8 +163,8 @@ class DefaultAgentHarness implements AgentHarness {
         const event = failureEvent(request.runId, error, options.signal?.aborted)
         lastEvent = event
         sawTerminal = true
-        this.pushTrace(event, request)
-        this.dispatchHook('onRuntimeEvent', { event, request, runtimeId })
+        this.pushTrace(event, preparedRequest)
+        this.dispatchHook('onRuntimeEvent', { event, request: preparedRequest, runtimeId })
         yield event
       }
     }
@@ -146,12 +175,46 @@ class DefaultAgentHarness implements AgentHarness {
         : failureEvent(request.runId, new Error('Runtime ended without a terminal AgentEvent'))
       lastEvent = event
       sawTerminal = true
-      this.pushTrace(event, request)
-      this.dispatchHook('onRuntimeEvent', { event, request, runtimeId })
+      this.pushTrace(event, preparedRequest)
+      this.dispatchHook('onRuntimeEvent', { event, request: preparedRequest, runtimeId })
       yield event
     }
 
-    this.dispatchHook('afterRun', { request, runtimeId, terminalEvent: lastEvent })
+    this.dispatchHook('afterRun', { request: preparedRequest, runtimeId, terminalEvent: lastEvent })
+  }
+
+  private registerHooks(hooks?: AgentHarnessHooks): void {
+    if (!hooks) return
+    for (const name of Object.keys(hooks) as HookName[]) {
+      const handlers = hooks[name]
+      if (!handlers) continue
+      const list = Array.isArray(handlers) ? handlers : [handlers]
+      for (const handler of list) {
+        this.hookBus.on(name, handler as HookHandler<typeof name>)
+      }
+    }
+  }
+
+  private async registerCapabilities(capabilities: AgentCapability[]): Promise<void> {
+    for (const capability of capabilities) {
+      await capability({ host: this.capabilities, hooks: this.hookBus })
+    }
+  }
+
+  private async prepareRequest(request: AgentRunRequest): Promise<AgentRunRequest> {
+    if (this.hookBus.listenerCount('input') === 0) {
+      return request
+    }
+
+    const result = await this.hookBus.runInputHooks(toInputHookEvent(request))
+    return {
+      ...request,
+      messages: result.messages,
+      metadata: {
+        ...request.metadata,
+        ...result.metadata,
+      },
+    }
   }
 
   private pushTrace(event: AgentEvent, request: AgentRunRequest): void {
@@ -163,18 +226,37 @@ class DefaultAgentHarness implements AgentHarness {
     }
   }
 
-  private dispatchHook(name: HookName, payload: unknown): void {
-    const handlers = this.hooks?.[name]
-    if (!handlers) return
-    const list = Array.isArray(handlers) ? handlers : [handlers]
-    for (const handler of list) {
-      try {
-        void Promise.resolve(handler(payload)).catch(() => {})
-      } catch {
-        // Hooks are extension points; hook failures must not poison the run stream.
-      }
-    }
+  private dispatchHook<N extends HookName>(name: N, payload: HookPayload<N>): void {
+    if (name === 'input') return
+    void this.hookBus
+      .emit(name as Exclude<HookName, 'input'>, payload as HookPayload<Exclude<HookName, 'input'>>)
+      .catch(() => {})
   }
+}
+
+function toInputHookEvent(request: AgentRunRequest): InputHookEvent {
+  const lastUserMessage = [...request.messages].reverse().find(message => message.role === 'user')
+  const lastMessage = lastUserMessage ?? request.messages.at(-1)
+
+  return {
+    type: 'input',
+    runId: request.runId,
+    sessionId: request.sessionId,
+    text: lastMessage?.content ?? '',
+    messages: request.messages,
+    metadata: request.metadata,
+    ts: Date.now(),
+  }
+}
+
+function normalizeHookError(error: unknown): Error {
+  if (error instanceof InputHookBlockedError) {
+    return new Error(`Input blocked: ${error.reason}`)
+  }
+  if (error instanceof HookExecutionError) {
+    return error
+  }
+  return error instanceof Error ? error : new Error(String(error))
 }
 
 function toRuntimeInput(request: AgentRunRequest, signal?: AbortSignal): RuntimeInput {

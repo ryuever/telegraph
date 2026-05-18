@@ -37,3 +37,29 @@ export {
   type TaskCapabilityProfile,
   type WorkspacePermissionPolicy,
 } from './PermissionBroker'
+export {
+  CapabilityHost,
+  type AgentCapability,
+  type AgentCapabilityContext,
+  type CapabilityKind,
+  type FeedbackAPI,
+  type FilesystemCapability,
+  type PatchApplyResult,
+  type PatchCapability,
+  type PatchFileOperation,
+  type PatchPreview,
+  type ProcessCapability,
+  type ProcessExecResult,
+  type ToolCapability,
+} from './CapabilityHost'
+export {
+  HookBus,
+  HookExecutionError,
+  InputHookBlockedError,
+} from './HookBus'
+export {
+  chatCapabilities,
+  codingCapabilities,
+  designCapabilities,
+  feedbackCapability,
+} from './capabilities'

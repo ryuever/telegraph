@@ -3,6 +3,7 @@ import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { describe, expect, it } from 'vitest'
 import { createAgentHarness, selectRuntimeId } from '../AgentHarness'
 import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
+import type { AgentCapability } from '../CapabilityHost'
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   const result: T[] = []
@@ -101,5 +102,65 @@ describe('AgentHarness', () => {
       'event:run_completed',
       'afterRun:run_completed',
     ])
+  })
+
+  it('runs input hooks before constructing runtime input', async () => {
+    const harness = createAgentHarness({
+      runtimes: [{ id: 'fake', create: () => new FakeRuntime() }],
+      hooks: {
+        input: (event) => ({
+          action: 'transform',
+          text: `${event.text} transformed`,
+          metadata: { transformed: true },
+        }),
+      },
+    })
+
+    const events = await collect(harness.run(baseRequest))
+
+    expect(events.find(event => event.type === 'assistant_delta')).toMatchObject({
+      text: 'hello transformed',
+    })
+  })
+
+  it('lets capabilities register input hooks and feedback adapters', async () => {
+    const capability: AgentCapability = ({ host }) => {
+      host.registerFeedback({
+        notify: () => {},
+      })
+      host.on('input', () => ({ action: 'transform', text: 'from capability' }))
+    }
+
+    const harness = createAgentHarness({
+      runtimes: [{ id: 'fake', create: () => new FakeRuntime() }],
+      capabilities: [capability],
+    })
+
+    const events = await collect(harness.run(baseRequest))
+
+    expect(harness.capabilities.has('feedback')).toBe(true)
+    expect(events.find(event => event.type === 'assistant_delta')).toMatchObject({
+      text: 'from capability',
+    })
+  })
+
+  it('turns input hook blocks into terminal run_failed events', async () => {
+    const harness = createAgentHarness({
+      runtimes: [{ id: 'fake', create: () => new FakeRuntime() }],
+      hooks: {
+        input: () => ({ action: 'block', reason: 'policy denied' }),
+      },
+    })
+
+    const events = await collect(harness.run(baseRequest))
+
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      type: 'run_failed',
+      error: {
+        code: 'agent_harness_runtime_error',
+        message: 'Input blocked: policy denied',
+      },
+    })
   })
 })
