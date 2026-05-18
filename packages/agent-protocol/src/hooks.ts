@@ -95,7 +95,7 @@ export interface ToolCallHookPayload extends BeforeRunHookPayload {
 export interface ToolResultHookPayload extends BeforeRunHookPayload {
   callId: string
   toolName: string
-  result: ToolResult | unknown
+  result: ToolResult
 }
 
 export interface MessageCommittedHookPayload extends BeforeRunHookPayload {
@@ -116,20 +116,20 @@ export interface HookPayloadMap {
 
 export interface HookResultMap {
   input: InputHookResult
-  beforeRun: void
-  afterRun: void
-  beforeModelRequest: void
-  afterModelEvent: void
-  beforeToolCall: void
-  afterToolResult: void
-  onRuntimeEvent: void
-  onMessageCommitted: void
+  beforeRun: undefined
+  afterRun: undefined
+  beforeModelRequest: undefined
+  afterModelEvent: undefined
+  beforeToolCall: undefined
+  afterToolResult: undefined
+  onRuntimeEvent: undefined
+  onMessageCommitted: undefined
 }
 
 export type HookPayload<N extends HookName> = HookPayloadMap[N]
 
 export type HookResult<N extends HookName> = HookResultMap[N]
 
-export type HookHandler<N extends HookName> = (
-  payload: HookPayload<N>,
-) => HookResult<N> | Promise<HookResult<N>>
+export type HookHandler<N extends HookName> = N extends 'input'
+  ? (payload: HookPayload<N>) => InputHookResult | Promise<InputHookResult>
+  : (payload: HookPayload<N>) => void | Promise<void>

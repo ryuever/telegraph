@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   PermissionRequest,
+  RuntimeTaskCapabilityProfile,
 } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 
@@ -15,11 +16,7 @@ export type FilesystemScope = Extract<PermissionRequest, { type: 'filesystem' }>
 export type FilesystemAccess = Extract<PermissionRequest, { type: 'filesystem' }>['access']
 
 export type TaskCapabilityProfile =
-  | { kind: 'default' }
-  | { kind: 'readonly-workspace'; scopes: string[] }
-  | { kind: 'shell-automation'; commands?: string[]; cwdPolicy: 'workspace' | 'restricted' }
-  | { kind: 'coding-edit'; scopes: string[]; patchPolicy: 'preview' | 'apply-after-confirm' }
-  | { kind: 'design-build'; scopes: string[]; artifactPolicy: 'preview' | 'apply-after-confirm' }
+  | RuntimeTaskCapabilityProfile
   | { kind: 'pi-extension-compat'; extensionIds: string[] }
 
 export interface PermissionUserIntent {

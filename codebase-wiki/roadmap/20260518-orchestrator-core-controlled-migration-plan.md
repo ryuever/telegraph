@@ -140,7 +140,7 @@ flowchart TB
 
 ### Phase 3：Pagelet 验证
 
-- [x] 在 chat pagelet 增加隐藏/测试入口 runtime selection，不先暴露正式产品开关。
+- [x] 在 chat pagelet 增加隐藏/测试入口 runtime selection，不先暴露正式产品开关。（2026-05-19 已升级为 chat 设置里的 experimental backend）
 - [x] 用同一 `AgentEvent` projector 验证 trace timeline 可展示 orchestrator step。
 - [x] 确认 main/shared/daemon 不 import `@/packages/orchestrator-core` 或 runtime implementation。
 

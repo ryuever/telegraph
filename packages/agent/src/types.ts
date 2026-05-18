@@ -1,4 +1,5 @@
 import type { Api, Context, Message, Model, Tool } from '@mariozechner/pi-ai'
+import type { RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 
 export type AgentRole = 'user' | 'assistant' | 'system' | 'tool'
 
@@ -51,6 +52,8 @@ export interface AgentRuntimeSettings {
    * Example: `['pi-subagents']` blocks pi-subagents orchestration paths.
    */
   extensionBlocklist?: string[]
+  /** Run-scoped capability profile requested by the pagelet/user for permission brokerage. */
+  taskCapabilityProfile?: RuntimeTaskCapabilityProfile
 }
 
 export interface AgentStreamCallbacks {

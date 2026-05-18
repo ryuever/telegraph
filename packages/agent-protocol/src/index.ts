@@ -4,6 +4,7 @@ export type {
   AgentRuntime,
   RunInput,
   RuntimeSettings,
+  RuntimeTaskCapabilityProfile,
 } from './runtime.js'
 export type {
   ExtensionCapability,

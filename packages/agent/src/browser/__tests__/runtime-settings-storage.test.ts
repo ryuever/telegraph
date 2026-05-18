@@ -33,14 +33,46 @@ describe('runtime settings storage', () => {
   it('writes both shared and legacy keys during migration', () => {
     const storage = new MemoryStorage()
 
-    writeRuntimeSettingsToStorage({ provider: 'p', modelId: 'm', apiKey: 'k', backend: 'pi-ai' }, storage)
+    writeRuntimeSettingsToStorage({
+      provider: 'p',
+      modelId: 'm',
+      apiKey: 'k',
+      backend: 'pi-ai',
+      taskCapabilityProfile: {
+        kind: 'readonly-workspace',
+        scopes: ['repo:read'],
+      },
+    }, storage)
 
     expect(JSON.parse(storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) ?? '{}')).toMatchObject({
       provider: 'p',
       modelId: 'm',
       apiKey: 'k',
       backend: 'pi-ai',
+      taskCapabilityProfile: {
+        kind: 'readonly-workspace',
+        scopes: ['repo:read'],
+      },
     })
     expect(storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY)).toBe(storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY))
+  })
+
+  it('normalizes task capability profiles from storage', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+      taskCapabilityProfile: {
+        kind: 'shell-automation',
+        commands: ['git', 42, 'pnpm'],
+        cwdPolicy: 'restricted',
+      },
+    }))
+
+    expect(readRuntimeSettingsFromStorage(storage)).toMatchObject({
+      taskCapabilityProfile: {
+        kind: 'shell-automation',
+        commands: ['git', 'pnpm'],
+        cwdPolicy: 'restricted',
+      },
+    })
   })
 })

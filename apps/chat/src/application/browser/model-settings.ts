@@ -7,6 +7,7 @@ import {
   type ModelDescriptor,
 } from '@/apps/chat/application/common'
 import type { AgentRuntimeSettings } from '@/apps/chat/application/common'
+import type { RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 import {
   AGENT_MODEL_SETTINGS_STORAGE_KEY,
   LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
@@ -31,6 +32,7 @@ export interface OrchestrationSettings {
 
 export interface ExtensionSettings {
   extensionBlocklist: string[]
+  taskCapabilityProfile: RuntimeTaskCapabilityProfile
 }
 
 export interface ApiKeySettings {
@@ -75,6 +77,7 @@ export const DEFAULT_ORCHESTRATION: OrchestrationSettings = {
 
 export const DEFAULT_EXTENSION: ExtensionSettings = {
   extensionBlocklist: [],
+  taskCapabilityProfile: { kind: 'default' },
 }
 
 export const DEFAULT_API_KEY: ApiKeySettings = {
@@ -130,6 +133,7 @@ export function loadSettings(): ChatModelSettings {
       extensionBlocklist: Array.isArray(parsed.extensionBlocklist)
         ? parsed.extensionBlocklist
         : DEFAULT_SETTINGS.extensionBlocklist,
+      taskCapabilityProfile: normalizeTaskCapabilityProfile(parsed.taskCapabilityProfile),
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -164,6 +168,7 @@ export function toRuntimeSettings(
     worktreeIsolation: settings.worktreeIsolation,
     extensionBlocklist:
       settings.extensionBlocklist.length > 0 ? [...settings.extensionBlocklist] : undefined,
+    taskCapabilityProfile: settings.taskCapabilityProfile,
   }
 }
 
@@ -190,4 +195,43 @@ export function getProviderOptions() {
 
 export function getModelOptions(provider: string) {
   return CATALOG.filter(m => m.provider === provider)
+}
+
+function normalizeTaskCapabilityProfile(value: unknown): RuntimeTaskCapabilityProfile {
+  if (!value || typeof value !== 'object') return DEFAULT_SETTINGS.taskCapabilityProfile
+  const profile = value as Partial<RuntimeTaskCapabilityProfile>
+
+  switch (profile.kind) {
+    case 'readonly-workspace':
+      return { kind: 'readonly-workspace', scopes: stringList(profile.scopes) }
+    case 'shell-automation':
+      return {
+        kind: 'shell-automation',
+        commands: stringList(profile.commands),
+        cwdPolicy: profile.cwdPolicy === 'restricted' ? 'restricted' : 'workspace',
+      }
+    case 'coding-edit':
+      return {
+        kind: 'coding-edit',
+        scopes: stringList(profile.scopes),
+        patchPolicy: profile.patchPolicy === 'apply-after-confirm'
+          ? 'apply-after-confirm'
+          : 'preview',
+      }
+    case 'design-build':
+      return {
+        kind: 'design-build',
+        scopes: stringList(profile.scopes),
+        artifactPolicy: profile.artifactPolicy === 'apply-after-confirm'
+          ? 'apply-after-confirm'
+          : 'preview',
+      }
+    default:
+      return DEFAULT_SETTINGS.taskCapabilityProfile
+  }
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter(item => typeof item === 'string')
 }

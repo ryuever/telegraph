@@ -293,7 +293,7 @@ interface ProcessCapability {
 ### Phase 5：Product Wiring
 
 - [ ] 为 future coding pagelet 或 coding mode 启用 `codingCapabilities() + piExtensionCompatProfile()`。
-- [ ] chat/design 设置页暴露“按任务请求 workspace/shell/edit 能力”的安全策略，不暴露默认 Pi extension 开关。
+- [ ] chat/design 设置页暴露“按任务请求 workspace/shell/edit 能力”的安全策略，不暴露默认 Pi extension 开关。（2026-05-19 chat settings 已持久化 run 级 task capability profile 与 orchestrator 实验入口；design UI 仍待接入，高风险 integration 仍未默认启用）
 - [ ] Trace panel 按 run 展示 extension hook、permission、exec、feedback。
 - [ ] 增加 architecture boundary test：main/shared/daemon 不 import extension runtime implementation。
 

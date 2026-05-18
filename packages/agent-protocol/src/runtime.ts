@@ -15,7 +15,15 @@ export interface RuntimeSettings {
   orchestrationPattern?: string | null
   worktreeIsolation?: boolean
   extensionBlocklist?: string[]
+  taskCapabilityProfile?: RuntimeTaskCapabilityProfile
 }
+
+export type RuntimeTaskCapabilityProfile =
+  | { kind: 'default' }
+  | { kind: 'readonly-workspace'; scopes: string[] }
+  | { kind: 'shell-automation'; commands?: string[]; cwdPolicy: 'workspace' | 'restricted' }
+  | { kind: 'coding-edit'; scopes: string[]; patchPolicy: 'preview' | 'apply-after-confirm' }
+  | { kind: 'design-build'; scopes: string[]; artifactPolicy: 'preview' | 'apply-after-confirm' }
 
 export interface RunInput {
   runId: string

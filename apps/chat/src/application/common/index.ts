@@ -1,5 +1,5 @@
 import { createId } from '@x-oasis/di'
-import type { AgentEvent } from '@/packages/agent-protocol'
+import type { AgentEvent, RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 
 export const CHAT_PAGELET_SERVICE_PATH = 'chat-pagelet-api'
 
@@ -17,6 +17,7 @@ export interface AgentRuntimeSettings {
   orchestrationPattern?: AgentOrchestrationPattern
   worktreeIsolation?: boolean
   extensionBlocklist?: string[]
+  taskCapabilityProfile?: RuntimeTaskCapabilityProfile
 }
 
 export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'pi-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'

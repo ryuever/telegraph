@@ -109,6 +109,8 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
         .map(s => s.trim())
         .filter(Boolean),
     })); }
+  const setTaskCapabilityProfile = (taskCapabilityProfile: ChatModelSettings['taskCapabilityProfile']) =>
+    { setDraft(d => ({ ...d, taskCapabilityProfile })); }
 
   const save = () => {
     onSave(draft)
@@ -124,7 +126,7 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5">
           <div className="flex items-center gap-3">
             <h2 className="text-[13.5px] font-semibold tracking-tight text-zinc-100">Settings</h2>
@@ -191,7 +193,11 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
             />
           )}
           {activeTab === 'extensions' && (
-            <ExtensionsTab draft={draft} onSetBlocklist={setExtensionBlocklistText} />
+            <ExtensionsTab
+              draft={draft}
+              onSetBlocklist={setExtensionBlocklistText}
+              onSetTaskCapabilityProfile={setTaskCapabilityProfile}
+            />
           )}
         </div>
 
@@ -364,6 +370,7 @@ function ModelTab({
         >
           <option value="pi-ai">pi-ai (default)</option>
           <option value="pi-embedded">pi-embedded (tool loop)</option>
+          <option value="telegraph-orchestrator">telegraph-orchestrator (experimental)</option>
           <option value="langgraph" disabled>langgraph (not validated)</option>
           <option value="vercel-ai" disabled>vercel-ai (not validated)</option>
         </select>
@@ -475,12 +482,111 @@ function OrchestrationTab({
 function ExtensionsTab({
   draft,
   onSetBlocklist,
+  onSetTaskCapabilityProfile,
 }: {
   draft: ChatModelSettings
   onSetBlocklist: (raw: string) => void
+  onSetTaskCapabilityProfile: (profile: ChatModelSettings['taskCapabilityProfile']) => void
 }) {
+  const profile = draft.taskCapabilityProfile
+  const setProfileKind = (kind: ChatModelSettings['taskCapabilityProfile']['kind']) => {
+    if (kind === 'readonly-workspace') {
+      onSetTaskCapabilityProfile({ kind, scopes: ['repo:read'] })
+      return
+    }
+    if (kind === 'shell-automation') {
+      onSetTaskCapabilityProfile({ kind, commands: [], cwdPolicy: 'workspace' })
+      return
+    }
+    if (kind === 'coding-edit') {
+      onSetTaskCapabilityProfile({ kind, scopes: ['repo:read', 'repo:write'], patchPolicy: 'preview' })
+      return
+    }
+    if (kind === 'design-build') {
+      onSetTaskCapabilityProfile({ kind, scopes: ['artifact:write', 'repo:read'], artifactPolicy: 'preview' })
+      return
+    }
+    onSetTaskCapabilityProfile({ kind: 'default' })
+  }
+
   return (
     <div className="space-y-4">
+      <Field
+        label="Task capability profile"
+        hint="Per-run request profile; permission broker still gates every risky action"
+      >
+        <select
+          value={profile.kind}
+          onChange={e => {
+            setProfileKind(e.target.value as ChatModelSettings['taskCapabilityProfile']['kind'])
+          }}
+          className={selectClass}
+        >
+          <option value="default">default (chat only)</option>
+          <option value="readonly-workspace">readonly workspace</option>
+          <option value="shell-automation">shell automation</option>
+          <option value="coding-edit">coding edit preview</option>
+          <option value="design-build">design build preview</option>
+        </select>
+      </Field>
+
+      {profile.kind === 'shell-automation' && (
+        <Field label="Allowed shell commands" hint="Blank means request only; no command allowlist">
+          <input
+            type="text"
+            value={profile.commands?.join(', ') ?? ''}
+            onChange={e => {
+              onSetTaskCapabilityProfile({
+                ...profile,
+                commands: splitList(e.target.value),
+              })
+            }}
+            placeholder="git, pnpm, node"
+            className={inputClass}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
+      )}
+
+      {(profile.kind === 'readonly-workspace' ||
+        profile.kind === 'coding-edit' ||
+        profile.kind === 'design-build') && (
+        <Field label="Requested scopes" hint="Saved with the run profile; defaults stay narrow">
+          <input
+            type="text"
+            value={profile.scopes.join(', ')}
+            onChange={e => {
+              onSetTaskCapabilityProfile({
+                ...profile,
+                scopes: splitList(e.target.value),
+              })
+            }}
+            placeholder="repo:read"
+            className={inputClass}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
+      )}
+
+      {profile.kind === 'coding-edit' && (
+        <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+          <input
+            type="checkbox"
+            checked={profile.patchPolicy === 'apply-after-confirm'}
+            onChange={e => {
+              onSetTaskCapabilityProfile({
+                ...profile,
+                patchPolicy: e.target.checked ? 'apply-after-confirm' : 'preview',
+              })
+            }}
+            className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
+          />
+          Allow patch apply after confirmation
+        </label>
+      )}
+
       <Field
         label="Extension blocklist"
         hint="Comma-separated capability ids denied for runs (merged with ~/.telegraph/extension-registry.json)"
@@ -497,6 +603,13 @@ function ExtensionsTab({
       </Field>
     </div>
   )
+}
+
+function splitList(raw: string): string[] {
+  return raw
+    .split(/[,\n]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
 }
 
 function Field({
