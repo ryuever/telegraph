@@ -25,8 +25,6 @@
       "@/packages/stores/*": ["../../packages/stores/src/*"],
       "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
-      "@/packages/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
-      "@/packages/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"],
       "@/packages/agent/*": ["../../packages/agent/src/*"]
     }
   },

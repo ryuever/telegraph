@@ -14,7 +14,7 @@ tags:
   - pagelet
   - multi-agent
   - runtime-event
-status: in-progress
+status: phase-1-complete
 ---
 
 # Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划
@@ -126,7 +126,7 @@ flowchart LR
 
 - 长期包名采用 `@telegraph/agent-protocol`，目录为 `packages/agent-protocol`。
 - `RuntimeEvent` 短期保留，新增别名 `AgentEvent = RuntimeEvent`；新代码优先使用 `AgentEvent`。
-- 保留临时兼容 re-export：`@telegraph/runtime-contracts`，迁移完成后再删除。
+- 已删除临时兼容 re-export：`@telegraph/runtime-contracts`；活跃代码只使用 `@/packages/agent-protocol`。
 - `agent-protocol` 只包含协议：events、run request、messages、tools metadata、extensions manifest、permissions、hooks、fixtures、compat docs。
 - `packages/agent` 承载实现：harness、runtime adapters、tool execution、permission broker、trace sink、orchestration adapters。
 - `chat` 和 `design` 都在各自 pagelet 内运行 harness；main/shared/daemon 不 import runtime 实现。
@@ -141,7 +141,7 @@ flowchart LR
 
 ## Execution Status
 
-- [x] 建立 `packages/agent-protocol`，保留 `packages/runtime-contracts` 兼容 re-export。
+- [x] 建立 `packages/agent-protocol`，并在迁移完成后删除 `packages/runtime-contracts` 兼容 re-export。
 - [x] 新增 `AgentEvent` alias、`AgentRunRequest`、`AgentRunEventEnvelope` 与 multi-agent/design fixtures。
 - [x] 新增 `agent-protocol` golden fixture compatibility tests，确保 schema v1、已知事件类型、JSON 可序列化与完整 run terminal event。
 - [x] 新增 `packages/agent` pagelet-local `AgentHarness`、runtime registry、terminal event fallback、non-blocking trace sink。
@@ -151,6 +151,20 @@ flowchart LR
 - [x] 为 design 增加独立 `AgentEvent → design projection` 纯函数与 design-ready tests，验证不依赖 chat message shape。
 - [x] 将 design pagelet node host 接入 pagelet-local harness，并通过 `metadata.designContext` 预留 design-local context/tools 注入点。
 - [x] 将 design renderer 接入 `IDesignPageletService` agent RPC，`DesignWorkspace` 可发起 pagelet-local agent run 并投影 assistant text / artifact。
+- [x] chat/design renderer agent service 支持 abort-aware pagelet readiness wait、RPC cancel 和 listener cleanup，避免后台 run/listener 泄漏。
+- [x] 将 abort-aware pagelet readiness wait 收束为 `packages/services/pagelet-host/browser/pagelet-ready`，并补 retry/timeout/abort tests。
+- [x] chat projector 支持 `tool_result` / `tool_error` 更新 tool card，避免 tool UI 长期停留在 running。
+- [x] 将 runtime settings storage 迁移到 `packages/agent/browser/runtime-settings-storage`，chat/design 共享 `telegraph.agent.modelSettings` 并兼容旧 chat key。
+- [x] design workspace 增加运行中停止按钮，显式 abort pagelet-local agent runs。
+- [x] 补 chat/design pagelet agent service abort/cancel tests，并将 tool call upsert 抽成可测纯函数。
+- [x] 补 chat/design pagelet agent service successful `AgentEvent` projection tests，覆盖 renderer service 的完成态 listener cleanup。
+- [x] `pagelet-ready` helper 补 already-aborted timeout signal 测试。
+- [x] chat/design pagelet worker 在 cancel 分支补 `run_cancelled` AgentEvent envelope，避免取消只落到 legacy `run_failed`。
+- [x] design renderer 将取消态与失败态区分为 `cancelled`，停止按钮不再把 `Cancelled` 当作 assistant 错误文本追加。
+- [x] `apps/main` renderer Vite alias 补 `@/packages/agent`，保证 chat/design browser 侧共享 runtime settings helper 可被实际打包解析。
+- [x] `AgentHarness` 增加轻量 hook runtime：`beforeRun`、`onRuntimeEvent`、`afterRun` 非阻塞调度，为 extension/orchestrator observability 预留稳定插槽。
+- [x] 修复 chat/design renderer event subscription cleanup：x-oasis `on*` 返回 `Unsubscribable` 对象，renderer 改为 `subscription.unsubscribe()`，避免 assistant 回复完成后报 `unsubscribe is not a function`。
+- [x] 删除 `packages/runtime-contracts` 兼容包，清理 tsconfig / Vite / Vitest / README / AGENTS / skill conventions 中的旧 alias。
 - [x] 补 adapter conformance 基础设施与 mock adapter tests：required fields、terminal event、serializable raw、failure normalization。
 - [x] 引入 orchestrator adapter 前补 observability hooks：node start/end、edge taken、checkpoint、interrupt；当前用 schema v1 现有事件表达，避免提前引入 Telegraph Workflow DSL。
 - [x] 新增 `TelegraphOrchestratorRuntime` 注入式 adapter 骨架，为 `/langgraphjs/libs/orchestrator` 预留接入点但不直接绑定外部实现。
@@ -167,7 +181,7 @@ flowchart LR
 
 ## Assumptions
 
-- 最终命名采用 `agent-protocol`，`runtime-contracts` 只作为过渡兼容名。
+- 最终命名采用 `agent-protocol`，`runtime-contracts` 过渡兼容包已删除。
 - 每个 pagelet 自持 harness，是长期架构默认。
 - 第一阶段不做 Telegraph Workflow DSL。
 - Multi-agent 的第一产品切片先服务 chat；design 接入以协议可移植性验证为目标。

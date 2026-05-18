@@ -89,6 +89,11 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
             {call.errorMessage && (
               <div className="mt-1 text-[11.5px] text-rose-300">{call.errorMessage}</div>
             )}
+            {call.output !== undefined && (
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-zinc-800/80 bg-zinc-950/70 p-2 font-mono text-[11px] leading-relaxed text-zinc-400">
+                {formatToolOutput(call.output)}
+              </pre>
+            )}
           </div>
         ))}
 
@@ -116,6 +121,15 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
       </div>
     </div>
   )
+}
+
+function formatToolOutput(output: unknown): string {
+  if (typeof output === 'string') return output
+  try {
+    return JSON.stringify(output, null, 2)
+  } catch {
+    return String(output)
+  }
 }
 
 function Avatar() {

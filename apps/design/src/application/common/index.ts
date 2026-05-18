@@ -8,7 +8,11 @@ export interface IDesignPageletService {
   ping(now: number): Promise<{ pong: number; serverTime: number }>;
   sendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult>;
   cancelAgent(runId: string): Promise<boolean>;
-  onAgentEvent(callback: (event: DesignAgentStreamEvent) => void): () => void;
+  onAgentEvent(callback: (event: DesignAgentStreamEvent) => void): EventSubscription;
+}
+
+export interface EventSubscription {
+  unsubscribe(): void;
 }
 
 export interface DesignAgentSendRequest {

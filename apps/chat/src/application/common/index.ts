@@ -37,6 +37,10 @@ export interface ChatStreamEvent {
   event?: AgentEvent
 }
 
+export interface EventSubscription {
+  unsubscribe(): void
+}
+
 export interface ChatSendRequest {
   message: string
   settings: AgentRuntimeSettings
@@ -106,7 +110,7 @@ export interface IChatPageletService {
   info(): Promise<string>
   send(request: ChatSendRequest): Promise<ChatSendResult>
   cancel(runId: string): Promise<boolean>
-  onStreamEvent(callback: (event: ChatStreamEvent) => void): () => void
+  onStreamEvent(callback: (event: ChatStreamEvent) => void): EventSubscription
 }
 
 // ---------------------------------------------------------------------------

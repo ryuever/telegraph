@@ -28,8 +28,6 @@
       "@/packages/stores/*": ["../../packages/stores/src/*"],
       "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
-      "@/packages/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
-      "@/packages/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"],
       "@/packages/agent/*": ["../../packages/agent/src/*"],
       "@/packages/services/pagelet-host/*": ["../../packages/services/src/pagelet-host/src/*"],
       "@/packages/services/main-metrics/*": ["../../packages/services/src/main-metrics/src/*"],

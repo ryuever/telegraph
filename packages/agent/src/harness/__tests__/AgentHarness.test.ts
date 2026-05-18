@@ -22,6 +22,7 @@ class FakeRuntime implements RuntimeExecutor {
   readonly label = 'Fake Runtime'
 
   async *run(input: RuntimeInput): AsyncIterable<AgentEvent> {
+    await Promise.resolve()
     yield {
       type: 'run_started',
       schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
@@ -64,5 +65,41 @@ describe('AgentHarness', () => {
 
   it('selects pi-subagents when orchestration requests it', () => {
     expect(selectRuntimeId({ orchestration: 'pi-subagents' })).toBe('pi-subagents')
+  })
+
+  it('dispatches lifecycle hooks without blocking the run stream', async () => {
+    const calls: string[] = []
+    const harness = createAgentHarness({
+      runtimes: [{ id: 'fake', create: () => new FakeRuntime() }],
+      hooks: {
+        beforeRun: () => {
+          calls.push('beforeRun')
+        },
+        onRuntimeEvent: [
+          (payload) => {
+            const event = (payload as { event: AgentEvent }).event
+            calls.push(`event:${event.type}`)
+          },
+          () => {
+            throw new Error('hook failure')
+          },
+        ],
+        afterRun: (payload) => {
+          const terminalEvent = (payload as { terminalEvent?: AgentEvent }).terminalEvent
+          calls.push(`afterRun:${terminalEvent ? terminalEvent.type : 'none'}`)
+        },
+      },
+    })
+
+    const events = await collect(harness.run(baseRequest))
+
+    expect(events.at(-1)?.type).toBe('run_completed')
+    expect(calls).toEqual([
+      'beforeRun',
+      'event:run_started',
+      'event:assistant_delta',
+      'event:run_completed',
+      'afterRun:run_completed',
+    ])
   })
 })

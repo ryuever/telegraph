@@ -18,12 +18,13 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   const sessionId = useMemo(() => globalThis.crypto.randomUUID(), [])
   const agent = useMemo(() => new PageletDesignAgentService(), [])
   const initialRunStarted = useRef(false)
+  const activeControllers = useRef<Set<AbortController>>(new Set())
   const [messages, setMessages] = useState<Message[]>([
     { role: 'user', content: initialPrompt },
     { role: 'assistant', content: '' },
   ])
   const [input, setInput] = useState('')
-  const [status, setStatus] = useState<'running' | 'completed' | 'failed'>('running')
+  const [status, setStatus] = useState<'running' | 'completed' | 'failed' | 'cancelled'>('running')
   const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>([])
 
   const appendAssistantText = (text: string): void => {
@@ -40,6 +41,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
 
   const runAgent = (prompt: string, context?: Record<string, unknown>): void => {
     const abortController = new AbortController()
+    activeControllers.current.add(abortController)
     setStatus('running')
     void agent.send({
       prompt,
@@ -52,15 +54,35 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
         setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
       },
     }).catch((error: unknown) => {
+      if (isCancelledError(error)) {
+        setStatus('cancelled')
+        return
+      }
       setStatus('failed')
       appendAssistantText(`\n${error instanceof Error ? error.message : String(error)}`)
+    }).finally(() => {
+      activeControllers.current.delete(abortController)
     })
+  }
+
+  const stopAgentRuns = (): void => {
+    for (const controller of activeControllers.current) {
+      controller.abort()
+    }
+    activeControllers.current.clear()
+    setStatus('cancelled')
   }
 
   useEffect(() => {
     if (initialRunStarted.current) return
     initialRunStarted.current = true
     runAgent(initialPrompt, { surface: 'design-workspace', initial: true })
+    return () => {
+      for (const controller of activeControllers.current) {
+        controller.abort()
+      }
+      activeControllers.current.clear()
+    }
   }, [initialPrompt])
 
   const handleSend = () => {
@@ -112,6 +134,14 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
             />
             <Button size="sm" onClick={handleSend} disabled={!input.trim()}>
               发送
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={stopAgentRuns}
+              disabled={status !== 'running'}
+            >
+              停止
             </Button>
           </div>
         </div>
@@ -167,4 +197,8 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
       </div>
     </div>
   )
+}
+
+function isCancelledError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Cancelled'
 }

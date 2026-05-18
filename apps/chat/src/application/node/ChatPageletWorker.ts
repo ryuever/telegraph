@@ -13,7 +13,7 @@ import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
 import { createAgentHarness } from '@/packages/agent/harness';
-import type { AgentEvent, AgentRunRequest } from '@/packages/agent-protocol';
+import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
 
@@ -59,10 +59,12 @@ export class ChatPageletWorker extends PageletWorker {
           return false;
         },
 
-        onStreamEvent: (callback: (event: ChatStreamEvent) => void): (() => void) => {
+        onStreamEvent: (callback: (event: ChatStreamEvent) => void): { unsubscribe: () => void } => {
           this.streamListeners.add(callback);
-          return () => {
-            this.streamListeners.delete(callback);
+          return {
+            unsubscribe: () => {
+              this.streamListeners.delete(callback);
+            },
           };
         },
       },
@@ -119,6 +121,7 @@ export class ChatPageletWorker extends PageletWorker {
       }
 
       if (abortController.signal.aborted) {
+        this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event: cancelledAgentEvent(runId) });
         this.emitStreamEvent({ type: 'run_failed', runId, error: 'Cancelled' });
         activeRuns.delete(runId);
         return { runId, status: 'failed', error: 'Cancelled' };
@@ -170,4 +173,16 @@ export class ChatPageletWorker extends PageletWorker {
         return null;
     }
   }
+}
+
+function cancelledAgentEvent(runId: string): AgentEvent {
+  return {
+    type: 'run_cancelled',
+    schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+    producerVersion: 'telegraph-chat-pagelet@0.0.0',
+    origin: { framework: 'telegraph', runtimeId: 'chat-pagelet' },
+    runId,
+    reason: 'Cancelled',
+    ts: Date.now(),
+  };
 }

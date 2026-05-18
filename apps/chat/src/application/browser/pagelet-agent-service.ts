@@ -3,38 +3,14 @@ import {
   type ChatSendRequest,
   type ChatStreamEvent,
 } from '@/apps/chat/application/common'
+import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
+import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
 import { isLegacyProjectionEvent, projectAgentEventToChat } from './agent-event-projector'
 
 const READY_ATTEMPTS = 40
 const READY_INTERVAL_MS = 500
 const PROBE_TIMEOUT_MS = 3000
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => { setTimeout(resolve, ms) })
-}
-
-/**
- * Race an RPC call against a timeout.  The x-oasis RPCMessageChannel
- * logs "send called before port was bound" and silently returns **without
- * settling the call promise** when the port isn't ready, so a bare
- * `client.info()` would hang forever.  Wrapping it in a timeout lets us
- * detect that situation and retry.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => { reject(new Error('probe timed out')) },
-      ms,
-    )
-    promise
-      .then(value => { clearTimeout(timer); resolve(value) })
-      .catch((err: unknown) => {
-        clearTimeout(timer)
-        reject(err instanceof Error ? err : new Error(String(err)))
-      })
-  })
-}
 
 /**
  * Wait for the chat pagelet RPC channel to be ready.
@@ -46,23 +22,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * probe `info()` with a per-attempt timeout and retry until the call
  * succeeds.
  */
-async function waitForPageletReady(): Promise<void> {
+async function waitForChatPageletReady(signal?: AbortSignal): Promise<void> {
   const client = getChatPageletClient()
-  for (let attempt = 0; attempt < READY_ATTEMPTS; attempt++) {
-    try {
-      await withTimeout(client.info(), PROBE_TIMEOUT_MS)
-      return // port is bound — pagelet is ready
-    } catch {
-      await sleep(READY_INTERVAL_MS)
-    }
-  }
-  throw new Error('Chat pagelet is not ready. Please try again in a moment.')
+  await waitForPageletReady(() => client.info(), {
+    attempts: READY_ATTEMPTS,
+    intervalMs: READY_INTERVAL_MS,
+    probeTimeoutMs: PROBE_TIMEOUT_MS,
+    signal,
+    notReadyMessage: 'Chat pagelet is not ready. Please try again in a moment.',
+  })
 }
 
 export class PageletAgentService implements AgentService {
-  private listeners = new Map<string, (event: ChatStreamEvent) => void>()
-  private unsub: (() => void) | null = null
-
   async send({ conversation, onChunk, onToolCall, onStatus, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
     const lastMessage = conversation.messages.filter(m => m.role === 'user').at(-1)
     if (!lastMessage) throw new Error('Last message must be from user')
@@ -138,10 +109,27 @@ export class PageletAgentService implements AgentService {
       // The chat utility process boots asynchronously after spawn; the
       // renderer may try to call RPC methods before the channel is ready.
       onStatus?.('queued')
-      await waitForPageletReady()
+      await waitForChatPageletReady(signal)
+      throwIfAborted(signal)
 
       const client = getChatPageletClient()
-      client.onStreamEvent(streamListener)
+      const subscription = client.onStreamEvent(streamListener)
+      let removeAbortListener = () => {}
+      const abortPromise = new Promise<never>((_resolve, reject) => {
+        if (!signal) return
+        const handleAbort = () => {
+          void client.cancel(runId)
+          reject(new Error('Cancelled'))
+        }
+        if (signal.aborted) {
+          handleAbort()
+          return
+        }
+        signal.addEventListener('abort', handleAbort, { once: true })
+        removeAbortListener = () => {
+          signal.removeEventListener('abort', handleAbort)
+        }
+      })
 
       const request: ChatSendRequest = {
         message: lastMessage.content,
@@ -152,12 +140,17 @@ export class PageletAgentService implements AgentService {
 
       onStatus?.('running')
 
-      const result = await client.send(request)
+      try {
+        const result = await Promise.race([client.send(request), abortPromise])
 
-      if (result.status === 'completed') {
-        onStatus?.('completed')
-      } else {
-        onStatus?.('failed')
+        if (result.status === 'completed') {
+          onStatus?.('completed')
+        } else {
+          onStatus?.('failed')
+        }
+      } finally {
+        removeAbortListener()
+        subscription.unsubscribe()
       }
     } catch (err) {
       onStatus?.('failed')
@@ -166,32 +159,6 @@ export class PageletAgentService implements AgentService {
   }
 
   private getSettings(): ChatSendRequest['settings'] {
-    const raw = localStorage.getItem('telegraph.chat.modelSettings')
-    if (raw) {
-      try {
-        const parsed: Record<string, unknown> = JSON.parse(raw) as Record<string, unknown>
-        const str = (v: unknown, fallback: string): string => typeof v === 'string' ? v : fallback
-        const bool = (v: unknown, fallback: boolean): boolean => typeof v === 'boolean' ? v : fallback
-        return {
-          provider: str(parsed.provider, 'minimax-cn'),
-          modelId: str(parsed.modelId, 'MiniMax-M2.7'),
-          apiKey: str(parsed.apiKey, ''),
-          baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
-          backend: str(parsed.backend, 'pi-ai') as ChatSendRequest['settings']['backend'],
-          orchestration: str(parsed.orchestration, 'none') as ChatSendRequest['settings']['orchestration'],
-          orchestrationPattern: str(parsed.orchestrationPattern, 'chain') as ChatSendRequest['settings']['orchestrationPattern'],
-          worktreeIsolation: bool(parsed.worktreeIsolation, false),
-          extensionBlocklist: Array.isArray(parsed.extensionBlocklist) ? parsed.extensionBlocklist as string[] : [],
-        }
-      } catch { /* noop */ }
-    }
-    return {
-      provider: 'minimax-cn',
-      modelId: 'MiniMax-M2.7',
-      apiKey: '',
-      backend: 'pi-ai',
-      orchestration: 'none',
-      orchestrationPattern: 'chain',
-    }
+    return readRuntimeSettingsFromStorage(localStorage) as ChatSendRequest['settings']
   }
 }

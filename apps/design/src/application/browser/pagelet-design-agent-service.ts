@@ -1,5 +1,7 @@
 import type { RuntimeSettings } from '@/packages/agent-protocol'
 import type { DesignAgentSendRequest, DesignAgentStreamEvent } from '@/apps/design/application/common'
+import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
+import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getDesignPageletClient } from './getClient'
 import {
   projectAgentEventToDesign,
@@ -22,62 +24,63 @@ export interface DesignAgentSendOptions {
   onTraceEvent?: (event: DesignAgentStreamEvent) => void
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => { setTimeout(resolve, ms) })
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => { reject(new Error('probe timed out')) }, ms)
-    promise
-      .then(value => { clearTimeout(timer); resolve(value) })
-      .catch((error: unknown) => {
-        clearTimeout(timer)
-        reject(error instanceof Error ? error : new Error(String(error)))
-      })
-  })
-}
-
-async function waitForPageletReady(): Promise<void> {
+async function waitForDesignPageletReady(signal?: AbortSignal): Promise<void> {
   const client = getDesignPageletClient()
-  for (let attempt = 0; attempt < READY_ATTEMPTS; attempt++) {
-    try {
-      await withTimeout(client.info(), PROBE_TIMEOUT_MS)
-      return
-    } catch {
-      await sleep(READY_INTERVAL_MS)
-    }
-  }
-  throw new Error('Design pagelet is not ready. Please try again in a moment.')
+  await waitForPageletReady(() => client.info(), {
+    attempts: READY_ATTEMPTS,
+    intervalMs: READY_INTERVAL_MS,
+    probeTimeoutMs: PROBE_TIMEOUT_MS,
+    signal,
+    notReadyMessage: 'Design pagelet is not ready. Please try again in a moment.',
+  })
 }
 
 export class PageletDesignAgentService {
   async send(options: DesignAgentSendOptions): Promise<void> {
     const runId = globalThis.crypto.randomUUID()
-    options.onStatus?.('running')
-    await waitForPageletReady()
-
-    const client = getDesignPageletClient()
-    const unsubscribe = client.onAgentEvent((event) => {
-      if (options.signal?.aborted) return
-      if (event.runId !== runId) return
-      options.onTraceEvent?.(event)
-
-      if (event.type === 'agent_event') {
-        projectAgentEventToDesign(event.event, {
-          onStatus: status => { options.onStatus?.(status); },
-          onAssistantText: text => { options.onAssistantText?.(text); },
-          onArtifact: artifact => { options.onArtifact?.(artifact); },
-        })
-        return
-      }
-
-      if (event.type === 'run_failed') {
-        options.onStatus?.('failed')
-      }
-    })
 
     try {
+      options.onStatus?.('running')
+      await waitForDesignPageletReady(options.signal)
+      throwIfAborted(options.signal)
+
+      const client = getDesignPageletClient()
+      let removeAbortListener = () => {}
+      const abortPromise = new Promise<never>((_resolve, reject) => {
+        if (!options.signal) return
+        const handleAbort = () => {
+          void client.cancelAgent(runId)
+          reject(new Error('Cancelled'))
+        }
+        if (options.signal.aborted) {
+          handleAbort()
+          return
+        }
+        options.signal.addEventListener('abort', handleAbort, { once: true })
+        removeAbortListener = () => {
+          options.signal?.removeEventListener('abort', handleAbort)
+        }
+      })
+
+      const subscription = client.onAgentEvent((event) => {
+        if (options.signal?.aborted && (event.type !== 'agent_event' || event.event.type !== 'run_cancelled')) return
+        if (event.runId !== runId) return
+        options.onTraceEvent?.(event)
+
+        if (event.type === 'agent_event') {
+          projectAgentEventToDesign(event.event, {
+            onStatus: status => { options.onStatus?.(status); },
+            onAssistantText: text => { options.onAssistantText?.(text); },
+            onArtifact: artifact => { options.onArtifact?.(artifact); },
+          })
+          return
+        }
+
+        if (event.type === 'run_failed') {
+          options.onStatus?.('failed')
+        }
+      })
+
       const request: DesignAgentSendRequest = {
         runId,
         sessionId: options.sessionId,
@@ -86,43 +89,24 @@ export class PageletDesignAgentService {
         context: options.context,
       }
 
-      const result = await client.sendAgent(request)
-      options.onStatus?.(result.status === 'completed' ? 'completed' : 'failed')
-    } finally {
-      unsubscribe()
+      try {
+        const result = await Promise.race([client.sendAgent(request), abortPromise])
+        options.onStatus?.(result.status === 'completed' ? 'completed' : 'failed')
+      } finally {
+        removeAbortListener()
+        subscription.unsubscribe()
+      }
+    } catch (error) {
+      options.onStatus?.(isCancelledError(error) ? 'cancelled' : 'failed')
+      throw error
     }
   }
 }
 
 function readRuntimeSettings(): RuntimeSettings {
-  const raw = localStorage.getItem('telegraph.chat.modelSettings')
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      const str = (value: unknown, fallback: string): string => typeof value === 'string' ? value : fallback
-      const bool = (value: unknown, fallback: boolean): boolean => typeof value === 'boolean' ? value : fallback
-      return {
-        provider: str(parsed.provider, 'minimax-cn'),
-        modelId: str(parsed.modelId, 'MiniMax-M2.7'),
-        apiKey: str(parsed.apiKey, ''),
-        baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
-        backend: str(parsed.backend, 'pi-ai'),
-        orchestration: str(parsed.orchestration, 'none'),
-        orchestrationPattern: str(parsed.orchestrationPattern, 'chain'),
-        worktreeIsolation: bool(parsed.worktreeIsolation, false),
-        extensionBlocklist: Array.isArray(parsed.extensionBlocklist) ? parsed.extensionBlocklist as string[] : [],
-      }
-    } catch {
-      // Fall through to defaults.
-    }
-  }
+  return readRuntimeSettingsFromStorage(localStorage)
+}
 
-  return {
-    provider: 'minimax-cn',
-    modelId: 'MiniMax-M2.7',
-    apiKey: '',
-    backend: 'pi-ai',
-    orchestration: 'none',
-    orchestrationPattern: 'chain',
-  }
+function isCancelledError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Cancelled'
 }

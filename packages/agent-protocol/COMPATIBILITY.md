@@ -1,8 +1,8 @@
 # Agent protocol compatibility
 
 `@telegraph/agent-protocol` is the long-term shared protocol package for
-pagelet-local agent hosts. The legacy `@telegraph/runtime-contracts` package is
-a compatibility re-export during migration.
+pagelet-local agent hosts. The legacy `@telegraph/runtime-contracts` compatibility
+package has been removed after the repo migrated to `@/packages/agent-protocol`.
 
 ## Versioning
 
@@ -14,8 +14,8 @@ Consumers must tolerate unknown event `type` values by degrading to `runtime_log
 ## Naming
 
 - Prefer `AgentEvent` in new cross-pagelet code.
-- Keep `RuntimeEvent` in adapter internals and migration-facing code until the
-  current chat/design integrations converge.
+- Keep `RuntimeEvent` in adapter internals when that name describes runtime
+  facts; use `AgentEvent` for cross-pagelet protocol surfaces.
 - Do not introduce app-specific protocol events for chat or design artifacts;
   carry app output through `assistant_message`, `tool_result.output`,
   `run_completed.output`, or event metadata.

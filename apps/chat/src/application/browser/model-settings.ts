@@ -7,10 +7,15 @@ import {
   type ModelDescriptor,
 } from '@/apps/chat/application/common'
 import type { AgentRuntimeSettings } from '@/apps/chat/application/common'
+import {
+  AGENT_MODEL_SETTINGS_STORAGE_KEY,
+  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
+  writeRuntimeSettingsToStorage,
+} from '@/packages/agent/browser/runtime-settings-storage'
 
 export type { AgentRuntimeSettings, ModelDescriptor }
 
-const STORAGE_KEY = 'telegraph.chat.modelSettings'
+const STORAGE_KEY = AGENT_MODEL_SETTINGS_STORAGE_KEY
 
 export interface ModelSelection {
   provider: string
@@ -109,7 +114,8 @@ export function getDefaultModelFromEnv(envModels: EnvModelConfig[]): {
 export function loadSettings(): ChatModelSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY)
     if (!raw) return DEFAULT_SETTINGS
     const parsed = JSON.parse(raw) as Partial<ChatModelSettings>
     return {
@@ -133,7 +139,7 @@ export function loadSettings(): ChatModelSettings {
 export function saveSettings(settings: ChatModelSettings) {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    writeRuntimeSettingsToStorage(settings, window.localStorage)
   } catch { /* noop */ }
 }
 

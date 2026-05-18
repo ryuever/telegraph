@@ -42,7 +42,7 @@ The same applies to cross-package imports — always use the alias, never `../..
   - `@/apps/<app>/*` → `apps/<app>/src/*` (e.g. `@/apps/main/…`, `@/apps/design/…`)
   - `@/packages/ui/*` → `packages/ui/src/*` (renderer view layer)
   - `@/packages/stores` → `packages/stores/src/index.ts` (barrel import)
-  - `@/packages/runtime-contracts` → `packages/runtime-contracts/src/index.ts` (barrel import)
+  - `@/packages/agent-protocol` → `packages/agent-protocol/src/index.ts` (barrel import)
   - `@/packages/agent/*` → `packages/agent/src/*`
   - `@/packages/services/pagelet-host/*` → `packages/services/src/pagelet-host/src/*`
   - `@/packages/services/main-metrics/*` → `packages/services/src/main-metrics/src/*`

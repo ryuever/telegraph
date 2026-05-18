@@ -36,6 +36,24 @@ export function projectAgentEventToChat(event: AgentEvent, handlers: ChatAgentEv
       })
       return
 
+    case 'tool_result':
+      handlers.onToolCall?.({
+        id: event.callId,
+        name: event.toolName,
+        output: event.output,
+        status: 'done',
+      })
+      return
+
+    case 'tool_error':
+      handlers.onToolCall?.({
+        id: event.callId,
+        name: event.toolName,
+        status: 'error',
+        errorMessage: event.error.message,
+      })
+      return
+
     case 'run_completed':
       handlers.onStatus?.('completed')
       return

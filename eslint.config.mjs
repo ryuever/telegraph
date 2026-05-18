@@ -24,9 +24,6 @@ export default tseslint.config(
       // first-party source.
       '.agents/**',
       '.claude/**',
-      // Legacy hand-checked-in JS build artefacts that ship next to the .ts
-      // sources in @/packages/runtime-contracts. Phase 0 leaves them as-is.
-      'packages/runtime-contracts/src/**/*.js',
     ],
   },
 

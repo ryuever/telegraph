@@ -117,7 +117,8 @@ When creating a new project skill, add it under `skills/` and update `skills/REA
 │   └── _legacy/                                   # frozen previous codebase — DO NOT IMPORT (see _legacy/README.md)
 │
 ├── packages/
-│   ├── runtime-contracts/                         # @/packages/runtime-contracts — RunInput / RuntimeEvent / tool & extension types (kept across rewrite)
+│   ├── agent-protocol/                            # @/packages/agent-protocol — AgentEvent / RuntimeEvent / run / tool / extension protocol types
+│   ├── agent/                                     # @/packages/agent — harness, runtime adapters, tool/trace implementation kit
 │   └── ui/                                        # @/packages/ui — shared UI component library (React + Tailwind, shadcn-based, no Electron imports)
 │
 ├── codebase-wiki/                                 # design + decision archive
@@ -148,8 +149,8 @@ This makes imports self-documenting — you can always locate a module by its im
 | `@/packages/ui/*`                     | `packages/ui/src/*`                               | `import { cn } from '@/packages/ui/lib/utils'`                     |
 | `@/packages/stores`                   | `packages/stores/src/index.ts`                    | `import { useSessionsStore } from '@/packages/stores'`             |
 | `@/packages/stores/*`                 | `packages/stores/src/*`                           | `import type { X } from '@/packages/stores/types'`                 |
-| `@/packages/runtime-contracts`        | `packages/runtime-contracts/src/index.ts`         | `import type { RuntimeEvent } from '@/packages/runtime-contracts'` |
-| `@/packages/runtime-contracts/*`      | `packages/runtime-contracts/src/*`                | `import { X } from '@/packages/runtime-contracts/events'`          |
+| `@/packages/agent-protocol`           | `packages/agent-protocol/src/index.ts`            | `import type { AgentEvent } from '@/packages/agent-protocol'`     |
+| `@/packages/agent-protocol/*`         | `packages/agent-protocol/src/*`                   | `import { X } from '@/packages/agent-protocol/events'`            |
 | `@/packages/agent/*`                  | `packages/agent/src/*`                            | `import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime'` |
 | `@/packages/services/pagelet-host/*`  | `packages/services/src/pagelet-host/src/*`        | `import { PageletWorker } from '@/packages/services/pagelet-host/node/PageletWorker'` |
 | `@/packages/services/main-metrics/*`  | `packages/services/src/main-metrics/src/*`        | `import { X } from '@/packages/services/main-metrics/common'`      |
@@ -166,26 +167,26 @@ This makes imports self-documenting — you can always locate a module by its im
    E.g. inside `packages/agent/`: `import { X } from '@/packages/agent/types'`.
 4. **Bare imports** (no sub-path) for packages with a barrel `index.ts`:
    - `@/packages/stores` → `packages/stores/src/index.ts`
-   - `@/packages/runtime-contracts` → `packages/runtime-contracts/src/index.ts`
+   - `@/packages/agent-protocol` → `packages/agent-protocol/src/index.ts`
 5. **Never introduce a new alias prefix** (no `@foo/`, `@bar/`, etc.). `@/` is the sole alias.
 
 ### Where each alias is configured
 
 | File                                              | Aliases declared                                                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------|
-| `apps/main/tsconfig.json`                         | `@/apps/{main,design,connection,daemon,shared,monitor,setting,chat}/*`, `@/packages/{ui,stores,runtime-contracts,agent,services/pagelet-host,services/main-metrics,services/process}/*` |
+| `apps/main/tsconfig.json`                         | `@/apps/{main,design,connection,daemon,shared,monitor,setting,chat}/*`, `@/packages/{ui,stores,agent-protocol,agent,services/pagelet-host,services/main-metrics,services/process}/*` |
 | `apps/design/tsconfig.json`                       | `@/apps/design/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
 | `apps/shared/tsconfig.json`                       | `@/apps/shared/*` (self), `@/apps/main/*`, `@/packages/services/{pagelet-host,main-metrics}/*` |
 | `apps/daemon/tsconfig.json`                       | `@/apps/daemon/*` (self), `@/apps/main/*`, `@/packages/services/{pagelet-host,main-metrics,process}/*` |
 | `apps/setting/tsconfig.json`                      | `@/apps/setting/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
 | `apps/monitor/tsconfig.json`                      | `@/apps/monitor/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
 | `apps/connection/tsconfig.json`                   | `@/apps/connection/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/{pagelet-host,main-metrics,process}}/*` |
-| `apps/chat/tsconfig.json`                         | `@/apps/chat/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,stores,runtime-contracts,agent,services/pagelet-host,services/main-metrics}/*` |
+| `apps/chat/tsconfig.json`                         | `@/apps/chat/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,stores,agent-protocol,agent,services/pagelet-host,services/main-metrics}/*` |
 | `packages/ui/tsconfig.json`                       | `@/packages/ui/*` (self) |
 | `packages/services/tsconfig.json`                 | `@/packages/services/*` (self + sub-services), `@/apps/{main,daemon}/*` |
-| `packages/agent/tsconfig.json`                    | `@/packages/agent/*` (self), `@/packages/runtime-contracts/*` |
+| `packages/agent/tsconfig.json`                    | `@/packages/agent/*` (self), `@/packages/agent-protocol/*` |
 | `packages/stores/tsconfig.json`                   | `@/packages/stores/*` (self) |
-| `packages/runtime-contracts/tsconfig.json`        | `@/packages/runtime-contracts/*` (self) |
+| `packages/agent-protocol/tsconfig.json`           | `@/packages/agent-protocol/*` (self) |
 | `apps/main/vite.*.config.ts`                      | Mirror tsconfig aliases as `resolve.alias` entries (key = `@/apps/X`, value = `resolve(__dirname, '<rel-path-to-src>')`) |
 
 ## Running and building

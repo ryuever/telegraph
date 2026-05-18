@@ -7,6 +7,13 @@ export {
   createMiniMaxOpenAIModel,
   resolveModel,
 } from '@/packages/agent/providers/index'
+export {
+  AGENT_MODEL_SETTINGS_STORAGE_KEY,
+  DEFAULT_RUNTIME_SETTINGS,
+  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
+  readRuntimeSettingsFromStorage,
+  writeRuntimeSettingsToStorage,
+} from '@/packages/agent/browser/runtime-settings-storage'
 export type {
   AgentBackendKind,
   AgentOrchestrationMode,
@@ -76,6 +83,8 @@ export {
   selectRuntimeId,
   validateAgentEvent,
   type AgentHarness,
+  type AgentHarnessHookHandler,
+  type AgentHarnessHooks,
   type AgentHarnessOptions,
   type AgentRunOptions,
   type AgentRuntimeFactory,

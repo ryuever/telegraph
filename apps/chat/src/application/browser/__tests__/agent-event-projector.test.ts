@@ -63,6 +63,44 @@ describe('projectAgentEventToChat', () => {
     ])
   })
 
+  it('projects tool results and errors into tool card updates', () => {
+    const resultEvent: AgentEvent = {
+      type: 'tool_result',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1',
+      callId: 'call-1',
+      toolName: 'search',
+      output: { answer: 42 },
+      ts: 1,
+    }
+    const errorEvent: AgentEvent = {
+      type: 'tool_error',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1',
+      callId: 'call-2',
+      toolName: 'read_file',
+      error: { code: 'enoent', message: 'Missing file' },
+      ts: 2,
+    }
+
+    expect(project(resultEvent).tools).toEqual([
+      {
+        id: 'call-1',
+        name: 'search',
+        output: { answer: 42 },
+        status: 'done',
+      },
+    ])
+    expect(project(errorEvent).tools).toEqual([
+      {
+        id: 'call-2',
+        name: 'read_file',
+        status: 'error',
+        errorMessage: 'Missing file',
+      },
+    ])
+  })
+
   it('normalizes failed and cancelled terminal events to failed chat status', () => {
     const failed: AgentEvent = {
       type: 'run_failed',

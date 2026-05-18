@@ -1,6 +1,6 @@
 import type { AgentEvent } from '@/packages/agent-protocol'
 
-export type DesignAgentRunStatus = 'running' | 'completed' | 'failed'
+export type DesignAgentRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
 
 export interface DesignProjectedArtifact {
   id: string
@@ -46,8 +46,11 @@ export function projectAgentEventToDesign(event: AgentEvent, handlers: DesignAge
       return
 
     case 'run_failed':
-    case 'run_cancelled':
       handlers.onStatus?.('failed', event)
+      return
+
+    case 'run_cancelled':
+      handlers.onStatus?.('cancelled', event)
       return
 
     default:

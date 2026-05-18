@@ -6,6 +6,8 @@ export {
   selectRuntimeId,
   validateAgentEvent,
   type AgentHarness,
+  type AgentHarnessHookHandler,
+  type AgentHarnessHooks,
   type AgentHarnessOptions,
   type AgentRunOptions,
   type AgentRuntimeFactory,

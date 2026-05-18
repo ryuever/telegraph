@@ -13,7 +13,7 @@ import { createAgentHarness } from '@/packages/agent/harness';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
-import type { AgentRunRequest } from '@/packages/agent-protocol';
+import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');
 
@@ -46,10 +46,12 @@ export class DesignPageletWorker extends PageletWorker {
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>
           Promise.resolve(this.cancelAgentRun(runId)),
-        onAgentEvent: (callback: (event: DesignAgentStreamEvent) => void): (() => void) => {
+        onAgentEvent: (callback: (event: DesignAgentStreamEvent) => void): { unsubscribe: () => void } => {
           this.agentListeners.add(callback);
-          return () => {
-            this.agentListeners.delete(callback);
+          return {
+            unsubscribe: () => {
+              this.agentListeners.delete(callback);
+            },
           };
         },
       },
@@ -105,6 +107,12 @@ export class DesignPageletWorker extends PageletWorker {
 
       activeAgentRuns.delete(request.runId);
       if (abortController.signal.aborted) {
+        this.emitAgentEvent({
+          type: 'agent_event',
+          runId: request.runId,
+          sessionId,
+          event: cancelledAgentEvent(request.runId),
+        });
         this.emitAgentEvent({ type: 'run_failed', runId: request.runId, sessionId, error: 'Cancelled' });
         return { runId: request.runId, status: 'failed', error: 'Cancelled' };
       }
@@ -116,4 +124,16 @@ export class DesignPageletWorker extends PageletWorker {
       return { runId: request.runId, status: 'failed', error: message };
     }
   }
+}
+
+function cancelledAgentEvent(runId: string): AgentEvent {
+  return {
+    type: 'run_cancelled',
+    schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+    producerVersion: 'telegraph-design-pagelet@0.0.0',
+    origin: { framework: 'telegraph', runtimeId: 'design-pagelet' },
+    runId,
+    reason: 'Cancelled',
+    ts: Date.now(),
+  };
 }

@@ -114,4 +114,18 @@ describe('projectAgentEventToDesign', () => {
       },
     ])
   })
+
+  it('keeps cancelled runs distinct from failed runs', () => {
+    const result = collect([
+      {
+        type: 'run_cancelled',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'design-run',
+        reason: 'user stopped',
+        ts: 1,
+      },
+    ])
+
+    expect(result.statuses).toEqual(['cancelled'])
+  })
 })
