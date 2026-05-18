@@ -10,6 +10,8 @@
     "baseUrl": ".",
     "paths": {
       "@/packages/agent/*": ["./src/*"],
+      "@/packages/agent-protocol": ["../agent-protocol/src/index.ts"],
+      "@/packages/agent-protocol/*": ["../agent-protocol/src/*"],
       "@/packages/runtime-contracts": ["../runtime-contracts/src/index.ts"],
       "@/packages/runtime-contracts/*": ["../runtime-contracts/src/*"],
       "@/packages/services/log/*": ["../services/src/log/src/*"]

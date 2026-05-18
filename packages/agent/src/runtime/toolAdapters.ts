@@ -1,4 +1,4 @@
-import type { ToolDefinition } from '@/packages/runtime-contracts'
+import type { ToolDefinition } from '@/packages/agent-protocol'
 
 /** Map a pi-ai / OpenAI-style tool descriptor into a serializable `ToolDefinition`. */
 export function piAiToolLikeToDefinition(tool: {

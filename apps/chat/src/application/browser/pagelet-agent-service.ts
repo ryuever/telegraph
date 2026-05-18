@@ -4,6 +4,7 @@ import {
   type ChatStreamEvent,
 } from '@/apps/chat/application/common'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
+import { isLegacyProjectionEvent, projectAgentEventToChat } from './agent-event-projector'
 
 const READY_ATTEMPTS = 40
 const READY_INTERVAL_MS = 500
@@ -62,7 +63,7 @@ export class PageletAgentService implements AgentService {
   private listeners = new Map<string, (event: ChatStreamEvent) => void>()
   private unsub: (() => void) | null = null
 
-  async send({ conversation, onChunk, onStatus, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
+  async send({ conversation, onChunk, onToolCall, onStatus, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
     const lastMessage = conversation.messages.filter(m => m.role === 'user').at(-1)
     if (!lastMessage) throw new Error('Last message must be from user')
 
@@ -91,9 +92,27 @@ export class PageletAgentService implements AgentService {
       },
     })
 
+    let sawAgentEvent = false
     const streamListener = (event: ChatStreamEvent) => {
       if (signal?.aborted) return
       if (event.runId !== runId) return
+
+      if (event.type === 'runtime_event' && event.event) {
+        sawAgentEvent = true
+        projectAgentEventToChat(event.event, {
+          sessionId: event.sessionId || conversation.id,
+          runId,
+          onChunk,
+          onToolCall,
+          onStatus,
+          onLlmTrace,
+        })
+        return
+      }
+
+      if (sawAgentEvent && isLegacyProjectionEvent(event.type)) {
+        return
+      }
 
       if (event.type === 'run_queued') {
         onStatus?.('queued')
@@ -110,15 +129,6 @@ export class PageletAgentService implements AgentService {
         const sid = event.sessionId || conversation.id
         if (event.trace) {
           onLlmTrace?.({ runId, sessionId: sid, trace: event.trace })
-        }
-      } else {
-        const sid = event.sessionId || conversation.id
-        if (event.event) {
-          onLlmTrace?.({
-            runId,
-            sessionId: sid,
-            trace: { kind: 'runtime_event', event: event.event },
-          })
         }
       }
     }

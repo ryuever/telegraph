@@ -1,4 +1,4 @@
-import type { RuntimeSettings } from '@/packages/runtime-contracts'
+import type { RuntimeSettings } from '@/packages/agent-protocol'
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime'
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime'
 import { createLangGraphRuntime } from '@/packages/agent/runtime/LangGraphRuntime'

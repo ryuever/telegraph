@@ -25,6 +25,8 @@
       "@/apps/shared/*": ["../shared/src/*"],
       "@/apps/connection/*": ["../connection/src/*"],
       "@/packages/ui/*": ["../../packages/ui/src/*"],
+      "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
+      "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
       "@/packages/runtime-contracts": ["../../packages/runtime-contracts/src/index.ts"],
       "@/packages/runtime-contracts/*": ["../../packages/runtime-contracts/src/*"]
     }

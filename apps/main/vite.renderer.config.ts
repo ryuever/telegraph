@@ -19,6 +19,7 @@ export default defineConfig(({ command }) => ({
       '@/apps/design': resolve(__dirname, '../design/src'),
       '@/apps/chat': resolve(__dirname, '../chat/src'),
       '@/packages/stores': resolve(__dirname, '../../packages/stores/src/index.ts'),
+      '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
       '@/packages/runtime-contracts': resolve(__dirname, '../../packages/runtime-contracts/src/index.ts'),
       '@/packages/ui/useOrchestratorDashboard': resolve(__dirname, '../../packages/ui/src/hooks/useOrchestratorDashboard.ts'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),

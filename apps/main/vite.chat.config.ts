@@ -18,6 +18,7 @@ export default defineConfig({
       '@/apps/daemon': resolve(__dirname, '../daemon/src'),
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
+      '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
       '@/packages/runtime-contracts': resolve(__dirname, '../../packages/runtime-contracts/src/index.ts'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
     },

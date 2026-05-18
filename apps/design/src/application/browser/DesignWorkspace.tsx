@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
+import type { DesignProjectedArtifact } from './design-agent-projector'
+import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -13,22 +15,60 @@ interface DesignWorkspaceProps {
 }
 
 export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.Element {
+  const sessionId = useMemo(() => globalThis.crypto.randomUUID(), [])
+  const agent = useMemo(() => new PageletDesignAgentService(), [])
+  const initialRunStarted = useRef(false)
   const [messages, setMessages] = useState<Message[]>([
     { role: 'user', content: initialPrompt },
-    { role: 'assistant', content: '正在生成界面...\n\n这里将展示 AI 的回复内容，包括生成过程的说明和代码。' },
+    { role: 'assistant', content: '' },
   ])
   const [input, setInput] = useState('')
+  const [status, setStatus] = useState<'running' | 'completed' | 'failed'>('running')
+  const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>([])
+
+  const appendAssistantText = (text: string): void => {
+    setMessages((prev) => {
+      const next = [...prev]
+      const last = next.at(-1)
+      if (last?.role === 'assistant') {
+        next[next.length - 1] = { ...last, content: `${last.content}${text}` }
+        return next
+      }
+      return [...next, { role: 'assistant', content: text }]
+    })
+  }
+
+  const runAgent = (prompt: string, context?: Record<string, unknown>): void => {
+    const abortController = new AbortController()
+    setStatus('running')
+    void agent.send({
+      prompt,
+      sessionId,
+      context,
+      signal: abortController.signal,
+      onStatus: nextStatus => { setStatus(nextStatus) },
+      onAssistantText: appendAssistantText,
+      onArtifact: artifact => {
+        setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
+      },
+    }).catch((error: unknown) => {
+      setStatus('failed')
+      appendAssistantText(`\n${error instanceof Error ? error.message : String(error)}`)
+    })
+  }
+
+  useEffect(() => {
+    if (initialRunStarted.current) return
+    initialRunStarted.current = true
+    runAgent(initialPrompt, { surface: 'design-workspace', initial: true })
+  }, [initialPrompt])
 
   const handleSend = () => {
     if (!input.trim()) return
-    setMessages((prev) => [...prev, { role: 'user', content: input.trim() }])
+    const prompt = input.trim()
+    setMessages((prev) => [...prev, { role: 'user', content: prompt }, { role: 'assistant', content: '' }])
     setInput('')
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: '已收到你的追问，正在调整...' },
-      ])
-    }, 500)
+    runAgent(prompt, { surface: 'design-workspace', artifactCount: artifacts.length })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
@@ -55,7 +95,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
                     : 'text-sm text-foreground whitespace-pre-wrap'
                 }
               >
-                {msg.content}
+                {msg.content || (msg.role === 'assistant' && status === 'running' ? '正在生成...' : '')}
               </div>
             </div>
           ))}
@@ -88,17 +128,41 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
             </button>
           </div>
           <div className="flex items-center gap-2">
+            <span className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+              {status}
+            </span>
             <button className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
               ↗ 新窗口
             </button>
           </div>
         </div>
         <div className="flex flex-1 items-center justify-center bg-background p-8">
-          <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-            <p className="text-center text-sm text-muted-foreground">
-              生成的界面将在这里预览
-            </p>
-          </div>
+          {artifacts.length > 0 ? (
+            <div className="w-full max-w-3xl space-y-3">
+              {artifacts.map(artifact => (
+                <div key={artifact.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-foreground">{artifact.title ?? artifact.id}</div>
+                      <div className="text-xs text-muted-foreground">{artifact.kind}</div>
+                    </div>
+                    <span className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                      {artifact.sourceEventType}
+                    </span>
+                  </div>
+                  <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-3 text-xs text-muted-foreground">
+                    {JSON.stringify(artifact.output, null, 2)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
+              <p className="text-center text-sm text-muted-foreground">
+                生成的界面将在这里预览
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

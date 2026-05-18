@@ -10,10 +10,13 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "lib": ["ES2022"],
-    "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@/packages/runtime-contracts/*": ["./src/*"]
+      "@/packages/runtime-contracts/*": ["./src/*"],
+      "@/packages/agent-protocol": ["../agent-protocol/src/index.ts"],
+      "@/packages/agent-protocol/*": ["../agent-protocol/src/*"],
+      "@telegraph/agent-protocol": ["../agent-protocol/src/index.ts"],
+      "@telegraph/agent-protocol/*": ["../agent-protocol/src/*"]
     }
   },
   "include": ["src/**/*.ts"]

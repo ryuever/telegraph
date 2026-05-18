@@ -159,6 +159,10 @@ export const wikiSidebar = {
         {
           "text": "P-003 Port Management → ConnectionOrchestrator 迁移计划（design 先行）",
           "link": "/roadmap/20260508-port-management-orchestrator-migration-plan"
+        },
+        {
+          "text": "P-004 Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划",
+          "link": "/roadmap/20260518-agent-protocol-pagelet-harness-plan"
         }
       ]
     }

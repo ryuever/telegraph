@@ -3,7 +3,7 @@
  * Manages message history, run records, and execution state.
  */
 
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/agent-protocol'
 import { createLogger } from '@/packages/services/log/node/logger'
 const logger = createLogger('agent')
 

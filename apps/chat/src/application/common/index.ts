@@ -1,5 +1,5 @@
 import { createId } from '@x-oasis/di'
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import type { AgentEvent } from '@/packages/agent-protocol'
 
 export const CHAT_PAGELET_SERVICE_PATH = 'chat-pagelet-api'
 
@@ -34,7 +34,7 @@ export interface ChatStreamEvent {
   text?: string
   error?: string
   trace?: LlmTracePayload
-  event?: RuntimeEvent
+  event?: AgentEvent
 }
 
 export interface ChatSendRequest {
@@ -95,7 +95,7 @@ export type LlmTracePayload =
     }
   | {
       kind: 'runtime_event'
-      event: RuntimeEvent
+      event: AgentEvent
     }
 
 // ---------------------------------------------------------------------------

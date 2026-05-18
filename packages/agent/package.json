@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./providers/*": "./src/providers/*.ts",
     "./backends/*": "./src/backends/*.ts",
+    "./harness": "./src/harness/index.ts",
     "./harness/*": "./src/harness/*.ts",
     "./extensions/node": "./src/extensions/node/index.ts",
     "./extensions/ExtensionManifest": "./src/extensions/ExtensionManifest.ts",
@@ -21,7 +22,7 @@
   },
   "dependencies": {
     "@mariozechner/pi-ai": "^0.72.1",
-    "@telegraph/runtime-contracts": "workspace:*"
+    "@telegraph/agent-protocol": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

@@ -18,6 +18,8 @@ export default defineConfig({
       '@/apps/daemon': resolve(__dirname, '../daemon/src'),
       '@/apps/shared': resolve(__dirname, '../shared/src'),
       '@/apps/main': resolve(__dirname, 'src'),
+      '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
+      '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
     },
   },

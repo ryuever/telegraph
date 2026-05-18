@@ -4,8 +4,8 @@
  * Tests the pi-ai runtime executor implementation.
  */
 import { PiAiRuntime } from '../PiAiRuntime'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
+import type { RuntimeEvent } from '@/packages/agent-protocol'
 
 // Simple assertion helpers
 function assertEqual(actual: any, expected: any, message?: string) {

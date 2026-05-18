@@ -11,8 +11,9 @@ import {
 } from '@/apps/chat/application/common';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
-import type { RuntimeExecutor } from '@/packages/agent/runtime/AgentRuntime';
-import type { RuntimeEvent } from '@/packages/runtime-contracts';
+import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
+import { createAgentHarness } from '@/packages/agent/harness';
+import type { AgentEvent, AgentRunRequest } from '@/packages/agent-protocol';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
 
@@ -24,6 +25,14 @@ const activeRuns = new Map<string, AbortController>();
 @injectable()
 export class ChatPageletWorker extends PageletWorker {
   private streamListeners = new Set<(event: ChatStreamEvent) => void>();
+  private readonly agentHarness = createAgentHarness({
+    defaultRuntimeId: 'pi-ai',
+    runtimes: [
+      { id: 'pi-ai', create: () => new PiAiRuntime() },
+      { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
+      { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
+    ],
+  });
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -71,23 +80,8 @@ export class ChatPageletWorker extends PageletWorker {
   }
 
   /**
-   * Create a RuntimeExecutor from settings.
-   * Uses direct imports instead of createRuntime() to avoid the dynamic
-   * require('@/packages/...') in createRuntime.ts that Vite cannot rewrite
-   * at build time — that require causes MODULE_NOT_FOUND at runtime and
-   * crashes the worker process.
-   */
-  private createExecutor(backend: string): RuntimeExecutor {
-    if (backend === 'pi-embedded') {
-      return new PiEmbeddedRuntime()
-    }
-    // Default: pi-ai
-    return new PiAiRuntime()
-  }
-
-  /**
-   * Core agent execution: create a RuntimeExecutor from settings,
-   * stream RuntimeEvents, and forward them as ChatStreamEvents.
+   * Core agent execution: run through the pagelet-local AgentHarness,
+   * stream AgentEvents, and forward compatibility ChatStreamEvents.
    */
   private async handleSend(req: ChatSendRequest): Promise<ChatSendResult> {
     const { runId, sessionId, message, settings } = req;
@@ -98,21 +92,27 @@ export class ChatPageletWorker extends PageletWorker {
     this.emitStreamEvent({ type: 'run_queued', runId });
 
     try {
-      const executor = this.createExecutor(settings.backend ?? 'pi-ai');
       this.emitStreamEvent({ type: 'run_started', runId });
 
-      const runtimeEvents = executor.run({
+      const agentRequest: AgentRunRequest = {
         runId,
         sessionId,
-        message,
+        messages: [
+          {
+            id: `${runId}-user`,
+            role: 'user',
+            content: message,
+          },
+        ],
         settings,
-        signal: abortController.signal,
-      });
+      };
 
-      for await (const ev of runtimeEvents) {
+      for await (const ev of this.agentHarness.run(agentRequest, { signal: abortController.signal })) {
         if (abortController.signal.aborted) break;
 
-        const chatEvent = this.runtimeEventToChatStream(ev, runId, sessionId);
+        this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event: ev });
+
+        const chatEvent = this.agentEventToLegacyChatStream(ev, runId, sessionId);
         if (chatEvent) {
           this.emitStreamEvent(chatEvent);
         }
@@ -135,10 +135,10 @@ export class ChatPageletWorker extends PageletWorker {
   }
 
   /**
-   * Map a RuntimeEvent to a ChatStreamEvent for the renderer.
+   * Map an AgentEvent to a legacy ChatStreamEvent for the current renderer UI.
    */
-  private runtimeEventToChatStream(
-    ev: RuntimeEvent,
+  private agentEventToLegacyChatStream(
+    ev: AgentEvent,
     runId: string,
     sessionId?: string,
   ): ChatStreamEvent | null {
@@ -165,9 +165,9 @@ export class ChatPageletWorker extends PageletWorker {
       case 'run_cancelled':
         return { type: 'run_failed', runId, sessionId, error: 'Cancelled' };
 
-      // All other events forwarded as runtime_event for trace
+      // All events are already forwarded as runtime_event before legacy projection.
       default:
-        return { type: 'runtime_event', runId, sessionId, event: ev };
+        return null;
     }
   }
 }

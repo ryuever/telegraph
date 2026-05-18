@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { cn } from '@/packages/ui/lib/utils'
-import type { LlmTracePayload } from '@/apps/chat/application/common'
 import type { LlmTraceRow } from '../llm-trace-store'
+import {
+  buildTraceTimeline,
+  formatTraceJson,
+  runtimeEventForRow,
+  shortId,
+  statusClass,
+  type TimelineStatus,
+} from '../trace-timeline'
 
 export type { LlmTraceRow }
-
-function formatJson(trace: LlmTracePayload): string {
-  try {
-    return JSON.stringify(trace, null, 2)
-  } catch {
-    return JSON.stringify(trace)
-  }
-}
 
 function runtimeEventBadgeClass(eventType: string): string {
   if (eventType.startsWith('run_')) return 'bg-fuchsia-500/15 text-fuchsia-200'
@@ -20,6 +19,106 @@ function runtimeEventBadgeClass(eventType: string): string {
   if (eventType.startsWith('step_') || eventType.includes('child_run')) return 'bg-lime-500/15 text-lime-200'
   if (eventType === 'runtime_log') return 'bg-zinc-600/40 text-zinc-300'
   return 'bg-slate-500/15 text-slate-200'
+}
+
+function TraceRowItem({
+  row,
+  rowIndex,
+  scopeAllChats,
+}: {
+  row: LlmTraceRow
+  rowIndex: number
+  scopeAllChats: boolean
+}) {
+  const trace = row.trace
+  const event = runtimeEventForRow(row)
+  const eventType = event?.type ?? ''
+
+  return (
+    <li
+      className="rounded-md border border-zinc-800/80 bg-zinc-900/35 p-2"
+      key={`${row.sessionId}-${row.runId}-${String(row.ts)}-${String(rowIndex)}`}
+    >
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+        <span
+          className={cn(
+            'rounded px-1.5 py-0.5 font-mono text-[10px] uppercase',
+            !event && trace.kind === 'telegraph_turn_context' && 'bg-violet-500/15 text-violet-200',
+            !event && trace.kind === 'pi_cli_request' && 'bg-sky-500/15 text-sky-200',
+            !event && trace.kind === 'pi_json_line' && 'bg-emerald-500/15 text-emerald-200',
+            !event && trace.kind === 'pi_ai_request' && 'bg-amber-500/15 text-amber-200',
+            !event && trace.kind === 'pi_ai_stream_event' && 'bg-orange-500/15 text-orange-200',
+            event && runtimeEventBadgeClass(eventType)
+          )}
+        >
+          {event ? eventType || 'runtime_event' : trace.kind}
+        </span>
+        <span>{new Date(row.ts).toLocaleTimeString()}</span>
+        {scopeAllChats && (
+          <span className="rounded bg-zinc-800/90 px-1 font-mono text-[9px] text-zinc-400">
+            {row.sessionId.slice(0, 12)}
+            {row.sessionId.length > 12 ? '...' : ''}
+          </span>
+        )}
+      </div>
+      <details className="group">
+        <summary className="cursor-pointer select-none text-[10px] text-zinc-500 group-open:mb-1 hover:text-zinc-300">
+          Payload
+        </summary>
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded border border-zinc-800/60 bg-zinc-950/80 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-300">
+          {formatTraceJson(trace)}
+        </pre>
+      </details>
+    </li>
+  )
+}
+
+function TraceEventList({
+  rows,
+  scopeAllChats,
+}: {
+  rows: LlmTraceRow[]
+  scopeAllChats: boolean
+}) {
+  if (rows.length === 0) return null
+  return (
+    <ul className="flex flex-col gap-2">
+      {rows.map((row, i) => (
+        <TraceRowItem
+          key={`${row.sessionId}-${row.runId}-${String(row.ts)}-${String(i)}`}
+          row={row}
+          rowIndex={i}
+          scopeAllChats={scopeAllChats}
+        />
+      ))}
+    </ul>
+  )
+}
+
+function TraceNodeSection({
+  title,
+  subtitle,
+  status,
+  rows,
+  scopeAllChats,
+}: {
+  title: string
+  subtitle?: string
+  status: TimelineStatus
+  rows: LlmTraceRow[]
+  scopeAllChats: boolean
+}) {
+  return (
+    <section className="border-l border-zinc-800/80 pl-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-medium text-zinc-200">{title}</span>
+        {subtitle && <span className="font-mono text-[10px] text-zinc-500">{subtitle}</span>}
+        <span className={cn('rounded px-1.5 py-0.5 text-[9px] uppercase', statusClass(status))}>{status}</span>
+        <span className="text-[10px] text-zinc-500">{rows.length} event{rows.length === 1 ? '' : 's'}</span>
+      </div>
+      <TraceEventList rows={rows} scopeAllChats={scopeAllChats} />
+    </section>
+  )
 }
 
 export function LlmTracePanel({
@@ -47,15 +146,7 @@ export function LlmTracePanel({
     el.scrollTop = el.scrollHeight
   }, [rows.length, open])
 
-  const rowsByRun = useMemo(() => {
-    const m = new Map<string, LlmTraceRow[]>()
-    for (const r of rows) {
-      const list = m.get(r.runId) ?? []
-      list.push(r)
-      m.set(r.runId, list)
-    }
-    return m
-  }, [rows])
+  const timelineRuns = useMemo(() => buildTraceTimeline(rows), [rows])
 
   return (
     <aside
@@ -122,56 +213,47 @@ export function LlmTracePanel({
           )
         ) : (
           <ul className="flex flex-col gap-4">
-            {[...rowsByRun.entries()].map(([runId, runRows]) => (
-              <li key={runId} className="rounded-lg border border-zinc-800/70 bg-zinc-950/30 p-2">
-                <div className="mb-2 flex flex-wrap items-baseline gap-2 border-b border-zinc-800/60 pb-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Run</span>
-                  <span className="font-mono text-[11px] text-zinc-200">{runId.slice(0, 10)}…</span>
-                  <span className="text-[10px] text-zinc-500">{runRows.length} row{runRows.length === 1 ? '' : 's'}</span>
+            {timelineRuns.map(run => (
+              <li key={run.id} className="rounded-lg border border-zinc-800/70 bg-zinc-950/30 p-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-zinc-800/60 pb-1.5">
+                  <span className="text-[10px] font-semibold uppercase text-zinc-400">Root run</span>
+                  <span className="font-mono text-[11px] text-zinc-200">{shortId(run.id)}</span>
+                  <span className={cn('rounded px-1.5 py-0.5 text-[9px] uppercase', statusClass(run.status))}>
+                    {run.status}
+                  </span>
+                  {run.pattern && (
+                    <span className="rounded bg-zinc-800/90 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
+                      {run.pattern}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-zinc-500">
+                    {run.childRuns.length} child / {run.steps.length} step / {run.rows.length} event
+                    {run.rows.length === 1 ? '' : 's'}
+                  </span>
                 </div>
-                <ul className="flex flex-col gap-2">
-                  {runRows.map((row, i) => {
-                    const tr = row.trace
-                    const isContract = tr.kind === 'runtime_event'
-                    let evType = ''
-                    if (isContract) {
-                      const ev = (tr as { kind: 'runtime_event'; event: { type?: string } }).event
-                      evType = typeof ev.type === 'string' ? ev.type : ''
-                    }
-                    return (
-                      <li
-                        key={`${row.sessionId}-${row.runId}-${String(row.ts)}-${String(i)}`}
-                        className="rounded-md border border-zinc-800/80 bg-zinc-900/40 p-2"
-                      >
-                        <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
-                          <span
-                            className={cn(
-                              'rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide',
-                              !isContract && row.trace.kind === 'telegraph_turn_context' && 'bg-violet-500/15 text-violet-200',
-                              !isContract && row.trace.kind === 'pi_cli_request' && 'bg-sky-500/15 text-sky-200',
-                              !isContract && row.trace.kind === 'pi_json_line' && 'bg-emerald-500/15 text-emerald-200',
-                              !isContract && row.trace.kind === 'pi_ai_request' && 'bg-amber-500/15 text-amber-200',
-                              !isContract && row.trace.kind === 'pi_ai_stream_event' && 'bg-orange-500/15 text-orange-200',
-                              isContract && runtimeEventBadgeClass(evType)
-                            )}
-                          >
-                            {isContract ? evType || 'runtime_event' : row.trace.kind}
-                          </span>
-                          <span>{new Date(row.ts).toLocaleTimeString()}</span>
-                          {scopeAllChats && (
-                            <span className="rounded bg-zinc-800/90 px-1 font-mono text-[9px] text-zinc-400">
-                              {row.sessionId.slice(0, 12)}
-                              {row.sessionId.length > 12 ? '…' : ''}
-                            </span>
-                          )}
-                        </div>
-                        <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded border border-zinc-800/60 bg-zinc-950/80 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-300">
-                          {formatJson(row.trace)}
-                        </pre>
-                      </li>
-                    )
-                  })}
-                </ul>
+                <div className="flex flex-col gap-3">
+                  <TraceEventList rows={run.directRows} scopeAllChats={scopeAllChats} />
+                  {run.childRuns.map(childRun => (
+                    <TraceNodeSection
+                      key={childRun.id}
+                      title={childRun.label}
+                      subtitle={shortId(childRun.id)}
+                      status={childRun.status}
+                      rows={childRun.rows}
+                      scopeAllChats={scopeAllChats}
+                    />
+                  ))}
+                  {run.steps.map(step => (
+                    <TraceNodeSection
+                      key={step.id}
+                      title={step.label}
+                      subtitle={step.kind ? `${step.kind} / ${shortId(step.id)}` : shortId(step.id)}
+                      status={step.status}
+                      rows={step.rows}
+                      scopeAllChats={scopeAllChats}
+                    />
+                  ))}
+                </div>
               </li>
             ))}
           </ul>

@@ -14,8 +14,8 @@
  * - Terminal states (end node or max iterations) trigger run_completed or run_failed
  */
 
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/agent-protocol'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { BaseAgentRuntime, type RuntimeInput } from './AgentRuntime'
 import type { Session } from './sessionManagement/Session'
 import { SessionStore } from './sessionManagement/SessionStore'

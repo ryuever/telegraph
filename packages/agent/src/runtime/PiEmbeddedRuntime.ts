@@ -11,8 +11,8 @@
  * For now, this extends the Phase 1 pi-ai streaming without tool execution.
  */
 
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/agent-protocol'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { BaseAgentRuntime, type RuntimeInput } from './AgentRuntime'
 import { streamPiAiRuntimeEvents, TELEGRAPH_PI_AI_PRODUCER_VERSION } from './streamPiAiRuntime'
 import type { Session } from './sessionManagement/Session'

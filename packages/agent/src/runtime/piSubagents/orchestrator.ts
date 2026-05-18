@@ -10,8 +10,8 @@
  * `step_started/completed`, and all model/tool events from each child.
  */
 
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/agent-protocol'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { streamPiAiRuntimeEvents } from '../streamPiAiRuntime'
 import type { AgentRuntimeSettings } from '../../types'
 import type {

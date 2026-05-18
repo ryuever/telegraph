@@ -1,7 +1,7 @@
 import { stream } from '@mariozechner/pi-ai'
 import type { Context, Message } from '@mariozechner/pi-ai'
-import type { RuntimeEvent } from '@/packages/runtime-contracts'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+import type { RuntimeEvent } from '@/packages/agent-protocol'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { resolveModel } from '@/packages/agent/providers/index'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 

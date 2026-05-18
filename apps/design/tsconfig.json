@@ -22,6 +22,9 @@
       "@/apps/daemon/*": ["../daemon/src/*"],
       "@/apps/shared/*": ["../shared/src/*"],
       "@/apps/main/*": ["../main/src/*"],
+      "@/packages/agent/*": ["../../packages/agent/src/*"],
+      "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
+      "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
       "@/packages/ui/*": ["../../packages/ui/src/*"]
     }
   },

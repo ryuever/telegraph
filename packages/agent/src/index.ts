@@ -22,13 +22,16 @@ export type {
   ModelDescriptor,
 } from '@/packages/agent/types'
 export type {
+  AgentEvent,
+  AgentRunEventEnvelope,
+  AgentRunRequest,
   AgentRuntime,
   RunInput,
   RuntimeEvent,
   RuntimeSettings,
   ToolDefinition,
-} from '@/packages/runtime-contracts'
-export { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/runtime-contracts'
+} from '@/packages/agent-protocol'
+export { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 export {
   streamPiAiRuntimeEvents,
   TELEGRAPH_PI_AI_PRODUCER_VERSION,
@@ -49,6 +52,13 @@ export {
   type LangGraphConfig,
 } from '@/packages/agent/runtime/LangGraphRuntime'
 export {
+  TELEGRAPH_ORCHESTRATOR_PRODUCER_VERSION,
+  TelegraphOrchestratorRuntime,
+  type TelegraphOrchestratorRunner,
+  type TelegraphOrchestratorRuntimeOptions,
+  type TelegraphOrchestratorSignal,
+} from '@/packages/agent/runtime/TelegraphOrchestratorRuntime'
+export {
   VercelAiRuntime,
   TELEGRAPH_VERCEL_AI_PRODUCER_VERSION,
   createVercelAiRuntime,
@@ -58,6 +68,39 @@ export {
   createRuntime,
   createPiAiRuntime,
 } from '@/packages/agent/runtime/createRuntime'
+export {
+  RuntimeRegistry,
+  createAgentHarness,
+  isAgentEvent,
+  isTerminalAgentEvent,
+  selectRuntimeId,
+  validateAgentEvent,
+  type AgentHarness,
+  type AgentHarnessOptions,
+  type AgentRunOptions,
+  type AgentRuntimeFactory,
+  type AgentTraceSink,
+  type RuntimeRegistration,
+} from '@/packages/agent/harness'
+export {
+  runRuntimeConformance,
+  validateRuntimeEventConformance,
+  type RuntimeConformanceIssue,
+  type RuntimeConformanceReport,
+} from '@/packages/agent/runtime/conformance'
+export {
+  createCheckpointEvent,
+  createEdgeTakenEvent,
+  createInterruptEvent,
+  createNodeCompletedEvent,
+  createNodeStartedEvent,
+  type CheckpointHookInput,
+  type EdgeTakenHookInput,
+  type InterruptHookInput,
+  type NodeCompletedHookInput,
+  type NodeHookInput,
+  type OrchestratorHookBase,
+} from '@/packages/agent/runtime/observability/orchestratorObservability'
 export { Session, type Message, type RunRecord, type ExecutionContext } from '@/packages/agent/runtime/sessionManagement/Session'
 export { SessionStore, type SessionStoreConfig } from '@/packages/agent/runtime/sessionManagement/SessionStore'
 export { ToolRegistry, type ToolCallEvent, type ToolResultEvent, type ToolParameter, type ToolParameters } from '@/packages/agent/runtime/toolExecution/ToolRegistry'
