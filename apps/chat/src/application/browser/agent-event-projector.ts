@@ -17,6 +17,10 @@ export function projectAgentEventToChat(event: AgentEvent, handlers: ChatAgentEv
     trace: { kind: 'runtime_event', event },
   })
 
+  if (!belongsToProjectedRun(event, handlers.runId)) {
+    return
+  }
+
   switch (event.type) {
     case 'run_started':
       handlers.onStatus?.('running')
@@ -66,6 +70,13 @@ export function projectAgentEventToChat(event: AgentEvent, handlers: ChatAgentEv
     default:
       return
   }
+}
+
+function belongsToProjectedRun(event: AgentEvent, runId: string): boolean {
+  if ('runId' in event && typeof event.runId === 'string') {
+    return event.runId === runId
+  }
+  return true
 }
 
 export function isLegacyProjectionEvent(type: string): boolean {

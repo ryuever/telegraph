@@ -2,7 +2,7 @@
  * Agent discovery for pi-subagents.
  *
  * Discovers agent definitions from three scopes (lowest → highest priority):
- * 1. Builtin: bundled with pi-subagents npm package
+ * 1. Builtin: Telegraph fallback agents + bundled pi-subagents package agents
  * 2. User:    ~/.pi/agent/agents/**\/*.md
  * 3. Project: .pi/agents/**\/*.md (and legacy .agents/**\/*.md)
  *
@@ -14,6 +14,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { parseAgentFile } from './agentParser'
 import type { SubagentDefinition, SubagentScope } from './types'
+import { createTelegraphBuiltinAgents } from './builtinAgents'
 
 // ---------------------------------------------------------------------------
 // Discovery options
@@ -109,10 +110,12 @@ function runtimeName(agent: SubagentDefinition): string {
 }
 
 function loadBuiltinAgents(piSubagentsRoot?: string): SubagentDefinition[] {
+  const agents = createTelegraphBuiltinAgents()
   const root = piSubagentsRoot ?? resolvePiSubagentsPackageRoot()
-  if (!root) return []
+  if (!root) return agents
   const agentsDir = join(root, 'agents')
-  return scanDirectory(agentsDir, 'builtin')
+  agents.push(...scanDirectory(agentsDir, 'builtin'))
+  return agents
 }
 
 function resolvePiSubagentsPackageRoot(): string | null {

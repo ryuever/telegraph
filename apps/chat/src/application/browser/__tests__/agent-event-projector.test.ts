@@ -121,6 +121,35 @@ describe('projectAgentEventToChat', () => {
     expect(project(cancelled).statuses).toEqual(['failed'])
   })
 
+  it('keeps child-run text and status out of the main chat projection', () => {
+    const childDelta: AgentEvent = {
+      type: 'assistant_delta',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1-child',
+      requestId: 'request-child',
+      text: 'intermediate child output',
+      ts: 1,
+    }
+    const childFailed: AgentEvent = {
+      type: 'run_failed',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1-child',
+      error: { code: 'child_failed', message: 'Child failed' },
+      ts: 2,
+    }
+
+    expect(project(childDelta)).toMatchObject({
+      chunks: [],
+      statuses: [],
+      traces: [{ kind: 'runtime_event', event: childDelta }],
+    })
+    expect(project(childFailed)).toMatchObject({
+      chunks: [],
+      statuses: [],
+      traces: [{ kind: 'runtime_event', event: childFailed }],
+    })
+  })
+
   it('keeps orchestrator step and edge events visible in the trace stream', () => {
     const step: AgentEvent = {
       type: 'step_started',

@@ -30,6 +30,10 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
     // Determine orchestration pattern from settings
     const agentSettings = settings as AgentRuntimeSettings
     const pattern = agentSettings.orchestrationPattern ?? 'chain'
+    const origin = {
+      framework: 'pi' as const,
+      runtimeId: 'pi-subagents-embedded',
+    }
 
     // Emit run_started
     yield {
@@ -39,15 +43,30 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
       runId,
       ts: Date.now(),
       pattern: pattern === 'parallel' ? 'parallelization' : 'prompt_chain',
-      origin: {
-        framework: 'pi',
-        runtimeId: 'pi-subagents-embedded',
-      },
+      origin,
     } as RuntimeEvent
 
     try {
+      if (agentSettings.extensionBlocklist?.includes('pi-subagents')) {
+        yield {
+          type: 'run_failed',
+          schemaVersion: SV,
+          producerVersion: PV,
+          origin,
+          runId,
+          error: {
+            code: 'pi_subagents_blocked',
+            message: 'pi-subagents orchestration is blocked for this run',
+          },
+          ts: Date.now(),
+        } as RuntimeEvent
+        return
+      }
+
       // Parse the orchestration input from the user message + settings
       const orchInput = parseOrchestratorInput(message, pattern)
+      let childFailure: Extract<RuntimeEvent, { type: 'run_failed' }> | undefined
+      const childOutputs: string[] = []
 
       // Run the orchestrator
       for await (const ev of orchestrate(orchInput, {
@@ -58,10 +77,55 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
       })) {
         yield ev
 
-        // If we got a terminal event from the orchestrator, stop
-        if (ev.type === 'run_failed' || ev.type === 'run_cancelled') {
+        if ((ev.type === 'run_failed' || ev.type === 'run_cancelled') && ev.runId === runId) {
           return
         }
+
+        if (ev.type === 'run_failed' && ev.runId !== runId && !childFailure) {
+          childFailure = ev
+        }
+
+        if (ev.type === 'child_run_completed' && ev.parentRunId === runId) {
+          const text = extractChildOutputText(ev.output)
+          if (text) {
+            childOutputs.push(text)
+          }
+        }
+      }
+
+      if (childFailure) {
+        yield {
+          type: 'run_failed',
+          schemaVersion: SV,
+          producerVersion: PV,
+          origin,
+          runId,
+          error: {
+            code: 'pi_subagents_child_failed',
+            message: childFailure.error.message,
+            details: {
+              childRunId: childFailure.runId,
+              childError: childFailure.error,
+            },
+          },
+          ts: Date.now(),
+        } as RuntimeEvent
+        return
+      }
+
+      const finalText = formatFinalOutput(orchInput.mode, childOutputs)
+      if (finalText) {
+        yield {
+          type: 'assistant_delta',
+          schemaVersion: SV,
+          producerVersion: PV,
+          origin,
+          runId,
+          requestId: this.generateRequestId(runId),
+          text: finalText,
+          ts: Date.now(),
+          raw: { source: 'pi-subagents-final-output', mode: orchInput.mode },
+        } as RuntimeEvent
       }
 
       // Emit run_completed
@@ -69,6 +133,7 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
         type: 'run_completed',
         schemaVersion: SV,
         producerVersion: PV,
+        origin,
         runId,
         output: { mode: orchInput.mode },
         ts: Date.now(),
@@ -78,16 +143,45 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
         type: 'run_failed',
         schemaVersion: SV,
         producerVersion: PV,
+        origin,
         runId,
         error: {
           code: 'pi_subagents_runtime_error',
           message: error instanceof Error ? error.message : String(error),
-          details: error,
+          details: normalizeErrorDetails(error),
         },
         ts: Date.now(),
       } as RuntimeEvent
     }
   }
+}
+
+function normalizeErrorDetails(error: unknown): unknown {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    }
+  }
+  return error
+}
+
+function extractChildOutputText(output: unknown): string | undefined {
+  if (typeof output === 'string') return output
+  if (!output || typeof output !== 'object') return undefined
+  const text = (output as { text?: unknown }).text
+  return typeof text === 'string' && text.length > 0 ? text : undefined
+}
+
+function formatFinalOutput(mode: SubagentOrchestratorInput['mode'], childOutputs: string[]): string {
+  if (childOutputs.length === 0) return ''
+  if (mode === 'parallel') {
+    return childOutputs
+      .map((text, index) => `=== Subagent ${index + 1} ===\n${text}`)
+      .join('\n\n')
+  }
+  return childOutputs[childOutputs.length - 1] ?? ''
 }
 
 // ---------------------------------------------------------------------------
