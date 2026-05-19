@@ -8,6 +8,8 @@ export interface IDesignPageletService {
   ping(now: number): Promise<{ pong: number; serverTime: number }>;
   sendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult>;
   cancelAgent(runId: string): Promise<boolean>;
+  previewArtifactPatch(request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult>;
+  applyArtifactPatch(request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult>;
   onAgentEvent(callback: (event: DesignAgentStreamEvent) => void): EventSubscription;
 }
 
@@ -26,6 +28,47 @@ export interface DesignAgentSendRequest {
 export interface DesignAgentSendResult {
   runId: string;
   status: 'completed' | 'failed';
+  error?: string;
+}
+
+export interface DesignPatchFileOperation {
+  path: string;
+  kind: 'add' | 'update' | 'delete';
+  content?: string;
+  expectedOriginal?: string;
+}
+
+export interface DesignPatchPreview {
+  operations: DesignPatchFileOperation[];
+  summary: {
+    adds: number;
+    updates: number;
+    deletes: number;
+  };
+}
+
+export interface DesignArtifactPatchRequest {
+  runId: string;
+  sessionId?: string;
+  artifactId: string;
+  settings: RuntimeSettings;
+  operations: DesignPatchFileOperation[];
+}
+
+export interface DesignArtifactPatchPreviewResult {
+  runId: string;
+  artifactId: string;
+  status: 'previewed' | 'failed';
+  preview?: DesignPatchPreview;
+  error?: string;
+}
+
+export interface DesignArtifactPatchApplyResult {
+  runId: string;
+  artifactId: string;
+  status: 'applied' | 'failed';
+  preview?: DesignPatchPreview;
+  applied?: boolean;
   error?: string;
 }
 

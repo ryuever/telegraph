@@ -8,9 +8,17 @@ import {
   type DesignAgentSendRequest,
   type DesignAgentSendResult,
   type DesignAgentStreamEvent,
+  type DesignArtifactPatchApplyResult,
+  type DesignArtifactPatchPreviewResult,
+  type DesignArtifactPatchRequest,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
-import { createAgentHarness, designCapabilities } from '@/packages/agent/harness';
+import { createAgentHarness } from '@/packages/agent/harness';
+import { PermissionBroker } from '@/packages/agent/harness/PermissionBroker';
+import {
+  createPageletRunCapabilities,
+  PermissionedNodePatchCapability,
+} from '@/packages/agent/harness/node';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
@@ -23,23 +31,6 @@ const activeAgentRuns = new Map<string, AbortController>();
 @injectable()
 export class DesignPageletWorker extends PageletWorker {
   private agentListeners = new Set<(event: DesignAgentStreamEvent) => void>();
-  private readonly agentHarness = createAgentHarness({
-    defaultRuntimeId: 'pi-ai',
-    runtimes: [
-      { id: 'pi-ai', create: () => new PiAiRuntime() },
-      { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
-      { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
-      { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
-    ],
-    capabilities: designCapabilities({
-      feedback: {
-        notify: input => {
-          if (!input.runId) return;
-          this.emitAgentEvent({ type: 'agent_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
-        },
-      },
-    }),
-  });
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -56,6 +47,10 @@ export class DesignPageletWorker extends PageletWorker {
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>
           Promise.resolve(this.cancelAgentRun(runId)),
+        previewArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult> =>
+          this.handlePreviewArtifactPatch(request),
+        applyArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult> =>
+          this.handleApplyArtifactPatch(request),
         onAgentEvent: (callback: (event: DesignAgentStreamEvent) => void): { unsubscribe: () => void } => {
           this.agentListeners.add(callback);
           return {
@@ -108,9 +103,34 @@ export class DesignPageletWorker extends PageletWorker {
         designContext: request.context ?? {},
       },
     };
+    const agentHarness = createAgentHarness({
+      defaultRuntimeId: 'pi-ai',
+      runtimes: [
+        { id: 'pi-ai', create: () => new PiAiRuntime() },
+        { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
+        { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
+        { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
+      ],
+      capabilities: createPageletRunCapabilities({
+        runId: request.runId,
+        sessionId,
+        pageletId: 'design',
+        pageletKind: 'design',
+        settings: request.settings,
+        feedback: {
+          notify: input => {
+            if (!input.runId) return;
+            this.emitAgentEvent({ type: 'agent_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
+          },
+        },
+        emit: event => {
+          this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
+        },
+      }),
+    });
 
     try {
-      for await (const event of this.agentHarness.run(agentRequest, { signal: abortController.signal })) {
+      for await (const event of agentHarness.run(agentRequest, { signal: abortController.signal })) {
         if (abortController.signal.aborted) break;
         this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
       }
@@ -133,6 +153,110 @@ export class DesignPageletWorker extends PageletWorker {
       this.emitAgentEvent({ type: 'run_failed', runId: request.runId, sessionId, error: message });
       return { runId: request.runId, status: 'failed', error: message };
     }
+  }
+
+  private async handlePreviewArtifactPatch(
+    request: DesignArtifactPatchRequest,
+  ): Promise<DesignArtifactPatchPreviewResult> {
+    try {
+      const patch = this.createDesignPatchCapability(request, false);
+      const preview = await patch.preview(request.operations);
+      return {
+        runId: request.runId,
+        artifactId: request.artifactId,
+        status: 'previewed',
+        preview,
+      };
+    } catch (error) {
+      return {
+        runId: request.runId,
+        artifactId: request.artifactId,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private async handleApplyArtifactPatch(
+    request: DesignArtifactPatchRequest,
+  ): Promise<DesignArtifactPatchApplyResult> {
+    try {
+      assertDesignPatchApplyAllowed(request);
+      const patch = this.createDesignPatchCapability(request, true);
+      const result = await patch.apply(request.operations);
+      return {
+        runId: request.runId,
+        artifactId: request.artifactId,
+        status: 'applied',
+        preview: {
+          operations: result.operations,
+          summary: result.summary,
+        },
+        applied: result.applied,
+      };
+    } catch (error) {
+      return {
+        runId: request.runId,
+        artifactId: request.artifactId,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private createDesignPatchCapability(
+    request: DesignArtifactPatchRequest,
+    userConfirmed: boolean,
+  ): PermissionedNodePatchCapability {
+    const taskProfile = request.settings.taskCapabilityProfile ?? { kind: 'default' as const };
+    const broker = new PermissionBroker({
+      prompt: () => userConfirmed,
+      emit: event => {
+        this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
+      },
+    });
+
+    return new PermissionedNodePatchCapability({
+      broker,
+      emit: event => {
+        this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
+      },
+      allowedRoots: [process.cwd()],
+      context: {
+        runId: request.runId,
+        sessionId: request.sessionId,
+        pageletId: 'design',
+        pageletKind: 'design',
+        taskProfile,
+        userIntent: {
+          summary: `Apply design artifact patch ${request.artifactId}`,
+          requestedCapabilities: ['filesystem'],
+        },
+        pageletPolicy: {
+          allowedCapabilities: ['filesystem'],
+        },
+        workspacePolicy: {
+          filesystem: {
+            readableScopes: ['workspace'],
+            writableScopes: ['workspace'],
+            autoGrantWrites: false,
+          },
+        },
+      },
+    });
+  }
+}
+
+function assertDesignPatchApplyAllowed(request: DesignArtifactPatchRequest): void {
+  const profile = request.settings.taskCapabilityProfile;
+  if (profile?.kind !== 'design-build') {
+    throw new Error('Artifact apply requires the design-build task capability profile');
+  }
+  if (profile.artifactPolicy !== 'apply-after-confirm') {
+    throw new Error('Artifact apply requires apply-after-confirm policy');
+  }
+  if (!profile.scopes.includes('repo:write')) {
+    throw new Error('Artifact apply requires repo:write scope');
   }
 }
 

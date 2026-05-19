@@ -2,7 +2,7 @@ import type { AgentEvent } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { describe, expect, it } from 'vitest'
 import type { LlmTraceRow } from '../llm-trace-store'
-import { buildTraceTimeline } from '../trace-timeline'
+import { buildTraceTimeline, traceRowSummary } from '../trace-timeline'
 
 function row(event: AgentEvent, index: number): LlmTraceRow {
   return {
@@ -109,5 +109,52 @@ describe('buildTraceTimeline', () => {
       kind: 'tool',
       status: 'completed',
     })
+  })
+
+  it('summarizes permission, exec, feedback, and hook trace rows', () => {
+    const events: AgentEvent[] = [
+      {
+        type: 'permission_requested',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'root-run',
+        permission: { type: 'shell', risk: 'medium' },
+        ts: 1,
+      },
+      {
+        type: 'tool_call',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        origin: { framework: 'telegraph', runtimeId: 'node-process-capability' },
+        runId: 'root-run',
+        callId: 'call-1',
+        toolName: 'bash',
+        input: { command: 'bash' },
+        ts: 2,
+      },
+      {
+        type: 'runtime_log',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'root-run',
+        level: 'debug',
+        message: 'Pi extension input hook transformed input',
+        raw: { source: 'pi-extension-compat', hook: 'input', action: 'transform' },
+        ts: 3,
+      },
+      {
+        type: 'runtime_log',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'root-run',
+        level: 'info',
+        message: 'Expanded inline commands',
+        raw: { source: 'pi-extension-compat' },
+        ts: 4,
+      },
+    ]
+
+    expect(events.map((event, index) => traceRowSummary(row(event, index)))).toEqual([
+      'Permission requested: shell:medium',
+      'Exec started: bash',
+      'Hook input transform: Pi extension input hook transformed input',
+      'Feedback (pi-extension-compat): Expanded inline commands',
+    ])
   })
 })

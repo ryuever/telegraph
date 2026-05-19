@@ -41,6 +41,58 @@ export function runtimeEventForRow(row: LlmTraceRow): AgentEvent | null {
   return row.trace.kind === 'runtime_event' ? row.trace.event : null
 }
 
+export function traceRowSummary(row: LlmTraceRow): string {
+  const event = runtimeEventForRow(row)
+  if (!event) return legacyTraceSummary(row.trace)
+
+  switch (event.type) {
+    case 'permission_requested':
+      return `Permission requested: ${permissionLabel(event.permission)}`
+    case 'permission_resolved':
+      return `Permission ${event.granted ? 'granted' : 'denied'}: ${permissionLabel(event.permission)}`
+    case 'tool_call':
+      return `${isExecEvent(event) ? 'Exec' : 'Tool'} started: ${event.toolName}`
+    case 'tool_result':
+      return `${isExecEvent(event) ? 'Exec' : 'Tool'} completed: ${event.toolName}`
+    case 'tool_error':
+      return `${isExecEvent(event) ? 'Exec' : 'Tool'} failed: ${event.toolName}`
+    case 'runtime_log':
+      return runtimeLogSummary(event)
+    case 'extension_activated':
+      return `Extension activated: ${event.extensionId}`
+    case 'extension_deactivated':
+      return `Extension deactivated: ${event.extensionId}`
+    case 'step_started':
+      return `Step started: ${event.label}`
+    case 'step_completed':
+      return `Step completed: ${shortId(event.stepId)}`
+    case 'edge_taken':
+      return `Edge taken: ${event.from} -> ${event.to}`
+    case 'child_run_started':
+      return `Child run started: ${event.label ?? shortId(event.childRunId)}`
+    case 'child_run_completed':
+      return `Child run completed: ${shortId(event.childRunId)}`
+    case 'assistant_delta':
+      return event.text ? `Assistant delta: ${compact(event.text)}` : 'Assistant delta'
+    case 'assistant_message':
+      return `Assistant message: ${compact(event.message.content)}`
+    case 'model_request':
+      return `Model request: ${event.requestId}`
+    case 'model_event':
+      return `Model event: ${event.requestId}`
+    case 'run_started':
+      return `Run started${event.pattern ? `: ${event.pattern}` : ''}`
+    case 'run_completed':
+      return 'Run completed'
+    case 'run_failed':
+      return `Run failed: ${event.error.message}`
+    case 'run_cancelled':
+      return `Run cancelled${event.reason ? `: ${event.reason}` : ''}`
+    default:
+      return event satisfies never
+  }
+}
+
 export function shortId(id: string): string {
   if (id.length <= 12) return id
   return `${id.slice(0, 10)}...`
@@ -78,6 +130,76 @@ function makeRun(runId: string): TraceTimelineRun {
     childRuns: [],
     steps: [],
   }
+}
+
+function legacyTraceSummary(trace: LlmTracePayload): string {
+  switch (trace.kind) {
+    case 'telegraph_turn_context':
+      return `Turn context: ${String(trace.messages.length)} message${trace.messages.length === 1 ? '' : 's'}`
+    case 'pi_cli_request':
+      return `Pi CLI request: ${compact(trace.userMessage)}`
+    case 'pi_json_line':
+      return 'Pi JSON line'
+    case 'pi_ai_request':
+      return `Pi AI request: ${String(trace.messages.length)} message${trace.messages.length === 1 ? '' : 's'}`
+    case 'pi_ai_stream_event':
+      return 'Pi AI stream event'
+    case 'runtime_event':
+      return traceRowSummary({
+        sessionId: '',
+        runId: '',
+        ts: 0,
+        trace,
+      })
+    default:
+      return trace satisfies never
+  }
+}
+
+function runtimeLogSummary(event: Extract<AgentEvent, { type: 'runtime_log' }>): string {
+  const source = rawStringField(event.raw, 'source')
+  const hook = rawStringField(event.raw, 'hook')
+  const action = rawStringField(event.raw, 'action')
+  if (source === 'pi-extension-compat' && hook) {
+    return `Hook ${hook}${action ? ` ${action}` : ''}: ${event.message}`
+  }
+  if (source) {
+    return `Feedback (${source}): ${event.message}`
+  }
+  return `Runtime ${event.level}: ${event.message}`
+}
+
+function rawStringField(raw: unknown, key: string): string | undefined {
+  if (!raw || typeof raw !== 'object' || !(key in raw)) return undefined
+  const value = raw[key as keyof typeof raw]
+  return typeof value === 'string' ? value : undefined
+}
+
+function permissionLabel(permission: Extract<AgentEvent, { type: 'permission_requested' }>['permission']): string {
+  switch (permission.type) {
+    case 'filesystem':
+      return `${permission.type}:${permission.scope}:${permission.access}`
+    case 'shell':
+      return `${permission.type}:${permission.risk}`
+    case 'network':
+      return `${permission.type}:${permission.hosts?.join(',') ?? '*'}`
+    case 'process':
+      return `${permission.type}:${permission.commands?.join(',') ?? '*'}`
+    case 'secrets':
+      return `${permission.type}:${permission.keys?.join(',') ?? '*'}`
+    default:
+      return permission satisfies never
+  }
+}
+
+function isExecEvent(event: Extract<AgentEvent, { type: 'tool_call' | 'tool_result' | 'tool_error' }>): boolean {
+  return event.origin?.runtimeId === 'node-process-capability'
+}
+
+function compact(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= 80) return normalized
+  return `${normalized.slice(0, 77)}...`
 }
 
 export function buildTraceTimeline(rows: LlmTraceRow[]): TraceTimelineRun[] {

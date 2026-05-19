@@ -169,7 +169,6 @@ function useOrchestratorDashboard(
     // Intentionally one-shot: api is captured via apiRef so it doesn't
     // need to be a dep, and re-subscribing on every render would defeat
     // the purpose of the cleanup.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onConnect = useCallback(() => {

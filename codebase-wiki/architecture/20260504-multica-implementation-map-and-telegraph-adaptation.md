@@ -7,7 +7,7 @@ description: >
   给出从「单会话 IPC」演进到任务队列、运行时隔离与事件总线的实现锚点与分阶段适配路径。
 category: architecture
 created: 2026-05-04
-updated: 2026-05-05
+updated: 2026-05-19
 tags:
   - multica
   - telegraph
@@ -36,6 +36,9 @@ references:
   - id: A-005
     rel: extended-by
     file: ./20260505-telegraph-agent-runtime-extension-host-theory.md
+  - id: D-014
+    rel: related-to
+    file: ../discussion/20260519-chat-agent-team-multica-strategy.md
 ---
 
 # Multica 源码实现映射与 Telegraph「类 Multica」能力适配路径

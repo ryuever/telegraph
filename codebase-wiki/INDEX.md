@@ -71,6 +71,7 @@ features:
 | D-011 | [20260517-chat-agent-runtime-integration.md](./discussion/20260517-chat-agent-runtime-integration.md) | Chat Agent Runtime 接入迁移文档 | 将 apps/chat 的 mock agent 能力替换为真实 agent runtime 执行（PiAiRuntime / PiEmbeddedRuntime / LangGraphRuntime / VercelAiRuntime），含端到端数据流设计、RuntimeEvent → ChatStreamEvent 映射表、实施步骤与风险分析。 |
 | D-012 | [20260517-telegraph-vs-open-design-agent-comparison.md](./discussion/20260517-telegraph-vs-open-design-agent-comparison.md) | Telegraph vs Open Design Agent 接入方式对比分析 | 深入分析 Open Design 的 CLI-Adapter 模式（spawn 外部 CLI 子进程 + per-format stdout parser）与 Telegraph 的 SDK-Embedded 模式（进程内 RuntimeExecutor）的核心差异，给出 12 维度对比表、CLI Adapter 实施工作量评估（~15 天）、关键决策分析（支持/反对/推荐混合模式）。 |
 | D-013 | [20260517-orchestrator-core-harness-control-feasibility.md](./discussion/20260517-orchestrator-core-harness-control-feasibility.md) | `@orchestrator/core` 作为 Harness Control 接入可行性分析 | 评估 langgraphjs/libs/orchestrator 零依赖 Pregel 图编排引擎接入 Telegraph 的可行性：5 个核心契合点（进程合规、API 桥接、HITL 映射、Checkpoint、Swarm）、4 个摩擦点与解决方案、三步集成策略、风险与架构合规性自检。 |
+| D-014 | [20260519-chat-agent-team-multica-strategy.md](./discussion/20260519-chat-agent-team-multica-strategy.md) | Chat Agent Team 与 Multica 差异化策略讨论归档 | 归档 Chat agent team / open source tools integration / Multica 竞品调研后的产品与架构结论：Telegraph 不应复制项目管理控制平面，而应做本地 agent runtime cockpit，围绕 Run、Trace、Permission、Handoff、Replay 与 Capability Matrix 建立差异化。 |
 
 ### issue/ — Issue 记录
 

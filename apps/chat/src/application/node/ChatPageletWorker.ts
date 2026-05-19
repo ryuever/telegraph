@@ -13,7 +13,8 @@ import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
-import { chatCapabilities, createAgentHarness } from '@/packages/agent/harness';
+import { createAgentHarness } from '@/packages/agent/harness';
+import { createPageletRunCapabilities } from '@/packages/agent/harness/node';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
@@ -26,23 +27,6 @@ const activeRuns = new Map<string, AbortController>();
 @injectable()
 export class ChatPageletWorker extends PageletWorker {
   private streamListeners = new Set<(event: ChatStreamEvent) => void>();
-  private readonly agentHarness = createAgentHarness({
-    defaultRuntimeId: 'pi-ai',
-    runtimes: [
-      { id: 'pi-ai', create: () => new PiAiRuntime() },
-      { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
-      { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
-      { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
-    ],
-    capabilities: chatCapabilities({
-      feedback: {
-        notify: input => {
-          if (!input.runId) return;
-          this.emitStreamEvent({ type: 'runtime_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
-        },
-      },
-    }),
-  });
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -118,8 +102,33 @@ export class ChatPageletWorker extends PageletWorker {
         ],
         settings,
       };
+      const agentHarness = createAgentHarness({
+        defaultRuntimeId: 'pi-ai',
+        runtimes: [
+          { id: 'pi-ai', create: () => new PiAiRuntime() },
+          { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
+          { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
+          { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
+        ],
+        capabilities: createPageletRunCapabilities({
+          runId,
+          sessionId,
+          pageletId: 'chat',
+          pageletKind: 'chat',
+          settings,
+          feedback: {
+            notify: input => {
+              if (!input.runId) return;
+              this.emitStreamEvent({ type: 'runtime_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
+            },
+          },
+          emit: event => {
+            this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event });
+          },
+        }),
+      });
 
-      for await (const ev of this.agentHarness.run(agentRequest, { signal: abortController.signal })) {
+      for await (const ev of agentHarness.run(agentRequest, { signal: abortController.signal })) {
         if (abortController.signal.aborted) break;
 
         this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event: ev });

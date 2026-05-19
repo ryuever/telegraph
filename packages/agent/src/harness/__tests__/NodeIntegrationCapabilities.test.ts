@@ -110,7 +110,7 @@ describe('node integration capabilities', () => {
   it('previews and applies structured patches through filesystem write permission', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'telegraph-patch-capability-'))
     const updateFile = join(dir, 'update.txt')
-    const addFile = join(dir, 'add.txt')
+    const addFile = join(dir, 'nested', 'add.txt')
     const deleteFile = join(dir, 'delete.txt')
     const events: AgentEvent[] = []
     const emit = (event: AgentEvent) => { events.push(event); }

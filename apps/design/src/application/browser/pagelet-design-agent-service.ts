@@ -1,5 +1,11 @@
 import type { RuntimeSettings } from '@/packages/agent-protocol'
-import type { DesignAgentSendRequest, DesignAgentStreamEvent } from '@/apps/design/application/common'
+import type {
+  DesignAgentSendRequest,
+  DesignAgentStreamEvent,
+  DesignArtifactPatchApplyResult,
+  DesignArtifactPatchPreviewResult,
+  DesignPatchFileOperation,
+} from '@/apps/design/application/common'
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getDesignPageletClient } from './getClient'
@@ -100,6 +106,42 @@ export class PageletDesignAgentService {
       options.onStatus?.(isCancelledError(error) ? 'cancelled' : 'failed')
       throw error
     }
+  }
+
+  async previewArtifactPatch(options: {
+    artifactId: string
+    operations: DesignPatchFileOperation[]
+    sessionId?: string
+    signal?: AbortSignal
+  }): Promise<DesignArtifactPatchPreviewResult> {
+    await waitForDesignPageletReady(options.signal)
+    throwIfAborted(options.signal)
+    const client = getDesignPageletClient()
+    return client.previewArtifactPatch({
+      runId: globalThis.crypto.randomUUID(),
+      sessionId: options.sessionId,
+      artifactId: options.artifactId,
+      settings: readRuntimeSettings(),
+      operations: options.operations,
+    })
+  }
+
+  async applyArtifactPatch(options: {
+    artifactId: string
+    operations: DesignPatchFileOperation[]
+    sessionId?: string
+    signal?: AbortSignal
+  }): Promise<DesignArtifactPatchApplyResult> {
+    await waitForDesignPageletReady(options.signal)
+    throwIfAborted(options.signal)
+    const client = getDesignPageletClient()
+    return client.applyArtifactPatch({
+      runId: globalThis.crypto.randomUUID(),
+      sessionId: options.sessionId,
+      artifactId: options.artifactId,
+      settings: readRuntimeSettings(),
+      operations: options.operations,
+    })
   }
 }
 

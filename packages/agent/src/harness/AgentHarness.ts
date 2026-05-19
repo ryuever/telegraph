@@ -190,7 +190,7 @@ class DefaultAgentHarness implements AgentHarness {
       if (!handlers) continue
       const list = Array.isArray(handlers) ? handlers : [handlers]
       for (const handler of list) {
-        this.hookBus.on(name, handler as HookHandler<typeof name>)
+        this.hookBus.on(name, handler)
       }
     }
   }
@@ -226,10 +226,9 @@ class DefaultAgentHarness implements AgentHarness {
     }
   }
 
-  private dispatchHook<N extends HookName>(name: N, payload: HookPayload<N>): void {
-    if (name === 'input') return
+  private dispatchHook<N extends Exclude<HookName, 'input'>>(name: N, payload: HookPayload<N>): void {
     void this.hookBus
-      .emit(name as Exclude<HookName, 'input'>, payload as HookPayload<Exclude<HookName, 'input'>>)
+      .emit(name, payload)
       .catch(() => {})
   }
 }

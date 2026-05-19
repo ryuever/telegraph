@@ -1,13 +1,9 @@
 import { useState, useEffect } from 'react';
 import type React from 'react';
-import PageView from '@/apps/connection/application/browser/PageView';
-import MonitorPage from '@/apps/monitor/application/browser/MonitorPage';
-import { DesignPanel } from '@/apps/design/application/browser/DesignPanel';
-import ChatPage from '@/apps/chat/application/browser/ChatPage';
 import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
+import { PageletHost } from '@/apps/main/application/browser/PageletHost';
 
 import {
-  CONNECTION_PAGE,
   DESIGN_PAGE,
   ALL_PAGES,
   PageConfig,
@@ -175,17 +171,10 @@ AI Agent Desktop
           display: 'flex',
           flexDirection: 'column',
           minWidth: 0,
+          minHeight: 0,
         }}
       >
-        {activePage.id === 'connection' ? (
-          <PageView page={CONNECTION_PAGE} />
-        ) : activePage.id === 'monitor' ? (
-          <MonitorPage />
-        ) : activePage.id === 'chat' ? (
-          <ChatPage />
-        ) : (
-          <DesignPanel />
-        )}
+        <PageletHost activePage={activePage} />
       </div>
     </div>
   );

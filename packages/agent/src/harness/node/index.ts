@@ -7,3 +7,8 @@ export {
   type NodePatchCapabilityOptions,
   type NodeProcessCapabilityOptions,
 } from './NodeIntegrationCapabilities'
+
+export {
+  createPageletRunCapabilities,
+  type PageletRunCapabilityOptions,
+} from './PageletRunCapabilities'

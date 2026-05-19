@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
-import { readFile, rm, writeFile } from 'node:fs/promises'
-import { isAbsolute, resolve } from 'node:path'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute, resolve } from 'node:path'
 import type { AgentEvent, PermissionRequest } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type {
@@ -58,7 +58,7 @@ export class PermissionedNodeProcessCapability implements ProcessCapability {
     this.assertAllowedCwd(cwd)
     const env = this.filterEnv(options.env)
     const permission = options.permission
-    const callId = `process:${this.context.runId}:${this.now()}`
+    const callId = `process:${this.context.runId}:${String(this.now())}`
     const context = {
       ...this.context,
       operation: {
@@ -257,17 +257,17 @@ export class PermissionedNodePatchCapability implements PatchCapability {
     this.allowedRoots = (options.allowedRoots ?? []).map(path => resolve(path))
   }
 
-  async preview(operations: PatchFileOperation[]): Promise<PatchPreview> {
+  preview(operations: PatchFileOperation[]): Promise<PatchPreview> {
     const normalized = operations.map(operation => this.normalizeOperation(operation))
-    return {
+    return Promise.resolve({
       operations: normalized,
       summary: summarizePatch(normalized),
-    }
+    })
   }
 
   async apply(operations: PatchFileOperation[]): Promise<PatchApplyResult> {
     const preview = await this.preview(operations)
-    const callId = `patch:${this.context.runId}:${this.now()}`
+    const callId = `patch:${this.context.runId}:${String(this.now())}`
     this.emitToolCall(callId, preview)
 
     try {
@@ -301,8 +301,8 @@ export class PermissionedNodePatchCapability implements PatchCapability {
 
   private async applyOperation(operation: PatchFileOperation): Promise<void> {
     if (operation.expectedOriginal !== undefined) {
-      const current = await readFile(operation.path, 'utf8').catch(error => {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      const current = await readFile(operation.path, 'utf8').catch((error: unknown) => {
+        if (isNodeError(error) && error.code === 'ENOENT') return undefined
         throw error
       })
       if (current !== operation.expectedOriginal) {
@@ -315,6 +315,7 @@ export class PermissionedNodePatchCapability implements PatchCapability {
       return
     }
 
+    await mkdir(dirname(operation.path), { recursive: true })
     await writeFile(operation.path, operation.content ?? '', 'utf8')
   }
 
@@ -418,7 +419,7 @@ function spawnProcess(
     const timer = options.timeoutMs
       ? setTimeout(() => {
           child.kill('SIGTERM')
-          rejectOnce(new Error(`Command timed out after ${options.timeoutMs}ms`))
+          rejectOnce(new Error(`Command timed out after ${String(options.timeoutMs)}ms`))
         }, options.timeoutMs)
       : undefined
 
@@ -433,15 +434,15 @@ function spawnProcess(
       const next = (kind === 'stdout' ? stdout : stderr) + chunk.toString('utf8')
       if (Buffer.byteLength(next) > options.maxOutputBytes) {
         child.kill('SIGTERM')
-        rejectOnce(new Error(`Command output exceeded ${options.maxOutputBytes} bytes`))
+        rejectOnce(new Error(`Command output exceeded ${String(options.maxOutputBytes)} bytes`))
         return
       }
       if (kind === 'stdout') stdout = next
       else stderr = next
     }
 
-    child.stdout?.on('data', chunk => { append('stdout', chunk as Buffer); })
-    child.stderr?.on('data', chunk => { append('stderr', chunk as Buffer); })
+    child.stdout.on('data', chunk => { append('stdout', chunk as Buffer); })
+    child.stderr.on('data', chunk => { append('stderr', chunk as Buffer); })
     child.on('error', rejectOnce)
     child.on('close', code => {
       if (settled) return
@@ -458,4 +459,8 @@ function summarizePatch(operations: PatchFileOperation[]): PatchPreview['summary
     updates: operations.filter(operation => operation.kind === 'update').length,
     deletes: operations.filter(operation => operation.kind === 'delete').length,
   }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
 }

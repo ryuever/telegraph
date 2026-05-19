@@ -7,6 +7,7 @@ import {
   runtimeEventForRow,
   shortId,
   statusClass,
+  traceRowSummary,
   type TimelineStatus,
 } from '../trace-timeline'
 
@@ -14,6 +15,8 @@ export type { LlmTraceRow }
 
 function runtimeEventBadgeClass(eventType: string): string {
   if (eventType.startsWith('run_')) return 'bg-fuchsia-500/15 text-fuchsia-200'
+  if (eventType.startsWith('permission_')) return 'bg-rose-500/15 text-rose-200'
+  if (eventType.startsWith('extension_')) return 'bg-indigo-500/15 text-indigo-200'
   if (eventType.startsWith('model_')) return 'bg-amber-500/15 text-amber-200'
   if (eventType.startsWith('tool_')) return 'bg-cyan-500/15 text-cyan-200'
   if (eventType.startsWith('step_') || eventType.includes('child_run')) return 'bg-lime-500/15 text-lime-200'
@@ -33,6 +36,7 @@ function TraceRowItem({
   const trace = row.trace
   const event = runtimeEventForRow(row)
   const eventType = event?.type ?? ''
+  const summary = traceRowSummary(row)
 
   return (
     <li
@@ -60,6 +64,9 @@ function TraceRowItem({
             {row.sessionId.length > 12 ? '...' : ''}
           </span>
         )}
+      </div>
+      <div className="mb-1 text-[11px] leading-relaxed text-zinc-300">
+        {summary}
       </div>
       <details className="group">
         <summary className="cursor-pointer select-none text-[10px] text-zinc-500 group-open:mb-1 hover:text-zinc-300">

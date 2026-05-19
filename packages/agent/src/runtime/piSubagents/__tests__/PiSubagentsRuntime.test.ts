@@ -130,6 +130,8 @@ describe('PiSubagentsRuntime', () => {
     expect(events.filter(event => event.type === 'child_run_started').map(event => event.label))
       .toEqual(['scout', 'planner', 'worker', 'reviewer'])
     expect(streamMock).toHaveBeenCalledTimes(4)
+    expect(streamMock.mock.calls[0]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
+    expect(streamMock.mock.calls[2]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
   })
 
   it('converts child run failure into a parent terminal run_failed event', async () => {

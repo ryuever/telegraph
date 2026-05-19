@@ -7,7 +7,7 @@ description: >
   路径选择与阶段性落地建议。
 category: discussion
 created: 2026-05-04
-updated: 2026-05-05
+updated: 2026-05-19
 tags:
   - multi-agent
   - multica
@@ -38,6 +38,9 @@ references:
   - id: A-005
     rel: extended-by
     file: ../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md
+  - id: D-014
+    rel: extended-by
+    file: ./20260519-chat-agent-team-multica-strategy.md
 ---
 
 # Multica 范式与 Pi / pi-subagents 生态下的 Telegraph 多智能体能力对比

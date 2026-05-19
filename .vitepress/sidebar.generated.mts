@@ -106,6 +106,10 @@ export const wikiSidebar = {
         {
           "text": "D-013 \"@orchestrator/core 作为 Harness Control 接入可行性分析\"",
           "link": "/discussion/20260517-orchestrator-core-harness-control-feasibility"
+        },
+        {
+          "text": "D-014 Chat Agent Team 与 Multica 差异化策略讨论归档",
+          "link": "/discussion/20260519-chat-agent-team-multica-strategy"
         }
       ]
     }

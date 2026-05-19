@@ -10,6 +10,7 @@ import {
 } from '../hooks';
 import { MonitorSnapshot, ProcessRow } from '@/apps/monitor/application/common';
 import { cn } from '@/packages/ui/lib/utils';
+import { useIsPageletActive } from '@/apps/main/application/browser/pagelet-activity';
 
 type TabId = 'overview' | 'processes' | 'supervisors';
 
@@ -20,16 +21,17 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 export function MonitorPanel() {
-  const { snapshot, updatedAt } = useMonitorSnapshots();
+  const isActive = useIsPageletActive('monitor');
+  const { snapshot, updatedAt } = useMonitorSnapshots(isActive);
   // Supervisor snapshots arrive on their own push channel
   // (`onSupervisorSnapshotsChanged`) sourced from main directly —
   // intentionally decoupled from the daemon-driven `MonitorSnapshot`
   // pipeline so daemon being down doesn't blind us to supervisor
   // `restarting` transitions. See IMonitorPageletService for the
   // full rationale.
-  const supervisorSnapshots = useSupervisorSnapshots();
+  const supervisorSnapshots = useSupervisorSnapshots(isActive);
   const history = useSnapshotHistory(snapshot, 60);
-  useNowTick(1000);
+  useNowTick(1000, isActive);
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<TabId>('overview');
 

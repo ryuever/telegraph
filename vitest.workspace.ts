@@ -3,6 +3,7 @@
 // definition. Phase 0 just enumerates the workspaces; per-project configs can
 // be added later as test suites land.
 export default [
+  'apps/main',
   'apps/chat',
   'apps/design',
   'packages/agent-protocol',

@@ -20,9 +20,9 @@ describe('PiExtensionCompatHost', () => {
     const notifications: string[] = []
     const processCalls: Array<{ command: string; args: string[]; risk: string }> = []
     const process: ProcessCapability = {
-      exec: async (command, args, options) => {
+      exec: (command, args, options) => {
         processCalls.push({ command, args, risk: options.permission.risk })
-        return { stdout: 'hello\n', stderr: '', code: 0 }
+        return Promise.resolve({ stdout: 'hello\n', stderr: '', code: 0 })
       },
     }
     const feedback: FeedbackAPI = {
@@ -37,14 +37,17 @@ describe('PiExtensionCompatHost', () => {
     expect(processCalls).toEqual([
       { command: 'bash', args: ['-c', 'echo hello'], risk: 'medium' },
     ])
-    expect(notifications).toEqual(['info:Expanded inline commands'])
+    expect(notifications).toEqual([
+      'info:Expanded inline commands',
+      'debug:Pi extension input hook transformed input',
+    ])
   })
 
   it('registers as an explicit compatibility profile on CapabilityHost', async () => {
     const hookBus = new HookBus()
     const host = new CapabilityHost(hookBus)
     host.registerProcess({
-      exec: async () => ({ stdout: 'ok', stderr: '', code: 0 }),
+      exec: () => Promise.resolve({ stdout: 'ok', stderr: '', code: 0 }),
     })
     host.registerFeedback({
       notify: () => {},

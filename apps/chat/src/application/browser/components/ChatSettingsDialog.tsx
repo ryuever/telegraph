@@ -525,15 +525,14 @@ function ExtensionsTab({
           <option value="default">default (chat only)</option>
           <option value="readonly-workspace">readonly workspace</option>
           <option value="shell-automation">shell automation</option>
-          <option value="coding-edit">coding edit preview</option>
-          <option value="design-build">design build preview</option>
+          <option value="coding-edit">coding edit</option>
+          <option value="design-build">design build</option>
         </select>
       </Field>
 
       {profile.kind === 'shell-automation' && (
-        <Field label="Allowed shell commands" hint="Blank means request only; no command allowlist">
-          <input
-            type="text"
+        <Field label="Allowed shell commands" hint="Comma or newline separated executable names">
+          <textarea
             value={profile.commands?.join(', ') ?? ''}
             onChange={e => {
               onSetTaskCapabilityProfile({
@@ -542,7 +541,7 @@ function ExtensionsTab({
               })
             }}
             placeholder="git, pnpm, node"
-            className={inputClass}
+            className={cn(inputClass, 'min-h-20 resize-y')}
             autoComplete="off"
             spellCheck={false}
           />
@@ -584,6 +583,23 @@ function ExtensionsTab({
             className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
           />
           Allow patch apply after confirmation
+        </label>
+      )}
+
+      {profile.kind === 'design-build' && (
+        <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+          <input
+            type="checkbox"
+            checked={profile.artifactPolicy === 'apply-after-confirm'}
+            onChange={e => {
+              onSetTaskCapabilityProfile({
+                ...profile,
+                artifactPolicy: e.target.checked ? 'apply-after-confirm' : 'preview',
+              })
+            }}
+            className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
+          />
+          Allow artifact apply after confirmation
         </label>
       )}
 

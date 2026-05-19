@@ -137,12 +137,12 @@ export class CapabilityHost {
     return [...this.tools.values()].map(tool => tool.definition)
   }
 
-  registerCustom<T>(key: string, capability: T): void {
+  registerCustom(key: string, capability: unknown): void {
     this.custom.set(key, capability)
   }
 
-  getCustom<T>(key: string): T | undefined {
-    return this.custom.get(key) as T | undefined
+  getCustom(key: string): unknown {
+    return this.custom.get(key)
   }
 
   on<N extends HookName>(name: N, handler: HookHandler<N>): () => void {

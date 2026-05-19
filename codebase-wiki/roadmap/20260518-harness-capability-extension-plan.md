@@ -7,7 +7,7 @@ description: >
   shell、filesystem、patch 等 integration；Pi extension 兼容仍属于 coding/显式启用场景。
 category: roadmap
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-19
 tags:
   - extension
   - capability
@@ -22,6 +22,9 @@ references:
   - id: P-004
     rel: extends
     file: ./20260518-agent-protocol-pagelet-harness-plan.md
+  - id: D-014
+    rel: related-to
+    file: ../discussion/20260519-chat-agent-team-multica-strategy.md
 ---
 
 # Harness Capability 与 Extension 分层执行计划
@@ -292,10 +295,26 @@ interface ProcessCapability {
 
 ### Phase 5：Product Wiring
 
-- [ ] 为 future coding pagelet 或 coding mode 启用 `codingCapabilities() + piExtensionCompatProfile()`。
-- [ ] chat/design 设置页暴露“按任务请求 workspace/shell/edit 能力”的安全策略，不暴露默认 Pi extension 开关。（2026-05-19 chat settings 已持久化 run 级 task capability profile 与 orchestrator 实验入口；design UI 仍待接入，高风险 integration 仍未默认启用）
-- [ ] Trace panel 按 run 展示 extension hook、permission、exec、feedback。
-- [ ] 增加 architecture boundary test：main/shared/daemon 不 import extension runtime implementation。
+- [x] 为 future coding pagelet 或 coding mode 启用 `codingCapabilities() + piExtensionCompatProfile()`。（2026-05-19 已通过 run-scoped `createPageletRunCapabilities()` 接入 chat/design pagelet：默认 profile 轻量，只有 explicit `shell-automation` / `coding-edit` / `design-build` 才按 run 注入 process/filesystem/patch/Pi compat，权限不跨 run 泄漏）
+- [x] chat/design 设置页暴露“按任务请求 workspace/shell/edit 能力”的安全策略，不暴露默认 Pi extension 开关。（2026-05-19 chat settings 已持久化 run 级 task capability profile 与 orchestrator 实验入口；design UI 已接入共享 runtime settings；高风险 integration 仍不默认启用）
+- [x] Trace panel 按 run 展示 extension hook、permission、exec、feedback。（2026-05-19 LLM Trace timeline 增加 permission/tool-exec/runtime feedback/hook 摘要；Pi compat input hook 会发非阻塞 feedback runtime_log）
+- [x] 增加 architecture boundary test：main/shared/daemon 不 import extension runtime implementation。（2026-05-19 boundary test 扩展到 static import、side-effect import、dynamic import、require）
+
+### Phase 6：Design Artifact Preview / Apply Loop
+
+- [x] 将 design agent 产物从 JSON 卡片升级为 artifact workbench，支持产物列表、当前产物保活选择、预览/源码切换。
+- [x] HTML 产物使用 sandbox iframe 预览；code/source/tsx/jsx/content 产物使用源码视图；operations 产物投影为 patch summary。
+- [x] “应用”动作不静默写文件，而是发起新的 design run，请求模型基于指定 artifact 进入 apply/patch 流程，继续受 run profile 与 permission 约束。
+- [x] 增加 view-model 单测和 DOM 交互测试，覆盖 HTML 预览、patch 统计、模式切换、应用回调与已请求禁用态。
+
+### Phase 7：Design Patch Preview / Confirm / Apply
+
+- [x] 在 design pagelet RPC contract 上新增 artifact patch preview/apply 方法，renderer 仍只通过现有 pagelet service client 访问，不引入裸 IPC。
+- [x] Patch preview 在 design utility process 内使用 `PermissionedNodePatchCapability.preview()` 做路径归一与 allowedRoots 校验，renderer 只消费序列化结果。
+- [x] Patch apply 必须满足 `design-build + artifactPolicy: apply-after-confirm + repo:write`，并通过 `PermissionBroker` 记录 permission/tool trace；默认 profile 仍不能静默写入。
+- [x] Workbench patch 产物进入两步动作：先“预览 Patch”，显示 normalized operations；再“确认应用”，应用成功后进入已应用态。
+- [x] Design 设置页在用户开启 artifact apply after confirmation 时自动补 `repo:write` scope，避免 UI 策略与 PermissionBroker 写入要求脱节。
+- [x] Patch add 操作支持自动创建父目录，结构化 patch 能覆盖新增嵌套文件。
 
 ## Test Plan
 
@@ -305,6 +324,8 @@ interface ProcessCapability {
 - PermissionBroker tests：shell permission denied/approved、timeout、error normalization。
 - Pi compat tests：inline bash extension transform、`ctx.ui.notify` 映射、unsupported API trace。
 - Chat/design tests：默认没有 shell/filesystem/Pi extension capability；带 explicit profile 时可以请求 shell/filesystem/patch，并被 PermissionBroker 正确约束。
+- Design artifact tests：HTML/code/patch view-model 投影正确；workbench 交互能选择产物、切换模式、请求应用且避免重复请求。
+- Design patch apply tests：pagelet browser service 传递保存后的 run profile；Node patch capability 支持嵌套新增文件并保留权限事件序列。
 - Coding pack tests：coding mode 默认具备 workspace-aware edit workflow，但 shell/patch apply 仍受 permission policy 约束。
 - Boundary tests：协议层无 Pi 类型，main/shared/daemon 不 import runtime/extension implementation。
 

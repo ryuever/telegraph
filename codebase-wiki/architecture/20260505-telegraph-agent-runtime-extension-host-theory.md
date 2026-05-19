@@ -7,7 +7,7 @@ description: >
   并说明如何兼容 Pi、LangGraph、Vercel AI SDK、Mastra 与未来 agent framework。
 category: architecture
 created: 2026-05-05
-updated: 2026-05-13
+updated: 2026-05-19
 tags:
   - telegraph
   - agent-runtime
@@ -46,6 +46,9 @@ references:
   - id: P-006
     rel: extended-by
     file: ../roadmap/20260518-harness-capability-extension-plan.md
+  - id: D-014
+    rel: extended-by
+    file: ../discussion/20260519-chat-agent-team-multica-strategy.md
 ---
 
 # Telegraph Agent Runtime 与 Extension Host 理论基础

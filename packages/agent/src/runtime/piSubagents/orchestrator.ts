@@ -14,6 +14,7 @@ import type { RuntimeEvent } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { streamPiAiRuntimeEvents } from '../streamPiAiRuntime'
 import type { AgentRuntimeSettings } from '../../types'
+import { createSubagentTools } from './tools'
 import type {
   SubagentChainStep,
   SubagentChildResult,
@@ -108,6 +109,12 @@ async function* runSingleAgent(
 
   const childSettings = applyAgentSettings(opts.settings, agent)
   const prompt = buildPromptForAgent(agent, task)
+  const tools = createSubagentTools({
+    runId: childRunId,
+    sessionId: opts.sessionId,
+    settings: childSettings,
+    allowedTools: agent.tools,
+  })
 
   let childText = ''
   const startMs = ts()
@@ -118,6 +125,7 @@ async function* runSingleAgent(
       settings: childSettings,
       message: prompt,
       signal: opts.signal,
+      tools,
     })) {
       // Re-emit child events (skip run_started/completed — we wrap with child_run_*)
       if (ev.type === 'run_completed' || ev.type === 'run_failed') {
@@ -215,6 +223,12 @@ async function* runChain(
     const childRunId = `${opts.runId}-chain-${i}-${step.agent}`
     const childSettings = applyAgentSettings(opts.settings, agentDef, step.model)
     const prompt = buildPromptForAgent(agentDef, task)
+    const tools = createSubagentTools({
+      runId: childRunId,
+      sessionId: opts.sessionId,
+      settings: childSettings,
+      allowedTools: agentDef.tools,
+    })
 
     yield childStarted(opts.runId, childRunId, step.agent)
 
@@ -227,6 +241,7 @@ async function* runChain(
         settings: childSettings,
         message: prompt,
         signal: opts.signal,
+        tools,
       })) {
         if (ev.type === 'run_completed' || ev.type === 'run_failed') {
           if (ev.type === 'run_failed') {
@@ -301,6 +316,12 @@ async function* runParallel(
     const childRunId = `${opts.runId}-par-${idx}-${t.agent}`
     const childSettings = applyAgentSettings(opts.settings, agentDef, t.model)
     const prompt = buildPromptForAgent(agentDef, t.task)
+    const tools = createSubagentTools({
+      runId: childRunId,
+      sessionId: opts.sessionId,
+      settings: childSettings,
+      allowedTools: agentDef.tools,
+    })
 
     allChildEvents[idx].push(childStarted(opts.runId, childRunId, t.agent))
 
@@ -313,6 +334,7 @@ async function* runParallel(
         settings: childSettings,
         message: prompt,
         signal: opts.signal,
+        tools,
       })) {
         if (ev.type === 'run_completed' || ev.type === 'run_failed') {
           if (ev.type === 'run_failed') {

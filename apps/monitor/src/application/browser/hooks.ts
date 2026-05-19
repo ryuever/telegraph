@@ -15,12 +15,18 @@ function createCancelledFlag(): { isCancelled: () => boolean; cancel: () => void
   };
 }
 
-export function useMonitorSnapshots() {
+export function useMonitorSnapshots(enabled = true) {
   const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      unsubRef.current?.();
+      unsubRef.current = null;
+      return;
+    }
+
     const { isCancelled, cancel } = createCancelledFlag();
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -76,7 +82,7 @@ export function useMonitorSnapshots() {
       unsubRef.current?.();
       unsubRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   return { snapshot, updatedAt };
 }
@@ -111,13 +117,19 @@ export function useSnapshotHistory(
  * pagelet not yet ready) using the same retry cadence as the
  * monitor-snapshot subscription.
  */
-export function useSupervisorSnapshots() {
+export function useSupervisorSnapshots(enabled = true) {
   const [snapshots, setSnapshots] = useState<
     SupervisorInspectorSnapshot[] | null
   >(null);
   const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      unsubRef.current?.();
+      unsubRef.current = null;
+      return;
+    }
+
     const { isCancelled, cancel } = createCancelledFlag();
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -160,15 +172,16 @@ export function useSupervisorSnapshots() {
       unsubRef.current?.();
       unsubRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   return snapshots;
 }
 
-export function useNowTick(intervalMs = 1000) {
+export function useNowTick(intervalMs = 1000, enabled = true) {
   const [, setNow] = useState(Date.now());
   useEffect(() => {
+    if (!enabled) return;
     const id = setInterval(() => { setNow(Date.now()); }, intervalMs);
     return () => { clearInterval(id); };
-  }, [intervalMs]);
+  }, [intervalMs, enabled]);
 }

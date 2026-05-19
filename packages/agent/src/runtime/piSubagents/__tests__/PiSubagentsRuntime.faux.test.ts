@@ -1,4 +1,4 @@
-import { fauxAssistantMessage, registerFauxProvider } from '@mariozechner/pi-ai'
+import { fauxAssistantMessage, fauxToolCall, registerFauxProvider } from '@mariozechner/pi-ai'
 import { describe, expect, it, vi } from 'vitest'
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
@@ -68,6 +68,76 @@ describe('PiSubagentsRuntime faux provider integration', () => {
           }),
         ])
       expect(faux.state.callCount).toBe(4)
+    } finally {
+      faux.unregister()
+      vi.doUnmock('@/packages/agent/providers/index')
+      vi.resetModules()
+    }
+  })
+
+  it('executes subagent read tool calls through the embedded tool loop', async () => {
+    vi.resetModules()
+    const faux = registerFauxProvider({
+      provider: 'telegraph-faux-subagents-tools',
+      models: [{ id: 'subagent-tool-test-model' }],
+      tokensPerSecond: 10_000,
+    })
+    faux.setResponses([
+      fauxAssistantMessage(
+        fauxToolCall('read', { path: 'package.json' }, { id: 'call-read-package' }),
+        { stopReason: 'toolUse' },
+      ),
+      fauxAssistantMessage('scout findings after read'),
+      fauxAssistantMessage('planner plan'),
+      fauxAssistantMessage('worker implementation'),
+      fauxAssistantMessage('reviewer final answer'),
+    ])
+
+    try {
+      vi.doMock('@/packages/agent/providers/index', () => ({
+        resolveModel: () => {
+          const model = faux.getModel('subagent-tool-test-model')
+          if (!model) throw new Error('Missing faux test model')
+          return model
+        },
+      }))
+      const { PiSubagentsRuntime } = await import('../PiSubagentsRuntime')
+      const runtime = new PiSubagentsRuntime()
+      const events = await collect(runtime.run({
+        runId: 'run-faux-subagents-tools',
+        sessionId: 'session-faux-subagents-tools',
+        message: 'Read package.json before planning',
+        settings: {
+          provider: 'telegraph-faux-subagents-tools',
+          modelId: 'subagent-tool-test-model',
+          apiKey: '',
+          orchestration: 'pi-subagents',
+          orchestrationPattern: 'chain',
+        },
+      }))
+
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'tool_call',
+            runId: 'run-faux-subagents-tools-chain-0-scout',
+            callId: 'call-read-package',
+            toolName: 'read',
+          }),
+          expect.objectContaining({
+            type: 'tool_result',
+            runId: 'run-faux-subagents-tools-chain-0-scout',
+            callId: 'call-read-package',
+            toolName: 'read',
+          }),
+          expect.objectContaining({
+            type: 'run_completed',
+            runId: 'run-faux-subagents-tools',
+          }),
+        ]),
+      )
+      expect(events.filter(event => event.type === 'model_request')).toHaveLength(5)
+      expect(faux.state.callCount).toBe(5)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')

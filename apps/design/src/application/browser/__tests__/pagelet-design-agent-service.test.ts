@@ -1,10 +1,14 @@
 import type {
   DesignAgentSendRequest,
   DesignAgentSendResult,
+  DesignArtifactPatchApplyResult,
+  DesignArtifactPatchPreviewResult,
+  DesignArtifactPatchRequest,
   DesignAgentStreamEvent,
   IDesignPageletService,
 } from '@/apps/design/application/common'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
+import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let agentEventCallback: ((event: DesignAgentStreamEvent) => void) | null = null
@@ -12,11 +16,34 @@ const sendAgentMock = vi.fn(
   (_: DesignAgentSendRequest): Promise<DesignAgentSendResult> => new Promise<DesignAgentSendResult>(() => {}),
 )
 const cancelAgentMock = vi.fn(() => Promise.resolve(true))
+const previewArtifactPatchMock = vi.fn(
+  (_: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult> => Promise.resolve({
+  runId: 'patch-run',
+  artifactId: 'artifact-1',
+  status: 'previewed' as const,
+  preview: {
+    operations: [{ kind: 'update' as const, path: 'apps/design/src/App.tsx', content: 'next' }],
+    summary: { adds: 0, updates: 1, deletes: 0 },
+  },
+}))
+const applyArtifactPatchMock = vi.fn(
+  (_: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult> => Promise.resolve({
+  runId: 'patch-run',
+  artifactId: 'artifact-1',
+  status: 'applied' as const,
+  applied: true,
+  preview: {
+    operations: [{ kind: 'update' as const, path: 'apps/design/src/App.tsx', content: 'next' }],
+    summary: { adds: 0, updates: 1, deletes: 0 },
+  },
+}))
 const client: IDesignPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   ping: vi.fn((now: number) => Promise.resolve({ pong: now, serverTime: now })),
   sendAgent: sendAgentMock,
   cancelAgent: cancelAgentMock,
+  previewArtifactPatch: previewArtifactPatchMock,
+  applyArtifactPatch: applyArtifactPatchMock,
   onAgentEvent: vi.fn((callback: (event: DesignAgentStreamEvent) => void) => {
     agentEventCallback = callback
     return { unsubscribe }
@@ -94,6 +121,78 @@ describe('PageletDesignAgentService', () => {
     expect(text).toEqual(['preview'])
     expect(statuses).toContain('completed')
     expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('passes the saved design task capability profile into pagelet runs', async () => {
+    globalThis.localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: 'pi-ai',
+      taskCapabilityProfile: {
+        kind: 'design-build',
+        scopes: ['artifact:write', 'repo:read'],
+        artifactPolicy: 'preview',
+      },
+    }))
+    sendAgentMock.mockImplementationOnce((request) => {
+      return Promise.resolve({ runId: request.runId, status: 'completed' })
+    })
+
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+
+    await service.send({
+      prompt: 'make a design',
+      sessionId: 'session-1',
+    })
+
+    expect(sendAgentMock.mock.calls[0]?.[0].settings.taskCapabilityProfile).toEqual({
+      kind: 'design-build',
+      scopes: ['artifact:write', 'repo:read'],
+      artifactPolicy: 'preview',
+    })
+  })
+
+  it('passes saved design settings into artifact patch preview and apply requests', async () => {
+    globalThis.localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: 'pi-ai',
+      taskCapabilityProfile: {
+        kind: 'design-build',
+        scopes: ['artifact:write', 'repo:read', 'repo:write'],
+        artifactPolicy: 'apply-after-confirm',
+      },
+    }))
+
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+    const operations = [{ kind: 'update' as const, path: 'apps/design/src/App.tsx', content: 'next' }]
+
+    await service.previewArtifactPatch({
+      artifactId: 'artifact-1',
+      operations,
+      sessionId: 'session-1',
+    })
+    await service.applyArtifactPatch({
+      artifactId: 'artifact-1',
+      operations,
+      sessionId: 'session-1',
+    })
+
+    const previewCalls = previewArtifactPatchMock.mock.calls
+    const applyCalls = applyArtifactPatchMock.mock.calls
+
+    expect(previewCalls[0]?.[0]?.settings.taskCapabilityProfile).toEqual({
+      kind: 'design-build',
+      scopes: ['artifact:write', 'repo:read', 'repo:write'],
+      artifactPolicy: 'apply-after-confirm',
+    })
+    expect(applyCalls[0]?.[0]?.settings.taskCapabilityProfile).toEqual({
+      kind: 'design-build',
+      scopes: ['artifact:write', 'repo:read', 'repo:write'],
+      artifactPolicy: 'apply-after-confirm',
+    })
   })
 })
 

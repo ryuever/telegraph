@@ -25,11 +25,11 @@ export class InputHookBlockedError extends Error {
 }
 
 export class HookBus {
-  private readonly handlers = new Map<HookName, Array<(payload: unknown) => unknown | Promise<unknown>>>()
+  private readonly handlers = new Map<HookName, Array<(payload: unknown) => unknown>>()
 
   on<N extends HookName>(name: N, handler: HookHandler<N>): () => void {
     const list = this.handlers.get(name) ?? []
-    list.push(handler as (payload: unknown) => unknown | Promise<unknown>)
+    list.push(handler as (payload: unknown) => unknown)
     this.handlers.set(name, list)
 
     return () => {

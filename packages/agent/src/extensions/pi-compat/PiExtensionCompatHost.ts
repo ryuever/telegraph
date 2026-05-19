@@ -24,7 +24,7 @@ export interface PiExtensionContext {
 }
 
 export interface PiExtensionCompatAPI {
-  on(event: 'input', handler: PiInputHandler): void
+  on(event: string, handler: PiInputHandler): void
   exec(command: string, args: string[], options?: {
     timeout?: number
     cwd?: string
@@ -66,8 +66,18 @@ export class PiExtensionCompatHost {
 
     return new Proxy(api, {
       get: (target, property, receiver) => {
-        if (typeof property !== 'string' || property in target) {
-          return Reflect.get(target, property, receiver)
+        if (typeof property !== 'string') {
+          return Reflect.get(target, property, receiver) as unknown
+        }
+        if (property === 'on') {
+          return (event: string, handler: PiInputHandler) => { target.on(event, handler) }
+        }
+        if (property === 'exec') {
+          return (
+            command: string,
+            args: string[],
+            options?: { timeout?: number; cwd?: string; env?: Record<string, string> },
+          ) => target.exec(command, args, options)
         }
         return async () => {
           const message = `Unsupported Pi extension API "${property}"`
@@ -92,7 +102,7 @@ export class PiExtensionCompatHost {
 
       let text = event.text
       for (const match of matches) {
-        const command = match[1]?.trim()
+        const command = match[1].trim()
         if (!command) continue
         const result = await pi.exec('bash', ['-c', command], { timeout: 30_000 })
         text = text.replace(match[0], result.stdout.trimEnd())
@@ -122,12 +132,33 @@ export class PiExtensionCompatHost {
           this.createContext(current),
         )
 
-        if (!result || result.action === 'continue') {
+        if (result.action === 'continue') {
+          await this.feedback?.notify({
+            runId: current.runId,
+            sessionId: current.sessionId,
+            level: 'debug',
+            message: 'Pi extension input hook continued',
+            raw: { source: 'pi-extension-compat', hook: 'input', action: 'continue' },
+          })
           continue
         }
         if (result.action === 'block') {
+          await this.feedback?.notify({
+            runId: current.runId,
+            sessionId: current.sessionId,
+            level: 'warn',
+            message: 'Pi extension input hook blocked input',
+            raw: { source: 'pi-extension-compat', hook: 'input', action: 'block' },
+          })
           return result
         }
+        await this.feedback?.notify({
+          runId: current.runId,
+          sessionId: current.sessionId,
+          level: 'debug',
+          message: 'Pi extension input hook transformed input',
+          raw: { source: 'pi-extension-compat', hook: 'input', action: 'transform' },
+        })
         current = {
           ...current,
           text: result.text,

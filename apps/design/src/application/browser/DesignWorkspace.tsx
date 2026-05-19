@@ -3,6 +3,8 @@ import type { JSX } from 'react'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
 import type { DesignProjectedArtifact } from './design-agent-projector'
+import { DesignArtifactWorkbench, type ArtifactApplyState } from './DesignArtifactWorkbench'
+import { extractDesignPatchOperations } from './design-artifact-view'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
 interface Message {
@@ -26,6 +28,10 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<'running' | 'completed' | 'failed' | 'cancelled'>('running')
   const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>([])
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
+  const [artifactMode, setArtifactMode] = useState<'preview' | 'code'>('preview')
+  const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
+  const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
 
   const appendAssistantText = (text: string): void => {
     setMessages((prev) => {
@@ -52,6 +58,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
       onAssistantText: appendAssistantText,
       onArtifact: artifact => {
         setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
+        setActiveArtifactId(artifact.id)
       },
     }).catch((error: unknown) => {
       if (isCancelledError(error)) {
@@ -104,6 +111,97 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
     setInput(e.target.value)
   }
 
+  const applyArtifact = (artifact: DesignProjectedArtifact): void => {
+    const operations = extractDesignPatchOperations(artifact)
+    if (operations) {
+      void applyPatchArtifact(artifact, operations)
+      return
+    }
+
+    setRequestedArtifactIds(prev => new Set(prev).add(artifact.id))
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: `应用 ${artifact.title ?? artifact.id}`,
+      },
+      { role: 'assistant', content: '' },
+    ])
+    runAgent(`Apply design artifact "${artifact.title ?? artifact.id}".`, {
+      surface: 'design-workspace',
+      action: 'apply-artifact',
+      artifactId: artifact.id,
+      artifactKind: artifact.kind,
+      artifact: artifact.output,
+    })
+  }
+
+  const applyPatchArtifact = async (
+    artifact: DesignProjectedArtifact,
+    operations: NonNullable<ReturnType<typeof extractDesignPatchOperations>>,
+  ): Promise<void> => {
+    const state = artifactApplyStates.get(artifact.id)
+
+    if (state?.stage === 'previewed') {
+      setArtifactApplyState(artifact.id, { ...state, stage: 'applying', error: undefined })
+      const result = await agent.applyArtifactPatch({
+        artifactId: artifact.id,
+        operations,
+        sessionId,
+      }).catch((error: unknown) => ({
+        runId: '',
+        artifactId: artifact.id,
+        status: 'failed' as const,
+        error: error instanceof Error ? error.message : String(error),
+      }))
+      if (result.status === 'applied') {
+        setArtifactApplyState(artifact.id, {
+          stage: 'applied',
+          preview: result.preview ?? state.preview,
+        })
+        appendAssistantText(`\n已应用 ${artifact.title ?? artifact.id}`)
+        return
+      }
+      setArtifactApplyState(artifact.id, {
+        stage: 'failed',
+        preview: state.preview,
+        error: result.error ?? 'Patch apply failed',
+      })
+      return
+    }
+
+    setArtifactApplyState(artifact.id, { stage: 'previewing' })
+    const result = await agent.previewArtifactPatch({
+      artifactId: artifact.id,
+      operations,
+      sessionId,
+    }).catch((error: unknown) => ({
+      runId: '',
+      artifactId: artifact.id,
+      status: 'failed' as const,
+      error: error instanceof Error ? error.message : String(error),
+    }))
+    if (result.status === 'previewed' && result.preview) {
+      setArtifactApplyState(artifact.id, {
+        stage: 'previewed',
+        preview: result.preview,
+      })
+      return
+    }
+    setArtifactApplyState(artifact.id, {
+      stage: 'failed',
+      error: result.error ?? 'Patch preview failed',
+    })
+  }
+
+  const setArtifactApplyState = (artifactId: string, state: ArtifactApplyState): void => {
+    setArtifactApplyStates(prev => {
+      const next = new Map(prev)
+      next.set(artifactId, state)
+      return next
+    })
+  }
+
   return (
     <div className="flex h-full">
       <div className="flex w-[400px] shrink-0 flex-col border-r border-border">
@@ -147,53 +245,22 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col">
-        <div className="flex h-10 items-center justify-between border-b border-border px-4">
-          <div className="flex items-center gap-2">
-            <button className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
-              预览
-            </button>
-            <button className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
-              代码
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-10 shrink-0 items-center justify-end border-b border-border px-4">
             <span className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
               {status}
             </span>
-            <button className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
-              ↗ 新窗口
-            </button>
-          </div>
         </div>
-        <div className="flex flex-1 items-center justify-center bg-background p-8">
-          {artifacts.length > 0 ? (
-            <div className="w-full max-w-3xl space-y-3">
-              {artifacts.map(artifact => (
-                <div key={artifact.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium text-foreground">{artifact.title ?? artifact.id}</div>
-                      <div className="text-xs text-muted-foreground">{artifact.kind}</div>
-                    </div>
-                    <span className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-                      {artifact.sourceEventType}
-                    </span>
-                  </div>
-                  <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-3 text-xs text-muted-foreground">
-                    {JSON.stringify(artifact.output, null, 2)}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-              <p className="text-center text-sm text-muted-foreground">
-                生成的界面将在这里预览
-              </p>
-            </div>
-          )}
-        </div>
+        <DesignArtifactWorkbench
+          artifacts={artifacts}
+          activeArtifactId={activeArtifactId}
+          requestedArtifactIds={requestedArtifactIds}
+          applyStates={artifactApplyStates}
+          mode={artifactMode}
+          onSelectArtifact={setActiveArtifactId}
+          onModeChange={setArtifactMode}
+          onApplyArtifact={applyArtifact}
+        />
       </div>
     </div>
   )
