@@ -39,6 +39,9 @@ references:
     rel: related-to
     file: ../discussion/20260515-renderer-spa-framework-selection.md
     note: D-009 PageletHost 的 pagelets[] 注册表是本文 TelegraphManifest 在 renderer 侧的最小落点
+  - id: A-012
+    rel: extended-by
+    file: ./20260520-telegraph-harness-extension-architecture.md
 ---
 
 # VS Code Contribution 模型对 Telegraph 可扩展架构的启示与落地路径

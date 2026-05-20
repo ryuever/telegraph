@@ -1,11 +1,14 @@
 import type { RuntimeEvent, RuntimeSettings } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { streamPiAiRuntimeEvents } from '../../streamPiAiRuntime'
+import { streamPiAiRuntimeEvents } from '@/packages/agent/runtime/streamPiAiRuntime'
 import { discoverAgents } from '../agentDiscovery'
 import { TelegraphSubagentHarness } from '../TelegraphSubagentHarness'
 
-vi.mock('../../streamPiAiRuntime', () => ({
+vi.mock('@/packages/agent/runtime/streamPiAiRuntime', () => ({
   streamPiAiRuntimeEvents: vi.fn(),
 }))
 
@@ -179,7 +182,47 @@ describe('TelegraphSubagentHarness', () => {
     expect([...agents.keys()]).toEqual(
       expect.arrayContaining(['scout', 'planner', 'worker', 'reviewer']),
     )
-    expect(agents.get('scout')?.sourcePath).toContain('telegraph://subagents/builtin')
+    expect(agents.get('scout')?.sourcePath).toContain('extensions/telegraph-subagents/agents/scout.md')
+  })
+
+  it('discovers custom agents by filename without requiring a name frontmatter field', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'telegraph-subagent-discovery-'))
+
+    try {
+      await writeFile(
+        join(dir, 'db-migrator.md'),
+        [
+          '---',
+          'description: Database migration specialist',
+          'prompt_mode: append',
+          'fallback_models: [haiku, sonnet]',
+          'tools:',
+          '  - read',
+          '  - grep',
+          '---',
+          '',
+          'Inspect migration files and report the smallest safe next step.',
+        ].join('\n'),
+        'utf8',
+      )
+
+      const agents = discoverAgents({
+        scopes: [],
+        extraDirs: [{ path: dir, scope: 'project' }],
+      })
+
+      expect([...agents.keys()]).toEqual(['db-migrator'])
+      expect(agents.get('db-migrator')).toMatchObject({
+        name: 'db-migrator',
+        description: 'Database migration specialist',
+        fallbackModels: ['haiku', 'sonnet'],
+        systemPromptMode: 'append',
+        tools: ['read', 'grep'],
+        systemPrompt: 'Inspect migration files and report the smallest safe next step.',
+      })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('runs the default chain through fallback subagents and completes the parent run', async () => {

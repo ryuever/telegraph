@@ -12,7 +12,7 @@ import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/Age
 import {
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
   isTelegraphSubagentsSelector,
-} from '@/packages/agent/runtime/telegraphSubagents/constants'
+} from '@/packages/agent/extensions/harness/constants'
 import {
   CapabilityHost,
   type AgentCapability,

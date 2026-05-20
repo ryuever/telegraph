@@ -387,7 +387,7 @@ AuthorDate: Mon May 4 06:03:27 2026 +0800
 
 ### 4.6 Telegraph Native Subagent Harness 与 OrchestratorCore 是两条 team 路线
 
-2026-05-20 对齐后，`pi-subagents` 不再作为长期 runtime adapter 定位；代码已收敛到 `packages/agent/src/runtime/telegraphSubagents/`。chain / parallel / role delegation 归属 Telegraph Native Subagent Harness；Pi 官方 `pi-subagents` 行为则通过 Pi CLI External Agent Runtime 兼容。
+2026-05-20 对齐后，`pi-subagents` 不再作为长期 runtime adapter 定位；代码已收敛到顶层 `extensions/telegraph-subagents/`，由 `packages/agent/src/extensions/harness/` 提供 manifest / contribution snapshot 基础设施。chain / parallel / role delegation 归属 Telegraph Native Subagent Harness；Pi 官方 `pi-subagents` 行为则通过 Pi CLI External Agent Runtime 兼容。
 
 `packages/agent/src/runtime/OrchestratorCoreRunner.ts:43-89` 则把 `@/packages/orchestrator-core` graph invoke 转成 Telegraph orchestrator signal；`OrchestratorCoreRunner.ts:151-205` 通过 instrument node action 产生 node_started、node_completed、edge_taken。
 

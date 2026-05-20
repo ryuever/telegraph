@@ -21,6 +21,7 @@ export default defineConfig({
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
       '@/packages/orchestrator-core': resolve(__dirname, '../../packages/orchestrator-core/src'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
+      '@/extensions/telegraph-subagents': resolve(__dirname, '../../extensions/telegraph-subagents'),
     },
   },
   build: {

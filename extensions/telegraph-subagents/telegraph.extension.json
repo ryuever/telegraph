@@ -1,0 +1,98 @@
+{
+  "id": "@telegraph/subagents",
+  "displayName": "Telegraph Subagents",
+  "version": "0.1.0",
+  "engines": {
+    "telegraph": ">=0.1.0"
+  },
+  "pagelets": ["chat", "coding", "design"],
+  "activationEvents": ["onAgentRun:telegraph-native", "onTool:subagent"],
+  "contributes": {
+    "agents": [
+      {
+        "id": "scout",
+        "title": "Scout",
+        "description": "Inspect the task and collect the facts needed before planning.",
+        "prompt": "./agents/scout.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true
+        }
+      },
+      {
+        "id": "planner",
+        "title": "Planner",
+        "description": "Turn findings into a concrete execution plan.",
+        "prompt": "./agents/planner.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true
+        }
+      },
+      {
+        "id": "worker",
+        "title": "Worker",
+        "description": "Execute the planned work and produce the main answer.",
+        "prompt": "./agents/worker.md",
+        "tools": ["read", "grep", "glob", "edit", "bash"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true
+        }
+      },
+      {
+        "id": "reviewer",
+        "title": "Reviewer",
+        "description": "Review the produced result for correctness, regressions, and gaps.",
+        "prompt": "./agents/reviewer.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true
+        }
+      }
+    ],
+    "orchestrationTools": [
+      {
+        "id": "subagent",
+        "title": "Subagent Delegation",
+        "description": "Delegate bounded work to one or more enabled subagent profiles.",
+        "agentSource": "enabled-registry",
+        "scope": "parent-selector"
+      }
+    ],
+    "contextProviders": [
+      {
+        "id": "agent-catalog-summary",
+        "description": "Summarizes enabled subagent profiles for the parent model.",
+        "activation": "onAgentRun:telegraph-native"
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "type": "filesystem",
+      "scope": "workspace",
+      "access": "read"
+    }
+  ],
+  "main": "./src/activate.ts"
+}

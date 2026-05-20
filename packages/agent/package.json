@@ -13,6 +13,7 @@
     "./harness/*": "./src/harness/*.ts",
     "./harness/node": "./src/harness/node/index.ts",
     "./extensions/pi-compat": "./src/extensions/pi-compat/index.ts",
+    "./extensions/harness": "./src/extensions/harness/index.ts",
     "./extensions/node": "./src/extensions/node/index.ts",
     "./extensions/ExtensionManifest": "./src/extensions/ExtensionManifest.ts",
     "./*": "./src/*.ts"

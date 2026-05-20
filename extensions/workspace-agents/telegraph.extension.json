@@ -1,0 +1,9 @@
+{
+  "id": "@telegraph/workspace-agents",
+  "displayName": "Workspace Agents",
+  "version": "0.1.0",
+  "activationEvents": ["onAgentRun:telegraph-native"],
+  "contributes": {
+    "agents": []
+  }
+}

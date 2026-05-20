@@ -1,11 +1,10 @@
 import { spawn } from 'node:child_process'
 import { mkdir, open, opendir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
-import type { Tool } from '@mariozechner/pi-ai'
 import type { RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 import { PermissionBroker, type PermissionBrokerRequestContext } from '@/packages/agent/harness/PermissionBroker'
-import type { AgentRuntimeSettings } from '../../types'
-import type { PiAiExecutableTool } from '../streamPiAiRuntime'
+import type { AgentRuntimeSettings } from '@/packages/agent/types'
+import type { PiAiExecutableTool } from '@/packages/agent/runtime/streamPiAiRuntime'
 
 const READ_MAX_BYTES = 128 * 1024
 const GREP_MAX_FILE_BYTES = 512 * 1024
@@ -477,13 +476,13 @@ function escapeRegExp(value: string | undefined): string {
   return (value ?? '').replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
 }
 
-function objectSchema(properties: Record<string, unknown>, required: string[]): Tool['parameters'] {
+function objectSchema(properties: Record<string, unknown>, required: string[]): PiAiExecutableTool['parameters'] {
   return {
     type: 'object',
     properties,
     required,
     additionalProperties: false,
-  } as Tool['parameters']
+  } as PiAiExecutableTool['parameters']
 }
 
 function stringSchema(description: string): unknown {

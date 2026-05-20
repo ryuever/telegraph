@@ -17,6 +17,7 @@
     "@telegraph/agent": "workspace:*",
     "@telegraph/agent-protocol": "workspace:*",
     "@telegraph/daemon": "workspace:*",
+    "@telegraph/extension-telegraph-subagents": "workspace:*",
     "@telegraph/services": "workspace:*",
     "@telegraph/shared": "workspace:*",
     "@telegraph/ui": "workspace:*",

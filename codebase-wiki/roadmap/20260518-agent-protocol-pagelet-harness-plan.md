@@ -25,6 +25,9 @@ references:
   - id: D-015
     rel: extended-by
     file: ../discussion/20260520-agent-runtime-product-layer-alignment.md
+  - id: A-012
+    rel: extended-by
+    file: ../architecture/20260520-telegraph-harness-extension-architecture.md
 ---
 
 # Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划

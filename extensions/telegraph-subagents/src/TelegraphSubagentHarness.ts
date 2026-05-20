@@ -11,15 +11,22 @@
 
 import type { RuntimeEvent } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
-import { BaseAgentRuntime, type RuntimeInput } from '../AgentRuntime'
-import { streamPiAiRuntimeEvents, type PiAiExecutableTool } from '../streamPiAiRuntime'
-import type { AgentRuntimeSettings } from '../../types'
+import { BaseAgentRuntime, type RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
+import { streamPiAiRuntimeEvents, type PiAiExecutableTool } from '@/packages/agent/runtime/streamPiAiRuntime'
+import type { AgentRuntimeSettings } from '@/packages/agent/types'
+import {
+  agentAliasList,
+  agentCatalogText,
+  type HarnessContributionSnapshot,
+} from '@/packages/agent/extensions/harness'
 import {
   TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
 } from './constants'
 import { orchestrate } from './orchestrator'
+import { SubagentManager } from './SubagentManager'
 import type { SubagentOrchestratorInput } from './types'
+import { createTelegraphSubagentsSnapshot, subagentDefinitionsFromSnapshot } from './agentDiscovery'
 
 const SV = RUNTIME_CONTRACT_SCHEMA_VERSION
 const PV = TELEGRAPH_SUBAGENTS_PRODUCER_VERSION
@@ -27,6 +34,7 @@ const PV = TELEGRAPH_SUBAGENTS_PRODUCER_VERSION
 export class TelegraphSubagentHarness extends BaseAgentRuntime {
   readonly id = TELEGRAPH_SUBAGENTS_RUNTIME_ID
   readonly label = 'Telegraph Native Subagents'
+  private readonly subagents = new SubagentManager()
 
   async *run(input: RuntimeInput): AsyncIterable<RuntimeEvent> {
     const { runId, sessionId, message, settings, signal } = input
@@ -67,12 +75,15 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         return
       }
 
+      const snapshot = createTelegraphSubagentsSnapshot({ cwd: process.cwd() })
+      const agents = subagentDefinitionsFromSnapshot(snapshot)
       const orchInput = yield* selectOrchestrationWithModel({
         runId,
         message,
         settings: agentSettings,
         signal,
         pattern,
+        snapshot,
       })
       if (!orchInput) {
         yield {
@@ -96,6 +107,8 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         sessionId,
         settings: agentSettings,
         signal,
+        agents,
+        manager: this.subagents,
       })) {
         yield ev
 
@@ -216,11 +229,13 @@ async function* selectOrchestrationWithModel(options: {
   settings: AgentRuntimeSettings
   signal?: AbortSignal
   pattern: 'chain' | 'parallel'
+  snapshot: HarnessContributionSnapshot
 }): AsyncGenerator<RuntimeEvent, SubagentOrchestratorInput | undefined, void> {
   let selectedInput: SubagentOrchestratorInput | undefined
   const subagentTool = createSubagentSelectionTool({
     message: options.message,
     pattern: options.pattern,
+    snapshot: options.snapshot,
     onSelect: input => {
       selectedInput = input
     },
@@ -233,7 +248,7 @@ async function* selectOrchestrationWithModel(options: {
     signal: options.signal,
     tools: [subagentTool],
     maxToolIterations: 1,
-    systemPrompt: buildParentOrchestratorSystemPrompt(options.pattern),
+    systemPrompt: buildParentOrchestratorSystemPrompt(options.pattern, options.snapshot),
   })) {
     if (event.type === 'run_failed') {
       if (!selectedInput) {
@@ -257,8 +272,13 @@ async function* selectOrchestrationWithModel(options: {
 function createSubagentSelectionTool(options: {
   message: string
   pattern: 'chain' | 'parallel'
+  snapshot: HarnessContributionSnapshot
   onSelect: (input: SubagentOrchestratorInput) => void
 }): PiAiExecutableTool {
+  const agentAliases = agentAliasList(options.snapshot)
+  const agentSchema = agentAliases.length > 0
+    ? stringEnumSchema(agentAliases, 'Agent profile alias from the enabled subagent registry.')
+    : stringSchema('Agent profile alias from the enabled subagent registry.')
   return {
     name: 'subagent',
     description: [
@@ -267,13 +287,13 @@ function createSubagentSelectionTool(options: {
       'Call this only when delegation materially helps the user request.',
     ].join(' '),
     parameters: objectSchema({
-      agent: stringSchema('Agent name for single-agent delegation.'),
+      agent: agentSchema,
       task: stringSchema('Task for the selected agent or the top-level objective.'),
       tasks: {
         type: 'array',
         description: 'Parallel delegation tasks.',
         items: objectSchema({
-          agent: stringSchema('Agent name.'),
+          agent: agentSchema,
           label: stringSchema('Optional display label for the child run.'),
           task: stringSchema('Concrete task for this child run.'),
           count: numberSchema('Repeat this task N times.'),
@@ -287,14 +307,14 @@ function createSubagentSelectionTool(options: {
         type: 'array',
         description: 'Sequential delegation steps.',
         items: objectSchema({
-          agent: stringSchema('Agent name for this step.'),
+          agent: agentSchema,
           label: stringSchema('Optional display label for this step.'),
           task: stringSchema('Task template. May use {task} and {previous}.'),
           parallel: {
             type: 'array',
             description: 'Parallel fan-out within this chain step.',
             items: objectSchema({
-              agent: stringSchema('Agent name.'),
+              agent: agentSchema,
               label: stringSchema('Optional display label.'),
               task: stringSchema('Task template.'),
             }, ['agent']),
@@ -313,7 +333,7 @@ function createSubagentSelectionTool(options: {
       },
     }, []),
     async execute(input) {
-      const selected = readToolOrchestratorInput(input, options.message, options.pattern)
+      const selected = readToolOrchestratorInput(input, options.message, options.pattern, agentAliases)
       options.onSelect(selected)
       return {
         accepted: true,
@@ -328,10 +348,15 @@ function createSubagentSelectionTool(options: {
   }
 }
 
-function buildParentOrchestratorSystemPrompt(pattern: 'chain' | 'parallel'): string {
+function buildParentOrchestratorSystemPrompt(
+  pattern: 'chain' | 'parallel',
+  snapshot: HarnessContributionSnapshot,
+): string {
   return [
     'You are the Telegraph parent agent.',
     'Decide from the user message whether subagents are useful.',
+    'Available subagent profiles for this run:',
+    agentCatalogText(snapshot),
     'If the user asks for subagents, parallel reviewers, delegated investigation, implementation plus review, or work that benefits from isolated specialist runs, call the subagent tool exactly once.',
     'If the request is simple enough for one assistant response, answer directly without calling tools.',
     `The UI preference is ${pattern}, but the user message and your judgment decide the actual subagent shape.`,
@@ -343,6 +368,7 @@ function readToolOrchestratorInput(
   input: Record<string, unknown>,
   message: string,
   pattern: 'chain' | 'parallel',
+  availableAgents: string[],
 ): SubagentOrchestratorInput {
   const task = readString(input.task) ?? message
   const tasks = readParallelTasks(input.tasks)
@@ -376,36 +402,40 @@ function readToolOrchestratorInput(
     }
   }
 
-  return createDefaultOrchestratorInput(message, pattern)
+  return createDefaultOrchestratorInput(message, pattern, availableAgents)
 }
 
 function createDefaultOrchestratorInput(
   message: string,
   pattern: 'chain' | 'parallel',
+  availableAgents: string[],
 ): SubagentOrchestratorInput {
+  // This fallback is intentionally data-driven. Specific presets such as scout
+  // are not special-cased here; the parent model should normally provide the
+  // selected plan through the subagent tool.
+  const selectedAgents = availableAgents.slice(0, 4)
+  if (selectedAgents.length === 0) {
+    return {
+      mode: 'single',
+      task: message,
+    }
+  }
   if (pattern === 'parallel') {
     return {
       mode: 'parallel',
       task: message,
-      tasks: [
-        { agent: 'scout', task: message },
-        { agent: 'planner', task: message },
-        { agent: 'worker', task: message },
-        { agent: 'reviewer', task: message },
-      ],
-      concurrency: 4,
+      tasks: selectedAgents.map(agent => ({ agent, task: message })),
+      concurrency: Math.max(1, selectedAgents.length),
     }
   }
 
   return {
     mode: 'chain',
     task: message,
-    chain: [
-      { agent: 'scout', task: '{task}' },
-      { agent: 'planner', task: '{previous}' },
-      { agent: 'worker', task: '{previous}' },
-      { agent: 'reviewer', task: '{previous}' },
-    ],
+    chain: selectedAgents.map((agent, index) => ({
+      agent,
+      task: index === 0 ? '{task}' : '{previous}',
+    })),
   }
 }
 
@@ -424,6 +454,10 @@ function stringSchema(description: string): unknown {
 
 function numberSchema(description: string): unknown {
   return { type: 'number', description }
+}
+
+function stringEnumSchema(values: string[], description: string): unknown {
+  return { type: 'string', enum: values, description }
 }
 
 function arrayOfStringsSchema(description: string): unknown {

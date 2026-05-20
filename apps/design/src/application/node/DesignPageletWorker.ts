@@ -21,8 +21,8 @@ import {
 } from '@/packages/agent/harness/node';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
-import { TelegraphSubagentHarness } from '@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness';
-import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/runtime/telegraphSubagents/constants';
+import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
+import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');

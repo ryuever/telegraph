@@ -1,8 +1,4 @@
-/**
- * Shared constants for Telegraph native subagents.
- * Kept in a separate module so the main barrel can import them
- * without pulling in Node.js-only dependencies (node:fs, node:os, etc.).
- */
+export const TELEGRAPH_SUBAGENTS_EXTENSION_ID = '@telegraph/subagents'
 export const TELEGRAPH_SUBAGENTS_RUNTIME_ID = 'telegraph-subagents'
 export const TELEGRAPH_SUBAGENTS_PRODUCER_VERSION = 'telegraph-subagents@0.1.0'
 

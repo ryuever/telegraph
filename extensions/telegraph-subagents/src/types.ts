@@ -45,6 +45,15 @@ export interface SubagentDefinition {
   scope: SubagentScope
   /** File path this definition was loaded from (for debugging). */
   sourcePath?: string
+  /** Contribution origin for trace/debug UI. */
+  origin?: {
+    extensionId: string
+    contributionId: string
+    fullId: string
+    sourceKind: string
+    sourcePath?: string
+    rootPath?: string
+  }
 }
 
 export type SubagentScope = 'builtin' | 'user' | 'project'
@@ -124,4 +133,29 @@ export interface SubagentChildResult {
   text: string
   exitCode: number
   durationMs: number
+}
+
+// ---------------------------------------------------------------------------
+// Subagent lifecycle records
+// ---------------------------------------------------------------------------
+
+export type SubagentStatus = 'queued' | 'running' | 'completed' | 'stopped' | 'error'
+
+export interface SubagentRecord {
+  id: string
+  parentRunId: string
+  agent: string
+  label: string
+  description: string
+  task: string
+  status: SubagentStatus
+  result?: string
+  error?: string
+  toolUses: number
+  startedAt: number
+  completedAt?: number
+  abortController: AbortController
+  resultConsumed?: boolean
+  sourcePath?: string
+  origin?: SubagentDefinition['origin']
 }

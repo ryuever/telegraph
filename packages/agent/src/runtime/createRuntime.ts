@@ -8,7 +8,7 @@ import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import {
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
   isTelegraphSubagentsSelector,
-} from '@/packages/agent/runtime/telegraphSubagents/constants'
+} from '@/packages/agent/extensions/harness/constants'
 
 /**
  * Factory function to create a RuntimeExecutor instance.
@@ -16,7 +16,6 @@ import {
  * Supports:
  * - pi-ai: LLM-only streaming (in-process)
  * - pi-embedded: Pi-AI with embedded tool loop
- * - telegraph-subagents: Telegraph native subagent harness (chain/parallel via pi-ai kernel)
  * - langgraph: LangGraph state machine framework
  * - vercel-ai: Vercel AI SDK adapter
  *
@@ -24,7 +23,9 @@ import {
  * They are spawned by the External Agent Runtime path, not represented as
  * framework adapters here.
  *
- * NOTE: TelegraphSubagentHarness is loaded lazily to avoid pulling node:fs into the renderer bundle.
+ * NOTE: first-party extension runtimes such as telegraph-subagents are
+ * registered by pagelet-local AgentHarness instances. They are not created
+ * by this framework runtime factory.
  * 
  * @param settings Runtime configuration
  * @returns RuntimeExecutor instance ready to execute runs
@@ -35,10 +36,7 @@ export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings):
   
   // Telegraph native orchestration mode takes precedence over backend selection.
   if (isTelegraphSubagentsSelector(agentSettings.orchestration) || isTelegraphSubagentsSelector(backend)) {
-    // Lazy require to avoid pulling node:fs into the renderer bundle.
-    // This code path only executes in the daemon (Node.js) process.
-    const { TelegraphSubagentHarness } = require('@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness') as typeof import('@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness')
-    return new TelegraphSubagentHarness()
+    throw new Error(`[createRuntime] '${TELEGRAPH_SUBAGENTS_RUNTIME_ID}' is a harness extension runtime. Register it on a pagelet-local AgentHarness instead of creating it through createRuntime().`)
   }
   
   if (backend === 'pi-embedded') {
@@ -57,7 +55,7 @@ export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings):
     return new PiAiRuntime()
   }
   
-  throw new Error(`[createRuntime] Unknown backend: '${backend}'. Supported: 'pi-ai', 'pi-embedded', '${TELEGRAPH_SUBAGENTS_RUNTIME_ID}', 'langgraph', 'vercel-ai'`)
+  throw new Error(`[createRuntime] Unknown backend: '${backend}'. Supported: 'pi-ai', 'pi-embedded', 'langgraph', 'vercel-ai'`)
 }
 
 /**

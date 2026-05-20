@@ -27,7 +27,8 @@
       "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
       "@/packages/orchestrator-core": ["../../packages/orchestrator-core/src/index.ts"],
       "@/packages/orchestrator-core/*": ["../../packages/orchestrator-core/src/*"],
-      "@/packages/agent/*": ["../../packages/agent/src/*"]
+      "@/packages/agent/*": ["../../packages/agent/src/*"],
+      "@/extensions/telegraph-subagents/*": ["../../extensions/telegraph-subagents/*"]
     }
   },
   "include": ["src/**/*"]

@@ -7,7 +7,7 @@ description: >
   runtime adapter，而应沉淀为 Telegraph native subagent harness。
 category: discussion
 created: 2026-05-20
-updated: 2026-05-20
+updated: 2026-05-21
 tags:
   - agent-runtime
   - native-harness
@@ -26,6 +26,9 @@ references:
   - id: D-003
     rel: extends
     file: ./20260506-spawn-cli-vs-embed-orchestra-agent-invocation.md
+  - id: R-002
+    rel: related-to
+    file: ../reference/20260521-pi-subagents-implementation-study.md
   - id: D-001
     rel: extends
     file: ./20260504-multica-vs-pi-multi-agent-for-telegraph.md
@@ -44,6 +47,9 @@ references:
   - id: I-004
     rel: related-to
     file: ../issue/20260519-pi-subagents-structured-plan-parsing.md
+  - id: A-012
+    rel: extended-by
+    file: ../architecture/20260520-telegraph-harness-extension-architecture.md
 ---
 
 # Agent Runtime 产品分层与 Telegraph Native Harness 对齐
@@ -160,14 +166,27 @@ Claude Code 时，Telegraph 不拆开它们内部的 `coding-agent -> agent-core
 当前代码已收敛为 Telegraph native 命名：
 
 ```text
-packages/agent/src/runtime/telegraphSubagents/
-  TelegraphSubagentHarness.ts
-  agentDiscovery.ts
-  agentParser.ts
-  builtinAgents.ts
-  orchestrator.ts
-  tools.ts
-  types.ts
+extensions/telegraph-subagents/
+  telegraph.extension.json
+  agents/
+    scout.md
+    planner.md
+    worker.md
+    reviewer.md
+  src/
+    TelegraphSubagentHarness.ts
+    agentDiscovery.ts
+    agentParser.ts
+    orchestrator.ts
+    tools.ts
+    types.ts
+
+packages/agent/src/extensions/harness/
+  HarnessExtensionManifest.ts
+  ContributionRegistry.ts
+  HarnessContributionSnapshot.ts
+  ActivationHost.ts
+  CapabilityBroker.ts
 ```
 
 目录约定也应分开：
@@ -206,7 +225,7 @@ packages/agent/src/runtime/telegraphSubagents/
 
 ## 7. 后续落地建议
 
-1. 继续将 `telegraphSubagents` 内部概念提升为 `AgentProfileRegistry`，默认读取 Telegraph 自己的 agent 目录。
+1. 继续将 `extensions/telegraph-subagents` 的 profile snapshot 能力提升为完整 `AgentProfileRegistry`，默认读取 Telegraph 自己的 agent 目录。
 2. 如果未来需要读取 `.pi/agents`，新增 importer / migration tool；不要放回 runtime discovery。
 3. 定义 `SubagentRunner` 接口，使 child run 可以选择 embedded kernel 或 external CLI runner。
 4. 恢复 / 保留 External Agent Runtime 路线，用于 Pi CLI、Codex CLI、Claude Code 等成熟 CLI。

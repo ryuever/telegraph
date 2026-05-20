@@ -273,14 +273,20 @@ packages/agent/src/
 │   ├── streamPiAiRuntime.ts    # pi-ai stream() → RuntimeEvent 适配
 │   ├── LangGraphRuntime.ts     # LangGraph 执行器
 │   ├── VercelAiRuntime.ts      # Vercel AI SDK 执行器
-│   ├── createRuntime.ts        # 工厂函数 (backend → executor)
-│   └── telegraphSubagents/     # Telegraph native 多 agent 编排
+│   └── createRuntime.ts        # 工厂函数 (backend → executor)
+├── extensions/
+│   └── harness/                # Telegraph Native Harness extension host 底座
 ├── providers/
 │   ├── index.ts                # resolveModel(), DEFAULT_MODEL_CATALOG
 │   └── minimax.ts              # MiniMax OpenAI-compat model builder
 ├── extensions/                 # Extension 加载框架
 ├── persistence/                # Session/Fact 存储
 └── ...
+
+extensions/telegraph-subagents/
+├── telegraph.extension.json    # first-party subagents extension manifest
+├── agents/                     # scout/planner/worker/reviewer preset profiles
+└── src/                        # TelegraphSubagentHarness + discovery/orchestration/tooling
 
 packages/runtime-contracts/src/
 ├── events.ts                   # RuntimeEvent 联合类型 (15+ 种事件)

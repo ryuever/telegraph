@@ -51,6 +51,10 @@ export const wikiSidebar = {
         {
           "text": "A-011 Telegraph 连接拓扑与通信模式",
           "link": "/architecture/20260515-connection-topology-and-patterns"
+        },
+        {
+          "text": "A-012 Telegraph Harness Extension 架构设计",
+          "link": "/architecture/20260520-telegraph-harness-extension-architecture"
         }
       ]
     }
@@ -152,6 +156,10 @@ export const wikiSidebar = {
         {
           "text": "R-001 x-oasis 本地 source link 配置手册（telegraph）",
           "link": "/reference/20260508-x-oasis-link-to-source-setup"
+        },
+        {
+          "text": "R-002 pi-subagents 实现解剖与 Telegraph Native Harness 借鉴清单",
+          "link": "/reference/20260521-pi-subagents-implementation-study"
         }
       ]
     }

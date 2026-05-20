@@ -1,0 +1,24 @@
+{
+  "name": "@telegraph/extension-telegraph-subagents",
+  "version": "0.0.0",
+  "description": "Telegraph first-party subagent platform extension.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/agent": "workspace:*",
+    "@telegraph/agent-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,5 +1,13 @@
 export { TelegraphSubagentHarness } from './TelegraphSubagentHarness'
 export { orchestrate } from './orchestrator'
+export { SubagentManager, type SubagentManagerOptions, type SpawnSubagentInput } from './SubagentManager'
+export {
+  StreamingSubagentRunner,
+  buildPromptForAgent,
+  applyAgentSettings,
+  type SubagentRunRequest,
+  type SubagentRunner,
+} from './SubagentRunner'
 export {
   TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
@@ -16,4 +24,6 @@ export type {
   SubagentChainStep,
   SubagentParallelTask,
   SubagentChildResult,
+  SubagentRecord,
+  SubagentStatus,
 } from './types'

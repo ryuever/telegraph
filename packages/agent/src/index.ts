@@ -207,24 +207,27 @@ export {
   type PermissionCheckResult,
   type PermissionLevel,
 } from '@/packages/agent/runtime/toolCoordination/PermissionValidator'
-// Node.js-only Telegraph subagent harness exports (TelegraphSubagentHarness, orchestrate,
-// discoverAgents, etc.) are intentionally excluded from main export to avoid bundling node:fs into the renderer.
-// Import from '@/packages/agent/runtime/telegraphSubagents/index' in Node.js environments.
 export {
+  TELEGRAPH_SUBAGENTS_EXTENSION_ID,
   TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
   isTelegraphSubagentsSelector,
-} from '@/packages/agent/runtime/telegraphSubagents/constants'
-export type {
-  SubagentDefinition,
-  SubagentScope,
-  SubagentOverrides,
-  SubagentExecutionMode,
-  SubagentOrchestratorInput,
-  SubagentChainStep,
-  SubagentParallelTask,
-  SubagentChildResult,
-} from '@/packages/agent/runtime/telegraphSubagents/types'
+} from '@/packages/agent/extensions/harness/constants'
+export {
+  ActivationHost,
+  CapabilityBroker,
+  ContributionRegistry,
+  agentAliasList,
+  agentCatalogText,
+  parseHarnessExtensionManifest,
+  type ActivationEvent,
+  type AgentContribution,
+  type HarnessContributionSnapshot,
+  type HarnessExtensionManifest,
+  type HarnessExtensionPackage,
+  type HarnessExtensionSourceKind,
+  type ResolvedAgentContribution,
+} from '@/packages/agent/extensions/harness'
 export {
   ExecutionTimeline,
   type TimelineEntry,

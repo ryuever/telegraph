@@ -11,8 +11,8 @@ import {
 } from '@/apps/chat/application/common';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
-import { TelegraphSubagentHarness } from '@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness';
-import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/runtime/telegraphSubagents/constants';
+import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
+import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { createAgentHarness } from '@/packages/agent/harness';
 import { createPageletRunCapabilities } from '@/packages/agent/harness/node';

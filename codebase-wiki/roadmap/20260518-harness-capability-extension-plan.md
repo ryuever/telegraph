@@ -25,6 +25,9 @@ references:
   - id: D-014
     rel: related-to
     file: ../discussion/20260519-chat-agent-team-multica-strategy.md
+  - id: A-012
+    rel: extended-by
+    file: ../architecture/20260520-telegraph-harness-extension-architecture.md
 ---
 
 # Harness Capability 与 Extension 分层执行计划

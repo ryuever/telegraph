@@ -53,6 +53,7 @@ features:
 | A-009 | [20260512-runtime-directory-convention-and-file-structure.md](./architecture/20260512-runtime-directory-convention-and-file-structure.md) | Telegraph 运行时目录分层与文件结构约定 | 以 VS Code 的 node/electron-browser/browser-common/browser 范式为参照，系统梳理 Telegraph 的 common / electron-main / electron-browser / browser / node 五层运行时目录含义、代码边界、完整文件映射与跨目录 import 规则矩阵。 |
 | A-010 | [20260513-vscode-contribution-model-for-telegraph.md](./architecture/20260513-vscode-contribution-model-for-telegraph.md) | VS Code Contribution 模型对 Telegraph 可扩展架构的启示与落地路径 | 以 VS Code extension 的 contributes 声明式贡献点为参照，分析 apps-v2 中 4 套隐式注册模式（participant ID / service path / PageConfig / DI Registry），提出 TelegraphManifest 声明式契约设计与三层贡献模型（Static Manifest → DI Registration → Runtime Binding），使新 Pagelet 接入从改 6 处代码收敛到写 1 份 manifest。 |
 | A-011 | [20260515-connection-topology-and-patterns.md](./architecture/20260515-connection-topology-and-patterns.md) | Telegraph 连接拓扑与通信模式 | 三层通信模型（IPC / Direct / Utility Control）的全局拓扑、各进程启动建连时序、Pagelet 全生命周期连接演变、重连策略、以及跨 Pagelet 高频交互的 Shared 服务发现 + P2P 直连方案。 |
+| A-012 | [20260520-telegraph-harness-extension-architecture.md](./architecture/20260520-telegraph-harness-extension-architecture.md) | Telegraph Harness Extension 架构设计 | 定义 Telegraph Native Harness 的 extension/contribution 架构：声明式贡献点、懒激活、能力代理、run-level snapshot、subagents first-party extension，以及与 Embedded Execution Kernel / External Agent Runtime 的边界。 |
 
 ### discussion/ — 技术讨论
 
@@ -88,6 +89,7 @@ features:
 | # | 文件 | 标题 | 概述 |
 |---|------|------|------|
 | R-001 | [20260508-x-oasis-link-to-source-setup.md](./reference/20260508-x-oasis-link-to-source-setup.md) | x-oasis 本地 source link 配置手册（telegraph） | 把 telegraph 4 个 app 全部指向本地 x-oasis source 的完整步骤：上游 12 个包改 main + telegraph pnpm.overrides + 移除 vite external + tsconfig paths。 |
+| R-002 | [20260521-pi-subagents-implementation-study.md](./reference/20260521-pi-subagents-implementation-study.md) | pi-subagents 实现解剖与 Telegraph Native Harness 借鉴清单 | 拆解 pi-subagents 的 Agent tool、AgentManager、独立 AgentSession、后台结果回流、steering/resume/event bus/scheduler 等实现，并映射为 Telegraph Native Harness 后续清单。 |
 
 ### roadmap/ — 规划路线
 
