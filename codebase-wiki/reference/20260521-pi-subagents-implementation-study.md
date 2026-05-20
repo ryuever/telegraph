@@ -261,12 +261,14 @@ SubagentManager 的最小状态机。
 - `SubagentManager` 已经成为 child lifecycle 入口，负责 `SubagentRecord`、并发槽位、abort 与 result consumption 标记。
 - `StreamingSubagentRunner` 已经封装 Embedded Execution Kernel child run 创建、tool filtering、prompt assembly 与 result collection。
 - single/chain/parallel 已经统一通过 `SubagentManager.spawnAndWait()` 执行 child，不再由各 workflow helper 手搓 child stream。
+- Chat / Design pagelet service 已注入 pagelet-local `SubagentManager`，并把 list/result/cancel 作为 RPC service 方法与浏览器侧 service wrapper 暴露。
+- parent final synthesis 已暴露 `get_subagent_result` tool，父模型可以通过 child run id 显式读取并消费 manager 内的 child result，再写最终回答。
 
 但它仍不是 pi-subagents 那种完整
 subagent platform：
 
-- 缺少 background child run id、later notification、result consumption。
-- 缺少 `get_subagent_result`、`steer_subagent`、resume。
+- 缺少 background child run id 与 later notification；result consumption 已在 manager、pagelet service、parent synthesis tool 层具备基础能力。
+- 缺少 `steer_subagent`、resume。
 - 缺少 join policy 与 background batch/group。
 - 缺少 child session transcript 与 usage 的完整状态对象。
 
@@ -275,10 +277,12 @@ subagent platform：
 1. ✅ 提取 `SubagentManager`：管理 `SubagentRecord`、并发槽位、abort、result consumption 与 lifecycle callback。
 2. ✅ 提取 `SubagentRunner`：封装 Embedded Execution Kernel child run 创建、tool filtering、prompt assembly、result collection。
 3. ✅ 重写 orchestrator child execution：single/chain/parallel 都通过 manager spawn child records。
-4. 增加 foreground/background 语义：foreground 等待 child；background 返回 id，并通过 RuntimeEvent / pagelet service 投递 completion。
-5. 增加 result/steer control：先作为 parent-visible tools，再投影到 UI actions。
-6. 加入 join policy：先实现 explicit group，再实现 smart debounce。
-7. 最后再考虑 scheduler、memory、worktree、cross-extension RPC。
+4. ✅ 将 `SubagentManager` 接入 Chat / Design pagelet service，提供 pagelet-local list/result/cancel 控制面。
+5. ✅ 增加 parent-visible result control：final synthesis turn 提供 `get_subagent_result` tool，并标记 `resultConsumed`。
+6. 增加 foreground/background 语义：foreground 等待 child；background 返回 id，并通过 RuntimeEvent / pagelet service 投递 completion。
+7. 增加 steer control：先评估 child session/resume 底座，再提供 `steer_subagent` tool 与 UI action。
+8. 加入 join policy：先实现 explicit group，再实现 smart debounce。
+9. 最后再考虑 scheduler、memory、worktree、cross-extension RPC。
 
 这条路线保留了 pi-subagents 的产品手感，但落在 Telegraph Native Harness 的边界里：
 extension contribution 负责“有什么 agent/capability”，manager/runner 负责“child run 怎么活”，

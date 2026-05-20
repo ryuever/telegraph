@@ -56,6 +56,22 @@ export interface ChatSendResult {
   error?: string
 }
 
+export interface ChatSubagentRecordSnapshot {
+  id: string
+  parentRunId: string
+  agent: string
+  label: string
+  description: string
+  task: string
+  status: 'queued' | 'running' | 'completed' | 'stopped' | 'error'
+  result?: string
+  error?: string
+  toolUses: number
+  startedAt: number
+  completedAt?: number
+  resultConsumed?: boolean
+}
+
 // ---------------------------------------------------------------------------
 // LLM trace payloads (renderer-side trace rows)
 // ---------------------------------------------------------------------------
@@ -111,6 +127,9 @@ export interface IChatPageletService {
   info(): Promise<string>
   send(request: ChatSendRequest): Promise<ChatSendResult>
   cancel(runId: string): Promise<boolean>
+  listSubagents(): Promise<ChatSubagentRecordSnapshot[]>
+  getSubagentResult(childRunId: string, consume?: boolean): Promise<ChatSubagentRecordSnapshot | null>
+  cancelSubagent(childRunId: string): Promise<boolean>
   onStreamEvent(callback: (event: ChatStreamEvent) => void): EventSubscription
 }
 

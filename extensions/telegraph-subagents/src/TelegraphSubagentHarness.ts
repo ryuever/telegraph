@@ -25,16 +25,25 @@ import {
 } from './constants'
 import { orchestrate } from './orchestrator'
 import { SubagentManager } from './SubagentManager'
-import type { SubagentOrchestratorInput } from './types'
+import type { SubagentOrchestratorInput, SubagentRecord } from './types'
 import { createTelegraphSubagentsSnapshot, subagentDefinitionsFromSnapshot } from './agentDiscovery'
 
 const SV = RUNTIME_CONTRACT_SCHEMA_VERSION
 const PV = TELEGRAPH_SUBAGENTS_PRODUCER_VERSION
 
+export interface TelegraphSubagentHarnessOptions {
+  subagentManager?: SubagentManager
+}
+
 export class TelegraphSubagentHarness extends BaseAgentRuntime {
   readonly id = TELEGRAPH_SUBAGENTS_RUNTIME_ID
   readonly label = 'Telegraph Native Subagents'
-  private readonly subagents = new SubagentManager()
+  private readonly subagents: SubagentManager
+
+  constructor(options: TelegraphSubagentHarnessOptions = {}) {
+    super()
+    this.subagents = options.subagentManager ?? new SubagentManager()
+  }
 
   async *run(input: RuntimeInput): AsyncIterable<RuntimeEvent> {
     const { runId, sessionId, message, settings, signal } = input
@@ -148,8 +157,17 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         return
       }
 
-      const finalText = formatFinalOutput(orchInput.mode, childOutputs)
-      if (finalText) {
+      const synthesized = yield* synthesizeFinalAnswerWithModel({
+        runId,
+        message,
+        settings: agentSettings,
+        signal,
+        mode: orchInput.mode,
+        subagents: this.subagents,
+      })
+
+      const finalText = synthesized ? '' : formatFinalOutput(orchInput.mode, childOutputs)
+      if (!synthesized && finalText) {
         yield {
           type: 'assistant_delta',
           schemaVersion: SV,
@@ -217,6 +235,163 @@ function formatFinalOutput(mode: SubagentOrchestratorInput['mode'], childOutputs
       .join('\n\n')
   }
   return childOutputs[childOutputs.length - 1] ?? ''
+}
+
+async function* synthesizeFinalAnswerWithModel(options: {
+  runId: string
+  message: string
+  settings: AgentRuntimeSettings
+  signal?: AbortSignal
+  mode: SubagentOrchestratorInput['mode']
+  subagents: SubagentManager
+}): AsyncGenerator<RuntimeEvent, boolean, void> {
+  const records = options.subagents
+    .listRecords()
+    .filter(record => record.parentRunId === options.runId)
+    .sort((a, b) => a.startedAt - b.startedAt)
+  if (records.length === 0) return false
+
+  let producedAssistantText = false
+  const tools = [
+    createGetSubagentResultTool({
+      parentRunId: options.runId,
+      subagents: options.subagents,
+    }),
+  ]
+
+  try {
+    for await (const event of streamPiAiRuntimeEvents({
+      runId: options.runId,
+      settings: options.settings,
+      message: buildFinalSynthesisUserMessage(options.message, options.mode, records),
+      signal: options.signal,
+      tools,
+      maxToolIterations: Math.max(2, records.length + 1),
+      systemPrompt: buildFinalSynthesisSystemPrompt(),
+    })) {
+      if (event.type === 'run_completed') {
+        return producedAssistantText
+      }
+      if (event.type === 'run_failed') {
+        yield finalSynthesisFallbackLog(options.runId, event.error.message, event.error)
+        return false
+      }
+      if (event.type === 'assistant_delta') {
+        producedAssistantText = true
+      }
+      yield event
+    }
+  } catch (error) {
+    yield finalSynthesisFallbackLog(
+      options.runId,
+      error instanceof Error ? error.message : String(error),
+      normalizeErrorDetails(error),
+    )
+    return false
+  }
+
+  return producedAssistantText
+}
+
+function createGetSubagentResultTool(options: {
+  parentRunId: string
+  subagents: SubagentManager
+}): PiAiExecutableTool {
+  return {
+    name: 'get_subagent_result',
+    description: [
+      'Fetch the current Telegraph subagent child-run snapshot and result by childRunId.',
+      'Use this before writing the final answer after subagent work completes.',
+    ].join(' '),
+    parameters: objectSchema({
+      childRunId: stringSchema('Child run id returned by the subagent orchestration.'),
+      consume: {
+        type: 'boolean',
+        description: 'Mark the result as consumed. Defaults to true for final synthesis.',
+      },
+    }, ['childRunId']),
+    async execute(input) {
+      const childRunId = readRequiredString(input.childRunId, 'childRunId')
+      const consume = input.consume === undefined ? true : input.consume === true
+      const record = options.subagents.getResult(childRunId, { consume })
+      if (!record || record.parentRunId !== options.parentRunId) {
+        return {
+          found: false,
+          childRunId,
+          error: 'Subagent child run not found in the current parent run.',
+        }
+      }
+      return {
+        found: true,
+        record: snapshotSubagentRecord(record),
+      }
+    },
+  }
+}
+
+function snapshotSubagentRecord(record: SubagentRecord): Record<string, unknown> {
+  return {
+    id: record.id,
+    parentRunId: record.parentRunId,
+    agent: record.agent,
+    label: record.label,
+    description: record.description,
+    task: record.task,
+    status: record.status,
+    result: record.result,
+    error: record.error,
+    toolUses: record.toolUses,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+    resultConsumed: record.resultConsumed,
+    origin: record.origin,
+  }
+}
+
+function buildFinalSynthesisSystemPrompt(): string {
+  return [
+    'You are the Telegraph parent agent writing the final answer after delegated subagent work.',
+    'Before answering, call get_subagent_result for each childRunId whose result you need.',
+    'Use only fetched subagent results and the original user request; do not invent child findings.',
+    'Return a concise answer for the user. Do not mention internal tool mechanics unless useful.',
+  ].join('\n')
+}
+
+function buildFinalSynthesisUserMessage(
+  message: string,
+  mode: SubagentOrchestratorInput['mode'],
+  records: SubagentRecord[],
+): string {
+  return [
+    'Original user request:',
+    message,
+    '',
+    `Subagent orchestration mode: ${mode}`,
+    '',
+    'Child runs available for result lookup:',
+    ...records.map(record => [
+      `- ${record.id}`,
+      `  agent: ${record.agent}`,
+      `  label: ${record.label}`,
+      `  status: ${record.status}`,
+      `  task: ${record.task}`,
+    ].join('\n')),
+    '',
+    'Call get_subagent_result for the relevant childRunId values, then write the final answer.',
+  ].join('\n')
+}
+
+function finalSynthesisFallbackLog(runId: string, message: string, details?: unknown): RuntimeEvent {
+  return {
+    type: 'runtime_log',
+    schemaVersion: SV,
+    producerVersion: PV,
+    runId,
+    level: 'warn',
+    message: `Final subagent synthesis failed; falling back to deterministic child output aggregation: ${message}`,
+    raw: details,
+    ts: Date.now(),
+  } as RuntimeEvent
 }
 
 // ---------------------------------------------------------------------------
@@ -521,6 +696,14 @@ function readContext(value: unknown): SubagentOrchestratorInput['context'] | und
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+}
+
+function readRequiredString(value: unknown, name: string): string {
+  const string = readString(value)
+  if (!string) {
+    throw new Error(`${name} must be a non-empty string`)
+  }
+  return string
 }
 
 function readStringArray(value: unknown): string[] | undefined {

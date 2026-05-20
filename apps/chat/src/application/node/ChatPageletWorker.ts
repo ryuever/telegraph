@@ -7,11 +7,14 @@ import {
   CHAT_PAGELET_SERVICE_PATH,
   type ChatSendRequest,
   type ChatSendResult,
+  type ChatSubagentRecordSnapshot,
   type ChatStreamEvent,
 } from '@/apps/chat/application/common';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
+import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
+import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
 import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { createAgentHarness } from '@/packages/agent/harness';
@@ -28,6 +31,7 @@ const activeRuns = new Map<string, AbortController>();
 @injectable()
 export class ChatPageletWorker extends PageletWorker {
   private streamListeners = new Set<(event: ChatStreamEvent) => void>();
+  private readonly subagents = new SubagentManager();
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -53,6 +57,17 @@ export class ChatPageletWorker extends PageletWorker {
           }
           return false;
         },
+
+        listSubagents: (): Promise<ChatSubagentRecordSnapshot[]> =>
+          Promise.resolve(this.subagents.listRecords().map(snapshotSubagentRecord)),
+
+        getSubagentResult: (childRunId: string, consume = false): Promise<ChatSubagentRecordSnapshot | null> => {
+          const record = this.subagents.getResult(childRunId, { consume });
+          return Promise.resolve(record ? snapshotSubagentRecord(record) : null);
+        },
+
+        cancelSubagent: (childRunId: string): Promise<boolean> =>
+          Promise.resolve(this.subagents.abort(childRunId)),
 
         onStreamEvent: (callback: (event: ChatStreamEvent) => void): { unsubscribe: () => void } => {
           this.streamListeners.add(callback);
@@ -110,7 +125,7 @@ export class ChatPageletWorker extends PageletWorker {
           { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
           {
             id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-            create: () => new TelegraphSubagentHarness(),
+            create: () => new TelegraphSubagentHarness({ subagentManager: this.subagents }),
           },
           { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
         ],
@@ -196,6 +211,24 @@ export class ChatPageletWorker extends PageletWorker {
         return null;
     }
   }
+}
+
+function snapshotSubagentRecord(record: SubagentRecord): ChatSubagentRecordSnapshot {
+  return {
+    id: record.id,
+    parentRunId: record.parentRunId,
+    agent: record.agent,
+    label: record.label,
+    description: record.description,
+    task: record.task,
+    status: record.status,
+    result: record.result,
+    error: record.error,
+    toolUses: record.toolUses,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+    resultConsumed: record.resultConsumed,
+  };
 }
 
 function feedbackRuntimeLog(input: { runId?: string; level: 'debug' | 'info' | 'warn' | 'error'; message: string; raw?: unknown; ts?: number }): AgentEvent {

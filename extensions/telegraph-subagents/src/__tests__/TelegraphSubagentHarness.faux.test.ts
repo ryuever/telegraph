@@ -25,6 +25,14 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
       fauxAssistantMessage('planner plan'),
       fauxAssistantMessage('worker implementation'),
       fauxAssistantMessage('reviewer final answer'),
+      fauxAssistantMessage(
+        fauxToolCall('get_subagent_result', {
+          childRunId: 'run-faux-subagents-chain-3-reviewer',
+          consume: true,
+        }, { id: 'call-get-reviewer-result' }),
+        { stopReason: 'toolUse' },
+      ),
+      fauxAssistantMessage('reviewer final answer'),
     ])
 
     try {
@@ -66,13 +74,12 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
         type: 'run_completed',
         runId: 'run-faux-subagents',
       })
-      expect(events.filter(event => event.type === 'assistant_delta' && event.runId === 'run-faux-subagents'))
-        .toEqual([
-          expect.objectContaining({
-            text: 'reviewer final answer',
-          }),
-        ])
-      expect(faux.state.callCount).toBe(6)
+      expect(events
+        .filter(event => event.type === 'assistant_delta' && event.runId === 'run-faux-subagents')
+        .map(event => event.type === 'assistant_delta' ? event.text : '')
+        .join(''))
+        .toBe('reviewer final answer')
+      expect(faux.state.callCount).toBe(8)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')
@@ -100,6 +107,14 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
       fauxAssistantMessage('scout findings after read'),
       fauxAssistantMessage('planner plan'),
       fauxAssistantMessage('worker implementation'),
+      fauxAssistantMessage('reviewer final answer'),
+      fauxAssistantMessage(
+        fauxToolCall('get_subagent_result', {
+          childRunId: 'run-faux-subagents-tools-chain-3-reviewer',
+          consume: true,
+        }, { id: 'call-get-reviewer-result' }),
+        { stopReason: 'toolUse' },
+      ),
       fauxAssistantMessage('reviewer final answer'),
     ])
 
@@ -146,8 +161,8 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
           }),
         ]),
       )
-      expect(events.filter(event => event.type === 'model_request')).toHaveLength(7)
-      expect(faux.state.callCount).toBe(7)
+      expect(events.filter(event => event.type === 'model_request')).toHaveLength(9)
+      expect(faux.state.callCount).toBe(9)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')

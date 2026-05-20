@@ -2,6 +2,7 @@ import type { AgentSendOptions, AgentService } from './types'
 import {
   type ChatSendRequest,
   type ChatStreamEvent,
+  type ChatSubagentRecordSnapshot,
 } from '@/apps/chat/application/common'
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
@@ -167,6 +168,27 @@ export class PageletAgentService implements AgentService {
       onStatus?.('failed')
       throw err
     }
+  }
+
+  async listSubagents(signal?: AbortSignal): Promise<ChatSubagentRecordSnapshot[]> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().listSubagents()
+  }
+
+  async getSubagentResult(
+    childRunId: string,
+    options: { consume?: boolean; signal?: AbortSignal } = {},
+  ): Promise<ChatSubagentRecordSnapshot | null> {
+    await waitForChatPageletReady(options.signal)
+    throwIfAborted(options.signal)
+    return getChatPageletClient().getSubagentResult(childRunId, options.consume)
+  }
+
+  async cancelSubagent(childRunId: string, signal?: AbortSignal): Promise<boolean> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().cancelSubagent(childRunId)
   }
 
   private getSettings(): ChatSendRequest['settings'] {

@@ -1,4 +1,4 @@
-import type { AgentSendOptions, AgentService } from './types'
+import type { AgentSendOptions, AgentService, ChatSubagentRecordSnapshot } from './types'
 
 export class MockAgentService implements AgentService {
   async send({ conversation, onChunk, onSubagentUpdate, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
@@ -80,6 +80,18 @@ export class MockAgentService implements AgentService {
         completedAt: Date.now(),
       })
     }
+  }
+
+  async listSubagents(): Promise<ChatSubagentRecordSnapshot[]> {
+    return []
+  }
+
+  async getSubagentResult(): Promise<ChatSubagentRecordSnapshot | null> {
+    return null
+  }
+
+  async cancelSubagent(): Promise<boolean> {
+    return false
   }
 }
 

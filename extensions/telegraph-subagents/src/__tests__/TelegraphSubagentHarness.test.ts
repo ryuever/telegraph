@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { streamPiAiRuntimeEvents } from '@/packages/agent/runtime/streamPiAiRuntime'
 import { discoverAgents } from '../agentDiscovery'
+import { SubagentManager } from '../SubagentManager'
 import { TelegraphSubagentHarness } from '../TelegraphSubagentHarness'
 
 vi.mock('@/packages/agent/runtime/streamPiAiRuntime', () => ({
@@ -141,6 +142,65 @@ function mockRouterSelectionAndChildRuns(
       return undefined
     }
 
+    const resultTool = options.tools?.find(tool => tool.name === 'get_subagent_result')
+    if (resultTool) {
+      const childRunId = readFirstChildRunId(options.message) ?? `${options.runId}-chain-3-reviewer`
+      const input = { childRunId, consume: true }
+      yield {
+        type: 'model_request',
+        schemaVersion: SV,
+        producerVersion: 'test-pi-ai@0.0.0',
+        runId: options.runId,
+        requestId: `req-${options.runId}-synthesis`,
+        payload: { tools: options.tools?.map(tool => tool.name) },
+        ts: Date.now(),
+      } satisfies RuntimeEvent
+      yield {
+        type: 'tool_call',
+        schemaVersion: SV,
+        producerVersion: 'test-pi-ai@0.0.0',
+        runId: options.runId,
+        callId: 'call-get-subagent-result',
+        toolName: 'get_subagent_result',
+        input,
+        ts: Date.now(),
+      } satisfies RuntimeEvent
+      const output = await resultTool.execute(input, {
+        runId: options.runId,
+        callId: 'call-get-subagent-result',
+        toolName: 'get_subagent_result',
+        signal: options.signal,
+      })
+      yield {
+        type: 'tool_result',
+        schemaVersion: SV,
+        producerVersion: 'test-pi-ai@0.0.0',
+        runId: options.runId,
+        callId: 'call-get-subagent-result',
+        toolName: 'get_subagent_result',
+        output,
+        ts: Date.now(),
+      } satisfies RuntimeEvent
+      yield {
+        type: 'assistant_delta',
+        schemaVersion: SV,
+        producerVersion: 'test-pi-ai@0.0.0',
+        runId: options.runId,
+        requestId: `req-${options.runId}-synthesis-2`,
+        text: `synthesized answer from ${childRunId}`,
+        ts: Date.now(),
+      } satisfies RuntimeEvent
+      yield {
+        type: 'run_completed',
+        schemaVersion: SV,
+        producerVersion: 'test-pi-ai@0.0.0',
+        runId: options.runId,
+        output: { text: `synthesized answer from ${childRunId}` },
+        ts: Date.now(),
+      } satisfies RuntimeEvent
+      return undefined
+    }
+
     yield* childRun(options.runId)
     return undefined
   })
@@ -244,15 +304,41 @@ describe('TelegraphSubagentHarness', () => {
     expect(events.filter(event => event.type === 'assistant_delta' && event.runId === 'run-subagents-test'))
       .toEqual([
         expect.objectContaining({
-          text: 'output from run-subagents-test-chain-3-reviewer',
+          text: 'synthesized answer from run-subagents-test-chain-0-scout',
         }),
       ])
     expect(events.filter(event => event.type === 'child_run_started').map(event => event.label))
       .toEqual(['scout', 'planner', 'worker', 'reviewer'])
-    expect(streamMock).toHaveBeenCalledTimes(5)
+    expect(streamMock).toHaveBeenCalledTimes(6)
     expect(streamMock.mock.calls[0]?.[0].tools?.map(tool => tool.name)).toEqual(['subagent'])
     expect(streamMock.mock.calls[1]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
     expect(streamMock.mock.calls[3]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
+    expect(streamMock.mock.calls[5]?.[0].tools?.map(tool => tool.name)).toEqual(['get_subagent_result'])
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'tool_call',
+          runId: 'run-subagents-test',
+          toolName: 'get_subagent_result',
+        }),
+      ]),
+    )
+  })
+
+  it('marks child results consumed when the parent synthesis tool reads them', async () => {
+    mockRouterSelectionAndChildRuns({
+      agent: 'scout',
+      task: 'Find auth files',
+    })
+
+    const manager = new SubagentManager()
+    const runtime = new TelegraphSubagentHarness({ subagentManager: manager })
+    await collect(runtime.run(runtimeInput()))
+
+    expect(manager.getRecord('run-subagents-test-scout')).toMatchObject({
+      resultConsumed: true,
+      status: 'completed',
+    })
   })
 
   it('converts child run failure into a parent terminal run_failed event', async () => {
@@ -306,9 +392,10 @@ describe('TelegraphSubagentHarness', () => {
     })
     expect(events.filter(event => event.type === 'child_run_started').map(event => event.label))
       .toEqual(['Runtime Scout', 'UI Reviewer'])
-    expect(streamMock).toHaveBeenCalledTimes(3)
+    expect(streamMock).toHaveBeenCalledTimes(4)
     expect(streamMock.mock.calls[1]?.[0].message).toContain('Read only the runtime projection path')
     expect(streamMock.mock.calls[2]?.[0].message).toContain('Read only the ChatMessages rendering path')
+    expect(streamMock.mock.calls[3]?.[0].tools?.map(tool => tool.name)).toEqual(['get_subagent_result'])
     expect(events.at(-1)).toMatchObject({
       type: 'run_completed',
       runId: 'run-subagents-test',
@@ -379,3 +466,8 @@ describe('TelegraphSubagentHarness', () => {
   })
 
 })
+
+function readFirstChildRunId(message: string): string | undefined {
+  const match = message.match(/Child runs available for result lookup:[\s\S]*?\n- ([^\n]+)/)
+  return match?.[1]
+}

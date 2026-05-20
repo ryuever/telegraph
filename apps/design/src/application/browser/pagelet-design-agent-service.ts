@@ -5,6 +5,7 @@ import type {
   DesignArtifactPatchApplyResult,
   DesignArtifactPatchPreviewResult,
   DesignPatchFileOperation,
+  DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common'
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
@@ -106,6 +107,27 @@ export class PageletDesignAgentService {
       options.onStatus?.(isCancelledError(error) ? 'cancelled' : 'failed')
       throw error
     }
+  }
+
+  async listSubagents(signal?: AbortSignal): Promise<DesignSubagentRecordSnapshot[]> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().listSubagents()
+  }
+
+  async getSubagentResult(
+    childRunId: string,
+    options: { consume?: boolean; signal?: AbortSignal } = {},
+  ): Promise<DesignSubagentRecordSnapshot | null> {
+    await waitForDesignPageletReady(options.signal)
+    throwIfAborted(options.signal)
+    return getDesignPageletClient().getSubagentResult(childRunId, options.consume)
+  }
+
+  async cancelSubagent(childRunId: string, signal?: AbortSignal): Promise<boolean> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().cancelSubagent(childRunId)
   }
 
   async previewArtifactPatch(options: {

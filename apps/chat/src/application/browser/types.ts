@@ -1,7 +1,7 @@
-import type { LlmTracePayload as CommonLlmTracePayload, ChatConversation } from '@/apps/chat/application/common'
+import type { LlmTracePayload as CommonLlmTracePayload, ChatConversation, ChatSubagentRecordSnapshot } from '@/apps/chat/application/common'
 
 export type { LlmTracePayload, ChatMessage, ChatConversation, ChatToolCall, ChatRole, ChatMessageStatus } from '@/apps/chat/application/common'
-export type { ChatSubagent, ChatSubagentGroup, ChatSubagentStatus, ChatSubagentUpdate } from '@/apps/chat/application/common'
+export type { ChatSubagent, ChatSubagentGroup, ChatSubagentRecordSnapshot, ChatSubagentStatus, ChatSubagentUpdate } from '@/apps/chat/application/common'
 
 export type AgentSendOptions = {
   conversation: ChatConversation
@@ -15,4 +15,7 @@ export type AgentSendOptions = {
 
 export interface AgentService {
   send(opts: AgentSendOptions): Promise<void>
+  listSubagents(signal?: AbortSignal): Promise<ChatSubagentRecordSnapshot[]>
+  getSubagentResult(childRunId: string, options?: { consume?: boolean; signal?: AbortSignal }): Promise<ChatSubagentRecordSnapshot | null>
+  cancelSubagent(childRunId: string, signal?: AbortSignal): Promise<boolean>
 }

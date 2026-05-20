@@ -11,6 +11,7 @@ import {
   type DesignArtifactPatchApplyResult,
   type DesignArtifactPatchPreviewResult,
   type DesignArtifactPatchRequest,
+  type DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { createAgentHarness } from '@/packages/agent/harness';
@@ -22,6 +23,8 @@ import {
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
+import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
+import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
 import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
@@ -32,6 +35,7 @@ const activeAgentRuns = new Map<string, AbortController>();
 @injectable()
 export class DesignPageletWorker extends PageletWorker {
   private agentListeners = new Set<(event: DesignAgentStreamEvent) => void>();
+  private readonly subagents = new SubagentManager();
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -48,6 +52,12 @@ export class DesignPageletWorker extends PageletWorker {
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>
           Promise.resolve(this.cancelAgentRun(runId)),
+        listSubagents: (): Promise<DesignSubagentRecordSnapshot[]> =>
+          Promise.resolve(this.subagents.listRecords().map(snapshotSubagentRecord)),
+        getSubagentResult: (childRunId: string, consume = false): Promise<DesignSubagentRecordSnapshot | null> =>
+          Promise.resolve(snapshotNullableSubagentRecord(this.subagents.getResult(childRunId, { consume }))),
+        cancelSubagent: (childRunId: string): Promise<boolean> =>
+          Promise.resolve(this.subagents.abort(childRunId)),
         previewArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult> =>
           this.handlePreviewArtifactPatch(request),
         applyArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult> =>
@@ -111,7 +121,7 @@ export class DesignPageletWorker extends PageletWorker {
         { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
         {
           id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-          create: () => new TelegraphSubagentHarness(),
+          create: () => new TelegraphSubagentHarness({ subagentManager: this.subagents }),
         },
         { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
       ],
@@ -249,6 +259,28 @@ export class DesignPageletWorker extends PageletWorker {
       },
     });
   }
+}
+
+function snapshotNullableSubagentRecord(record: SubagentRecord | undefined): DesignSubagentRecordSnapshot | null {
+  return record ? snapshotSubagentRecord(record) : null;
+}
+
+function snapshotSubagentRecord(record: SubagentRecord): DesignSubagentRecordSnapshot {
+  return {
+    id: record.id,
+    parentRunId: record.parentRunId,
+    agent: record.agent,
+    label: record.label,
+    description: record.description,
+    task: record.task,
+    status: record.status,
+    result: record.result,
+    error: record.error,
+    toolUses: record.toolUses,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+    resultConsumed: record.resultConsumed,
+  };
 }
 
 function assertDesignPatchApplyAllowed(request: DesignArtifactPatchRequest): void {

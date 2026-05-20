@@ -8,6 +8,9 @@ export interface IDesignPageletService {
   ping(now: number): Promise<{ pong: number; serverTime: number }>;
   sendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult>;
   cancelAgent(runId: string): Promise<boolean>;
+  listSubagents(): Promise<DesignSubagentRecordSnapshot[]>;
+  getSubagentResult(childRunId: string, consume?: boolean): Promise<DesignSubagentRecordSnapshot | null>;
+  cancelSubagent(childRunId: string): Promise<boolean>;
   previewArtifactPatch(request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult>;
   applyArtifactPatch(request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult>;
   onAgentEvent(callback: (event: DesignAgentStreamEvent) => void): EventSubscription;
@@ -29,6 +32,22 @@ export interface DesignAgentSendResult {
   runId: string;
   status: 'completed' | 'failed';
   error?: string;
+}
+
+export interface DesignSubagentRecordSnapshot {
+  id: string;
+  parentRunId: string;
+  agent: string;
+  label: string;
+  description: string;
+  task: string;
+  status: 'queued' | 'running' | 'completed' | 'stopped' | 'error';
+  result?: string;
+  error?: string;
+  toolUses: number;
+  startedAt: number;
+  completedAt?: number;
+  resultConsumed?: boolean;
 }
 
 export interface DesignPatchFileOperation {

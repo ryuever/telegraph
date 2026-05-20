@@ -16,6 +16,9 @@ const client: IChatPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   send: sendMock,
   cancel: cancelMock,
+  listSubagents: vi.fn(() => Promise.resolve([])),
+  getSubagentResult: vi.fn(() => Promise.resolve(null)),
+  cancelSubagent: vi.fn(() => Promise.resolve(false)),
   onStreamEvent: vi.fn((callback: (event: ChatStreamEvent) => void) => {
     streamCallback = callback
     return { unsubscribe }
@@ -87,6 +90,19 @@ describe('PageletAgentService', () => {
     expect(chunks).toEqual(['hello'])
     expect(statuses).toContain('completed')
     expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('forwards subagent control calls through the pagelet service', async () => {
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await expect(service.listSubagents()).resolves.toEqual([])
+    await expect(service.getSubagentResult('child-1', { consume: true })).resolves.toBeNull()
+    await expect(service.cancelSubagent('child-1')).resolves.toBe(false)
+
+    expect(client.listSubagents).toHaveBeenCalled()
+    expect(client.getSubagentResult).toHaveBeenCalledWith('child-1', true)
+    expect(client.cancelSubagent).toHaveBeenCalledWith('child-1')
   })
 })
 

@@ -1,4 +1,4 @@
-export { TelegraphSubagentHarness } from './TelegraphSubagentHarness'
+export { TelegraphSubagentHarness, type TelegraphSubagentHarnessOptions } from './TelegraphSubagentHarness'
 export { orchestrate } from './orchestrator'
 export { SubagentManager, type SubagentManagerOptions, type SpawnSubagentInput } from './SubagentManager'
 export {

@@ -42,6 +42,9 @@ const client: IDesignPageletService = {
   ping: vi.fn((now: number) => Promise.resolve({ pong: now, serverTime: now })),
   sendAgent: sendAgentMock,
   cancelAgent: cancelAgentMock,
+  listSubagents: vi.fn(() => Promise.resolve([])),
+  getSubagentResult: vi.fn(() => Promise.resolve(null)),
+  cancelSubagent: vi.fn(() => Promise.resolve(false)),
   previewArtifactPatch: previewArtifactPatchMock,
   applyArtifactPatch: applyArtifactPatchMock,
   onAgentEvent: vi.fn((callback: (event: DesignAgentStreamEvent) => void) => {
@@ -193,6 +196,19 @@ describe('PageletDesignAgentService', () => {
       scopes: ['artifact:write', 'repo:read', 'repo:write'],
       artifactPolicy: 'apply-after-confirm',
     })
+  })
+
+  it('forwards subagent control calls through the pagelet service', async () => {
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+
+    await expect(service.listSubagents()).resolves.toEqual([])
+    await expect(service.getSubagentResult('child-1', { consume: true })).resolves.toBeNull()
+    await expect(service.cancelSubagent('child-1')).resolves.toBe(false)
+
+    expect(client.listSubagents).toHaveBeenCalled()
+    expect(client.getSubagentResult).toHaveBeenCalledWith('child-1', true)
+    expect(client.cancelSubagent).toHaveBeenCalledWith('child-1')
   })
 })
 
