@@ -6,7 +6,7 @@ description: >
   到 daemon 托管执行、目录隔离、会话恢复与可选 Pi CLI/pi-subagents，再到协调平面扩展或 Multica 集成。
 category: roadmap
 created: 2026-05-04
-updated: 2026-05-19
+updated: 2026-05-20
 tags:
   - telegraph
   - multi-agent
@@ -26,6 +26,9 @@ references:
   - id: D-014
     rel: related-to
     file: ../discussion/20260519-chat-agent-team-multica-strategy.md
+  - id: D-015
+    rel: extended-by
+    file: ../discussion/20260520-agent-runtime-product-layer-alignment.md
 ---
 
 # Telegraph 多智能体（类 Multica）分阶段路线图
@@ -36,30 +39,30 @@ references:
 
 进入阶段 0 前，建议先阅读以下文档，统一边界与术语：
 
-- [A-005：Telegraph Agent Runtime 与 Extension Host 理论基础](../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md)  
+- [A-005：Telegraph Agent Runtime 与 Extension Host 理论基础](../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md)
   - 对齐 runtime/extension host 的长期目标，避免路线图只停留在“多智能体编排”层面。
-- [A-004：Multica 源码实现映射与 Telegraph 适配路径](../architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md)  
+- [A-004：Multica 源码实现映射与 Telegraph 适配路径](../architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md)
   - 理解当前代码映射基础与可复用能力。
-- [A-002：Telegraph 多进程拓扑](../architecture/20260504-multi-process-topology.md)  
+- [A-002：Telegraph 多进程拓扑](../architecture/20260504-multi-process-topology.md)
   - 明确 main/daemon/renderer 的职责边界。
-- [I-002：pi-ai 流式首包后卡住复盘](../issue/20260505-pi-ai-llm-trace-await-sink-deadlock.md)  
+- [I-002：pi-ai 流式首包后卡住复盘](../issue/20260505-pi-ai-llm-trace-await-sink-deadlock.md)
   - 作为流式事件与回压设计的风险基线。
 
 ---
 
 ## 阶段 0：定标（1–2 次技术评审）
 
-- [ ] 选定主路径：**嵌入 Multica** / **自建协调平面** / **单机 AgentRuntime（路径 C）**（见 A-004 §5）。  
-- [ ] 明确 Pi 形态：**仅 pi-ai（现状）** vs **增加 Pi CLI（对齐 Multica `piBackend` + pi-subagents）**。  
+- [ ] 选定主路径：**嵌入 Multica** / **自建协调平面** / **单机 AgentRuntime（路径 C）**（见 A-004 §5）。
+- [ ] 明确产品分层：**External Agent Runtime**（Pi CLI / Codex CLI / Claude Code）与 **Telegraph Native Harness**（Telegraph-owned agents/subagents）如何同时存在；详见 [D-015](../discussion/20260520-agent-runtime-product-layer-alignment.md)。
 - [ ] 定义「多 Agent」最小演示：**并行两次 run** 或 **链式两次 run**，验收 UI 与时间线。
 
 ---
 
 ## 阶段 1：Run 模型与事件契约（不挪进程也可做）
 
-- [ ] 引入 **`AgentRun`（或 `Task`）** 实体：`id`、状态、`createdAt`、会话指针、`workDir`、错误原因（对齐 Multica `PinTaskSession` 语义）。  
-- [ ] 持久化：**SQLite / electron-store / 文件**，任选其一；重启后能列出历史 run。  
-- [ ] 定义 **`AgentRunEvent`枚举**：至少包含 `queued | dispatch | progress | message | completed | failed | cancelled`（命名可对齐 `pkg/protocol/events.go` 的 `task:*`）。  
+- [ ] 引入 **`AgentRun`（或 `Task`）** 实体：`id`、状态、`createdAt`、会话指针、`workDir`、错误原因（对齐 Multica `PinTaskSession` 语义）。
+- [ ] 持久化：**SQLite / electron-store / 文件**，任选其一；重启后能列出历史 run。
+- [ ] 定义 **`AgentRunEvent`枚举**：至少包含 `queued | dispatch | progress | message | completed | failed | cancelled`（命名可对齐 `pkg/protocol/events.go` 的 `task:*`）。
 - [ ] 将 `AgentHandler` 中 **`AGENT_STREAM_DATA_CHANNEL` 的 payload** 逐步映射为上述事件（保持向后兼容或版本字段）。
 
 **验收**：单次对话可在面板看到结构化时间线，刷新应用后 run 仍在。
@@ -68,10 +71,10 @@ references:
 
 ## 阶段 2：执行环境与 Backend 分叉
 
-- [ ] 实现 **per-run 工作目录**（A-004 §2.3 / §4 `execenv` 等价）：`<userData>/runs/<runId>/workdir` + `meta.json`。  
-- [ ] 在 `packages/agent` 抽象 **`AgentBackend` 接口**（`execute(prompt, opts) → AsyncIterable<Event>` 或 Multica 式 `Session`）。  
-- [ ] **实现 1**：迁移现有逻辑为 `PiAiBackend`。  
-- [ ] **实现 2（可选）**：`PiCliBackend`（`pi -p --mode json --session <path>`），参数与 Multica `pkg/agent/pi.go` 行为对齐，便于接 pi-subagents。
+- [ ] 实现 **per-run 工作目录**（A-004 §2.3 / §4 `execenv` 等价）：`<userData>/runs/<runId>/workdir` + `meta.json`。
+- [ ] 在 `packages/agent` 抽象 **`AgentBackend` 接口**（`execute(prompt, opts) → AsyncIterable<Event>` 或 Multica 式 `Session`）。
+- [ ] **实现 1**：迁移现有逻辑为 Telegraph Native Harness 的 embedded runner。
+- [ ] **实现 2（可选）**：`ExternalCliAgentRuntime`（Pi CLI / Codex CLI / Claude Code），参数与各自官方 CLI 行为对齐，不复刻其私有 extension loader。
 
 **验收**：同一 UI 可切换 backend；CLI 模式下会话文件路径可复用（恢复一次中断 run）。
 
@@ -79,9 +82,9 @@ references:
 
 ## 阶段 3：daemon utility-process 托管执行器
 
-- [ ] 将 **长时间运行**的 `execute` 从 **main** 迁到 **daemon**（见 **A-002**），main 仅转发 IPC / 权限 / 窗口焦点。  
-- [ ] **claim 循环**：首版可用 **内存队列**（应用内调度），预留接口兼容将来 Multica API / 本地 SQLite 队列。  
-- [ ] **孤儿 run**：应用启动时扫描 `running`，标记 `failed` 或 `retry`（对齐 `RecoverOrphanedTasks` 意图）。  
+- [ ] 将 **长时间运行**的 `execute` 从 **main** 迁到 **daemon**（见 **A-002**），main 仅转发 IPC / 权限 / 窗口焦点。
+- [ ] **claim 循环**：首版可用 **内存队列**（应用内调度），预留接口兼容将来 Multica API / 本地 SQLite 队列。
+- [ ] **孤儿 run**：应用启动时扫描 `running`，标记 `failed` 或 `retry`（对齐 `RecoverOrphanedTasks` 意图）。
 - [ ] **并发**：限制全局并发数；并行 run 时可选 **git worktree** 或 **目录级隔离**（避免 pi-subagents 式并行写冲突）。
 
 **验收**：main 崩溃或窗口关闭不应单独吞掉 run 状态（run 状态以持久层为准）；daemon 重启策略与现有 `DaemonProcessMain.handleResumeConnection` 一致且无死锁。
@@ -90,8 +93,8 @@ references:
 
 ## 阶段 4：多角色与编排
 
-- [ ] **应用内编排**：调度多次 `Backend.Execute`（scout → planner → worker），步骤间传递 artifact 路径（类似 `.chain.md` 的 `{previous}`）。  
-- [ ] **或**：Pi CLI + **`pi install npm:pi-subagents`**，由扩展承担链式/并行（Telegraph 仅托管 cwd 与事件转发）。  
+- [ ] **Telegraph Native Subagent Harness**：调度多次 child run（scout → planner → worker），步骤间传递 artifact 路径与 structured output。
+- [ ] **兼容路径**：Pi CLI + `pi-subagents` 作为 External Agent Runtime（Telegraph 托管 cwd、生命周期与事件转发，不把 `.pi` discovery 变成 native 默认）。
 - [ ] **可选**：**pi-intercom** 类督导回调 → 映射为 `AgentRunEvent` 的 `need_decision` 与用户 inbox。
 
 **验收**：固定演示脚本（例如「检索 → 方案 → 实现 → 审查」）可一键跑通并可在 UI 区分各角色 run。
@@ -100,8 +103,8 @@ references:
 
 ## 阶段 5：协调平面（可选）或与 Multica 集成
 
-- [ ] **集成 Multica**：打包或引导安装 CLI + daemon；Telegraph OAuth / WebView；事件桥接。  
-- [ ] **或自建**：Issue/Workspace 最小集 + HTTP API + WS hub（Multica `realtime/hub` 语义参考）。  
+- [ ] **集成 Multica**：打包或引导安装 CLI + daemon；Telegraph OAuth / WebView；事件桥接。
+- [ ] **或自建**：Issue/Workspace 最小集 + HTTP API + WS hub（Multica `realtime/hub` 语义参考）。
 
 **验收**：多设备或多用户场景下的权限模型与订阅 scope 有明确结论（可 deferred）。
 

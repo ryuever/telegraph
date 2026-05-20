@@ -7,13 +7,18 @@
 
 ---
 
+> 2026-05-20 对齐注记：本文是历史 Phase 3 设计草案。新的分层见
+> [D-015](../discussion/20260520-agent-runtime-product-layer-alignment.md)：External Agent Runtime
+> 与 Telegraph Native Harness 是产品层；Embedded Execution Kernel 只作为 Native Harness
+> 底层，不再以 `PiEmbeddedRuntime` 作为独立长期主线。
+
 ## Executive Summary
 
 Phase 3 extends the Telegraph Agent Runtime from a monolithic embedded executor into a **pluggable multi-framework host** with **persistent session storage** and **dynamic extension loading**. The architecture introduces:
 
 1. **Extension Manifest System**: YAML/JSON-based tool/capability declarations loaded from filesystem or app bundle
 2. **Persistent SQLite Backend**: Multi-turn conversation storage, session recovery, query-based history
-3. **Framework Adapter Pattern**: Runtime adapters for LangGraph, Vercel AI SDK, Mastra (beyond pi-ai/pi-embedded)
+3. **Framework Adapter Pattern**: Runtime adapters for LangGraph, Vercel AI SDK, Mastra (beyond pi-ai / embedded kernel)
 4. **Tool Coordination**: Dependency resolution, rate limiting, permission-based execution
 5. **Observability Layer**: Execution timeline, metrics, tracing for UI visualization
 
@@ -41,7 +46,7 @@ Telegraph Agent Runtime (Phase 3)
 ├─ Framework Adapters
 │  ├─ RuntimeAdapterFactory (dispatch by framework type)
 │  ├─ PiAiRuntime (existing, no changes)
-│  ├─ PiEmbeddedRuntime (existing, no changes)
+│  ├─ EmbeddedExecutionKernel (Native Harness 底层)
 │  ├─ LangGraphRuntime (new)
 │  ├─ VercelAiRuntime (new)
 │  └─ MastraRuntime (new, low priority)
@@ -692,10 +697,10 @@ class ExecutionTimeline {
 ### Emit Timeline to Renderer
 
 ```typescript
-// In PiEmbeddedRuntime or any executor
+// In EmbeddedExecutionKernel or any native harness executor
 import { ExecutionTimeline } from './observability/ExecutionTimeline';
 
-class PiEmbeddedRuntime extends BaseAgentRuntime {
+class EmbeddedExecutionKernel extends BaseAgentRuntime {
   private timeline = new ExecutionTimeline();
 
   async executeToolCalls(toolCalls: ToolCall[]): Promise<void> {

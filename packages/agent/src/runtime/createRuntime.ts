@@ -5,6 +5,10 @@ import { createLangGraphRuntime } from '@/packages/agent/runtime/LangGraphRuntim
 import { createVercelAiRuntime } from '@/packages/agent/runtime/VercelAiRuntime'
 import type { RuntimeExecutor } from '@/packages/agent/runtime/AgentRuntime'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
+import {
+  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
+  isTelegraphSubagentsSelector,
+} from '@/packages/agent/runtime/telegraphSubagents/constants'
 
 /**
  * Factory function to create a RuntimeExecutor instance.
@@ -12,14 +16,15 @@ import type { AgentRuntimeSettings } from '@/packages/agent/types'
  * Supports:
  * - pi-ai: LLM-only streaming (in-process)
  * - pi-embedded: Pi-AI with embedded tool loop
- * - pi-subagents: Embedded subagent orchestrator (chain/parallel via pi-ai)
+ * - telegraph-subagents: Telegraph native subagent harness (chain/parallel via pi-ai kernel)
  * - langgraph: LangGraph state machine framework
  * - vercel-ai: Vercel AI SDK adapter
- * 
- * NOTE: pi-cli (spawned process) is deprecated and removed from the runtime adapter pattern.
- * It was a temporary compatibility layer. Going forward, all execution happens in-process.
- * 
- * NOTE: PiSubagentsRuntime is loaded lazily to avoid pulling node:fs into the renderer bundle.
+ *
+ * NOTE: External CLI agents remain outside this embedded runtime factory.
+ * They are spawned by the External Agent Runtime path, not represented as
+ * framework adapters here.
+ *
+ * NOTE: TelegraphSubagentHarness is loaded lazily to avoid pulling node:fs into the renderer bundle.
  * 
  * @param settings Runtime configuration
  * @returns RuntimeExecutor instance ready to execute runs
@@ -28,12 +33,12 @@ export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings):
   const agentSettings = settings as AgentRuntimeSettings
   const backend = agentSettings.backend ?? 'pi-ai'
   
-  // Orchestration mode takes precedence over backend selection
-  if (agentSettings.orchestration === 'pi-subagents' || backend === 'pi-subagents') {
+  // Telegraph native orchestration mode takes precedence over backend selection.
+  if (isTelegraphSubagentsSelector(agentSettings.orchestration) || isTelegraphSubagentsSelector(backend)) {
     // Lazy require to avoid pulling node:fs into the renderer bundle.
     // This code path only executes in the daemon (Node.js) process.
-    const { PiSubagentsRuntime } = require('@/packages/agent/runtime/piSubagents/PiSubagentsRuntime') as typeof import('@/packages/agent/runtime/piSubagents/PiSubagentsRuntime')
-    return new PiSubagentsRuntime()
+    const { TelegraphSubagentHarness } = require('@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness') as typeof import('@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness')
+    return new TelegraphSubagentHarness()
   }
   
   if (backend === 'pi-embedded') {
@@ -52,7 +57,7 @@ export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings):
     return new PiAiRuntime()
   }
   
-  throw new Error(`[createRuntime] Unknown backend: '${backend}'. Supported: 'pi-ai', 'pi-embedded', 'pi-subagents', 'langgraph', 'vercel-ai'`)
+  throw new Error(`[createRuntime] Unknown backend: '${backend}'. Supported: 'pi-ai', 'pi-embedded', '${TELEGRAPH_SUBAGENTS_RUNTIME_ID}', 'langgraph', 'vercel-ai'`)
 }
 
 /**

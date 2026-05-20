@@ -20,8 +20,8 @@ export interface AgentRuntimeSettings {
   taskCapabilityProfile?: RuntimeTaskCapabilityProfile
 }
 
-export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'pi-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
-export type AgentOrchestrationMode = 'none' | 'pi-subagents'
+export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'telegraph-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
+export type AgentOrchestrationMode = 'none' | 'telegraph-subagents'
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 
 // ---------------------------------------------------------------------------

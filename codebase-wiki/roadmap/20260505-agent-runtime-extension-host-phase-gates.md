@@ -6,7 +6,7 @@ description: >
   通过 Entry/Exit/Gate Evidence/No-Go Criteria 约束实施节奏，降低协议漂移与运行风险。
 category: roadmap
 created: 2026-05-05
-updated: 2026-05-05
+updated: 2026-05-20
 tags:
   - telegraph
   - agent-runtime
@@ -21,6 +21,9 @@ references:
   - id: P-001
     rel: complements
     file: ./20260504-multi-agent-telegraph-roadmap.md
+  - id: D-015
+    rel: extended-by
+    file: ../discussion/20260520-agent-runtime-product-layer-alignment.md
 ---
 
 # Telegraph Agent Runtime / Extension Host 实施 Phase-Gate 模板
@@ -106,7 +109,7 @@ references:
 - 主链路仍依赖未封装 backend 分支。
 - Trace 事件与主 RPC 出现互等或阻塞风险未解除。
 
-## Phase 2（P1）：Extension Registry + Tool Adapter + Embedded MVP
+## Phase 2（P1）：Tool Adapter + Embedded Execution Kernel MVP
 
 ### Entry Criteria
 
@@ -115,37 +118,34 @@ references:
 
 ### Exit Criteria
 
-- ExtensionRegistry 可管理 installed/enabled/version/permissions/installPath。
 - Tool Adapter 可把至少两类工具来源映射为统一 `ToolDefinition`。
-- Embedded runtime 跑通最小 tool loop（model -> tool -> model -> done）。
+- Embedded Execution Kernel 在 Telegraph Native Harness 内跑通最小 tool loop（model -> tool -> model -> done）。
 
 ### Gate Evidence
 
-- 本地安装/启用/禁用 extension 的可重复操作记录。
 - 至少一个工具调用全链路 trace（含 input/output/raw）。
-- Embedded 与 CLI fallback 判定日志可追踪。
+- Native Harness 与 External Agent Runtime 的选择原因可追踪。
 
 ### No-Go Criteria
 
-- Extension 状态无法持久化或重启后不一致。
 - Tool 权限未声明或无用户可见确认路径。
 
-## Phase 3（P2）：复杂扩展验证（pi-subagents）+ 安全与稳定性强化
+## Phase 3（P2）：Telegraph Native Subagent Harness + External Runtime 兼容
 
 ### Entry Criteria
 
-- Phase 2 通过，embedded 最小闭环稳定。
+- Phase 2 通过，Native Harness 的 embedded kernel 最小闭环稳定。
 
 ### Exit Criteria
 
-- `pi-subagents` 的 chain/parallel 至少一条 demo 跑通并可观测 child runs。
-- fallback 策略具备明确触发条件与可观测原因。
+- Telegraph Native Subagent Harness 的 chain/parallel 至少一条 demo 跑通并可观测 child runs。
+- Pi CLI / Codex CLI / Claude Code 等 External Agent Runtime 具备明确选择条件与可观测 origin。
 - 安全治理最小闭环上线：来源校验信息、blocklist 机制、最小权限默认。
 
 ### Gate Evidence
 
 - 固定 demo 脚本执行记录（含失败分支）。
-- fallback 触发样例与用户可见提示。
+- External runtime 触发样例与用户可见提示。
 - 安全演练记录（恶意/失效扩展禁用流程）。
 
 ### No-Go Criteria
@@ -217,7 +217,7 @@ flowchart TB
 
 - Date: 2026-05-05
 - Decision: CONDITIONAL_PASS
-- Scope: `extensionBlocklist` + registry `blocklist` 合并；`[telegraph.fallback]` pi-subagents 解析日志
+- Scope: `extensionBlocklist` + registry `blocklist` 合并；Telegraph Native Subagent Harness 与 External Agent Runtime 选择日志
 - Follow-ups: 固定 demo 脚本与恶意扩展演练用例入库；child run 顺序语义专项测试
 
 ### Gate Review - Phase 4
@@ -233,4 +233,3 @@ flowchart TB
 - 关键生命周期事件不可丢失；调试事件可降级但需可追踪。
 - 所有高风险能力（shell/network/process）默认不授予，必须显式授权。
 - 至少保留一条 I-002 类背压回归用例，避免死锁问题回归。
-

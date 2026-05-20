@@ -171,7 +171,7 @@ export function DesignRuntimeSettingsDialog({
               type="text"
               value={draft.extensionBlocklist?.join(', ') ?? ''}
               onChange={event => { setExtensionBlocklist(event.target.value) }}
-              placeholder="pi-subagents"
+              placeholder="telegraph-subagents"
               className={inputClass}
               autoComplete="off"
               spellCheck={false}

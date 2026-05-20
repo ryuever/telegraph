@@ -1,13 +1,12 @@
 /**
- * Pi-Subagents Runtime Executor.
+ * Telegraph Native Subagent Harness.
  *
- * Implements the `RuntimeExecutor` interface for the pi-subagents
- * orchestration mode. Uses the embedded orchestrator to run
- * subagent workflows (single/chain/parallel) in-process via pi-ai,
- * without spawning external CLI processes.
+ * Implements the `RuntimeExecutor` interface for Telegraph-owned subagent
+ * orchestration. It runs subagent workflows (single/chain/parallel) through
+ * Telegraph's native harness and embedded pi-ai kernel, without pretending to
+ * be an adapter for any external subagent package.
  *
- * This runtime is selected when `settings.orchestration === 'pi-subagents'`
- * or `settings.backend === 'pi-subagents'`.
+ * This runtime is selected only by `telegraph-subagents`.
  */
 
 import type { RuntimeEvent } from '@/packages/agent-protocol'
@@ -15,15 +14,19 @@ import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { BaseAgentRuntime, type RuntimeInput } from '../AgentRuntime'
 import { streamPiAiRuntimeEvents, type PiAiExecutableTool } from '../streamPiAiRuntime'
 import type { AgentRuntimeSettings } from '../../types'
-import { orchestrate, TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION } from './orchestrator'
+import {
+  TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
+  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
+} from './constants'
+import { orchestrate } from './orchestrator'
 import type { SubagentOrchestratorInput } from './types'
 
 const SV = RUNTIME_CONTRACT_SCHEMA_VERSION
-const PV = TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION
+const PV = TELEGRAPH_SUBAGENTS_PRODUCER_VERSION
 
-export class PiSubagentsRuntime extends BaseAgentRuntime {
-  readonly id = 'pi-subagents'
-  readonly label = 'Pi Subagents (Embedded Orchestrator)'
+export class TelegraphSubagentHarness extends BaseAgentRuntime {
+  readonly id = TELEGRAPH_SUBAGENTS_RUNTIME_ID
+  readonly label = 'Telegraph Native Subagents'
 
   async *run(input: RuntimeInput): AsyncIterable<RuntimeEvent> {
     const { runId, sessionId, message, settings, signal } = input
@@ -32,8 +35,8 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
     const agentSettings = settings as AgentRuntimeSettings
     const pattern = agentSettings.orchestrationPattern ?? 'chain'
     const origin = {
-      framework: 'pi' as const,
-      runtimeId: 'pi-subagents-embedded',
+      framework: 'telegraph' as const,
+      runtimeId: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
     }
 
     // Emit run_started
@@ -48,7 +51,7 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
     } as RuntimeEvent
 
     try {
-      if (agentSettings.extensionBlocklist?.includes('pi-subagents')) {
+      if (agentSettings.extensionBlocklist?.includes(TELEGRAPH_SUBAGENTS_RUNTIME_ID)) {
         yield {
           type: 'run_failed',
           schemaVersion: SV,
@@ -56,8 +59,8 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
           origin,
           runId,
           error: {
-            code: 'pi_subagents_blocked',
-            message: 'pi-subagents orchestration is blocked for this run',
+            code: 'telegraph_subagents_blocked',
+            message: 'Telegraph native subagent orchestration is blocked for this run',
           },
           ts: Date.now(),
         } as RuntimeEvent
@@ -120,7 +123,7 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
           origin,
           runId,
           error: {
-            code: 'pi_subagents_child_failed',
+            code: 'telegraph_subagents_child_failed',
             message: childFailure.error.message,
             details: {
               childRunId: childFailure.runId,
@@ -143,7 +146,7 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
           requestId: this.generateRequestId(runId),
           text: finalText,
           ts: Date.now(),
-          raw: { source: 'pi-subagents-final-output', mode: orchInput.mode },
+          raw: { source: 'telegraph-subagents-final-output', mode: orchInput.mode },
         } as RuntimeEvent
       }
 
@@ -165,7 +168,7 @@ export class PiSubagentsRuntime extends BaseAgentRuntime {
         origin,
         runId,
         error: {
-          code: 'pi_subagents_runtime_error',
+          code: 'telegraph_subagents_runtime_error',
           message: error instanceof Error ? error.message : String(error),
           details: normalizeErrorDetails(error),
         },

@@ -7,7 +7,7 @@ async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   return result
 }
 
-describe('PiSubagentsRuntime faux provider integration', () => {
+describe('TelegraphSubagentHarness faux provider integration', () => {
   it('runs the default chain through the real pi-ai stream adapter', async () => {
     vi.resetModules()
     const faux = registerFauxProvider({
@@ -16,6 +16,11 @@ describe('PiSubagentsRuntime faux provider integration', () => {
       tokensPerSecond: 10_000,
     })
     faux.setResponses([
+      fauxAssistantMessage(
+        fauxToolCall('subagent', {}, { id: 'call-subagent-default-chain' }),
+        { stopReason: 'toolUse' },
+      ),
+      fauxAssistantMessage('subagent plan accepted'),
       fauxAssistantMessage('scout findings'),
       fauxAssistantMessage('planner plan'),
       fauxAssistantMessage('worker implementation'),
@@ -30,8 +35,8 @@ describe('PiSubagentsRuntime faux provider integration', () => {
           return model
         },
       }))
-      const { PiSubagentsRuntime } = await import('../PiSubagentsRuntime')
-      const runtime = new PiSubagentsRuntime()
+      const { TelegraphSubagentHarness } = await import('../TelegraphSubagentHarness')
+      const runtime = new TelegraphSubagentHarness()
       const events = await collect(runtime.run({
         runId: 'run-faux-subagents',
         sessionId: 'session-faux-subagents',
@@ -40,7 +45,7 @@ describe('PiSubagentsRuntime faux provider integration', () => {
           provider: 'telegraph-faux-subagents',
           modelId: 'subagent-test-model',
           apiKey: '',
-          orchestration: 'pi-subagents',
+          orchestration: 'telegraph-subagents',
           orchestrationPattern: 'chain',
         },
       }))
@@ -67,7 +72,7 @@ describe('PiSubagentsRuntime faux provider integration', () => {
             text: 'reviewer final answer',
           }),
         ])
-      expect(faux.state.callCount).toBe(4)
+      expect(faux.state.callCount).toBe(6)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')
@@ -83,6 +88,11 @@ describe('PiSubagentsRuntime faux provider integration', () => {
       tokensPerSecond: 10_000,
     })
     faux.setResponses([
+      fauxAssistantMessage(
+        fauxToolCall('subagent', {}, { id: 'call-subagent-tool-chain' }),
+        { stopReason: 'toolUse' },
+      ),
+      fauxAssistantMessage('subagent plan accepted'),
       fauxAssistantMessage(
         fauxToolCall('read', { path: 'package.json' }, { id: 'call-read-package' }),
         { stopReason: 'toolUse' },
@@ -101,8 +111,8 @@ describe('PiSubagentsRuntime faux provider integration', () => {
           return model
         },
       }))
-      const { PiSubagentsRuntime } = await import('../PiSubagentsRuntime')
-      const runtime = new PiSubagentsRuntime()
+      const { TelegraphSubagentHarness } = await import('../TelegraphSubagentHarness')
+      const runtime = new TelegraphSubagentHarness()
       const events = await collect(runtime.run({
         runId: 'run-faux-subagents-tools',
         sessionId: 'session-faux-subagents-tools',
@@ -111,7 +121,7 @@ describe('PiSubagentsRuntime faux provider integration', () => {
           provider: 'telegraph-faux-subagents-tools',
           modelId: 'subagent-tool-test-model',
           apiKey: '',
-          orchestration: 'pi-subagents',
+          orchestration: 'telegraph-subagents',
           orchestrationPattern: 'chain',
         },
       }))
@@ -136,8 +146,8 @@ describe('PiSubagentsRuntime faux provider integration', () => {
           }),
         ]),
       )
-      expect(events.filter(event => event.type === 'model_request')).toHaveLength(5)
-      expect(faux.state.callCount).toBe(5)
+      expect(events.filter(event => event.type === 'model_request')).toHaveLength(7)
+      expect(faux.state.callCount).toBe(7)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')

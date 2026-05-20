@@ -7,7 +7,7 @@ description: >
   路径选择与阶段性落地建议。
 category: discussion
 created: 2026-05-04
-updated: 2026-05-19
+updated: 2026-05-20
 tags:
   - multi-agent
   - multica
@@ -41,6 +41,9 @@ references:
   - id: D-014
     rel: extended-by
     file: ./20260519-chat-agent-team-multica-strategy.md
+  - id: D-015
+    rel: extended-by
+    file: ./20260520-agent-runtime-product-layer-alignment.md
 ---
 
 # Multica 范式与 Pi / pi-subagents 生态下的 Telegraph 多智能体能力对比
@@ -100,7 +103,7 @@ Telegraph 目标不是“只有流式输出”，而是可持续运行的 **mult
 | 维度 | Multica | Pi + pi-subagents | 对 Telegraph 的含义 |
 |------|---------|-------------------|---------------------|
 | 控制平面 | 原生 workspace、issue、assignee、权限、队列、活动流 | 无统一控制平面；重心是“父会话委派子会话” | 若你要“类 Jira + Agent 同事”，Multica 更近 |
-| 执行平面 | daemon 统一调度多 CLI，具备 runtime 注册与健康语义 | 子进程编排强，但主要围绕 Pi 生态 | 若你坚持 Pi 生态，本地执行可先用 pi-subagents 路线 |
+| 执行平面 | daemon 统一调度多 CLI，具备 runtime 注册与健康语义 | 子进程编排强，但主要围绕 Pi 生态 | 兼容 Pi 生态走 External Agent Runtime；Telegraph 自有多 agent 走 Native Harness |
 | 编排表达力 | 平台化任务流，偏业务流程 | chain/parallel/fork/worktree/async 非常强，偏工程流程 | 代码协作自动化场景（scout/planner/worker/reviewer）Pi 方案更快 |
 | 恢复能力 | orphan recovery + session pin 是内建机制 | 有 async 状态与 session 路径，但“业务恢复策略”要自己补 | Telegraph 需要补 run registry 与重启恢复 |
 | 实时可观测 | WebSocket + event protocol，团队协作可视化成熟 | TUI + 文件化状态，适合单机/会话内观察 | Electron UI 需自行把状态抽象为可视事件流 |
@@ -122,15 +125,15 @@ Telegraph 目标不是“只有流式输出”，而是可持续运行的 **mult
 
 这部分是 Multica 最强项，也是目前 Telegraph 最薄弱部分。
 
-### 3.2 如果目标是“在 Pi 生态下做强 multi-agent”
+### 3.2 如果目标是“借鉴 Pi 生态做强 multi-agent”
 
-关键是把 pi-subagents 的“编排中枢能力”搬到 Telegraph 的 daemon 托管模式：
+2026-05-20 对齐后，关键不是把 `pi-subagents` 作为 Telegraph runtime adapter 搬进来，而是把它的“编排中枢能力”抽象成 Telegraph Native Subagent Harness：
 
 - 角色定义（markdown agent files）
 - chain/parallel/fork/worktree
 - async 状态文件 + UI 事件桥接
 
-这条路在工程上更贴近你当前约束（本地优先 + Pi 生态）。
+这条路在工程上更贴近当前约束（本地优先 + 可观测 run + Telegraph 自己的 agent profile）。Pi CLI / pi-subagents 仍可通过 External Agent Runtime 兼容。
 
 ---
 
@@ -138,7 +141,7 @@ Telegraph 目标不是“只有流式输出”，而是可持续运行的 **mult
 
 ### 4.1 目标形态（建议）
 
-**短中期目标**：先做“Pi-native 编排器”，再决定是否升级为“协作平台”。
+**短中期目标**：先做“Telegraph native subagent harness”，再决定是否升级为“协作平台”。
 
 1. 在 daemon 内引入 run 抽象（runId、status、session、artifacts、startedAt/updatedAt）。
 2. 接入 subagent 编排（single/chain/parallel），先支持核心角色流。
@@ -164,8 +167,8 @@ Telegraph 目标不是“只有流式输出”，而是可持续运行的 **mult
 
 - **Multica 本质是协作平台**（控制平面完备），不是单纯的“多 agent 执行器”。
 - **pi-subagents 本质是编排引擎**（委派、并发、隔离、异步很强），但缺乏平台级治理模型。
-- 在你明确“基于 Pi 生态”这个前提下，Telegraph 的正确切入点应是：  
-  **先做 Pi-native 多角色编排与可观测 run 系统，再视产品需求决定是否引入 Multica 控制平面能力。**
+- 在 2026-05-20 的产品分层对齐后，Telegraph 的正确切入点应是：
+  **先做 Telegraph native 多角色编排与可观测 run 系统，再视产品需求决定是否引入 Multica 控制平面能力。**
 - 该结论与实现映射见 [A-004](../architecture/20260504-multica-implementation-map-and-telegraph-adaptation.md)，与阶段计划见 [P-001](../roadmap/20260504-multi-agent-telegraph-roadmap.md)。
 
 本文保持 `draft`，作为后续架构与 roadmap 收敛的讨论基线。

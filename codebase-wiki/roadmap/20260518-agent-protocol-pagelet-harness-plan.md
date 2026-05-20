@@ -7,7 +7,7 @@ description: >
   orchestrator adapter 的统一演进。
 category: roadmap
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-20
 tags:
   - agent-protocol
   - agent-harness
@@ -22,6 +22,9 @@ references:
   - id: P-006
     rel: extended-by
     file: ./20260518-harness-capability-extension-plan.md
+  - id: D-015
+    rel: extended-by
+    file: ../discussion/20260520-agent-runtime-product-layer-alignment.md
 ---
 
 # Telegraph Agent Protocol 与跨 Pagelet Agent 架构计划
@@ -55,7 +58,7 @@ flowchart TB
 
     subgraph RA["Runtime Adapters"]
       Pi["Pi adapters"]
-      Sub["pi-subagents"]
+      Sub["Telegraph Native Subagent Harness"]
       LG["LangGraph adapter"]
       TO["future orchestrator adapter"]
     end
@@ -144,7 +147,7 @@ flowchart LR
 - **Pagelet Agent Harness**：在 `packages/agent` 新增 `createAgentHarness()`，负责 runtime selection、run lifecycle、cancel、event validation、non-blocking trace、tool/permission/hook 调度。
 - **Chat First Consumer**：`chat` 主链路改为 `AgentEvent-first`，旧 `text_delta` / `llm_trace` 只作为兼容桥；UI projector 负责 `AgentEvent → chat messages / tool cards / run status / trace rows`。
 - **Design Second Consumer**：`design` 后续接同一 harness，但不复用 chat 状态模型；design 结果先通过 `assistant_message`、`tool_result.output`、`run_completed.output` 或 metadata 承载。
-- **Multi-Agent 与 Orchestrator**：第一版 multi-agent 用现有 `pi-subagents` 打通 chain/parallel；`/langgraphjs/libs/orchestrator` 未来作为 `TelegraphOrchestratorRuntime` adapter 引入，不成为协议层。
+- **Multi-Agent 与 Orchestrator**：第一版 multi-agent 应收敛为 Telegraph Native Subagent Harness 打通 chain/parallel；`pi-subagents` 仅作为参考/导入来源或 Pi CLI external runtime 兼容能力；`/langgraphjs/libs/orchestrator` 未来作为 `TelegraphOrchestratorRuntime` adapter 引入，不成为协议层。
 
 ## Execution Status
 

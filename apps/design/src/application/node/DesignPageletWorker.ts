@@ -21,7 +21,8 @@ import {
 } from '@/packages/agent/harness/node';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
-import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
+import { TelegraphSubagentHarness } from '@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness';
+import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/runtime/telegraphSubagents/constants';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');
@@ -108,7 +109,10 @@ export class DesignPageletWorker extends PageletWorker {
       runtimes: [
         { id: 'pi-ai', create: () => new PiAiRuntime() },
         { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
-        { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
+        {
+          id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
+          create: () => new TelegraphSubagentHarness(),
+        },
         { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
       ],
       capabilities: createPageletRunCapabilities({

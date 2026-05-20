@@ -124,15 +124,13 @@ export function loadSettings(): ChatModelSettings {
     return {
       provider: parsed.provider ?? DEFAULT_SETTINGS.provider,
       modelId: parsed.modelId ?? DEFAULT_SETTINGS.modelId,
-      backend: parsed.backend ?? DEFAULT_SETTINGS.backend,
+      backend: normalizeBackend(parsed.backend),
       apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : DEFAULT_SETTINGS.apiKey,
       baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : DEFAULT_SETTINGS.baseUrl,
-      orchestration: parsed.orchestration ?? DEFAULT_SETTINGS.orchestration,
+      orchestration: normalizeOrchestration(parsed.orchestration),
       orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
       worktreeIsolation: parsed.worktreeIsolation ?? DEFAULT_SETTINGS.worktreeIsolation,
-      extensionBlocklist: Array.isArray(parsed.extensionBlocklist)
-        ? parsed.extensionBlocklist
-        : DEFAULT_SETTINGS.extensionBlocklist,
+      extensionBlocklist: normalizeExtensionBlocklist(parsed.extensionBlocklist),
       taskCapabilityProfile: normalizeTaskCapabilityProfile(parsed.taskCapabilityProfile),
     }
   } catch {
@@ -234,4 +232,31 @@ function normalizeTaskCapabilityProfile(value: unknown): RuntimeTaskCapabilityPr
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.filter(item => typeof item === 'string')
+}
+
+function normalizeBackend(value: unknown): AgentBackendKind {
+  if (
+    value === 'pi-ai' ||
+    value === 'pi-cli' ||
+    value === 'pi-embedded' ||
+    value === 'telegraph-subagents' ||
+    value === 'langgraph' ||
+    value === 'vercel-ai' ||
+    value === 'telegraph-orchestrator'
+  ) {
+    return value
+  }
+  return DEFAULT_SETTINGS.backend
+}
+
+function normalizeOrchestration(value: unknown): AgentOrchestrationMode {
+  if (value === 'none' || value === 'telegraph-subagents') return value
+  return DEFAULT_SETTINGS.orchestration
+}
+
+function normalizeExtensionBlocklist(value: unknown): string[] {
+  if (!Array.isArray(value)) return DEFAULT_SETTINGS.extensionBlocklist
+  const normalized = value
+    .filter((item): item is string => typeof item === 'string')
+  return [...new Set(normalized)]
 }

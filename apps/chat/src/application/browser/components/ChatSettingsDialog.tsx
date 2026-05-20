@@ -438,11 +438,11 @@ function OrchestrationTab({
           className={selectClass}
         >
           <option value="none">none</option>
-          <option value="pi-subagents">pi-subagents</option>
+          <option value="telegraph-subagents">Telegraph native subagents</option>
         </select>
       </Field>
 
-      {draft.orchestration === 'pi-subagents' && (
+      {draft.orchestration === 'telegraph-subagents' && (
         <>
           <Field label="Orchestration pattern">
             <select
@@ -470,8 +470,8 @@ function OrchestrationTab({
           </label>
 
           <div className="text-[11px] text-zinc-500">
-            Prefers project-local `pi-subagents` extension; falls back to system install if not
-            found.
+            Uses Telegraph native agent profiles from `~/.telegraph/agents` and project
+            `.telegraph/agents`. Pi compatibility must be enabled explicitly.
           </div>
         </>
       )}
@@ -611,7 +611,7 @@ function ExtensionsTab({
           type="text"
           value={draft.extensionBlocklist.join(', ')}
           onChange={e => { onSetBlocklist(e.target.value); }}
-          placeholder="pi-subagents"
+          placeholder="telegraph-subagents"
           className={inputClass}
           autoComplete="off"
           spellCheck={false}

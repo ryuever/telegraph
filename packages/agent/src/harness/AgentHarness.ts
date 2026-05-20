@@ -10,6 +10,10 @@ import type {
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
 import {
+  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
+  isTelegraphSubagentsSelector,
+} from '@/packages/agent/runtime/telegraphSubagents/constants'
+import {
   CapabilityHost,
   type AgentCapability,
 } from './CapabilityHost'
@@ -84,8 +88,8 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
 }
 
 export function selectRuntimeId(settings: RuntimeSettings, defaultRuntimeId = 'pi-ai'): string {
-  if (settings.orchestration === 'pi-subagents' || settings.backend === 'pi-subagents') {
-    return 'pi-subagents'
+  if (isTelegraphSubagentsSelector(settings.orchestration) || isTelegraphSubagentsSelector(settings.backend)) {
+    return TELEGRAPH_SUBAGENTS_RUNTIME_ID
   }
   return settings.backend ?? defaultRuntimeId
 }

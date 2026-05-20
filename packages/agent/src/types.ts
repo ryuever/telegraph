@@ -41,15 +41,15 @@ export interface AgentRuntimeSettings {
   baseUrl?: string
   /** Execution backend selector; defaults to 'pi-ai'. */
   backend?: AgentBackendKind
-  /** Multi-agent orchestration mode (currently daemon-side for pi-cli). */
+  /** Telegraph-native multi-agent orchestration mode. External CLI agents are spawned outside this embedded harness. */
   orchestration?: AgentOrchestrationMode
-  /** Multi-agent orchestration pattern used by pi-subagents mode. */
+  /** Multi-agent orchestration pattern used by the Telegraph native subagent harness. */
   orchestrationPattern?: AgentOrchestrationPattern
-  /** Hint for parallel task workspace isolation in pi-subagents mode. */
+  /** Hint for parallel task workspace isolation in Telegraph native subagent mode. */
   worktreeIsolation?: boolean
   /**
    * Extension capability ids denied for this run (renderer + optional daemon registry merge).
-   * Example: `['pi-subagents']` blocks pi-subagents orchestration paths.
+   * Example: `['telegraph-subagents']` blocks Telegraph native subagent orchestration paths.
    */
   extensionBlocklist?: string[]
   /** Run-scoped capability profile requested by the pagelet/user for permission brokerage. */
@@ -78,8 +78,8 @@ export interface AgentSendInput {
   onPiAiStreamEvent?: (event: unknown) => void | Promise<void>
 }
 
-export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'pi-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
-export type AgentOrchestrationMode = 'none' | 'pi-subagents'
+export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'telegraph-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
+export type AgentOrchestrationMode = 'none' | 'telegraph-subagents'
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 
 export interface AgentBackend {

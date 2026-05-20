@@ -207,12 +207,14 @@ export {
   type PermissionCheckResult,
   type PermissionLevel,
 } from '@/packages/agent/runtime/toolCoordination/PermissionValidator'
-// Node.js-only pi-subagents exports (PiSubagentsRuntime, orchestrate, discoverAgents, etc.)
-// are intentionally excluded from main export to avoid bundling node:fs into the renderer.
-// Import from '@/packages/agent/runtime/piSubagents/index' in Node.js environments.
+// Node.js-only Telegraph subagent harness exports (TelegraphSubagentHarness, orchestrate,
+// discoverAgents, etc.) are intentionally excluded from main export to avoid bundling node:fs into the renderer.
+// Import from '@/packages/agent/runtime/telegraphSubagents/index' in Node.js environments.
 export {
-  TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION,
-} from '@/packages/agent/runtime/piSubagents/constants'
+  TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
+  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
+  isTelegraphSubagentsSelector,
+} from '@/packages/agent/runtime/telegraphSubagents/constants'
 export type {
   SubagentDefinition,
   SubagentScope,
@@ -222,7 +224,7 @@ export type {
   SubagentChainStep,
   SubagentParallelTask,
   SubagentChildResult,
-} from '@/packages/agent/runtime/piSubagents/types'
+} from '@/packages/agent/runtime/telegraphSubagents/types'
 export {
   ExecutionTimeline,
   type TimelineEntry,

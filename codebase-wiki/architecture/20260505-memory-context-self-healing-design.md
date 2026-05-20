@@ -7,6 +7,10 @@
 
 ---
 
+> 2026-05-20 对齐注记：本文中出现的 `PiEmbeddedRuntime` 仅作为历史示例名称。
+> 新分层中应理解为 Telegraph Native Harness 下的 Embedded Execution Kernel。
+> 详见 [D-015](../discussion/20260520-agent-runtime-product-layer-alignment.md)。
+
 ## Part 1: Memory Hierarchy & Retention Strategy
 
 ### 1.1 Current State (Phase 3)
@@ -495,7 +499,7 @@ class SelfHealingLearner {
 
 ```typescript
 // Phase 3: Simple session storage
-class PiEmbeddedRuntime {
+class EmbeddedExecutionKernel {
   async run(input: RuntimeInput) {
     const session = await sessionStore.getSession(input.sessionId);
     // ... execute ...
@@ -504,7 +508,7 @@ class PiEmbeddedRuntime {
 }
 
 // Phase 4: Multi-tier memory + context injection
-class PiEmbeddedRuntimeV2 {
+class EmbeddedExecutionKernelV2 {
   async run(input: RuntimeInput) {
     // 1. Get working memory
     const workingMem = await memoryTier.getWorkingMemory(input.sessionId);

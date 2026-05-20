@@ -8,7 +8,7 @@ description: >
   以 Run、Trace、Permission、Handoff Contract、Replay 与 Capability Matrix 形成差异化。
 category: discussion
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-05-20
 tags:
   - chat
   - agent-team
@@ -58,6 +58,9 @@ references:
   - id: A-005
     rel: extends
     file: ../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md
+  - id: D-015
+    rel: extended-by
+    file: ./20260520-agent-runtime-product-layer-alignment.md
   - id: P-001
     rel: related-to
     file: ../roadmap/20260504-multi-agent-telegraph-roadmap.md
@@ -349,8 +352,8 @@ AuthorDate: Mon May 4 06:03:27 2026 +0800
 `apps/chat/src/application/node/ChatPageletWorker.ts:78-139` 已经把 chat run 放在 pagelet worker 中执行，创建 pagelet-local `AgentHarness`，并注册多个 runtime：
 
 - `pi-ai`
-- `pi-embedded`
-- `pi-subagents`
+- `embedded-kernel`（Native Harness 底层）
+- `telegraph-native-subagents`
 - `telegraph-orchestrator` / `orchestrator-core`
 
 这与 [A-005](../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md) 和 A-008 的边界一致：runtime 不应该跑在 main / daemon，而应该跑在 pagelet utility process 内。
@@ -382,15 +385,15 @@ AuthorDate: Mon May 4 06:03:27 2026 +0800
 - 右侧 raw inspector：model request、tool input/output、schema、raw payload。
 - 顶部 actions：cancel、retry infrastructure、manual rerun fresh session、fork from step、export trace。
 
-### 4.6 PiSubagents 与 OrchestratorCore 是两条 team 路线
+### 4.6 Telegraph Native Subagent Harness 与 OrchestratorCore 是两条 team 路线
 
-`packages/agent/src/runtime/piSubagents/PiSubagentsRuntime.ts:23-47` 已经把 `pi-subagents` 作为 runtime executor，并按 `chain / parallel` 选择 prompt_chain / parallelization。`PiSubagentsRuntime.ts:165-180` 给了默认 parallel 模式：scout、planner、worker、reviewer 并发。
+2026-05-20 对齐后，`pi-subagents` 不再作为长期 runtime adapter 定位；代码已收敛到 `packages/agent/src/runtime/telegraphSubagents/`。chain / parallel / role delegation 归属 Telegraph Native Subagent Harness；Pi 官方 `pi-subagents` 行为则通过 Pi CLI External Agent Runtime 兼容。
 
 `packages/agent/src/runtime/OrchestratorCoreRunner.ts:43-89` 则把 `@/packages/orchestrator-core` graph invoke 转成 Telegraph orchestrator signal；`OrchestratorCoreRunner.ts:151-205` 通过 instrument node action 产生 node_started、node_completed、edge_taken。
 
 这表示 Telegraph 已经有两种 team 承载方式：
 
-- Pi-native / pi-subagents：快速验证 chain / parallel / role delegation。
+- Telegraph Native Subagent Harness：快速验证 chain / parallel / role delegation。
 - Telegraph-native orchestrator-core：更适合长期做 framework-neutral team router、checkpoint、human-in-the-loop。
 
 建议优先做 `Team Router v0`，不要先做 full DAG builder。
@@ -698,7 +701,7 @@ interface AgentRunRecord {
 验收：
 
 - 发送一次普通 chat 可看到 root run。
-- 发送一次 pi-subagents chain / parallel 可看到 child runs / steps。
+- 发送一次 Telegraph native subagent chain / parallel 可看到 child runs / steps。
 - tool call input/output 可展开。
 - raw model request 可查看。
 
@@ -780,7 +783,7 @@ interface AgentRunRecord {
 
 ### 8.1 对 D-001 的更新
 
-[D-001](./20260504-multica-vs-pi-multi-agent-for-telegraph.md) 的核心判断仍成立：Multica 是协作平台，pi-subagents 是编排引擎，Telegraph 应先做 Pi-native 多角色编排与可观测 run 系统。
+[D-001](./20260504-multica-vs-pi-multi-agent-for-telegraph.md) 的核心判断需要按 [D-015](./20260520-agent-runtime-product-layer-alignment.md) 更新：Multica 是协作平台，pi-subagents 是可参考的编排引擎；Telegraph 应先做 **Telegraph Native Subagent Harness** 与可观测 run 系统，而不是把 Pi-native 编排作为长期核心。
 
 本次讨论新增结论：
 
@@ -881,8 +884,8 @@ interface AgentRunRecord {
 3. 把 `LlmTracePanel` 重命名 / 演进为 `RunConsolePanel`，先复用现有 timeline。
 4. 为现有 runtime 添加 capability descriptor：
    - `pi-ai`
-   - `pi-embedded`
-   - `pi-subagents`
+   - `embedded-kernel`
+   - `telegraph-native-subagents`
    - `telegraph-orchestrator`
 5. 在 settings 中展示 capability matrix。
 6. 定义 `TeamSpec` 草案，但暂不实现复杂 DAG。
@@ -890,7 +893,7 @@ interface AgentRunRecord {
 验收标准：
 
 - 普通 chat run 可持久化、可重启查看。
-- pi-subagents run 可显示 child run / step。
+- Telegraph native subagent run 可显示 child run / step。
 - runtime picker 能显示至少 5 个能力维度。
 - 团队功能设计不突破 pagelet-local runtime 边界。
 

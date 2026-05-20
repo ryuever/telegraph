@@ -7,6 +7,10 @@
 
 ---
 
+> 2026-05-20 对齐注记：本文中的 “SDK-Embedded 模式” 应拆成 **Telegraph Native Harness**
+> 与其底层 **Embedded Execution Kernel**；Open Design 式 CLI adapter 对应 Telegraph 的
+> **External Agent Runtime**。详见 [D-015](./20260520-agent-runtime-product-layer-alignment.md)。
+
 ## 0. 架构范式对比
 
 ### 0.1 Open Design：CLI-Adapter 模式（spawn 子进程）
@@ -68,11 +72,10 @@ Telegraph 的当前方案是：**将 agent runtime SDK 打包进 pagelet utility
 ┌───────────────────────────────────────────────────────────────┐
 │ Chat Pagelet (UtilityProcess)                                  │
 │                                                                │
-│  createRuntime(settings) → RuntimeExecutor                     │
-│    ├── PiAiRuntime     → @mariozechner/pi-ai stream()         │
-│    ├── PiEmbeddedRuntime → pi-ai + embedded tool loop          │
-│    ├── LangGraphRuntime → @langchain/langgraph                 │
-│    └── VercelAiRuntime → ai-sdk                                │
+│  Telegraph Native Harness                                      │
+│    └── Embedded Execution Kernel                               │
+│        ├── pi-ai / OpenAI SDK / AI SDK provider                 │
+│        └── Telegraph ToolRegistry tool loop                     │
 │                                                                │
 │  executor.run({ runId, message, settings, signal })            │
 │    → AsyncIterable<RuntimeEvent>                               │
@@ -266,12 +269,12 @@ packages/agent/src/
 ├── runtime/
 │   ├── AgentRuntime.ts         # RuntimeExecutor 接口 + BaseAgentRuntime 基类
 │   ├── PiAiRuntime.ts          # pi-ai 进程内执行器
-│   ├── PiEmbeddedRuntime.ts    # pi-ai + embedded tool loop
+│   ├── EmbeddedExecutionKernel.ts # Native Harness 底层 tool loop（规划命名）
 │   ├── streamPiAiRuntime.ts    # pi-ai stream() → RuntimeEvent 适配
 │   ├── LangGraphRuntime.ts     # LangGraph 执行器
 │   ├── VercelAiRuntime.ts      # Vercel AI SDK 执行器
 │   ├── createRuntime.ts        # 工厂函数 (backend → executor)
-│   └── piSubagents/            # 多 agent 编排
+│   └── telegraphSubagents/     # Telegraph native 多 agent 编排
 ├── providers/
 │   ├── index.ts                # resolveModel(), DEFAULT_MODEL_CATALOG
 │   └── minimax.ts              # MiniMax OpenAI-compat model builder
@@ -349,12 +352,10 @@ client.onStreamEvent(callback)                          ← RPC callback 订阅
     ↓
 ChatPageletWorker.handleSend(req)   (utility process 内)
     ↓
-createRuntime(settings) → executor: RuntimeExecutor
-  ├── PiAiRuntime      (pi-ai SDK, 进程内)
-  ├── PiEmbeddedRuntime (pi-ai + tool loop)
-  ├── LangGraphRuntime  (@langchain/langgraph)
-  ├── VercelAiRuntime   (ai-sdk)
-  └── PiSubagentsRuntime (多 agent 编排)
+select native harness runner
+  ├── Embedded Execution Kernel (pi-ai / OpenAI SDK / AI SDK)
+  ├── Telegraph Native Subagent Harness
+  └── optional framework runner (LangGraph / Vercel AI SDK)
     ↓
 executor.run({ runId, message, settings, signal }) → AsyncIterable<RuntimeEvent>
     ↓
@@ -381,7 +382,7 @@ ChatMessages 组件渲染
 | **Prompt 传递** | stdin pipe / argv（有 OS 长度限制） | 内存中直接传参 |
 | **MCP 支持** | 写 .mcp.json / ACP 协议转发 | 暂无 |
 | **取消机制** | kill child process / abort ACP session | AbortSignal |
-| **支持 agent 数** | 16 个（claude, codex, gemini, pi, opencode, hermes, kimi, cursor, qwen, qoder, copilot, kiro, kilo, vibe, deepseek, devin） | 5 个 backend（pi-ai, pi-embedded, pi-subagents, langgraph, vercel-ai） |
+| **支持 agent 数** | 16 个（claude, codex, gemini, pi, opencode, hermes, kimi, cursor, qwen, qoder, copilot, kiro, kilo, vibe, deepseek, devin） | 两条产品路径：External Agent Runtime 覆盖 CLI 产品；Telegraph Native Harness 覆盖自有 agent/subagent |
 | **归一化事件** | `DaemonAgentPayload`（7 种事件，偏展示层） | `RuntimeEvent`（15+ 种事件，含 workflow/extension/permission） |
 | **依赖管理** | 不需要打包 SDK 到应用中 | 需要将 pi-ai 等打包进 pagelet bundle |
 | **跨平台** | 需要处理 Windows .cmd shim、PATH 解析、native binary discovery | 不需要（进程内调用） |
@@ -446,8 +447,8 @@ ChatPageletWorker.handleSend(req)
     ↓
 createRuntime(settings)
     │
-    ├── backend in ['pi-ai', 'pi-embedded', 'langgraph', 'vercel-ai', 'pi-subagents']:
-    │     → 现有 SDK RuntimeExecutor（进程内执行，高效）
+    ├── mode is Telegraph Native Harness:
+    │     → Embedded Execution Kernel / Native Subagent Harness
     │
     └── backend is a CLI agent id (e.g. 'claude-code', 'codex', 'gemini'):
           → CliRuntimeExecutor（spawn 子进程，覆盖 CLI 生态）
@@ -463,7 +464,7 @@ createRuntime(settings)
 
 优势：
 - **RuntimeEvent 协议不变**——UI / trace panel / LlmTracePanel 无需改动
-- **SDK backend 保持进程内高效**——pi-ai 等不走 spawn
+- **Telegraph Native Harness 保持进程内高效**——embedded kernel 可用 pi-ai 等 SDK，不走 spawn
 - **CLI backend 通过 CliRuntimeExecutor 接入**——复用 Open Design 的声明式 adapter 模式
 - **渐进式实施**：先做 1-2 个 CLI adapter（Claude Code + Codex），验证后再扩展
 
@@ -479,7 +480,7 @@ createRuntime(settings)
 
 ### 6.1 支持 CLI Adapter 的理由
 
-- 支持 16+ agent CLI 生态，覆盖面远大于当前 5 个 SDK backend
+- 支持 16+ agent CLI 生态，补足 Telegraph Native Harness 不应复刻的外部产品能力
 - 不需要将每个 SDK 打包进应用（减小 bundle 体积）
 - 跟上社区趋势：Claude Code / Codex CLI / Gemini CLI / Cursor Agent 等都在快速发展
 - Open Design 已经验证了这套模式的可行性（16 个 agent adapter，生产级质量）
@@ -497,7 +498,7 @@ createRuntime(settings)
 
 两种模式不是非此即彼。Telegraph 的 `RuntimeEvent` 协议已经足够有表达力，可以在同一个 `RuntimeExecutor` 接口下同时支持两种执行方式：
 
-- **SDK backend（进程内）**：pi-ai / pi-embedded / langgraph / vercel-ai / pi-subagents — 高效、无需本地 CLI 安装
-- **CLI backend（spawn 子进程）**：claude-code / codex / gemini / pi / opencode / ... — 覆盖 CLI 生态
+- **Telegraph Native Harness（进程内）**：Telegraph-owned agent profile / subagent / tool loop，底层 embedded kernel 可用 pi-ai / AI SDK 等
+- **External Agent Runtime（spawn 子进程）**：claude-code / codex / gemini / pi / opencode / ... — 覆盖 CLI 生态
 
-统一入口是 `createRuntime(settings)`，根据 `backend` 字段路由到不同的 `RuntimeExecutor` 实现。所有路径最终输出 `AsyncIterable<RuntimeEvent>`，下游 UI 完全无感。
+统一入口仍应产出 `AsyncIterable<RuntimeEvent>`，但设置与 UI 文案不应再表达为 “SDK backend vs CLI backend vs pi-subagents backend”，而应表达为 “External Agents vs Telegraph Native Agents”。

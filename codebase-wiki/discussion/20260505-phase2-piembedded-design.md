@@ -7,10 +7,15 @@
 
 ---
 
+> 2026-05-20 对齐注记：本文是历史设计草案。`PiEmbeddedRuntime` 不再作为独立产品层或
+> “替代 pi-cli spawn” 的路线表达；新的术语是 **Embedded Execution Kernel**，它只服务
+> Telegraph Native Harness。兼容 Pi CLI / pi-subagents 生态时，应走 External Agent Runtime。
+> 详见 [D-015](./20260520-agent-runtime-product-layer-alignment.md)。
+
 ## Overview
 
 Phase 2 builds on Phase 1's Runtime Adapter pattern to introduce:
-1. **PiEmbeddedRuntime**: Direct in-process Pi execution (replaces pi-cli spawn)
+1. **Embedded Execution Kernel**: Native Harness 底层的 in-process model/tool loop
 2. **Tool Execution**: Tool call / tool result events
 3. **Multi-turn Sessions**: Conversation state management
 
@@ -28,11 +33,11 @@ Phase 2 builds on Phase 1's Runtime Adapter pattern to introduce:
 
 ## Architecture
 
-### 2.1 PiEmbeddedRuntime Class Structure
+### 2.1 EmbeddedExecutionKernel Class Structure（历史草案原称 PiEmbeddedRuntime）
 
 ```typescript
-export class PiEmbeddedRuntime extends BaseAgentRuntime {
-  readonly id = 'pi-embedded'
+export class EmbeddedExecutionKernel extends BaseAgentRuntime {
+  readonly id = 'native-embedded'
   readonly label = 'Pi Embedded (In-Process + Tools)'
 
   private toolRegistry: ToolRegistry
@@ -303,7 +308,7 @@ interface Extension {
 
 ```
 packages/agent/src/runtime/
-  ├── PiEmbeddedRuntime.ts           [NEW]
+  ├── EmbeddedExecutionKernel.ts     [NEW]
   ├── sessionManagement/
   │   ├── SessionStore.ts             [NEW]
   │   └── Session.ts                  [NEW]
@@ -316,7 +321,7 @@ packages/agent/src/runtime/
 
 ```
 packages/agent/src/runtime/
-  └── streamPiEmbeddedRuntime.ts      [NEW - event adapter]
+  └── streamEmbeddedExecutionKernel.ts [NEW - event adapter]
 ```
 
 Update Event Mapping (R-001) to include tool_call/tool_result.
@@ -332,7 +337,7 @@ packages/agent/src/extensions/
 
 ### Step 4: Integration & Tests (Week 3)
 
-- Update `createRuntime()` to handle 'pi-embedded'
+- Update runtime selection to handle 'native-embedded'
 - Integration tests: multi-turn, tool execution, error handling
 - Performance baseline
 
@@ -380,7 +385,7 @@ packages/agent/src/extensions/
 
 ## Success Criteria (Phase 2 Exit)
 
-- [ ] PiEmbeddedRuntime compiles and exports correctly
+- [ ] EmbeddedExecutionKernel compiles and exports correctly
 - [ ] Tool call/result events defined and tested
 - [ ] Multi-turn conversation maintains state across runs
 - [ ] Extension Host loads and activates extensions

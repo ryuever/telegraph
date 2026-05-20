@@ -320,7 +320,7 @@ function createPermissionContext(
     pageletKind: 'chat',
     taskProfile: permissionProfile(options.settings.taskCapabilityProfile),
     userIntent: {
-      summary: 'pi-subagents readonly workspace tool call',
+      summary: 'Telegraph native subagent readonly workspace tool call',
       requestedCapabilities: ['filesystem'],
     },
     pageletPolicy: {

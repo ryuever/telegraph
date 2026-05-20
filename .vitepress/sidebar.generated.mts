@@ -110,6 +110,10 @@ export const wikiSidebar = {
         {
           "text": "D-014 Chat Agent Team 与 Multica 差异化策略讨论归档",
           "link": "/discussion/20260519-chat-agent-team-multica-strategy"
+        },
+        {
+          "text": "D-015 Agent Runtime 产品分层与 Telegraph Native Harness 对齐",
+          "link": "/discussion/20260520-agent-runtime-product-layer-alignment"
         }
       ]
     }

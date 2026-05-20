@@ -8,9 +8,14 @@
 
 ---
 
+> 2026-05-20 对齐注记：本文记录的是当时的接入迁移状态。后续 runtime 分层应按
+> [D-015](./20260520-agent-runtime-product-layer-alignment.md) 理解：External Agent Runtime
+> 托管成熟 CLI 产品；Telegraph Native Harness 承载 Telegraph-owned agent/subagent；
+> Embedded Execution Kernel 只是 Native Harness 的底层。
+
 ## 1. 目标
 
-将 `apps/chat` 的 **mock agent 能力** 替换为 **真实的 agent runtime 执行**，使 ChatPanel 能通过 pagelet RPC 链路调用 `packages/agent` 中已实现的 `RuntimeExecutor`（PiAiRuntime / PiEmbeddedRuntime / LangGraphRuntime / VercelAiRuntime），获取流式 `RuntimeEvent` 并展示在 UI 上。
+将 `apps/chat` 的 **mock agent 能力** 替换为 **真实的 agent runtime 执行**，使 ChatPanel 能通过 pagelet RPC 链路调用 `packages/agent` 中已实现的 runtime / harness 能力（PiAiRuntime / Embedded Execution Kernel / LangGraphRuntime / VercelAiRuntime 等），获取流式 `RuntimeEvent` 并展示在 UI 上。
 
 ### 1.1 现状分析
 
@@ -19,7 +24,7 @@
 | `ChatPageletWorker.handleSend()` | ❌ Mock | 仅 echo token，不调 LLM |
 | `ChatPanel` 默认 AgentService | ❌ MockAgentService | `use-chat.ts` 中默认 fallback |
 | `PageletAgentService` | ⚠️ 已实现未启用 | 已有完整 RPC 调用逻辑 |
-| `packages/agent` RuntimeExecutor | ✅ 已实现 | PiAiRuntime / PiEmbeddedRuntime / LangGraphRuntime / VercelAiRuntime |
+| `packages/agent` RuntimeExecutor | ✅ 已实现 | PiAiRuntime / Embedded Execution Kernel / LangGraphRuntime / VercelAiRuntime |
 | `packages/runtime-contracts` | ✅ 类型骨架 | RuntimeEvent 等类型完整 |
 | `vite.chat.config.ts` 构建别名 | ❌ 缺少 agent 别名 | 无法 import `@/packages/agent` |
 | `IChatPageletService` RPC 接口 | ⚠️ 需扩展 | 当前不支持 async iterable / 取消 |
@@ -121,9 +126,9 @@
 
 ## 5. 后续演进
 
-1. **P1**: PiEmbeddedRuntime（嵌入式 tool loop）
-2. **P1**: ExtensionRegistry 接入
-3. **P2**: PiSubagentsRuntime（多 agent 编排）
+1. **P1**: Embedded Execution Kernel（Native Harness 底层 tool loop）
+2. **P1**: Capability / ToolRegistry 接入
+3. **P2**: Telegraph Native Subagent Harness（多 agent 编排）
 4. **P2**: LangGraph / Vercel AI SDK runtime 切换
 5. **P3**: TracePanel 完整重建
 

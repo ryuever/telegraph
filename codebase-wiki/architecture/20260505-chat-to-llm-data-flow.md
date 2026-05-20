@@ -130,12 +130,17 @@ for await (const ev of runtime.run({                 // :168
 
 ### 2.4 Runtime Adapter：统一接口
 
+> 2026-05-20 对齐注记：下表是当时实现视角。新的产品分层见
+> [D-015](../discussion/20260520-agent-runtime-product-layer-alignment.md)：External Agent Runtime
+> 托管成熟 CLI；Telegraph Native Harness 承载自有 agent/subagent；Embedded Execution Kernel
+> 只作为 Native Harness 的底层。
+
 `createRuntime()`（`packages/agent/src/runtime/createRuntime.ts:27`）根据 `settings.backend` 选择 runtime：
 
 | backend | Runtime 类 | 状态 |
 |---------|-----------|------|
 | `pi-ai`（默认） | `PiAiRuntime` | 生产可用 |
-| `pi-embedded` | `PiEmbeddedRuntime` | 开发中 |
+| `native-embedded` | Embedded Execution Kernel | 开发中 |
 | `langgraph` | `LangGraphRuntime` | 骨架 |
 | `vercel-ai` | `VercelAiRuntime` | 骨架 |
 
@@ -295,5 +300,5 @@ sequenceDiagram
 | `RuntimeEvent` 统一事件协议 | `packages/runtime-contracts` 已定义并在用 |
 | Trace 从 RuntimeEvent 投影 | daemon 通过 `runtime_event` chunk 推送到 renderer，TracePanel 消费 |
 | PiCliRuntime 作为 fallback | 已移除，不再保留 |
-| PiEmbeddedRuntime（带 tool loop） | 骨架已存在，待完善 |
+| Embedded Execution Kernel（Native Harness 底层 tool loop） | 骨架已存在，待完善 |
 | Extension Host / Tool Registry | 骨架存在，尚未接入主流程 |

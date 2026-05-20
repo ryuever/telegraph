@@ -15,7 +15,7 @@ import { BaseAgentRuntime, type RuntimeInput } from '@/packages/agent/runtime/Ag
  * 
  * Limitations:
  * - No built-in extension loading (unlike pi-cli)
- * - Limited orchestration support (pi-subagents requires cli)
+ * - Multi-agent delegation is owned by TelegraphSubagentHarness, not the base pi-ai runtime
  */
 export class PiAiRuntime extends BaseAgentRuntime {
   readonly id = 'pi-ai'

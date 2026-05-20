@@ -64,8 +64,8 @@ describe('AgentHarness', () => {
     expect(events.at(-1)?.type).toBe('run_completed')
   })
 
-  it('selects pi-subagents when orchestration requests it', () => {
-    expect(selectRuntimeId({ orchestration: 'pi-subagents' })).toBe('pi-subagents')
+  it('selects Telegraph native subagents when orchestration requests it', () => {
+    expect(selectRuntimeId({ orchestration: 'telegraph-subagents' })).toBe('telegraph-subagents')
   })
 
   it('dispatches lifecycle hooks without blocking the run stream', async () => {

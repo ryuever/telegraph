@@ -3,7 +3,7 @@ import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { streamPiAiRuntimeEvents } from '../../streamPiAiRuntime'
 import { discoverAgents } from '../agentDiscovery'
-import { PiSubagentsRuntime } from '../PiSubagentsRuntime'
+import { TelegraphSubagentHarness } from '../TelegraphSubagentHarness'
 
 vi.mock('../../streamPiAiRuntime', () => ({
   streamPiAiRuntimeEvents: vi.fn(),
@@ -24,17 +24,17 @@ function settings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
     provider: 'minimax-cn',
     modelId: 'MiniMax-M2.7',
     apiKey: 'test-key',
-    orchestration: 'pi-subagents',
+    orchestration: 'telegraph-subagents',
     orchestrationPattern: 'chain',
     ...overrides,
   }
 }
 
-function runtimeInput(overrides: Partial<Parameters<PiSubagentsRuntime['run']>[0]> = {}) {
+function runtimeInput(overrides: Partial<Parameters<TelegraphSubagentHarness['run']>[0]> = {}) {
   return {
     runId: 'run-subagents-test',
     sessionId: 'session-subagents-test',
-    message: 'Build the smallest useful pi-subagents MVP',
+    message: 'Build the smallest useful Telegraph native subagents MVP',
     settings: settings(),
     ...overrides,
   }
@@ -166,27 +166,26 @@ function mockRouterDirectAnswer(): void {
   })
 }
 
-describe('PiSubagentsRuntime', () => {
+describe('TelegraphSubagentHarness', () => {
   beforeEach(() => {
     streamMock.mockReset()
   })
 
-  it('discovers Telegraph fallback agents without a pi-subagents package install', () => {
+  it('discovers Telegraph fallback agents without pi compatibility enabled', () => {
     const agents = discoverAgents({
       scopes: ['builtin'],
-      piSubagentsRoot: `/tmp/telegraph-missing-pi-subagents-${String(process.pid)}`,
     })
 
     expect([...agents.keys()]).toEqual(
       expect.arrayContaining(['scout', 'planner', 'worker', 'reviewer']),
     )
-    expect(agents.get('scout')?.sourcePath).toContain('telegraph://pi-subagents/builtin')
+    expect(agents.get('scout')?.sourcePath).toContain('telegraph://subagents/builtin')
   })
 
   it('runs the default chain through fallback subagents and completes the parent run', async () => {
     mockRouterSelectionAndChildRuns({})
 
-    const runtime = new PiSubagentsRuntime()
+    const runtime = new TelegraphSubagentHarness()
     const events = await collect(runtime.run(runtimeInput()))
 
     expect(events[0]).toMatchObject({
@@ -216,7 +215,7 @@ describe('PiSubagentsRuntime', () => {
   it('converts child run failure into a parent terminal run_failed event', async () => {
     mockRouterSelectionAndChildRuns({}, childFailure)
 
-    const runtime = new PiSubagentsRuntime()
+    const runtime = new TelegraphSubagentHarness()
     const events = await collect(runtime.run(runtimeInput()))
 
     expect(events.some(event => event.type === 'run_failed' && event.runId !== 'run-subagents-test'))
@@ -225,7 +224,7 @@ describe('PiSubagentsRuntime', () => {
       type: 'run_failed',
       runId: 'run-subagents-test',
       error: {
-        code: 'pi_subagents_child_failed',
+        code: 'telegraph_subagents_child_failed',
       },
     })
     expect(events.some(event => event.type === 'run_completed' && event.runId === 'run-subagents-test'))
@@ -251,7 +250,7 @@ describe('PiSubagentsRuntime', () => {
       ],
     })
 
-    const runtime = new PiSubagentsRuntime()
+    const runtime = new TelegraphSubagentHarness()
     const events = await collect(runtime.run(runtimeInput({
       message: 'Use two subagents to check Chat subagent visibility.',
       settings: settings({ orchestrationPattern: 'parallel' }),
@@ -277,10 +276,10 @@ describe('PiSubagentsRuntime', () => {
   it('does not parse natural-language numbered plans in the runtime', async () => {
     mockRouterDirectAnswer()
 
-    const runtime = new PiSubagentsRuntime()
+    const runtime = new TelegraphSubagentHarness()
     const events = await collect(runtime.run(runtimeInput({
       message: [
-        '请使用 pi-subagents 的 parallel 模式并行完成一次有边界的检查。',
+        '请使用 Telegraph native subagents 的 parallel 模式并行完成一次有边界的检查。',
         '',
         '目标：',
         '验证 Telegraph Chat 是否已经能在 UI 中展示 subagents 能力。',
@@ -317,12 +316,12 @@ describe('PiSubagentsRuntime', () => {
     })
   })
 
-  it('fails before spawning child runs when pi-subagents is blocklisted', async () => {
+  it('fails before spawning child runs when Telegraph native subagents are blocklisted', async () => {
     mockRouterSelectionAndChildRuns({})
 
-    const runtime = new PiSubagentsRuntime()
+    const runtime = new TelegraphSubagentHarness()
     const events = await collect(runtime.run(runtimeInput({
-      settings: settings({ extensionBlocklist: ['pi-subagents'] }),
+      settings: settings({ extensionBlocklist: ['telegraph-subagents'] }),
     })))
 
     expect(events).toHaveLength(2)
@@ -330,9 +329,10 @@ describe('PiSubagentsRuntime', () => {
       type: 'run_failed',
       runId: 'run-subagents-test',
       error: {
-        code: 'pi_subagents_blocked',
+        code: 'telegraph_subagents_blocked',
       },
     })
     expect(streamMock).not.toHaveBeenCalled()
   })
+
 })

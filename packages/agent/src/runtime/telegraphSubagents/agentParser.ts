@@ -1,8 +1,8 @@
 /**
  * Agent definition parser.
  *
- * Reads pi-subagents-compatible `.md` agent files with YAML frontmatter
- * and converts them into `SubagentDefinition` objects.
+ * Reads Telegraph `.md` agent files with YAML frontmatter and converts them
+ * into `SubagentDefinition` objects.
  */
 
 import type { SubagentDefinition, SubagentScope } from './types'

@@ -11,7 +11,8 @@ import {
 } from '@/apps/chat/application/common';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
-import { PiSubagentsRuntime } from '@/packages/agent/runtime/piSubagents/PiSubagentsRuntime';
+import { TelegraphSubagentHarness } from '@/packages/agent/runtime/telegraphSubagents/TelegraphSubagentHarness';
+import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/runtime/telegraphSubagents/constants';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { createAgentHarness } from '@/packages/agent/harness';
 import { createPageletRunCapabilities } from '@/packages/agent/harness/node';
@@ -107,7 +108,10 @@ export class ChatPageletWorker extends PageletWorker {
         runtimes: [
           { id: 'pi-ai', create: () => new PiAiRuntime() },
           { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
-          { id: 'pi-subagents', create: () => new PiSubagentsRuntime() },
+          {
+            id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
+            create: () => new TelegraphSubagentHarness(),
+          },
           { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
         ],
         capabilities: createPageletRunCapabilities({

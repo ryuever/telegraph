@@ -1,10 +1,8 @@
 /**
- * pi-subagents embedded orchestrator types.
+ * Telegraph native subagent harness types.
  *
- * These types mirror the pi-subagents agent definition format
- * (YAML frontmatter in .md files) so Telegraph can load and
- * execute subagent workflows in-process via pi-ai, without
- * spawning the pi CLI.
+ * These types describe Telegraph-owned agent definitions using markdown
+ * frontmatter plus a system prompt body.
  */
 
 // ---------------------------------------------------------------------------

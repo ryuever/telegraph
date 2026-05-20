@@ -1,6 +1,6 @@
 import type { SubagentDefinition } from './types'
 
-const TELEGRAPH_BUILTIN_SOURCE = 'telegraph://pi-subagents/builtin'
+const TELEGRAPH_BUILTIN_SOURCE = 'telegraph://subagents/builtin'
 
 export function createTelegraphBuiltinAgents(): SubagentDefinition[] {
   return [

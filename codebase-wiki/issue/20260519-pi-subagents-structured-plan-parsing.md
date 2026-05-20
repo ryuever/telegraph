@@ -7,9 +7,13 @@ description: >
   判断是否调用以及如何拆分，而不是要求用户输入 JSON 或靠 runtime 正则解析自然语言。
 category: issue
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-05-20
 tags: [agent-runtime, pi-subagents, chat, tool-call, runtime-event]
 status: final
+references:
+  - id: D-015
+    rel: related-to
+    file: ../discussion/20260520-agent-runtime-product-layer-alignment.md
 ---
 
 # pi-subagents 触发不应由自然语言 parser 决定
@@ -40,13 +44,18 @@ Chat UI 已能把 `child_run_started` / `child_run_completed` 投影为 Subagent
 用户自然语言
   -> parent model 判断是否需要 delegation
   -> parent model 调用 subagent tool，给出结构化参数
-  -> PiSubagentsRuntime 执行 tool call 对应的 single / parallel / chain
+  -> Telegraph Native Subagent Harness 执行 tool call 对应的 single / parallel / chain
   -> RuntimeEvent child_run_* 进入 Chat UI
 ```
 
+2026-05-20 对齐后，过渡实现名称已清理为
+[D-015](../discussion/20260520-agent-runtime-product-layer-alignment.md) 定义的
+`TelegraphSubagentHarness`；`pi-subagents` 不再是 runtime selector、目录名或 native
+discovery 来源。
+
 ## 根因
 
-Telegraph 的 `PiSubagentsRuntime` 曾经直接根据 `orchestrationPattern` 生成默认 chain / parallel 计划；第一次补丁为了让 prompt 可控，又在 runtime 内解析 JSON 和编号式自然语言。
+Telegraph 的 subagent runtime 曾经直接根据 `orchestrationPattern` 生成默认 chain / parallel 计划；第一次补丁为了让 prompt 可控，又在 runtime 内解析 JSON 和编号式自然语言。
 
 这两个方向都混淆了职责：
 
@@ -60,7 +69,7 @@ Telegraph 的 `PiSubagentsRuntime` 曾经直接根据 `orchestrationPattern` 生
 本次修复移除了自然语言 plan parser，并改成模型驱动选择：
 
 - `streamPiAiRuntimeEvents()` 增加可选 `systemPrompt`，让调用方能给 parent selector 注入明确职责；
-- `PiSubagentsRuntime` 在真正执行 child run 前，先运行 parent model；
+- `TelegraphSubagentHarness` 在真正执行 child run 前，先运行 parent model；
 - parent model 可见一个 `subagent` tool；
 - 如果模型调用 `subagent`，runtime 把 tool arguments 映射成 `SubagentOrchestratorInput` 后执行 orchestrator；
 - 如果模型不调用 tool，runtime 直接完成本轮，不启动 child run；
@@ -69,13 +78,13 @@ Telegraph 的 `PiSubagentsRuntime` 曾经直接根据 `orchestrationPattern` 生
 
 关键代码位置：
 
-- `packages/agent/src/runtime/piSubagents/PiSubagentsRuntime.ts`
+- `packages/agent/src/runtime/telegraphSubagents/TelegraphSubagentHarness.ts`
 - `packages/agent/src/runtime/streamPiAiRuntime.ts`
-- `packages/agent/src/runtime/piSubagents/__tests__/PiSubagentsRuntime.test.ts`
+- `packages/agent/src/runtime/telegraphSubagents/__tests__/TelegraphSubagentHarness.test.ts`
 
 ## 当前限制
 
-这仍是嵌入式 MVP，不是完整 pi-subagents extension host：
+这仍是 Telegraph native harness 的嵌入式 MVP：
 
 - parent selector 的 `subagent` tool 只覆盖执行型参数，不覆盖 create/update/status/interrupt/resume 等管理动作；
 - child run 在 parent selector 完成后启动，后续可以优化成 tool execution 期间实时转发 child events；
@@ -93,8 +102,8 @@ Telegraph 的 `PiSubagentsRuntime` 曾经直接根据 `orchestrationPattern` 生
 执行结果：
 
 ```bash
-pnpm --filter @telegraph/agent exec vitest run src/runtime/piSubagents/__tests__/PiSubagentsRuntime.test.ts
-# 1 file passed, 6 tests passed
+pnpm --filter @telegraph/agent exec vitest run src/runtime/telegraphSubagents/__tests__/TelegraphSubagentHarness.test.ts
+# passed
 
 pnpm --filter @telegraph/agent exec vitest run src/runtime/__tests__/streamPiAiRuntime.test.ts
 # 1 file passed, 1 test passed

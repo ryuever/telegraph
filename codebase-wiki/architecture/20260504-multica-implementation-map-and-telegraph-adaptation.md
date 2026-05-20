@@ -7,7 +7,7 @@ description: >
   给出从「单会话 IPC」演进到任务队列、运行时隔离与事件总线的实现锚点与分阶段适配路径。
 category: architecture
 created: 2026-05-04
-updated: 2026-05-19
+updated: 2026-05-20
 tags:
   - multica
   - telegraph
@@ -39,11 +39,19 @@ references:
   - id: D-014
     rel: related-to
     file: ../discussion/20260519-chat-agent-team-multica-strategy.md
+  - id: D-015
+    rel: related-to
+    file: ../discussion/20260520-agent-runtime-product-layer-alignment.md
 ---
 
 # Multica 源码实现映射与 Telegraph「类 Multica」能力适配路径
 
 本文假设 Multica 源码位于本地 **`/Users/ryuyutyo/Documents/code/modules/ai/multica`**（与上游 [multica-ai/multica](https://github.com/multica-ai/multica) 同步）。宏观产品讨论见 **D-001**；进程拓扑背景见 **A-002**；可执行的阶段清单见 **P-001**。
+
+> 2026-05-20 对齐注记：本文中关于 Pi CLI / pi-subagents 的内容应按
+> [D-015](../discussion/20260520-agent-runtime-product-layer-alignment.md) 重新理解：
+> Pi CLI 兼容属于 External Agent Runtime；Telegraph 自有多 agent 能力应沉淀为
+> Telegraph Native Subagent Harness。
 
 ---
 

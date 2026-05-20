@@ -68,21 +68,22 @@ type TelegraphEvent = PiJsonLine | LangGraphNodeEvent | AiSdkStreamPart
 
 **做什么**：
 
-- 短期保留 `PiCliRuntime` 吃 Pi CLI 已有 extension loader 的红利
-- 中期建设 `PiEmbeddedRuntime`（不 spawn CLI，直接用 `pi-ai` SDK + 自己实现 tool loop）
-- 长期接入 LangGraph / AI SDK / Mastra / OpenAI Agents SDK / MCP
+- 将产品层分为 **External Agent Runtime** 与 **Telegraph Native Harness**
+- Pi CLI / Codex CLI / Claude Code 等成熟 CLI 作为 External Agent Runtime 托管，尊重它们自己的 extension/config/agent 目录
+- Telegraph 自己的 agent profile / subagent / orchestration 进入 Native Harness
+- Embedded Execution Kernel 只作为 Native Harness 的底层，负责 model loop / tool loop / trace / permission，底层可用 `pi-ai`、OpenAI SDK、AI SDK 等
 
 **不做什么**：
 
 - 不要让 ChatPanel / TracePanel / ExtensionRegistry **任何**地方写 `if (backend === 'pi-cli')`
 - 不要把 `~/.pi` 目录结构当成 Telegraph extension 安装的标准
-- 不要在长期主线上依赖 `spawn pi`——它生命周期复杂、stdout JSON 是旁路协议、安全/权限粒度粗
+- 不要把 `pi-subagents` 做成 Telegraph embedded adapter；它只能是参考实现、导入格式或 Pi CLI 兼容能力
 
 **为什么**：Pi 是**当下最快的产品验证路径**，但它的扩展机制、CLI 行为、目录约定都是 Pi 团队的工程权衡，未必符合 Telegraph 的长期定位。把它沉淀进核心 = 锁死。
 
 **判定信号**：
 
-- ✅ "我加一个 PiXxxRuntime / PiXxxAdapter" → 方向对
+- ✅ "我加一个 ExternalCliRuntime / TelegraphSubagentHarness / EmbeddedExecutionKernel" → 方向对
 - ❌ "我把 Pi 的 X 概念升级成 Telegraph 通用 Y" → 危险信号，先讨论是否真的通用
 
 **详见**：A-005 §1.2 + §5 + §11.5。
@@ -211,8 +212,8 @@ P0: Runtime Adapter Wrapper（PiAi/PiCli 包成 RuntimeEvent producer）
 P0: Trace Model v2（按 run 分组、展示 raw）
 P1: ExtensionRegistry MVP（自管 install / enable / permissions）
 P1: Tool Adapter Layer（统一 ToolDefinition）
-P1: PiEmbeddedRuntime MVP（不 spawn CLI 跑通 tool loop）
-P2: pi-subagents Embedded Adapter（第一个复杂生态验证）
+P1: Embedded Execution Kernel MVP（服务 Telegraph Native Harness）
+P2: Telegraph Native Subagent Harness（借鉴/导入 pi-subagents，但不作为 pi-subagents adapter）
 P2: Extension Install UI
 P3: Telegraph Native Workflow DSL（最后再考虑）
 ```
@@ -221,7 +222,7 @@ P3: Telegraph Native Workflow DSL（最后再考虑）
 
 - 不要先做 marketplace（registry/permission 没稳定时 marketplace 是空中楼阁）
 - 不要先做 workflow DSL（编排范式锁死）
-- 不要先做 PiEmbeddedRuntime（contracts 没稳定时 embedded 实现会带框架偏向）
+- 不要先做 Embedded Execution Kernel（contracts / Native Harness 边界没稳定时 embedded 实现会带框架偏向）
 
 **为什么**：A-005 §10.11 的依赖图 = 这个顺序。倒着做 = 上层抽象被下层杂质污染。
 
@@ -239,7 +240,7 @@ P3: Telegraph Native Workflow DSL（最后再考虑）
 | "extension 直接 patch ChatPanel 加按钮" | 原则 5 拒绝。走 `ctx.contributes.panels`。 |
 | "RuntimeEvent 加个 type 但 raw 字段先空着" | 原则 7 拒绝。要么齐，要么不加。 |
 | "先做个 marketplace 吸引开发者" | 原则 8 反对。registry / permission 都没稳定，marketplace 没法兑现承诺。 |
-| "spawn pi 太烦，我直接重写 Pi 的 extension loader" | 原则 3 提醒。先 PiCliRuntime fallback，再渐进 PiEmbeddedRuntime；不要在 contracts 没稳定时就重写。 |
+| "spawn pi 太烦，我直接重写 Pi 的 extension loader" | 原则 3 提醒。Pi CLI 走 External Agent Runtime；Telegraph 自己的能力走 Native Harness。不要复刻 Pi 的私有 loader。 |
 
 ---
 

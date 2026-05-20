@@ -24,11 +24,11 @@ import type {
 } from './types'
 import { discoverAgents } from './agentDiscovery'
 
-import { TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION } from './constants'
-export { TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION }
+import { TELEGRAPH_SUBAGENTS_PRODUCER_VERSION } from './constants'
+export { TELEGRAPH_SUBAGENTS_PRODUCER_VERSION }
 
 const SV = RUNTIME_CONTRACT_SCHEMA_VERSION
-const PV = TELEGRAPH_PI_SUBAGENTS_PRODUCER_VERSION
+const PV = TELEGRAPH_SUBAGENTS_PRODUCER_VERSION
 
 function ts() {
   return Date.now()

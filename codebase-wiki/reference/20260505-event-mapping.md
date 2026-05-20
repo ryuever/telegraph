@@ -174,7 +174,7 @@ manager.processRuntimeEvent({ type: 'run_failed', ... })    // ✗ ignored, logg
 - [ ] Support multi-turn (session-level context)
 
 ### Phase 3 (Multi-Framework)
-- [ ] Add mapping for pi-embedded runtime
+- [ ] Add mapping for Embedded Execution Kernel events
 - [ ] Extend for OpenAI API runtime
 - [ ] Add extension framework events
 

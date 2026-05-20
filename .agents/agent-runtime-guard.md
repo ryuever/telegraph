@@ -85,11 +85,13 @@ await traceSink.push(event)  // 同步等 trace ack 再继续推 model_event = I
 
 **规则**：trace 与业务 RPC 同 channel 但分级——`run_started/completed/failed/cancelled` 不可丢，`model_event/assistant_delta/tool_*` 可降级丢弃并在 TracePanel 标 `[degraded]`。
 
-### 2.5 CLI fallback 红线（A-005 §11.5）
+### 2.5 External CLI Runtime 红线（A-005 §11.5 + D-015）
 
 ```text
 ❌ 把 PiCliRuntime 当架构中心：在 ChatPanel / TracePanel / ExtensionRegistry 里写 if (backend === 'pi-cli')
-✅ PiCliRuntime 仅作为 PiEmbeddedRuntime 不支持的能力的 fallback；UI 与 registry 永远只看 RuntimeEvent / ToolDefinition / ExtensionManifest
+❌ 把 pi-subagents 做成 Telegraph embedded adapter，默认扫描/复刻 .pi 目录语义
+✅ PiCliRuntime / Codex CLI / Claude Code CLI 属于 External Agent Runtime；UI 与 registry 永远只看 RuntimeEvent / ToolDefinition / AgentProfile / CapabilityProfile
+✅ Telegraph 自己的 subagents 属于 Native Harness；Embedded Execution Kernel 只是它的底层 model/tool loop
 ```
 
 ---
@@ -104,7 +106,7 @@ await traceSink.push(event)  // 同步等 trace ack 再继续推 model_event = I
 | `packages/agent-runtime/`（PiAiRuntime / PiCliRuntime / ...） | ❌ 尚未实现 |
 | `AgentStreamService` / `RuntimeEventForwarder` | ❌ 尚未实现 |
 | `LlmTracePanel` / `RuntimeTimeline` | ❌ 尚未实现 |
-| pi-subagents adapter | ❌ 尚未实现 |
+| Telegraph Native Subagent Harness | 方向见 D-015；不要再按 `pi-subagents adapter` 定位 |
 
 **判定**：动手前先 `ls packages/` 和 `ls apps/<pagelet>/src/` 确认依赖类型/服务**实际存在**，不要凭 A-005 §10 "Phase 0 完成"的描述假设它已就绪。需要的话先在新仓库重新接 contracts 消费者。
 
