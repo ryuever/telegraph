@@ -180,15 +180,6 @@ export {
   type ExecutableType,
   type LLMHints,
 } from '@/packages/agent/extensions/ExtensionManifest'
-export {
-  PiExtensionCompatHost,
-  piExtensionCompatProfile,
-  type PiExtensionCompatAPI,
-  type PiExtensionCompatHostOptions,
-  type PiExtensionContext,
-  type PiInputEvent,
-  type PiInputHandler,
-} from '@/packages/agent/extensions/pi-compat'
 export { SessionRepository, type StoredSession, type StoredMessage, SessionRepositoryMigration } from '@/packages/agent/persistence/SessionRepository'
 export {
   DependencyGraph,

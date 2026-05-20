@@ -135,8 +135,8 @@ describe('buildTraceTimeline', () => {
         schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
         runId: 'root-run',
         level: 'debug',
-        message: 'Pi extension input hook transformed input',
-        raw: { source: 'pi-extension-compat', hook: 'input', action: 'transform' },
+        message: 'Native extension input hook transformed input',
+        raw: { source: 'native-extension', hook: 'input', action: 'transform' },
         ts: 3,
       },
       {
@@ -144,8 +144,8 @@ describe('buildTraceTimeline', () => {
         schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
         runId: 'root-run',
         level: 'info',
-        message: 'Expanded inline commands',
-        raw: { source: 'pi-extension-compat' },
+        message: 'Extension feedback',
+        raw: { source: 'native-extension' },
         ts: 4,
       },
     ]
@@ -153,8 +153,8 @@ describe('buildTraceTimeline', () => {
     expect(events.map((event, index) => traceRowSummary(row(event, index)))).toEqual([
       'Permission requested: shell:medium',
       'Exec started: bash',
-      'Hook input transform: Pi extension input hook transformed input',
-      'Feedback (pi-extension-compat): Expanded inline commands',
+      'Hook input transform: Native extension input hook transformed input',
+      'Feedback (native-extension): Extension feedback',
     ])
   })
 })

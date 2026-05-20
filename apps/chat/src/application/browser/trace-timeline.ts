@@ -160,7 +160,7 @@ function runtimeLogSummary(event: Extract<AgentEvent, { type: 'runtime_log' }>):
   const source = rawStringField(event.raw, 'source')
   const hook = rawStringField(event.raw, 'hook')
   const action = rawStringField(event.raw, 'action')
-  if (source === 'pi-extension-compat' && hook) {
+  if (hook) {
     return `Hook ${hook}${action ? ` ${action}` : ''}: ${event.message}`
   }
   if (source) {

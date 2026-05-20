@@ -32,6 +32,7 @@ export function parseAgentFile(
 
   return {
     name,
+    title: asString(fm.title),
     package: asString(fm.package),
     description: asString(fm.description),
     tools: parseCommaSeparated(fm.tools),
@@ -41,12 +42,12 @@ export function parseAgentFile(
     systemPromptMode: asString(pick(fm, 'systemPromptMode', 'system_prompt_mode', 'prompt_mode'))?.toLowerCase() === 'append'
       ? 'append'
       : 'replace',
-    inheritProjectContext: parseBool(pick(fm, 'inheritProjectContext', 'inherit_project_context', 'inherit_context'), false),
-    inheritSkills: parseBool(pick(fm, 'inheritSkills', 'inherit_skills'), false),
-    defaultContext: pick(fm, 'defaultContext', 'default_context') === 'fork' ? 'fork' : 'fresh',
+    inheritProjectContext: parseOptionalBool(pick(fm, 'inheritProjectContext', 'inherit_project_context', 'inherit_context')),
+    inheritSkills: parseOptionalBool(pick(fm, 'inheritSkills', 'inherit_skills')),
+    defaultContext: parseDefaultContext(pick(fm, 'defaultContext', 'default_context')),
     output: asString(fm.output),
     defaultReads: parseCommaSeparated(pick(fm, 'defaultReads', 'default_reads')),
-    defaultProgress: parseBool(pick(fm, 'defaultProgress', 'default_progress'), false),
+    defaultProgress: parseOptionalBool(pick(fm, 'defaultProgress', 'default_progress')),
     skills: parseCommaSeparated(fm.skills),
     systemPrompt: body,
     scope,
@@ -110,10 +111,14 @@ function parseCommaSeparated(raw: unknown): string[] | undefined {
     .filter(Boolean)
 }
 
-function parseBool(raw: unknown, fallback: boolean): boolean {
+function parseOptionalBool(raw: unknown): boolean | undefined {
   if (raw === true || raw === 'true') return true
   if (raw === false || raw === 'false') return false
-  return fallback
+  return undefined
+}
+
+function parseDefaultContext(raw: unknown): SubagentDefinition['defaultContext'] | undefined {
+  return raw === 'fork' || raw === 'fresh' ? raw : undefined
 }
 
 function asString(raw: unknown): string | undefined {

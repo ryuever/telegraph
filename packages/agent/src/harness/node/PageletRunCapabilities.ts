@@ -23,7 +23,6 @@ import {
   PermissionedNodePatchCapability,
   PermissionedNodeProcessCapability,
 } from './NodeIntegrationCapabilities'
-import { piExtensionCompatProfile } from '@/packages/agent/extensions/pi-compat'
 
 export interface PageletRunCapabilityOptions {
   runId: string
@@ -79,10 +78,6 @@ export function createPageletRunCapabilities(options: PageletRunCapabilityOption
     patch: patchCapability,
   })
 
-  if (shouldAttachPiCompat(taskProfile, options.settings.extensionBlocklist)) {
-    capabilities.push(piExtensionCompatProfile({ inlineBash: true }))
-  }
-
   return capabilities
 }
 
@@ -115,14 +110,6 @@ function shouldAttachFilesystem(profile: RuntimeTaskCapabilityProfile): boolean 
 
 function shouldAttachPatch(profile: RuntimeTaskCapabilityProfile): boolean {
   return profile.kind === 'coding-edit' || profile.kind === 'design-build'
-}
-
-function shouldAttachPiCompat(
-  profile: RuntimeTaskCapabilityProfile,
-  extensionBlocklist: string[] | undefined,
-): boolean {
-  return profile.kind === 'shell-automation' &&
-    !(extensionBlocklist ?? []).includes('pi-extension-compat')
 }
 
 function allowedCapabilitiesForProfile(

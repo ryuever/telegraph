@@ -471,7 +471,7 @@ function OrchestrationTab({
 
           <div className="text-[11px] text-zinc-500">
             Uses Telegraph native agent profiles from `~/.telegraph/agents` and project
-            `.telegraph/agents`. Pi compatibility must be enabled explicitly.
+            `.telegraph/agents`. Pi extensions should run through Pi CLI external runtime.
           </div>
         </>
       )}

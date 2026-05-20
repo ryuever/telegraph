@@ -89,7 +89,7 @@ export function createTelegraphSubagentsSnapshot(opts: DiscoveryOptions = {}): H
     }
   }
 
-  return registry.createSnapshot()
+  return hydrateAgentProfilesFromPromptFiles(registry.createSnapshot())
 }
 
 export function subagentDefinitionsFromSnapshot(snapshot: HarnessContributionSnapshot): Map<string, SubagentDefinition> {
@@ -134,7 +134,7 @@ function createProfileSourceManifest(extensionId: string, dir: string, scope: Su
     contributes: {
       agents: agents.map(agent => ({
         id: runtimeName(agent),
-        title: agent.name,
+        title: agent.title ?? agent.name,
         description: agent.description ?? `${agent.name} subagent profile`,
         prompt: agent.sourcePath ? relativePromptPath(dir, agent.sourcePath) : `${agent.name}.md`,
         tools: agent.tools,
@@ -200,6 +200,7 @@ function contributionToDefinition(contribution: ResolvedAgentContribution): Suba
     : contribution.prompt
   return {
     name: typeof metadata.name === 'string' ? metadata.name : contribution.alias,
+    title: contribution.title,
     package: typeof metadata.package === 'string' ? metadata.package : undefined,
     description: contribution.description,
     tools: contribution.tools,
@@ -218,6 +219,42 @@ function contributionToDefinition(contribution: ResolvedAgentContribution): Suba
     scope: toSubagentScope(contribution.origin.sourceKind),
     sourcePath: promptPath ?? contribution.origin.sourcePath,
     origin: contribution.origin,
+  }
+}
+
+function hydrateAgentProfilesFromPromptFiles(snapshot: HarnessContributionSnapshot): HarnessContributionSnapshot {
+  return {
+    ...snapshot,
+    agents: snapshot.agents.map(hydrateAgentProfileFromPromptFile),
+  }
+}
+
+function hydrateAgentProfileFromPromptFile(contribution: ResolvedAgentContribution): ResolvedAgentContribution {
+  const promptPath = contribution.promptPath ?? contribution.origin.sourcePath
+  if (!promptPath || !existsSync(promptPath)) return contribution
+
+  const parsed = parseAgentFile(readFileSync(promptPath, 'utf8'), toSubagentScope(contribution.origin.sourceKind), promptPath)
+  if (!parsed) return contribution
+
+  return {
+    ...contribution,
+    title: parsed.title ?? contribution.title,
+    description: parsed.description ?? contribution.description,
+    tools: parsed.tools ?? contribution.tools,
+    metadata: {
+      ...contribution.metadata,
+      model: parsed.model ?? contribution.metadata?.model,
+      fallbackModels: parsed.fallbackModels ?? contribution.metadata?.fallbackModels,
+      thinking: parsed.thinking ?? contribution.metadata?.thinking,
+      systemPromptMode: parsed.systemPromptMode ?? contribution.metadata?.systemPromptMode,
+      inheritProjectContext: parsed.inheritProjectContext ?? contribution.metadata?.inheritProjectContext,
+      inheritSkills: parsed.inheritSkills ?? contribution.metadata?.inheritSkills,
+      defaultContext: parsed.defaultContext ?? contribution.metadata?.defaultContext,
+      output: parsed.output ?? contribution.metadata?.output,
+      defaultReads: parsed.defaultReads ?? contribution.metadata?.defaultReads,
+      defaultProgress: parsed.defaultProgress ?? contribution.metadata?.defaultProgress,
+      skills: parsed.skills ?? contribution.metadata?.skills,
+    },
   }
 }
 

@@ -15,9 +15,7 @@ export type FilesystemScope = Extract<PermissionRequest, { type: 'filesystem' }>
 
 export type FilesystemAccess = Extract<PermissionRequest, { type: 'filesystem' }>['access']
 
-export type TaskCapabilityProfile =
-  | RuntimeTaskCapabilityProfile
-  | { kind: 'pi-extension-compat'; extensionIds: string[] }
+export type TaskCapabilityProfile = RuntimeTaskCapabilityProfile
 
 export interface PermissionUserIntent {
   summary?: string

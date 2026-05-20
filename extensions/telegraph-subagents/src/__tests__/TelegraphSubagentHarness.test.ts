@@ -1,11 +1,12 @@
 import type { RuntimeEvent, RuntimeSettings } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { streamPiAiRuntimeEvents } from '@/packages/agent/runtime/streamPiAiRuntime'
-import { discoverAgents } from '../agentDiscovery'
+import { agentCatalogText } from '@/packages/agent/extensions/harness'
+import { createTelegraphSubagentsSnapshot, discoverAgents } from '../agentDiscovery'
 import { SubagentManager } from '../SubagentManager'
 import { TelegraphSubagentHarness } from '../TelegraphSubagentHarness'
 
@@ -234,7 +235,7 @@ describe('TelegraphSubagentHarness', () => {
     streamMock.mockReset()
   })
 
-  it('discovers Telegraph fallback agents without pi compatibility enabled', () => {
+  it('discovers Telegraph fallback agents from the subagents extension manifest', () => {
     const agents = discoverAgents({
       scopes: ['builtin'],
     })
@@ -279,6 +280,72 @@ describe('TelegraphSubagentHarness', () => {
         systemPromptMode: 'append',
         tools: ['read', 'grep'],
         systemPrompt: 'Inspect migration files and report the smallest safe next step.',
+      })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses agent markdown frontmatter as the final profile metadata source', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'telegraph-subagent-manifest-drift-'))
+
+    try {
+      await mkdir(join(dir, 'agents'), { recursive: true })
+      await writeFile(
+        join(dir, 'telegraph.extension.json'),
+        JSON.stringify({
+          id: '@telegraph/subagents',
+          displayName: 'Telegraph Subagents',
+          version: '0.1.0',
+          contributes: {
+            agents: [
+              {
+                id: 'scout',
+                title: 'Stale Scout',
+                description: 'Stale description from manifest.',
+                prompt: './agents/scout.md',
+                tools: ['read'],
+              },
+            ],
+          },
+        }),
+        'utf8',
+      )
+      await writeFile(
+        join(dir, 'agents', 'scout.md'),
+        [
+          '---',
+          'title: Fresh Scout',
+          'description: Fresh description from markdown.',
+          'tools: read, grep',
+          '---',
+          '',
+          'Fresh scout prompt.',
+        ].join('\n'),
+        'utf8',
+      )
+
+      const snapshot = createTelegraphSubagentsSnapshot({
+        extensionRoot: dir,
+        scopes: ['builtin'],
+      })
+      const scout = snapshot.agents.find(agent => agent.alias === 'scout')
+      const agents = discoverAgents({
+        extensionRoot: dir,
+        scopes: ['builtin'],
+      })
+
+      expect(scout).toMatchObject({
+        title: 'Fresh Scout',
+        description: 'Fresh description from markdown.',
+        tools: ['read', 'grep'],
+      })
+      expect(agentCatalogText(snapshot)).toContain('scout: Fresh description from markdown.')
+      expect(agents.get('scout')).toMatchObject({
+        title: 'Fresh Scout',
+        description: 'Fresh description from markdown.',
+        tools: ['read', 'grep'],
+        systemPrompt: 'Fresh scout prompt.',
       })
     } finally {
       await rm(dir, { recursive: true, force: true })

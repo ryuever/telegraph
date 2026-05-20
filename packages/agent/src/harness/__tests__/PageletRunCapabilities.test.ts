@@ -1,7 +1,6 @@
 import type { AgentEvent } from '@/packages/agent-protocol'
 import { CapabilityHost } from '@/packages/agent/harness/CapabilityHost'
 import { HookBus } from '@/packages/agent/harness/HookBus'
-import { PiExtensionCompatHost } from '@/packages/agent/extensions/pi-compat'
 import { createPageletRunCapabilities } from '@/packages/agent/harness/node/PageletRunCapabilities'
 import { describe, expect, it } from 'vitest'
 
@@ -15,10 +14,9 @@ describe('createPageletRunCapabilities', () => {
     expect(host.has('process')).toBe(false)
     expect(host.has('filesystem')).toBe(false)
     expect(host.has('patch')).toBe(false)
-    expect(host.has('custom', 'pi-extension-compat')).toBe(false)
   })
 
-  it('enables shell automation and Pi compat only for explicit shell profiles', async () => {
+  it('enables shell automation only for explicit shell profiles', async () => {
     const host = await register({
       taskCapabilityProfile: {
         kind: 'shell-automation',
@@ -30,7 +28,6 @@ describe('createPageletRunCapabilities', () => {
     expect(host.has('process')).toBe(true)
     expect(host.has('filesystem')).toBe(false)
     expect(host.has('patch')).toBe(false)
-    expect(host.getCustom('pi-extension-compat')).toBeInstanceOf(PiExtensionCompatHost)
   })
 
   it('enables workspace filesystem and patch capabilities for design build profiles', async () => {
@@ -45,7 +42,6 @@ describe('createPageletRunCapabilities', () => {
     expect(host.has('process')).toBe(false)
     expect(host.has('filesystem')).toBe(true)
     expect(host.has('patch')).toBe(true)
-    expect(host.has('custom', 'pi-extension-compat')).toBe(false)
   })
 })
 

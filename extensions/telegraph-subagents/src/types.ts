@@ -12,6 +12,8 @@
 export interface SubagentDefinition {
   /** Agent name used in chain/parallel references. */
   name: string
+  /** Human-facing display title. */
+  title?: string
   /** Optional package namespace (runtime name = `package.name`). */
   package?: string
   description?: string
