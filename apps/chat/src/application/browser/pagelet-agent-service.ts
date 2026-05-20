@@ -6,7 +6,7 @@ import {
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
-import { isLegacyProjectionEvent, projectAgentEventToChat } from './agent-event-projector'
+import { createChatAgentEventProjectionState, isLegacyProjectionEvent, projectAgentEventToChat } from './agent-event-projector'
 
 const READY_ATTEMPTS = 40
 const READY_INTERVAL_MS = 500
@@ -34,7 +34,15 @@ async function waitForChatPageletReady(signal?: AbortSignal): Promise<void> {
 }
 
 export class PageletAgentService implements AgentService {
-  async send({ conversation, onChunk, onToolCall, onStatus, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
+  async send({
+    conversation,
+    onChunk,
+    onToolCall,
+    onSubagentUpdate,
+    onStatus,
+    signal,
+    onLlmTrace,
+  }: AgentSendOptions): Promise<void> {
     const lastMessage = conversation.messages.filter(m => m.role === 'user').at(-1)
     if (!lastMessage) throw new Error('Last message must be from user')
 
@@ -64,6 +72,7 @@ export class PageletAgentService implements AgentService {
     })
 
     let sawAgentEvent = false
+    const projectionState = createChatAgentEventProjectionState()
     const streamListener = (event: ChatStreamEvent) => {
       if (signal?.aborted) return
       if (event.runId !== runId) return
@@ -75,8 +84,10 @@ export class PageletAgentService implements AgentService {
           runId,
           onChunk,
           onToolCall,
+          onSubagentUpdate,
           onStatus,
           onLlmTrace,
+          projectionState,
         })
         return
       }

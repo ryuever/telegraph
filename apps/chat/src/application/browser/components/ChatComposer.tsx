@@ -46,10 +46,12 @@ export const ChatComposer = React.memo(function ChatComposer({
 
   const handleSend = () => {
     const t = text.trim()
-    if (!t || isStreaming || !sessionId) return
+    if (!t || isStreaming) return
     onSendMessage(t)
     setText('')
-    onPersistSessionDraft(sessionId, '')
+    if (sessionId) {
+      onPersistSessionDraft(sessionId, '')
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -59,7 +61,27 @@ export const ChatComposer = React.memo(function ChatComposer({
     }
   }
 
-  const canSend = text.trim().length > 0 && !isStreaming && !!sessionId
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData('text/plain')
+    if (!pastedText) return
+
+    e.preventDefault()
+    const target = e.currentTarget
+    const selectionStart = target.selectionStart
+    const selectionEnd = target.selectionEnd
+    setText(current => {
+      const next = current.slice(0, selectionStart) + pastedText + current.slice(selectionEnd)
+      requestAnimationFrame(() => {
+        const el = textareaRef.current
+        if (!el) return
+        const caret = selectionStart + pastedText.length
+        el.setSelectionRange(caret, caret)
+      })
+      return next
+    })
+  }
+
+  const canSend = text.trim().length > 0 && !isStreaming
 
   return (
     <div className="border-t border-zinc-800/80 bg-zinc-950/80 px-4 pb-4 pt-3">
@@ -73,15 +95,12 @@ export const ChatComposer = React.memo(function ChatComposer({
           <textarea
             ref={textareaRef}
             value={text}
-            readOnly={!sessionId}
             onChange={e => { setText(e.target.value); }}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={placeholder}
             rows={1}
-            className={cn(
-              'min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500',
-              !sessionId && 'opacity-50'
-            )}
+            className="min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
           />
           {isStreaming ? (
             <button

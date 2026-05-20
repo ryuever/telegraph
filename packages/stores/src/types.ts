@@ -12,6 +12,23 @@ export interface ChatMessage {
     status: 'running' | 'done' | 'error'
     errorMessage?: string
   }[]
+  subagentGroups?: {
+    id: string
+    parentRunId: string
+    title: string
+    agents: {
+      runId: string
+      name: string
+      task?: string
+      status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+      lastUpdate?: string
+      summary?: string
+      elapsedMs?: number
+      startedAt?: number
+      completedAt?: number
+    }[]
+    updatedAt: number
+  }[]
   errorMessage?: string
 }
 

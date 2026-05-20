@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { cn } from '@/packages/ui/lib/utils'
-import type { ChatMessage } from '@/apps/chat/application/common'
+import type { ChatMessage, ChatSubagentGroup, ChatSubagentStatus } from '@/apps/chat/application/common'
 
 interface Props {
   messages: ChatMessage[]
@@ -97,6 +97,10 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
           </div>
         ))}
 
+        {message.subagentGroups?.map(group => (
+          <SubagentGroupCard key={group.id} group={group} />
+        ))}
+
         {showThinking ? (
           <ThinkingIndicator />
         ) : (
@@ -121,6 +125,72 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
       </div>
     </div>
   )
+}
+
+function SubagentGroupCard({ group }: { group: ChatSubagentGroup }) {
+  const total = group.agents.length
+  const completed = group.agents.filter(agent => agent.status === 'completed').length
+  const failed = group.agents.filter(agent => agent.status === 'failed' || agent.status === 'cancelled').length
+  const active = group.agents.some(agent => agent.status === 'running' || agent.status === 'queued')
+  const statusLabel = active
+    ? `${String(completed)}/${String(total)} done`
+    : failed > 0
+      ? `${String(failed)} need attention`
+      : 'complete'
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/55 text-[12px] shadow-sm">
+      <div className="flex items-center gap-2 border-b border-zinc-800/80 px-3 py-2">
+        <span className="font-medium text-zinc-200">{group.title}</span>
+        <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
+          {statusLabel}
+        </span>
+      </div>
+      <div className="divide-y divide-zinc-800/70">
+        {group.agents.map(agent => (
+          <div key={agent.runId} className="grid grid-cols-[auto_1fr_auto] gap-2 px-3 py-2">
+            <StatusDot status={agent.status} />
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-medium text-zinc-200">{agent.name}</span>
+                <span className="shrink-0 text-[11px] text-zinc-500">{agent.status}</span>
+              </div>
+              {agent.task && (
+                <div className="mt-0.5 truncate text-[11px] text-zinc-500">{agent.task}</div>
+              )}
+              {(agent.summary || agent.lastUpdate) && (
+                <div className="mt-1 max-h-[2.9em] overflow-hidden text-[11.5px] leading-relaxed text-zinc-400">
+                  {agent.summary ?? agent.lastUpdate}
+                </div>
+              )}
+            </div>
+            <div className="pt-0.5 text-[11px] tabular-nums text-zinc-600">
+              {agent.elapsedMs !== undefined ? formatElapsed(agent.elapsedMs) : ''}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function StatusDot({ status }: { status: ChatSubagentStatus }) {
+  return (
+    <span
+      className={cn(
+        'mt-1.5 h-2 w-2 rounded-full',
+        (status === 'queued' || status === 'running') && 'bg-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.12)]',
+        status === 'completed' && 'bg-emerald-400',
+        status === 'failed' && 'bg-rose-400',
+        status === 'cancelled' && 'bg-zinc-500'
+      )}
+    />
+  )
+}
+
+function formatElapsed(ms: number): string {
+  if (ms < 1000) return `${String(ms)}ms`
+  return `${(ms / 1000).toFixed(1)}s`
 }
 
 function formatToolOutput(output: unknown): string {

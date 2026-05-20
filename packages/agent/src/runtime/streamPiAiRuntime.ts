@@ -36,6 +36,7 @@ export async function* streamPiAiRuntimeEvents(opts: {
   signal?: AbortSignal
   tools?: PiAiExecutableTool[]
   maxToolIterations?: number
+  systemPrompt?: string
 }): AsyncGenerator<RuntimeEvent, Message | undefined, void> {
   const { runId, settings, message, signal } = opts
   const schemaVersion = RUNTIME_CONTRACT_SCHEMA_VERSION
@@ -46,7 +47,7 @@ export async function* streamPiAiRuntimeEvents(opts: {
   const tools = opts.tools ?? []
   const toolsByName = new Map(tools.map(tool => [tool.name, tool]))
   const context: Context = {
-    systemPrompt: PI_AI_DEFAULT_SYSTEM,
+    systemPrompt: opts.systemPrompt ?? PI_AI_DEFAULT_SYSTEM,
     messages: [{
       role: 'user',
       content: message,

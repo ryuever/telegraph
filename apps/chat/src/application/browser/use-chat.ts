@@ -4,6 +4,7 @@ import type { AgentService, ChatConversation, ChatMessage, LlmTracePayload } fro
 import { MockAgentService } from './mock-agent-service'
 import type { ChatMessage as CommonChatMessage } from '@/apps/chat/application/common'
 import { upsertToolCall } from './chat-tool-calls'
+import { upsertSubagentUpdate } from './chat-subagents'
 
 function uid(prefix = '') {
   return prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
@@ -166,6 +167,12 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
               store.updateMessage(assistantMsg.id, (m: CommonChatMessage) => ({
                 ...m,
                 toolCalls: upsertToolCall(m.toolCalls ?? [], call),
+              }))
+            },
+            onSubagentUpdate: (update) => {
+              store.updateMessage(assistantMsg.id, (m: CommonChatMessage) => ({
+                ...m,
+                subagentGroups: upsertSubagentUpdate(m.subagentGroups ?? [], update),
               }))
             },
             onLlmTrace: info =>

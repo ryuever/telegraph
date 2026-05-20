@@ -117,7 +117,10 @@ export class WindowManager implements IWindowManager {
               ],
             },
           ]
-        : []),
+	        : []),
+      {
+        role: 'editMenu' as const,
+      },
       {
         label: 'Develop',
         submenu: [

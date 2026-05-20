@@ -281,12 +281,13 @@ async function* runParallel(
   concurrency: number = 4,
 ): AsyncGenerator<RuntimeEvent> {
   // Expand tasks with count > 1
-  const expanded: Array<{ agent: string; task: string; index: number; model?: string }> = []
+  const expanded: Array<{ agent: string; label?: string; task: string; index: number; model?: string }> = []
   for (const t of tasks) {
     const count = t.count ?? 1
     for (let i = 0; i < count; i++) {
       expanded.push({
         agent: t.agent,
+        label: t.label,
         task: t.task ?? fallbackTask,
         index: expanded.length,
         model: t.model,
@@ -314,6 +315,7 @@ async function* runParallel(
     }
 
     const childRunId = `${opts.runId}-par-${idx}-${t.agent}`
+    const childLabel = t.label ?? t.agent
     const childSettings = applyAgentSettings(opts.settings, agentDef, t.model)
     const prompt = buildPromptForAgent(agentDef, t.task)
     const tools = createSubagentTools({
@@ -323,7 +325,7 @@ async function* runParallel(
       allowedTools: agentDef.tools,
     })
 
-    allChildEvents[idx].push(childStarted(opts.runId, childRunId, t.agent))
+    allChildEvents[idx].push(childStarted(opts.runId, childRunId, childLabel))
 
     let childText = ''
     const startMs = ts()
@@ -338,7 +340,7 @@ async function* runParallel(
       })) {
         if (ev.type === 'run_completed' || ev.type === 'run_failed') {
           if (ev.type === 'run_failed') {
-            allChildEvents[idx].push(childCompleted(opts.runId, childRunId, t.agent, childText, 1, ts() - startMs))
+            allChildEvents[idx].push(childCompleted(opts.runId, childRunId, childLabel, childText, 1, ts() - startMs))
             allChildEvents[idx].push(ev)
             return
           }
@@ -350,11 +352,11 @@ async function* runParallel(
         allChildEvents[idx].push(ev)
       }
     } catch (err) {
-      allChildEvents[idx].push(childCompleted(opts.runId, childRunId, t.agent, '', 1, ts() - startMs))
+      allChildEvents[idx].push(childCompleted(opts.runId, childRunId, childLabel, '', 1, ts() - startMs))
       return
     }
 
-    allChildEvents[idx].push(childCompleted(opts.runId, childRunId, t.agent, childText, 0, ts() - startMs))
+    allChildEvents[idx].push(childCompleted(opts.runId, childRunId, childLabel, childText, 0, ts() - startMs))
   }
 
   // Execute with concurrency limit

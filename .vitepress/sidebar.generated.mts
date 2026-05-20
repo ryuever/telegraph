@@ -133,6 +133,10 @@ export const wikiSidebar = {
         {
           "text": "I-003 Renderer ↔ Design Utility RPC Ping 全链路调试复盘（Phase 4–5）",
           "link": "/issue/20260508-renderer-design-rpc-ping-debug"
+        },
+        {
+          "text": "I-004 pi-subagents 触发不应由自然语言 parser 决定",
+          "link": "/issue/20260519-pi-subagents-structured-plan-parsing"
         }
       ]
     }

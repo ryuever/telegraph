@@ -80,6 +80,7 @@ features:
 | I-001 | [20260504-chat-tailwind-not-applied-postmortem.md](./issue/20260504-chat-tailwind-not-applied-postmortem.md) | Chat 页面 Tailwind 未生效故障复盘 | 归档 2026-05-04 chat 页面“无样式”问题的现象、根因拆解、时间线、修复动作、回归验证与复发排查清单。 |
 | I-002 | [20260505-pi-ai-llm-trace-await-sink-deadlock.md](./issue/20260505-pi-ai-llm-trace-await-sink-deadlock.md) | pi-ai 流式首包后卡住与助手长期 pending（llm_trace await sink 死锁） | pi-ai 路径下首条 stream 为 `start` 后 await `llm_trace` 的 sink.push 与主进程 `invoke(runStream)` 互等；改为 `safePushLlmTrace` 及回归要点。 |
 | I-003 | [20260508-renderer-design-rpc-ping-debug.md](./issue/20260508-renderer-design-rpc-ping-debug.md) | Renderer ↔ Design Utility RPC Ping 全链路调试复盘（Phase 4–5） | 三个独立 Bug：port 提前到达被丢弃（earlyPorts 队列修复）、MessagePort 无法跨 contextBridge（移入 preload 修复）、RPCServiceHost 空数组误判导致 handler 静默丢弃（isHandlerMap 加 length > 0 修复）。 |
+| I-004 | [20260519-pi-subagents-structured-plan-parsing.md](./issue/20260519-pi-subagents-structured-plan-parsing.md) | pi-subagents 触发不应由自然语言 parser 决定 | Chat Subagents 卡片已可见后，记录第一次 parser 修复为何破坏使用性；正确链路是 parent model 通过 `subagent` tool call 决定是否 delegation。 |
 
 ### reference/ — 参考手册
 

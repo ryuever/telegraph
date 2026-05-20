@@ -1,13 +1,14 @@
 import type { AgentEvent } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
-import type { ChatToolCall, LlmTracePayload } from '@/apps/chat/application/common'
+import type { ChatSubagentUpdate, ChatToolCall, LlmTracePayload } from '@/apps/chat/application/common'
 import { describe, expect, it } from 'vitest'
-import { projectAgentEventToChat } from '../agent-event-projector'
+import { createChatAgentEventProjectionState, projectAgentEventToChat } from '../agent-event-projector'
 
 function project(event: AgentEvent) {
   const chunks: string[] = []
   const statuses: string[] = []
   const tools: ChatToolCall[] = []
+  const subagents: ChatSubagentUpdate[] = []
   const traces: LlmTracePayload[] = []
 
   projectAgentEventToChat(event, {
@@ -16,10 +17,11 @@ function project(event: AgentEvent) {
     onChunk: text => { chunks.push(text); },
     onStatus: status => { statuses.push(status); },
     onToolCall: call => { tools.push(call); },
+    onSubagentUpdate: update => { subagents.push(update); },
     onLlmTrace: info => { traces.push(info.trace); },
   })
 
-  return { chunks, statuses, tools, traces }
+  return { chunks, statuses, tools, subagents, traces }
 }
 
 describe('projectAgentEventToChat', () => {
@@ -171,5 +173,75 @@ describe('projectAgentEventToChat', () => {
 
     expect(project(step).traces).toEqual([{ kind: 'runtime_event', event: step }])
     expect(project(edge).traces).toEqual([{ kind: 'runtime_event', event: edge }])
+  })
+
+  it('projects child-run lifecycle into subagent updates without adding main chat text', () => {
+    const state = createChatAgentEventProjectionState()
+    const chunks: string[] = []
+    const subagents: ChatSubagentUpdate[] = []
+    const events: AgentEvent[] = [
+      {
+        type: 'child_run_started',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        parentRunId: 'run-1',
+        childRunId: 'run-1-scout',
+        label: 'Scout',
+        ts: 1,
+      },
+      {
+        type: 'assistant_delta',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1-scout',
+        requestId: 'request-child',
+        text: 'reading runtime events',
+        ts: 2,
+      },
+      {
+        type: 'child_run_completed',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        parentRunId: 'run-1',
+        childRunId: 'run-1-scout',
+        output: { text: 'runtime event mapping looks correct', exitCode: 0, durationMs: 1200 },
+        ts: 3,
+      },
+    ]
+
+    for (const event of events) {
+      projectAgentEventToChat(event, {
+        sessionId: 'session-1',
+        runId: 'run-1',
+        onChunk: text => { chunks.push(text); },
+        onSubagentUpdate: update => { subagents.push(update); },
+        projectionState: state,
+      })
+    }
+
+    expect(chunks).toEqual([])
+    expect(subagents).toEqual([
+      {
+        parentRunId: 'run-1',
+        childRunId: 'run-1-scout',
+        name: 'Scout',
+        status: 'running',
+        lastUpdate: 'Starting',
+        startedAt: 1,
+      },
+      {
+        parentRunId: 'run-1',
+        childRunId: 'run-1-scout',
+        name: 'Scout',
+        status: 'running',
+        lastUpdate: 'reading runtime events',
+      },
+      {
+        parentRunId: 'run-1',
+        childRunId: 'run-1-scout',
+        name: 'Scout',
+        status: 'completed',
+        summary: 'runtime event mapping looks correct',
+        elapsedMs: 1200,
+        completedAt: 3,
+      },
+    ])
   })
 })

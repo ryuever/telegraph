@@ -152,6 +152,41 @@ export interface ChatToolCall {
   errorMessage?: string
 }
 
+export type ChatSubagentStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+
+export interface ChatSubagent {
+  runId: string
+  name: string
+  task?: string
+  status: ChatSubagentStatus
+  lastUpdate?: string
+  summary?: string
+  elapsedMs?: number
+  startedAt?: number
+  completedAt?: number
+}
+
+export interface ChatSubagentGroup {
+  id: string
+  parentRunId: string
+  title: string
+  agents: ChatSubagent[]
+  updatedAt: number
+}
+
+export interface ChatSubagentUpdate {
+  parentRunId: string
+  childRunId: string
+  name?: string
+  task?: string
+  status: ChatSubagentStatus
+  lastUpdate?: string
+  summary?: string
+  elapsedMs?: number
+  startedAt?: number
+  completedAt?: number
+}
+
 export interface ChatMessage {
   id: string
   role: ChatRole
@@ -159,6 +194,7 @@ export interface ChatMessage {
   createdAt: number
   status?: ChatMessageStatus
   toolCalls?: ChatToolCall[]
+  subagentGroups?: ChatSubagentGroup[]
   errorMessage?: string
 }
 

@@ -75,7 +75,7 @@ export interface SubagentOverrides {
 
 export type SubagentExecutionMode = 'single' | 'chain' | 'parallel'
 
-/** Top-level orchestration request parsed from the user message or settings. */
+/** Top-level orchestration request selected by the parent model's subagent tool call. */
 export interface SubagentOrchestratorInput {
   mode: SubagentExecutionMode
   /** User task / message. */
@@ -94,6 +94,7 @@ export interface SubagentOrchestratorInput {
 
 export interface SubagentChainStep {
   agent: string
+  label?: string
   task?: string
   /** Parallel fan-out within a chain step. */
   parallel?: SubagentParallelTask[]
@@ -105,6 +106,7 @@ export interface SubagentChainStep {
 
 export interface SubagentParallelTask {
   agent: string
+  label?: string
   task?: string
   /** Replicate this task N times. */
   count?: number
