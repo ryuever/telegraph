@@ -36,8 +36,6 @@ function devSandpackerServiceWorkerPlugin(): Plugin {
 function createDevSandpackerServiceWorkerSource(): string {
   return `
 const DEFAULT_CACHE_NAME = 'sandpacker';
-const DEFAULT_CDN_CACHE_NAME = 'sandpacker-cdn';
-const DEFAULT_CDN_ORIGINS = ['https://esm.sh'];
 const buses = new Map();
 
 class BroadcastChannelTransport {
@@ -124,24 +122,10 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (isCdnCacheRequest(event.request, url)) {
-    event.respondWith(serveCdnRequest(event.request));
-    return;
-  }
-
   const parsed = parseSandboxUrl(url);
   if (!parsed) return;
   event.respondWith(serveSandboxRequest(event.request, url, parsed));
 });
-
-async function serveCdnRequest(request) {
-  const cache = await caches.open(DEFAULT_CDN_CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) return cached.clone();
-  const response = await fetch(request);
-  if (response.ok || response.type === 'opaque') await cache.put(request, response.clone());
-  return response;
-}
 
 async function serveSandboxRequest(request, url, parsed) {
   const result = await getBus(parsed.busId).command('asset.serve', {
@@ -185,12 +169,6 @@ async function waitForCache(cache, cacheKey) {
   return cached;
 }
 
-function isCdnCacheRequest(request, url) {
-  if (request.method !== 'GET') return false;
-  if (!DEFAULT_CDN_ORIGINS.includes(url.origin)) return false;
-  if (request.destination === 'script' || request.destination === 'style') return true;
-  return /\\.(?:mjs|js|css)(?:$|[?#])/.test(url.pathname);
-}
 `;
 }
 
