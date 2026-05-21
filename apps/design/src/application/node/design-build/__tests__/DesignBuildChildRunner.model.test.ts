@@ -80,4 +80,50 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
       input: { artifactId: 'model-input-artifact' },
     }))
   })
+
+  it('falls back to deterministic child output when model output is not JSON', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield {
+        type: 'assistant_delta',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        producerVersion: 'test',
+        runId: 'run-1:worker',
+        requestId: 'req-1',
+        text: 'I can help with that, but I need more details.',
+        ts: 1,
+      }
+      yield {
+        type: 'run_completed',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        producerVersion: 'test',
+        runId: 'run-1:worker',
+        output: {
+          role: 'assistant',
+          content: 'I can help with that, but I need more details.',
+        },
+        ts: 2,
+      }
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await expect(runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'deterministic-artifact' },
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })).resolves.toEqual({
+      output: { artifactId: 'deterministic-artifact' },
+      source: 'deterministic',
+    })
+  })
 })

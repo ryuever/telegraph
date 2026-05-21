@@ -56,11 +56,29 @@ export class ModelBackedDesignBuildChildRunner implements DesignBuildChildRunner
       return this.fallback.runChild(request)
     }
 
-    return {
-      output: await runModelChild(request, settings),
-      source: 'model-backed',
+    try {
+      return {
+        output: await runModelChild(request, settings),
+        source: 'model-backed',
+      }
+    } catch (error) {
+      if (isModelChildOutputParseError(error)) {
+        return this.fallback.runChild(request)
+      }
+      throw error
     }
   }
+}
+
+class ModelChildOutputParseError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ModelChildOutputParseError'
+  }
+}
+
+function isModelChildOutputParseError(error: unknown): error is ModelChildOutputParseError {
+  return error instanceof ModelChildOutputParseError
 }
 
 async function runModelChild(
@@ -95,6 +113,7 @@ function createChildSystemPrompt(request: DesignBuildChildRunRequest): string {
   return [
     'You are a Telegraph design page generation child agent.',
     'Return only one valid JSON object. Do not include markdown fences, commentary, or extra text.',
+    'If you cannot improve the provided input, echo a valid JSON object with the same shape as the input.',
     'Use the provided input as the source of truth. Keep imports using "@/..." monorepo-root aliases when source code appears.',
     stageInstruction(request),
   ].join('\n')
@@ -178,12 +197,18 @@ function parseJsonObject(text: string): unknown {
   const start = normalized.indexOf('{')
   const end = normalized.lastIndexOf('}')
   if (start < 0 || end < start) {
-    throw new Error('Model child output did not contain a JSON object.')
+    throw new ModelChildOutputParseError('Model child output did not contain a JSON object.')
   }
 
-  const parsed: unknown = JSON.parse(normalized.slice(start, end + 1))
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(normalized.slice(start, end + 1))
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new ModelChildOutputParseError(`Model child output JSON was invalid: ${detail}`)
+  }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Model child output JSON must be an object.')
+    throw new ModelChildOutputParseError('Model child output JSON must be an object.')
   }
   return parsed
 }
