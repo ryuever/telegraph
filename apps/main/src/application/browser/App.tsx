@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
 import { Activity, Cable, MessageCircle, Palette, Settings, Sparkles } from 'lucide-react';
 import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
@@ -27,15 +27,42 @@ const PAGE_ACCENTS: Record<PageConfig['id'], string> = {
   connection: 'bg-primary text-primary-foreground',
 };
 
+const ACTIVE_PAGE_STORAGE_KEY = 'telegraph.activePageId';
+
+function findPageById(pageId: string | null): PageConfig | undefined {
+  if (!pageId) return undefined;
+  return ALL_PAGES.find((page) => page.id === pageId);
+}
+
+function loadInitialPage(): PageConfig {
+  try {
+    return findPageById(globalThis.localStorage.getItem(ACTIVE_PAGE_STORAGE_KEY)) ?? DESIGN_PAGE;
+  } catch {
+    return DESIGN_PAGE;
+  }
+}
+
+function persistActivePage(page: PageConfig): void {
+  try {
+    globalThis.localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, page.id);
+  } catch {
+    // Ignore storage failures; navigation should still work in restricted contexts.
+  }
+}
+
 function App(): React.JSX.Element {
-  const [activePage, setActivePage] = useState<PageConfig>(DESIGN_PAGE);
+  const [activePage, setActivePage] = useState<PageConfig>(loadInitialPage);
+  const selectPage = useCallback((page: PageConfig) => {
+    setActivePage(page);
+    persistActivePage(page);
+  }, []);
 
   useEffect(() => {
     mainWindowClient.onSwitchPage((pageId: string) => {
-      const page = ALL_PAGES.find((p) => p.id === pageId);
-      if (page) setActivePage(page);
+      const page = findPageById(pageId);
+      if (page) selectPage(page);
     });
-  }, []);
+  }, [selectPage]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
@@ -61,7 +88,7 @@ function App(): React.JSX.Element {
                 <button
                   key={page.id}
                   type="button"
-                  onClick={() => { setActivePage(page); }}
+                  onClick={() => { selectPage(page); }}
                   className={cn(
                     'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors',
                     isActive
