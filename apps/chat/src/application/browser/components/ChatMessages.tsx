@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { cn } from '@/packages/ui/lib/utils'
 import type { ChatMessage, ChatSubagentGroup, ChatSubagentStatus } from '@/apps/chat/application/common'
 
@@ -106,13 +107,16 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
         ) : (
           <div
             className={cn(
-              'whitespace-pre-wrap text-[13.5px] leading-relaxed text-foreground',
-              isError && 'text-destructive'
+              'rounded-md border border-border bg-card/70 px-4 py-3 shadow-sm',
+              isError && 'border-destructive/30 bg-destructive/10'
             )}
           >
-            {message.content}
+            <MarkdownMessage
+              content={message.content}
+              className={cn(isError && 'text-destructive [&_*]:text-destructive')}
+            />
             {showCursor && message.content.length > 0 && (
-              <span className="ml-0.5 inline-block h-[1em] w-[1.5px] -translate-y-[1px] animate-pulse bg-primary align-middle" />
+              <span className="mt-2 inline-block h-[1em] w-[1.5px] animate-pulse bg-primary align-middle" />
             )}
           </div>
         )}

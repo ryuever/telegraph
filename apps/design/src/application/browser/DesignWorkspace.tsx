@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { SendHorizontal, Square } from 'lucide-react'
+import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
 import type { DesignAgentStreamEvent } from '@/apps/design/application/common'
@@ -267,17 +268,21 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
             {status}
           </span>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {messages.map((msg, i) => (
             <div key={i} className={msg.role === 'user' ? 'flex justify-end' : ''}>
               <div
                 className={
                   msg.role === 'user'
-                    ? 'max-w-[86%] rounded-md bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm'
-                    : 'whitespace-pre-wrap rounded-md border border-border bg-background px-3 py-2 text-sm leading-relaxed text-foreground'
+                    ? 'max-w-[86%] whitespace-pre-wrap break-words rounded-md bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm'
+                    : 'min-w-0 rounded-md border border-border bg-background px-3 py-2 shadow-sm'
                 }
               >
-                {msg.content || (msg.role === 'assistant' && status === 'running' ? '正在生成...' : '')}
+                {msg.role === 'assistant' && msg.content ? (
+                  <MarkdownMessage content={msg.content} compact />
+                ) : (
+                  msg.content || (msg.role === 'assistant' && status === 'running' ? '正在生成...' : '')
+                )}
               </div>
             </div>
           ))}
