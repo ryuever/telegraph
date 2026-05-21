@@ -43,6 +43,9 @@ export default defineConfig(({ command }) => ({
       util: 'util',
       vm: 'vm-browserify',
       worker_threads: resolve(__dirname, 'src/application/browser/sandpacker-node-stubs/empty.ts'),
+      // The package's browser export points at a UMD build without ESM default export.
+      // Sandpacker/Vite preview imports it as ESM through @jridgewell/trace-mapping.
+      '@jridgewell/resolve-uri': resolve(__dirname, '../../node_modules/@jridgewell/resolve-uri/dist/resolve-uri.mjs'),
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
       '@/packages/services/main-metrics': resolve(__dirname, '../../packages/services/src/main-metrics/src'),
