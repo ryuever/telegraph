@@ -20,6 +20,9 @@ references:
   - id: D-016
     rel: derived-from
     file: ../discussion/20260521-design-page-agent-generation-product-architecture.md
+  - id: P-009
+    rel: extended-by
+    file: ./20260521-design-page-preview-editor-handoff.md
 ---
 
 # Design Page 一句话生成页面可执行实施计划

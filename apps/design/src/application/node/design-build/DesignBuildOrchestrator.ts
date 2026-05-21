@@ -38,6 +38,13 @@ export interface DesignBuildSelectedComponentContext {
   source?: string
   path?: string
   operationKind?: string
+  elementTag?: string
+  className?: string
+  sourceLocation?: {
+    filePath: string
+    line: number
+    column: number
+  }
 }
 
 export interface DesignBuildPagePlan {
@@ -261,12 +268,25 @@ function extractSelectedComponentContext(
     source: stringField(value, 'source'),
     path: stringField(value, 'path'),
     operationKind: stringField(value, 'operationKind'),
+    elementTag: stringField(value, 'elementTag'),
+    className: stringField(value, 'className'),
+    sourceLocation: sourceLocationField(value),
   }
 }
 
 function selectedComponentSummary(component: DesignBuildSelectedComponentContext | undefined): string | undefined {
   if (!component) return undefined
-  return component.label ?? component.path ?? component.id
+  const tag = component.elementTag ? `<${component.elementTag}>` : undefined
+  return [component.label ?? component.path ?? component.id, tag, component.className].filter(Boolean).join(' ')
+}
+
+function sourceLocationField(value: unknown): DesignBuildSelectedComponentContext['sourceLocation'] {
+  const sourceLocation = recordField(value, 'sourceLocation')
+  const filePath = stringField(sourceLocation, 'filePath')
+  const line = numberField(sourceLocation, 'line')
+  const column = numberField(sourceLocation, 'column')
+  if (!filePath || line === undefined || column === undefined) return undefined
+  return { filePath, line, column }
 }
 
 function recordField(value: unknown, key: string): Record<string, unknown> | undefined {

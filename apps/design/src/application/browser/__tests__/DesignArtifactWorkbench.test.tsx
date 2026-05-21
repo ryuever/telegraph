@@ -5,7 +5,45 @@ import { DesignArtifactWorkbench } from '../DesignArtifactWorkbench'
 import type { DesignProjectedArtifact } from '../design-agent-projector'
 
 vi.mock('../DesignSandpackerPreview', () => ({
-  DesignSandpackerPreview: () => <div data-testid="sandpacker-preview" />,
+  DesignSandpackerPreview: (props: {
+    onSelectComponent?: (component: {
+      id: string
+      artifactId: string
+      label: string
+      source: 'preview-dom'
+      path: string
+      elementTag: string
+      className: string
+      sourceLocation: {
+        filePath: string
+        line: number
+        column: number
+      }
+    }) => void
+  }) => (
+    <button
+      type="button"
+      data-testid="sandpacker-preview"
+      onClick={() => {
+        props.onSelectComponent?.({
+          id: 'artifact-patch:preview-dom:hero-button',
+          artifactId: 'artifact-patch',
+          label: 'Button .bg-primary',
+          source: 'preview-dom',
+          path: 'apps/design/src/Hero.tsx',
+          elementTag: 'button',
+          className: 'bg-primary text-white',
+          sourceLocation: {
+            filePath: 'apps/design/src/Hero.tsx',
+            line: 12,
+            column: 8,
+          },
+        })
+      }}
+    >
+      Select preview node
+    </button>
+  ),
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -139,6 +177,25 @@ describe('DesignArtifactWorkbench', () => {
       operationKind: 'add',
       path: 'apps/design/src/NewPanel.tsx',
       source: 'patch-operation',
+    }))
+
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>('[data-testid="sandpacker-preview"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onSelectComponent).toHaveBeenCalledWith(expect.objectContaining({
+      artifactId: 'artifact-patch',
+      className: 'bg-primary text-white',
+      elementTag: 'button',
+      label: 'Button .bg-primary',
+      path: 'apps/design/src/Hero.tsx',
+      source: 'preview-dom',
+      sourceLocation: {
+        filePath: 'apps/design/src/Hero.tsx',
+        line: 12,
+        column: 8,
+      },
     }))
 
     expect(

@@ -499,6 +499,10 @@ function summarizeSelectedComponent(
     source: selectedComponent.source,
     path: selectedComponent.path,
     operationKind: selectedComponent.operationKind,
+    elementTag: selectedComponent.elementTag,
+    className: selectedComponent.className,
+    attributes: selectedComponent.attributes,
+    sourceLocation: selectedComponent.sourceLocation,
   }
 }
 

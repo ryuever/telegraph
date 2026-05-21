@@ -199,6 +199,10 @@ export const wikiSidebar = {
         {
           "text": "P-008 Design Page 一句话生成页面可执行实施计划",
           "link": "/roadmap/20260521-design-page-agent-generation-implementation-plan"
+        },
+        {
+          "text": "P-009 Design Page Preview 与组件编辑器接入 Handoff",
+          "link": "/roadmap/20260521-design-page-preview-editor-handoff"
         }
       ]
     }

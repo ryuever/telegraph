@@ -5,15 +5,21 @@ import { SandpackerProvider, useSandpacker } from '@sandpacker/core'
 import { BrowserWorkerBackendFactory } from '@sandpacker/worker/browser-worker-backend'
 import { editorService } from '@sandpacker/editor-service'
 import { StyleEditorPanel } from '@sandpacker/style-editor'
-import type { FileTree } from '@sandpacker/shared'
+import type { ElementSelectionShape, FileTree, SerializedDOMNode } from '@sandpacker/shared'
 import workerUrl from '@sandpacker/worker/worker-entry?worker&url'
 import serviceWorkerUrl from '@sandpacker/worker/service-worker-entry?worker&url'
 import { Button } from '@/packages/ui/components/ui/button'
 import { cn } from '@/packages/ui/lib/utils'
-import type { DesignPatchFileOperation } from '@/apps/design/application/common'
+import type {
+  DesignPatchFileOperation,
+  DesignSelectedComponentSnapshot,
+} from '@/apps/design/application/common'
 
 const backendFactory = new BrowserWorkerBackendFactory({ workerUrl })
 let serviceWorkerPromise: Promise<void> | null = null
+const SANDPACKER_MAX_OPERATION_FILES = 40
+const SANDPACKER_MAX_TOTAL_SOURCE_CHARS = 750_000
+const SANDPACKER_MAX_FILE_SOURCE_CHARS = 250_000
 
 export interface DesignSandpackerPreviewProps {
   artifactId: string
@@ -21,14 +27,17 @@ export interface DesignSandpackerPreviewProps {
   operations: DesignPatchFileOperation[]
   selectedPath?: string
   onOperationsChange?: (operations: DesignPatchFileOperation[]) => void
+  onSelectComponent?: (component: DesignSelectedComponentSnapshot) => void
 }
 
 export function DesignSandpackerPreview(props: DesignSandpackerPreviewProps): JSX.Element {
+  const payloadGuard = useMemo(() => validateSandpackerPayload(props.operations), [props.operations])
   const [serviceWorkerState, setServiceWorkerState] = useState<
     { status: 'pending' | 'ready' } | { status: 'failed'; error: string }
   >({ status: 'pending' })
 
   useEffect(() => {
+    if (!payloadGuard.ok) return
     let disposed = false
     ensureSandpackerServiceWorker()
       .then(() => {
@@ -45,13 +54,22 @@ export function DesignSandpackerPreview(props: DesignSandpackerPreviewProps): JS
     return () => {
       disposed = true
     }
-  }, [])
+  }, [payloadGuard.ok])
+
+  if (!payloadGuard.ok) {
+    return (
+      <SandpackerMessage
+        title="Preview source is too large"
+        detail={payloadGuard.reason}
+      />
+    )
+  }
 
   if (serviceWorkerState.status === 'failed') {
     return (
       <SandpackerMessage
         title="Sandpacker service worker failed"
-        detail={serviceWorkerState.error}
+        detail={`${serviceWorkerState.error} Preview is unavailable, but code and inspect tabs remain usable.`}
       />
     )
   }
@@ -62,6 +80,7 @@ export function DesignSandpackerPreview(props: DesignSandpackerPreviewProps): JS
 
   return (
     <SandpackerProvider
+      key={props.artifactId}
       busId={`telegraph-design-${safeRouteSegment(props.artifactId)}`}
       backendFactory={backendFactory}
       compileDebounceMs={150}
@@ -77,6 +96,7 @@ function SandpackerPreviewSurface({
   operations,
   selectedPath,
   onOperationsChange,
+  onSelectComponent,
 }: DesignSandpackerPreviewProps): JSX.Element {
   const workspaceId = useMemo(() => safeRouteSegment(artifactId), [artifactId])
   const initial = useMemo(() => createSandpackerFiles(operations, title), [artifactId])
@@ -84,6 +104,7 @@ function SandpackerPreviewSurface({
   const [activePath, setActivePath] = useState(initial.entryPath)
   const [status, setStatus] = useState('Preparing preview')
   const lastEmittedOperations = useRef(JSON.stringify(operations))
+  const lastEmittedSelectionId = useRef<string | null>(null)
   const previousArtifactId = useRef(artifactId)
   const { client, iframeRef, error, errorDetails, selectedElement, hmrMessage } = useSandpacker({
     workspaceId,
@@ -98,6 +119,7 @@ function SandpackerPreviewSurface({
     editorService.reset()
     editorService.getCurrentFileService().setFilesFromRemote(next.files)
     lastEmittedOperations.current = JSON.stringify(operations)
+    lastEmittedSelectionId.current = null
   }, [artifactId, operations, title])
 
   useEffect(() => {
@@ -129,7 +151,16 @@ function SandpackerPreviewSurface({
 
   useEffect(() => {
     editorService.receiveElementSelection(selectedElement)
-  }, [selectedElement])
+    if (!selectedElement || !onSelectComponent) return
+    const snapshot = selectedComponentFromSandpackerSelection({
+      artifactId,
+      selection: selectedElement,
+      virtualPathToOperationPath: initial.virtualPathToOperationPath,
+    })
+    if (!snapshot || snapshot.id === lastEmittedSelectionId.current) return
+    lastEmittedSelectionId.current = snapshot.id
+    onSelectComponent(snapshot)
+  }, [artifactId, initial.virtualPathToOperationPath, onSelectComponent, selectedElement])
 
   useEffect(() => {
     if (!client) return
@@ -164,7 +195,7 @@ function SandpackerPreviewSurface({
 
   const filePaths = useMemo(() => Object.keys(files).sort(sortFilePaths), [files])
   const selectedFile = selectedPath ? toVirtualPath(selectedPath) : activePath
-  const selectedSource = files[selectedFile] ?? files[activePath] ?? ''
+  const selectedSource = fileContent(files, selectedFile) ?? fileContent(files, activePath) ?? ''
 
   const restartPreview = async (): Promise<void> => {
     if (!client) return
@@ -227,6 +258,7 @@ function SandpackerPreviewSurface({
           <iframe
             ref={iframeRef as unknown as LegacyRef<HTMLIFrameElement>}
             title={`${title} preview`}
+            sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
             className="h-full w-full bg-white"
           />
         </div>
@@ -264,10 +296,12 @@ function createSandpackerFiles(
   files: FileTree
   entryPath: string
   importRestorers: Map<string, (source: string) => string>
+  virtualPathToOperationPath: Map<string, string>
 } {
   const firstSourceOperation = operations.find(operation => operation.kind !== 'delete' && operation.content)
   const entryPath = firstSourceOperation ? toVirtualPath(firstSourceOperation.path) : '/src/Generated.tsx'
   const importRestorers = new Map<string, (source: string) => string>()
+  const virtualPathToOperationPath = new Map<string, string>()
   const files: FileTree = {
     '/package.json': JSON.stringify({
       dependencies: {
@@ -290,13 +324,14 @@ function createSandpackerFiles(
     const normalized = normalizeTelegraphImports(operation.content)
     files[path] = normalized.source
     importRestorers.set(path, normalized.restore)
+    virtualPathToOperationPath.set(path, operation.path)
   }
 
   if (!files[entryPath]) {
     files[entryPath] = 'export default function GeneratedDesignPreview() { return <main>No preview source</main> }'
   }
 
-  return { files, entryPath, importRestorers }
+  return { files, entryPath, importRestorers, virtualPathToOperationPath }
 }
 
 function updateOperationsFromFiles(
@@ -307,7 +342,7 @@ function updateOperationsFromFiles(
   return operations.map(operation => {
     if (operation.kind === 'delete') return operation
     const path = toVirtualPath(operation.path)
-    const content = files[path]
+    const content = fileContent(files, path)
     if (content === undefined) return operation
     const restore = importRestorers.get(path)
     const restored = restore ? restore(content) : content
@@ -444,6 +479,98 @@ export function TabsContent({ className, ...props }: ElementProps<'div'>) {
 
 function toVirtualPath(path: string): string {
   return path.startsWith('/') ? path : `/${path}`
+}
+
+function fileContent(files: FileTree, path: string): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(files, path)) return undefined
+  return (files as Partial<Record<string, string>>)[path]
+}
+
+function validateSandpackerPayload(operations: DesignPatchFileOperation[]): { ok: true } | { ok: false; reason: string } {
+  const sourceOperations = operations.filter(operation => operation.kind !== 'delete' && operation.content)
+  if (sourceOperations.length > SANDPACKER_MAX_OPERATION_FILES) {
+    return {
+      ok: false,
+      reason: `This artifact has ${String(sourceOperations.length)} source files; preview is capped at ${String(SANDPACKER_MAX_OPERATION_FILES)} files.`,
+    }
+  }
+
+  let totalSourceChars = 0
+  for (const operation of sourceOperations) {
+    const sourceChars = operation.content?.length ?? 0
+    totalSourceChars += sourceChars
+    if (sourceChars > SANDPACKER_MAX_FILE_SOURCE_CHARS) {
+      return {
+        ok: false,
+        reason: `${operation.path} is ${String(sourceChars)} characters; preview is capped at ${String(SANDPACKER_MAX_FILE_SOURCE_CHARS)} characters per file.`,
+      }
+    }
+  }
+
+  if (totalSourceChars > SANDPACKER_MAX_TOTAL_SOURCE_CHARS) {
+    return {
+      ok: false,
+      reason: `This artifact has ${String(totalSourceChars)} source characters; preview is capped at ${String(SANDPACKER_MAX_TOTAL_SOURCE_CHARS)} characters.`,
+    }
+  }
+
+  return { ok: true }
+}
+
+function selectedComponentFromSandpackerSelection({
+  artifactId,
+  selection,
+  virtualPathToOperationPath,
+}: {
+  artifactId: string
+  selection: ElementSelectionShape
+  virtualPathToOperationPath: Map<string, string>
+}): DesignSelectedComponentSnapshot | null {
+  const virtualPath = toVirtualPath(selection.filePath)
+  const path = virtualPathToOperationPath.get(virtualPath) ?? selection.filePath
+  const selectedNode = selectedDomNode(selection.domTree)
+  const attributes = selection.attributes ?? selectedNode?.attributes
+  const elementTag = selectedNode?.tag ?? tagFromSelectionName(selection.name)
+  const className = attributes?.class ?? attributes?.className
+  const label = [
+    selection.name,
+    elementTag,
+    className ? `.${className.split(/\s+/).filter(Boolean).slice(0, 2).join('.')}` : undefined,
+  ].filter(Boolean).join(' ') || 'Selected element'
+
+  return {
+    id: [
+      artifactId,
+      'preview-dom',
+      path,
+      String(selection.line),
+      String(selection.column),
+      selection.id,
+    ].map(safeRouteSegment).join(':'),
+    artifactId,
+    label,
+    source: 'preview-dom',
+    path,
+    elementTag,
+    className,
+    attributes,
+    sourceLocation: {
+      filePath: path,
+      line: selection.line,
+      column: selection.column,
+    },
+  }
+}
+
+function selectedDomNode(node: SerializedDOMNode | undefined): SerializedDOMNode | undefined {
+  if (!node) return undefined
+  if (node.selected) return node
+  return node.children?.map(selectedDomNode).find((child): child is SerializedDOMNode => Boolean(child))
+}
+
+function tagFromSelectionName(name: string): string | undefined {
+  const trimmed = name.trim()
+  return /^[a-z][a-z0-9-]*$/i.test(trimmed) ? trimmed.toLowerCase() : undefined
 }
 
 function safeRouteSegment(value: string): string {

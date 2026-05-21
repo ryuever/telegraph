@@ -258,6 +258,7 @@ function ArtifactPreview({
             title={viewModel.title}
             operations={operations}
             selectedPath={selectedComponent?.path}
+            onSelectComponent={onSelectComponent}
             onOperationsChange={(nextOperations) => {
               onPatchOperationsChange?.(artifact.id, nextOperations)
             }}
@@ -383,8 +384,17 @@ function ComponentInspector({
           <div className="mt-3 space-y-2 text-xs">
             <InspectorField label="Artifact" value={active.artifactId} />
             <InspectorField label="Target" value={active.label} />
+            <InspectorField label="Source" value={active.source} />
             {active.path && <InspectorField label="Path" value={active.path} />}
+            {active.elementTag && <InspectorField label="Element" value={active.elementTag} />}
+            {active.className && <InspectorField label="Class" value={active.className} />}
             {active.operationKind && <InspectorField label="Operation" value={active.operationKind} />}
+            {active.sourceLocation && (
+              <InspectorField
+                label="Location"
+                value={`${active.sourceLocation.filePath}:${String(active.sourceLocation.line)}:${String(active.sourceLocation.column)}`}
+              />
+            )}
           </div>
         ) : (
           <div className="mt-3 text-xs text-muted-foreground">No selection</div>

@@ -26,6 +26,9 @@ references:
   - id: P-008
     rel: derives
     file: ../roadmap/20260521-design-page-agent-generation-implementation-plan.md
+  - id: P-009
+    rel: derives
+    file: ../roadmap/20260521-design-page-preview-editor-handoff.md
 ---
 
 # Design Page 一句话生成页面的产品定位与 Agent 编排架构

@@ -90,9 +90,17 @@ export interface DesignSelectedComponentSnapshot {
   id: string;
   artifactId: string;
   label: string;
-  source: 'patch-operation' | 'preview-placeholder';
+  source: 'patch-operation' | 'preview-dom' | 'preview-placeholder';
   path?: string;
   operationKind?: DesignPatchFileOperation['kind'];
+  elementTag?: string;
+  className?: string;
+  attributes?: Record<string, string>;
+  sourceLocation?: {
+    filePath: string;
+    line: number;
+    column: number;
+  };
 }
 
 export interface DesignArtifactPatchRequest {
