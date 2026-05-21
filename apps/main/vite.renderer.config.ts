@@ -259,6 +259,7 @@ export default defineConfig(({ command }) => ({
       'acorn-static-class-features',
       'convert-source-map',
       'esbuild',
+      'esbuild-wasm/lib/browser',
       'etag',
       'fast-glob',
       'is-reference',
