@@ -8,7 +8,7 @@ description: >
   first-party platform extension，而不是 Pi extension 兼容层或 runtime adapter。
 category: architecture
 created: 2026-05-20
-updated: 2026-05-21
+updated: 2026-05-22
 tags:
   - agent-runtime
   - native-harness
@@ -39,6 +39,12 @@ references:
   - id: D-016
     rel: related-to
     file: ../discussion/20260521-design-page-agent-generation-product-architecture.md
+  - id: A-013
+    rel: related-to
+    file: ./20260522-telegraph-remote-agent-os-architecture.md
+  - id: P-010
+    rel: related-to
+    file: ../roadmap/20260522-remote-agent-os-implementation-roadmap.md
 ---
 
 # Telegraph Harness Extension 架构设计

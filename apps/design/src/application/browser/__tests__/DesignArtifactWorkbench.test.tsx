@@ -137,10 +137,8 @@ describe('DesignArtifactWorkbench', () => {
     expect(onApplyArtifact).toHaveBeenCalledWith(htmlArtifact)
 
     act(() => {
-      container
-        ?.querySelectorAll<HTMLButtonElement>('aside button')
-        .item(1)
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      findButtonByText(container, 'artifact-patch')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(onSelectArtifact).toHaveBeenCalledWith('artifact-patch')
 
@@ -160,12 +158,28 @@ describe('DesignArtifactWorkbench', () => {
       )
     })
 
-    expect(container.textContent).toContain('Add1')
-    expect(container.textContent).toContain('Update1')
-    expect(container.textContent).toContain('Delete0')
     expect(container.textContent).toContain('rev 2')
     expect(container.textContent).toContain('parent artifact-html')
     expect(container.textContent).toContain('Apply requested change: add panel')
+    expect(container.textContent).not.toContain('Add1')
+    expect(container.textContent).not.toContain('Component targets')
+    expect(container.textContent).not.toContain('apps/design/src/NewPanel.tsx')
+
+    act(() => {
+      root?.render(
+        <DesignArtifactWorkbench
+          artifacts={[htmlArtifact, patchArtifact]}
+          activeArtifactId="artifact-patch"
+          requestedArtifactIds={new Set()}
+          applyStates={new Map([['artifact-patch', { stage: 'applied' }]])}
+          mode="inspect"
+          onSelectArtifact={onSelectArtifact}
+          onModeChange={onModeChange}
+          onSelectComponent={onSelectComponent}
+          onApplyArtifact={onApplyArtifact}
+        />
+      )
+    })
 
     act(() => {
       findButtonByText(container, 'apps/design/src/NewPanel.tsx')
@@ -178,6 +192,22 @@ describe('DesignArtifactWorkbench', () => {
       path: 'apps/design/src/NewPanel.tsx',
       source: 'patch-operation',
     }))
+
+    act(() => {
+      root?.render(
+        <DesignArtifactWorkbench
+          artifacts={[htmlArtifact, patchArtifact]}
+          activeArtifactId="artifact-patch"
+          requestedArtifactIds={new Set()}
+          applyStates={new Map([['artifact-patch', { stage: 'applied' }]])}
+          mode="preview"
+          onSelectArtifact={onSelectArtifact}
+          onModeChange={onModeChange}
+          onSelectComponent={onSelectComponent}
+          onApplyArtifact={onApplyArtifact}
+        />
+      )
+    })
 
     act(() => {
       container

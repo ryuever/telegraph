@@ -9,7 +9,6 @@ import type { ElementSelectionShape, FileTree, SerializedDOMNode } from '@sandpa
 import workerUrl from '@sandpacker/worker/worker-entry?worker&url'
 import productionServiceWorkerUrl from '@sandpacker/worker/service-worker-entry?worker&url'
 import { Button } from '@/packages/ui/components/ui/button'
-import { cn } from '@/packages/ui/lib/utils'
 import type {
   DesignPatchFileOperation,
   DesignSelectedComponentSnapshot,
@@ -113,14 +112,12 @@ function SandpackerPreviewSurface({
   artifactId,
   title,
   operations,
-  selectedPath,
   onOperationsChange,
   onSelectComponent,
 }: DesignSandpackerPreviewProps): JSX.Element {
   const workspaceId = useMemo(() => safeRouteSegment(artifactId), [artifactId])
   const initial = useMemo(() => createSandpackerFiles(operations, title), [artifactId])
   const [files, setFiles] = useState<FileTree>(initial.files)
-  const [activePath, setActivePath] = useState(initial.entryPath)
   const [status, setStatus] = useState('Preparing preview')
   const lastEmittedOperations = useRef(JSON.stringify(operations))
   const lastEmittedSelectionId = useRef<string | null>(null)
@@ -134,7 +131,6 @@ function SandpackerPreviewSurface({
     previousArtifactId.current = artifactId
     const next = createSandpackerFiles(operations, title)
     setFiles(next.files)
-    setActivePath(next.entryPath)
     editorService.reset()
     editorService.getCurrentFileService().setFilesFromRemote(next.files)
     lastEmittedOperations.current = JSON.stringify(operations)
@@ -212,10 +208,6 @@ function SandpackerPreviewSurface({
     onOperationsChange(next)
   }, [files, initial.importRestorers, onOperationsChange, operations])
 
-  const filePaths = useMemo(() => Object.keys(files).sort(sortFilePaths), [files])
-  const selectedFile = selectedPath ? toVirtualPath(selectedPath) : activePath
-  const selectedSource = fileContent(files, selectedFile) ?? fileContent(files, activePath) ?? ''
-
   const restartPreview = async (): Promise<void> => {
     if (!client) return
     setStatus('Restarting')
@@ -225,42 +217,25 @@ function SandpackerPreviewSurface({
   }
 
   return (
-    <div className="grid h-full min-h-[560px] grid-cols-[220px_minmax(0,1fr)_300px] overflow-hidden rounded-md border border-border bg-card shadow-sm">
-      <aside className="flex min-w-0 flex-col border-r border-border bg-surface-soft/55">
-        <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
-          <span className="truncate text-xs font-medium text-foreground">Files</span>
-          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => { void restartPreview() }}>
-            <RefreshCcw size={14} />
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {filePaths.map(path => (
-            <button
-              key={path}
-              type="button"
-              onClick={() => { setActivePath(path) }}
-              className={cn(
-                'block w-full truncate rounded px-2 py-1.5 text-left font-mono text-[11px]',
-                activePath === path
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-background/70 hover:text-foreground',
-              )}
-            >
-              {path}
-            </button>
-          ))}
-        </div>
-        <pre className="max-h-56 overflow-auto border-t border-border bg-slate-950 p-3 text-[10px] leading-relaxed text-slate-100">
-          {selectedSource}
-        </pre>
-      </aside>
-
-      <section className="flex min-w-0 flex-col">
-        <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-background/70 px-3">
+    <div className="grid h-full min-h-[560px] overflow-hidden rounded-md border border-border bg-card shadow-sm xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="flex min-h-0 min-w-0 flex-col bg-background">
+        <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-3">
           <div className="min-w-0 truncate text-xs text-muted-foreground">
             {error ? error.message : status}
           </div>
-          <div className="shrink-0 text-[10px] text-muted-foreground">{formatHmr(hmrMessage)}</div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">{formatHmr(hmrMessage)}</span>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Restart preview"
+              className="h-7 w-7"
+              onClick={() => { void restartPreview() }}
+            >
+              <RefreshCcw size={14} />
+            </Button>
+          </div>
         </div>
         {error ? (
           <div className="m-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
@@ -283,7 +258,7 @@ function SandpackerPreviewSurface({
         </div>
       </section>
 
-      <aside className="min-w-0 overflow-y-auto border-l border-border bg-card p-2">
+      <aside className="min-h-0 min-w-0 overflow-y-auto border-t border-border bg-card p-2 xl:border-l xl:border-t-0">
         <StyleEditorPanel />
       </aside>
     </div>
@@ -607,14 +582,6 @@ function tagFromSelectionName(name: string): string | undefined {
 
 function safeRouteSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-')
-}
-
-function sortFilePaths(left: string, right: string): number {
-  if (left === '/index.html') return -1
-  if (right === '/index.html') return 1
-  if (left === '/package.json') return 1
-  if (right === '/package.json') return -1
-  return left.localeCompare(right)
 }
 
 function formatHmr(payload: unknown): string {

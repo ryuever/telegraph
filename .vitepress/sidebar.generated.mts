@@ -55,6 +55,10 @@ export const wikiSidebar = {
         {
           "text": "A-012 Telegraph Harness Extension 架构设计",
           "link": "/architecture/20260520-telegraph-harness-extension-architecture"
+        },
+        {
+          "text": "A-013 Telegraph Remote Agent OS 与外部控制架构",
+          "link": "/architecture/20260522-telegraph-remote-agent-os-architecture"
         }
       ]
     }
@@ -207,6 +211,10 @@ export const wikiSidebar = {
         {
           "text": "P-009 Design Page Preview 与组件编辑器接入 Handoff",
           "link": "/roadmap/20260521-design-page-preview-editor-handoff"
+        },
+        {
+          "text": "P-010 Remote Agent OS 能力象限与实施路线图",
+          "link": "/roadmap/20260522-remote-agent-os-implementation-roadmap"
         }
       ]
     }

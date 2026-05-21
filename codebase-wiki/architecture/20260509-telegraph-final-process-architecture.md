@@ -8,7 +8,7 @@ description: >
   所有 channel 经由 x-oasis ConnectionOrchestrator 编排。
 category: architecture
 created: 2026-05-09
-updated: 2026-05-15
+updated: 2026-05-22
 tags:
   - architecture
   - process-topology
@@ -47,6 +47,10 @@ references:
     rel: extended-by
     file: ../discussion/20260515-renderer-spa-framework-selection.md
     note: D-009 在本文 §6 "Chat/Design 通过路由切换或 BrowserView 叠加" 的 hook 上确定 renderer 侧采用 React Router v7 + 自实现 PageletHost (KeepAlive)，并定义了与 §6 direct channel 的协作约定
+  - id: A-013
+    rel: extended-by
+    file: ./20260522-telegraph-remote-agent-os-architecture.md
+    note: A-013 在本文 Pagelet / Shared / Main 边界上扩展 Mobile、CLI、Slack、Telegram、MCP 与 Computer Use 的远程控制目标架构。
 ---
 
 # Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）

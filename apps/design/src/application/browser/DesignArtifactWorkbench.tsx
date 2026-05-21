@@ -55,9 +55,11 @@ export function DesignArtifactWorkbench({
 
   if (!activeArtifact) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-background p-8">
-        <div className="rounded-md border border-border bg-card px-8 py-7 text-center shadow-sm">
-          <div className="mx-auto mb-3 h-2 w-16 rounded-full bg-accent-mint" />
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-surface-soft/35 p-8">
+        <div className="w-full max-w-sm rounded-md border border-dashed border-border bg-card px-8 py-7 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-accent text-accent-foreground">
+            <Eye size={18} />
+          </div>
           <p className="text-sm font-medium text-foreground">生成的界面将在这里预览</p>
           <p className="mt-1 text-xs text-muted-foreground">等待第一个 artifact</p>
         </div>
@@ -75,49 +77,38 @@ export function DesignArtifactWorkbench({
   const applyLabel = applyButtonLabel({ isPatch, isRequested, state: applyState })
 
   return (
-    <div className="flex min-h-0 flex-1 bg-background">
-      <aside className="w-60 shrink-0 overflow-y-auto border-r border-border bg-card/50 p-2.5">
-        <div className="space-y-1">
-          {artifacts.map(artifact => {
-            const selected = artifact.id === activeArtifact.id
-            const meta = artifactRevisionMeta(artifact)
-            return (
-              <button
-                key={artifact.id}
-                type="button"
-                onClick={() => { onSelectArtifact(artifact.id) }}
-                className={cn(
-                  'block w-full rounded-md border px-2.5 py-2 text-left transition-colors',
-                  selected
-                    ? 'border-border bg-background text-foreground shadow-sm'
-                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-background/70 hover:text-foreground',
-                )}
-              >
-                <span className="block truncate text-xs font-medium">
-                  {artifact.title ?? artifact.id}
-                </span>
-                <span className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <span className="truncate">{artifact.kind}</span>
-                  {meta.revision !== undefined && <span>rev {meta.revision}</span>}
-                  {requestedArtifactIds.has(artifact.id) && <Check size={11} />}
-                </span>
-                {meta.changeSummary && (
-                  <span className="mt-1 block truncate text-[10px] text-muted-foreground">
-                    {meta.changeSummary}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </aside>
-
-      <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-12 items-center justify-between border-b border-border bg-card/35 px-4">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-foreground">{viewModel.title}</div>
-            <div className="truncate text-[10px] text-muted-foreground">
-              {artifactHeaderMeta(viewModel.kind, activeArtifact)}
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-soft/35">
+      <div className="shrink-0 border-b border-border bg-background/95 px-4 py-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 truncate text-sm font-semibold text-foreground">{viewModel.title}</div>
+              <span className="shrink-0 rounded-md bg-surface-soft px-2 py-0.5 text-[10px] text-muted-foreground">
+                {artifactHeaderMeta(viewModel.kind, activeArtifact)}
+              </span>
+            </div>
+            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+              {artifacts.map(artifact => {
+                const selected = artifact.id === activeArtifact.id
+                const meta = artifactRevisionMeta(artifact)
+                return (
+                  <button
+                    key={artifact.id}
+                    type="button"
+                    onClick={() => { onSelectArtifact(artifact.id) }}
+                    className={cn(
+                      'flex max-w-56 shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors',
+                      selected
+                        ? 'border-primary/35 bg-primary/10 text-foreground shadow-sm'
+                        : 'border-border bg-card text-muted-foreground hover:bg-background hover:text-foreground',
+                    )}
+                  >
+                    <span className="min-w-0 truncate font-medium">{artifact.title ?? artifact.id}</span>
+                    {meta.revision !== undefined && <span className="shrink-0 text-[10px]">rev {meta.revision}</span>}
+                    {requestedArtifactIds.has(artifact.id) && <Check size={11} className="shrink-0" />}
+                  </button>
+                )
+              })}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -169,31 +160,35 @@ export function DesignArtifactWorkbench({
             </Button>
           </div>
         </div>
+        {artifactRevisionMeta(activeArtifact).changeSummary && (
+          <div className="mt-2 truncate text-[11px] text-muted-foreground">
+            {artifactRevisionMeta(activeArtifact).changeSummary}
+          </div>
+        )}
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-auto p-4">
-          {mode === 'preview' ? (
-            <ArtifactPreview
-              artifact={activeArtifact}
-              viewModel={viewModel}
-              applyState={applyState}
-              selectedComponent={selectedComponent}
-              onSelectComponent={onSelectComponent}
-              onPatchOperationsChange={onPatchOperationsChange}
-            />
-          ) : mode === 'inspect' ? (
-            <ComponentInspector
-              artifact={activeArtifact}
-              selectedComponent={selectedComponent}
-              onSelectComponent={onSelectComponent}
-              onClearSelectedComponent={onClearSelectedComponent}
-            />
-          ) : (
-            <pre className="min-h-full whitespace-pre-wrap rounded-md border border-border bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100">
-              {viewModel.code}
-            </pre>
-          )}
-        </div>
-      </section>
+      <div className="min-h-0 flex-1 overflow-auto p-4 xl:p-5">
+        {mode === 'preview' ? (
+          <ArtifactPreview
+            artifact={activeArtifact}
+            viewModel={viewModel}
+            selectedComponent={selectedComponent}
+            onSelectComponent={onSelectComponent}
+            onPatchOperationsChange={onPatchOperationsChange}
+          />
+        ) : mode === 'inspect' ? (
+          <ComponentInspector
+            artifact={activeArtifact}
+            selectedComponent={selectedComponent}
+            onSelectComponent={onSelectComponent}
+            onClearSelectedComponent={onClearSelectedComponent}
+          />
+        ) : (
+          <pre className="min-h-full whitespace-pre-wrap rounded-md border border-border bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100">
+            {viewModel.code}
+          </pre>
+        )}
+      </div>
     </div>
   )
 }
@@ -226,14 +221,12 @@ function artifactRevisionMeta(artifact: DesignProjectedArtifact): {
 function ArtifactPreview({
   artifact,
   viewModel,
-  applyState,
   selectedComponent,
   onSelectComponent,
   onPatchOperationsChange,
 }: {
   artifact: DesignProjectedArtifact
   viewModel: ReturnType<typeof createDesignArtifactViewModel>
-  applyState?: ArtifactApplyState
   selectedComponent?: DesignSelectedComponent | null
   onSelectComponent?: (component: DesignSelectedComponent) => void
   onPatchOperationsChange?: (artifactId: string, operations: DesignPatchFileOperation[]) => void
@@ -249,75 +242,22 @@ function ArtifactPreview({
     )
   }
 
-  if (viewModel.viewKind === 'patch' && viewModel.patchSummary) {
-    const targets = selectableComponentsFromArtifact(artifact)
+  if (viewModel.viewKind === 'patch') {
     const operations = extractDesignPatchOperations(artifact)
-    return (
-      <div className="space-y-4">
-        {operations && (
-          <DesignSandpackerPreview
-            artifactId={artifact.id}
-            title={viewModel.title}
-            operations={operations}
-            selectedPath={selectedComponent?.path}
-            onSelectComponent={onSelectComponent}
-            onOperationsChange={(nextOperations) => {
-              onPatchOperationsChange?.(artifact.id, nextOperations)
-            }}
-          />
-        )}
-        <div className="grid grid-cols-3 gap-3">
-          <PatchCount label="Add" value={viewModel.patchSummary.adds} />
-          <PatchCount label="Update" value={viewModel.patchSummary.updates} />
-          <PatchCount label="Delete" value={viewModel.patchSummary.deletes} />
-        </div>
-        {applyState?.preview && (
-          <div className="rounded-md border border-border bg-card p-3 shadow-sm">
-            <div className="text-xs font-medium text-foreground">Normalized patch preview</div>
-            <div className="mt-2 space-y-1">
-              {applyState.preview.operations.map(operation => (
-                <div key={`${operation.kind}:${operation.path}`} className="flex gap-2 text-xs text-muted-foreground">
-                  <span className="w-14 shrink-0 uppercase">{operation.kind}</span>
-                  <span className="min-w-0 truncate font-mono">{operation.path}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {applyState?.error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-            {applyState.error}
-          </div>
-        )}
-        {targets.length > 0 && (
-          <div className="rounded-md border border-border bg-card p-3 shadow-sm">
-            <div className="text-xs font-medium text-foreground">Component targets</div>
-            <div className="mt-2 space-y-1">
-              {targets.map(target => (
-                <button
-                  key={target.id}
-                  type="button"
-                  onClick={() => { onSelectComponent?.(target) }}
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors',
-                    selectedComponent?.id === target.id
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-                  )}
-                >
-                  <MousePointer2 size={12} />
-                  <span className="w-14 shrink-0 uppercase">{target.operationKind}</span>
-                  <span className="min-w-0 truncate font-mono">{target.path}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-card p-4 font-mono text-xs leading-relaxed text-muted-foreground">
-          {viewModel.code}
-        </pre>
-      </div>
-    )
+    if (operations) {
+      return (
+        <DesignSandpackerPreview
+          artifactId={artifact.id}
+          title={viewModel.title}
+          operations={operations}
+          selectedPath={selectedComponent?.path}
+          onSelectComponent={onSelectComponent}
+          onOperationsChange={(nextOperations) => {
+            onPatchOperationsChange?.(artifact.id, nextOperations)
+          }}
+        />
+      )
+    }
   }
 
   return (
@@ -431,15 +371,6 @@ function selectableComponentsFromArtifact(artifact: DesignProjectedArtifact): De
 function componentLabelFromPath(path: string): string {
   const filename = path.split('/').at(-1) ?? path
   return filename.replace(/\.[^.]+$/, '') || path
-}
-
-function PatchCount({ label, value }: { label: string; value: number }): JSX.Element {
-  return (
-    <div className="rounded-md border border-border bg-card p-3 shadow-sm">
-      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-foreground">{String(value)}</div>
-    </div>
-  )
 }
 
 function applyButtonLabel({

@@ -163,16 +163,14 @@ function textFromModelOutput(output: unknown): string | undefined {
 }
 
 function parseJsonObject(text: string): unknown {
-  const normalized = stripMarkdownFence(text).trim()
-  const start = normalized.indexOf('{')
-  const end = normalized.lastIndexOf('}')
-  if (start < 0 || end < start) {
+  const json = extractFirstJsonObject(stripMarkdownFence(text).trim())
+  if (!json) {
     throw new ModelChildOutputParseError('Model child output did not contain a JSON object.')
   }
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(normalized.slice(start, end + 1))
+    parsed = JSON.parse(json)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new ModelChildOutputParseError(`Model child output JSON was invalid: ${detail}`)
@@ -181,6 +179,38 @@ function parseJsonObject(text: string): unknown {
     throw new ModelChildOutputParseError('Model child output JSON must be an object.')
   }
   return parsed
+}
+
+function extractFirstJsonObject(text: string): string | undefined {
+  const start = text.indexOf('{')
+  if (start < 0) return undefined
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+    } else if (char === '{') {
+      depth += 1
+    } else if (char === '}') {
+      depth -= 1
+      if (depth === 0) return text.slice(start, index + 1)
+    }
+  }
+  return undefined
 }
 
 function stripMarkdownFence(text: string): string {

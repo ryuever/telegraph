@@ -123,4 +123,85 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
       },
     })).rejects.toThrow('Model child output did not contain a JSON object.')
   })
+
+  it('parses the first complete JSON object when the model appends another object', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield {
+        type: 'run_completed',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        producerVersion: 'test',
+        runId: 'run-1:worker',
+        output: {
+          role: 'assistant',
+          content: '{"artifactId":"model-artifact"}{"review":{"verdict":"pass","checks":[]}}',
+        },
+        ts: 2,
+      }
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await expect(runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })).resolves.toEqual({
+      output: { artifactId: 'model-artifact' },
+      source: 'model-backed',
+    })
+  })
+
+  it('ignores braces inside JSON strings and trailing commentary', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield {
+        type: 'run_completed',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        producerVersion: 'test',
+        runId: 'run-1:worker',
+        output: {
+          role: 'assistant',
+          content: '{"artifact":{"kind":"design-patch","operations":[{"content":"export function Demo() { return <div>{title}</div> }"}]}}\nDone.',
+        },
+        ts: 2,
+      }
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await expect(runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })).resolves.toEqual({
+      output: {
+        artifact: {
+          kind: 'design-patch',
+          operations: [{
+            content: 'export function Demo() { return <div>{title}</div> }',
+          }],
+        },
+      },
+      source: 'model-backed',
+    })
+  })
 })

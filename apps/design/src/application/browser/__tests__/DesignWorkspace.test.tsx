@@ -122,6 +122,27 @@ describe('DesignWorkspace', () => {
     root = undefined
   })
 
+  it('offers a way back to the design entry', async () => {
+    const onReturnToEntry = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignWorkspace initialPrompt="make a hero" onReturnToEntry={onReturnToEntry} />)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      container
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Back to design entry"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(onReturnToEntry).toHaveBeenCalledTimes(1)
+  })
+
   it('previews and confirms patch artifact application from the workspace', async () => {
     container = document.createElement('div')
     document.body.append(container)
@@ -138,6 +159,14 @@ describe('DesignWorkspace', () => {
     expect(applyButton()?.textContent).toContain('预览 Patch')
     expect(container.textContent).toContain('已生成「Hero patch」预览。')
     expect(container.textContent).not.toContain('正在生成...')
+
+    await act(async () => {
+      container
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Toggle build progress"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
     expect(container.textContent).toContain('Intent Brief')
     expect(container.textContent).toContain('Design Component Scout')
     expect(container.textContent).toContain('1 components')
@@ -151,7 +180,7 @@ describe('DesignWorkspace', () => {
       artifactId: 'patch-1',
       operations: [{ kind: 'update', path: 'apps/design/src/Hero.tsx', content: 'next' }],
     }))
-    expect(container.textContent).toContain('/repo/apps/design/src/Hero.tsx')
+    expect(container.textContent).not.toContain('/repo/apps/design/src/Hero.tsx')
     expect(applyButton()?.textContent).toContain('确认应用')
 
     await act(async () => {
@@ -172,6 +201,13 @@ describe('DesignWorkspace', () => {
 
     await act(async () => {
       root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      container
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Inspect selected component"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await Promise.resolve()
     })
 
