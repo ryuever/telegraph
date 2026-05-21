@@ -18,6 +18,7 @@ describe('RuntimeCapabilityDescriptor', () => {
     expect(capabilitySupport(getRuntimeCapabilityDescriptor('pi-ai'), 'rawTrace')).toBe('supported')
     expect(capabilitySupport(getRuntimeCapabilityDescriptor('pi-ai'), 'shell')).toBe('unsupported')
     expect(capabilitySupport(getRuntimeCapabilityDescriptor('telegraph-subagents'), 'childRun')).toBe('supported')
+    expect(getRuntimeCapabilityDescriptor('telegraph-orchestrator')?.selectable).toBe(false)
   })
 
   it('returns cloned descriptors for callers', () => {

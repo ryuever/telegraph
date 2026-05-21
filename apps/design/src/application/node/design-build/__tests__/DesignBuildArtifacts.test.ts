@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createMockDesignPatchArtifact,
-  createMockDesignPreviewArtifact,
+  createTemplateDesignPatchArtifact,
+  createTemplateDesignPreviewArtifact,
   isDesignBuildArtifact,
   isDesignPatchArtifact,
   isDesignPreviewArtifact,
@@ -9,7 +9,7 @@ import {
 
 describe('DesignBuildArtifacts', () => {
   it('recognizes design preview artifacts', () => {
-    const artifact = createMockDesignPreviewArtifact({
+    const artifact = createTemplateDesignPreviewArtifact({
       runId: 'run-preview',
       prompt: 'Create a pricing page',
     })
@@ -24,7 +24,7 @@ describe('DesignBuildArtifacts', () => {
   })
 
   it('recognizes valid design patch artifacts', () => {
-    const artifact = createMockDesignPatchArtifact({
+    const artifact = createTemplateDesignPatchArtifact({
       runId: 'run-patch',
       prompt: 'Create a pricing page',
     })
@@ -38,11 +38,11 @@ describe('DesignBuildArtifacts', () => {
   })
 
   it('generates prompt-aware source variants', () => {
-    const login = createMockDesignPatchArtifact({
+    const login = createTemplateDesignPatchArtifact({
       runId: 'run-login',
       prompt: 'Create a login page',
     })
-    const settings = createMockDesignPatchArtifact({
+    const settings = createTemplateDesignPatchArtifact({
       runId: 'run-settings',
       prompt: 'Create a settings page with tabs',
     })

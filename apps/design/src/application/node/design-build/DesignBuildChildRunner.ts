@@ -23,49 +23,23 @@ export interface DesignBuildChildRunRequest {
 
 export interface DesignBuildChildRunResult {
   output: unknown
-  source: 'deterministic' | 'model-backed'
+  source: 'model-backed'
 }
 
 export interface DesignBuildChildRunner {
   runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult>
 }
 
-export class DeterministicDesignBuildChildRunner implements DesignBuildChildRunner {
-  runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult> {
-    return Promise.resolve({
-      output: request.input,
-      source: 'deterministic',
-    })
-  }
-}
-
 export class ModelBackedDesignBuildChildRunner implements DesignBuildChildRunner {
-  private readonly fallback = new DeterministicDesignBuildChildRunner()
-
   async runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult> {
-    const output = modelChildOutput(request.metadata, request.profileId, request.stage)
-    if (output !== undefined) {
-      return {
-        output,
-        source: 'model-backed',
-      }
-    }
-
     const settings = toAgentRuntimeSettings(request.settings)
     if (!settings) {
-      return this.fallback.runChild(request)
+      throw new Error('Design build model settings are required: provider, modelId, and apiKey must be configured.')
     }
 
-    try {
-      return {
-        output: await runModelChild(request, settings),
-        source: 'model-backed',
-      }
-    } catch (error) {
-      if (isModelChildOutputParseError(error)) {
-        return this.fallback.runChild(request)
-      }
-      throw error
+    return {
+      output: await runModelChild(request, settings),
+      source: 'model-backed',
     }
   }
 }
@@ -75,10 +49,6 @@ class ModelChildOutputParseError extends Error {
     super(message)
     this.name = 'ModelChildOutputParseError'
   }
-}
-
-function isModelChildOutputParseError(error: unknown): error is ModelChildOutputParseError {
-  return error instanceof ModelChildOutputParseError
 }
 
 async function runModelChild(
@@ -217,23 +187,4 @@ function stripMarkdownFence(text: string): string {
   const trimmed = text.trim()
   const withoutOpening = trimmed.replace(/^```(?:json)?\s*/i, '')
   return withoutOpening.replace(/\s*```$/u, '')
-}
-
-function modelChildOutput(
-  metadata: Record<string, unknown> | undefined,
-  profileId: string,
-  stage: string,
-): unknown {
-  const debug = recordField(metadata, 'designBuildModelChildOutputs')
-  const profile = recordField(debug, profileId)
-  if (!profile) return undefined
-  return profile[stage]
-}
-
-function recordField(value: unknown, key: string): Record<string, unknown> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const field = (value as Record<string, unknown>)[key]
-  return field && typeof field === 'object' && !Array.isArray(field)
-    ? field as Record<string, unknown>
-    : undefined
 }

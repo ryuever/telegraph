@@ -23,13 +23,6 @@ interface SystemStatusEvent {
   monitorCount: number;
 }
 
-interface LogEvent {
-  timestamp: string;
-  level: string;
-  message: string;
-  pid: number;
-}
-
 type UtilityProcessParentPort = NodeJS.EventEmitter & {
   postMessage(message: unknown): void;
 };
@@ -77,24 +70,6 @@ export class DaemonWorker implements IDaemonWorker {
             monitorCount: this.monitorCount,
           });
         }, 2000);
-        return () => { clearInterval(interval); };
-      },
-      onLogEvent: (callback: (log: LogEvent) => void) => {
-        const levels = ['INFO', 'WARN', 'DEBUG', 'ERROR'] as const;
-        const messages = [
-          'Health check passed',
-          'Connection established',
-          'Cache updated',
-          'Request processed',
-        ];
-        const interval = setInterval(() => {
-          callback({
-            timestamp: new Date().toISOString(),
-            level: levels[Math.floor(Math.random() * levels.length)],
-            message: messages[Math.floor(Math.random() * messages.length)],
-            pid: process.pid,
-          });
-        }, 1500);
         return () => { clearInterval(interval); };
       },
       getPerformanceSnapshot: () => diagnostics.getPerformanceSnapshot(),

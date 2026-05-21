@@ -53,7 +53,7 @@ export function isDesignBuildArtifact(value: unknown): value is DesignBuildArtif
   return isDesignPreviewArtifact(value) || isDesignPatchArtifact(value)
 }
 
-export function createMockDesignPreviewArtifact(input: {
+export function createTemplateDesignPreviewArtifact(input: {
   runId: string
   prompt: string
 }): DesignPreviewArtifact {
@@ -70,7 +70,7 @@ export function createMockDesignPreviewArtifact(input: {
   }
 }
 
-export function createMockDesignPatchArtifact(input: {
+export function createTemplateDesignPatchArtifact(input: {
   runId: string
   prompt: string
   parentArtifactId?: string
@@ -283,7 +283,7 @@ function renderPreviewHtml(input: { title: string; prompt: string }): string {
         <aside class="panel" aria-label="Generated layout summary">
           <div class="panel-row"><span>Layout</span><span class="metric">Responsive</span></div>
           <div class="panel-row"><span>Artifact</span><span class="metric">Preview</span></div>
-          <div class="panel-row"><span>Status</span><span class="metric">Mock MVP</span></div>
+          <div class="panel-row"><span>Status</span><span class="metric">Generated</span></div>
         </aside>
       </section>
     </main>

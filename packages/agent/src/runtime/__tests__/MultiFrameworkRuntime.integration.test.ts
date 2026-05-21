@@ -123,8 +123,8 @@ export async function runMultiFrameworkTests() {
     assert(startEvent.origin?.framework === 'langgraph', 'Should have langgraph origin')
   })
 
-  // Test 6: VercelAiRuntime basic execution
-  await test('VercelAiRuntime: basic run execution', async () => {
+  // Test 6: VercelAiRuntime unsupported execution
+  await test('VercelAiRuntime: explicit unsupported failure', async () => {
     const runtime = new VercelAiRuntime()
     const events = []
 
@@ -140,19 +140,16 @@ export async function runMultiFrameworkTests() {
     // Verify event sequence
     assert(events.length > 0, 'Should emit events')
     assertEquals(events[0].type, 'run_started')
-    assert(
-      events[events.length - 1].type === 'run_completed' || events[events.length - 1].type === 'run_failed',
-      'Last event should be terminal'
-    )
+    assertEquals(events[events.length - 1].type, 'run_failed')
 
     // Verify event structure
     const startEvent = events[0] as any
     assertEquals(startEvent.runId, 'test-run-2')
-    assert(startEvent.origin?.framework === 'vercel-ai', 'Should have vercel-ai origin')
+    assert(startEvent.origin?.framework === 'ai-sdk', 'Should have AI SDK origin')
   })
 
-  // Test 7: VercelAiRuntime streaming deltas
-  await test('VercelAiRuntime: streaming deltas', async () => {
+  // Test 7: VercelAiRuntime does not emit simulated deltas
+  await test('VercelAiRuntime: no simulated streaming deltas', async () => {
     const runtime = new VercelAiRuntime()
     const deltaEvents = []
 
@@ -167,10 +164,7 @@ export async function runMultiFrameworkTests() {
       }
     }
 
-    // Vercel AI should emit delta events for streaming text
-    assert(deltaEvents.length > 0, 'Should emit delta events')
-    const delta = deltaEvents[0] as any
-    assert(delta.data?.delta !== undefined, 'Delta should have content')
+    assertEquals(deltaEvents.length, 0)
   })
 
   // Test 8: LangGraphRuntime step events

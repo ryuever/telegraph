@@ -5,11 +5,19 @@ import {
   DesignBuildRuntime,
   TELEGRAPH_DESIGN_BUILD_PRODUCER_VERSION,
 } from '../DesignBuildRuntime'
-import { DESIGN_BUILD_CHILD_CONTRACT_VERSION } from '../DesignBuildChildContracts'
+import {
+  DESIGN_BUILD_CHILD_CONTRACT_VERSION,
+  DESIGN_BUILD_CHILD_PROFILES,
+} from '../DesignBuildChildContracts'
+import type {
+  DesignBuildChildRunRequest,
+  DesignBuildChildRunResult,
+  DesignBuildChildRunner,
+} from '../DesignBuildChildRunner'
 
 describe('DesignBuildRuntime', () => {
   it('emits a design preview artifact as a RuntimeEvent stream', async () => {
-    const runtime = new DesignBuildRuntime()
+    const runtime = createTestRuntime()
     const events = await collect(runtime.run({
       runId: 'run-design-build',
       sessionId: 'session-1',
@@ -138,7 +146,7 @@ describe('DesignBuildRuntime', () => {
   })
 
   it('uses artifact revision context from run metadata', async () => {
-    const runtime = new DesignBuildRuntime()
+    const runtime = createTestRuntime()
     const events = await collect(runtime.run({
       runId: 'run-revision',
       message: 'Make the primary button green',
@@ -185,16 +193,42 @@ describe('DesignBuildRuntime', () => {
   })
 
   it('runs at most one repair attempt when reviewer requests repair', async () => {
-    const runtime = new DesignBuildRuntime()
+    const runtime = createTestRuntime(request => {
+      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer && request.stage === 'review') {
+        return {
+          review: {
+            verdict: 'repair_required',
+            checks: [
+              {
+                id: 'test-review',
+                passed: false,
+                summary: 'Test runner requested one repair pass.',
+              },
+            ],
+          },
+        }
+      }
+      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer && request.stage === 'review-repair') {
+        return {
+          review: {
+            verdict: 'pass',
+            checks: [
+              {
+                id: 'test-review-repair',
+                passed: true,
+                summary: 'Test runner accepted the repaired artifact.',
+              },
+            ],
+          },
+          repairAttempt: request.attempt,
+        }
+      }
+      return undefined
+    })
     const events = await collect(runtime.run({
       runId: 'run-repair',
       message: 'Create a repairable dashboard',
       settings: {},
-      metadata: {
-        designBuildDebug: {
-          forceRepair: true,
-        },
-      },
     }))
 
     const childStarts = events.filter((event): event is Extract<AgentEvent, { type: 'child_run_started' }> =>
@@ -239,31 +273,29 @@ describe('DesignBuildRuntime', () => {
   })
 
   it('consumes model-backed worker output when provided', async () => {
-    const runtime = new DesignBuildRuntime()
+    const runtime = createTestRuntime(request => {
+      if (request.profileId !== DESIGN_BUILD_CHILD_PROFILES.worker || request.stage !== 'code-artifact') {
+        return undefined
+      }
+      return {
+        artifact: {
+          id: 'model-artifact',
+          kind: 'design-patch',
+          title: 'Model generated source',
+          operations: [
+            {
+              kind: 'add',
+              path: 'apps/design/src/generated/model-page.tsx',
+              content: "import { Button } from '@/packages/ui/components/ui/button'\n\nexport function ModelPage() { return <Button>Model</Button> }\n",
+            },
+          ],
+        },
+      }
+    })
     const events = await collect(runtime.run({
       runId: 'run-model-worker',
       message: 'Create a page',
       settings: {},
-      metadata: {
-        designBuildModelChildOutputs: {
-          'design-worker': {
-            'code-artifact': {
-              artifact: {
-                id: 'model-artifact',
-                kind: 'design-patch',
-                title: 'Model generated source',
-                operations: [
-                  {
-                    kind: 'add',
-                    path: 'apps/design/src/generated/model-page.tsx',
-                    content: "import { Button } from '@/packages/ui/components/ui/button'\n\nexport function ModelPage() { return <Button>Model</Button> }\n",
-                  },
-                ],
-              },
-            },
-          },
-        },
-      },
     }))
 
     const terminal = events.at(-1)
@@ -276,7 +308,47 @@ describe('DesignBuildRuntime', () => {
       title: 'Model generated source',
     })
   })
+
+  it('fails instead of falling back when the default model-backed runner has no model settings', async () => {
+    const runtime = new DesignBuildRuntime()
+    const events = await collect(runtime.run({
+      runId: 'run-missing-settings',
+      message: 'Create a page',
+      settings: {},
+    }))
+
+    const terminal = events.at(-1)
+    expect(terminal).toMatchObject({
+      type: 'run_failed',
+      error: {
+        code: 'codegen_failed',
+        message: 'Design build model settings are required: provider, modelId, and apiKey must be configured.',
+      },
+    })
+  })
 })
+
+function createTestRuntime(
+  override?: (request: DesignBuildChildRunRequest) => unknown,
+): DesignBuildRuntime {
+  return new DesignBuildRuntime({
+    childRunner: new TestDesignBuildChildRunner(override),
+  })
+}
+
+class TestDesignBuildChildRunner implements DesignBuildChildRunner {
+  constructor(
+    private readonly override?: (request: DesignBuildChildRunRequest) => unknown,
+  ) {}
+
+  runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult> {
+    const output = this.override ? this.override(request) : undefined
+    return Promise.resolve({
+      output: output ?? request.input,
+      source: 'model-backed',
+    })
+  }
+}
 
 async function collect(input: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
   const events: AgentEvent[] = []

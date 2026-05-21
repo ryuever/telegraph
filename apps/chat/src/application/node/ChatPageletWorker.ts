@@ -131,7 +131,7 @@ export class ChatPageletWorker extends PageletWorker {
         listSubagents: (): Promise<ChatSubagentRecordSnapshot[]> =>
           Promise.resolve(this.subagents.listRecords().map(snapshotSubagentRecord)),
 
-        getSubagentResult: (childRunId: string, consume = false): Promise<ChatSubagentRecordSnapshot | null> => {
+        getSubagentResult: (childRunId: string, consume: boolean = false): Promise<ChatSubagentRecordSnapshot | null> => {
           const record = this.subagents.getResult(childRunId, { consume });
           return Promise.resolve(record ? snapshotSubagentRecord(record) : null);
         },

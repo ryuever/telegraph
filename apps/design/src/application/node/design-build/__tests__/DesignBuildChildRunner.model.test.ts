@@ -81,7 +81,7 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
     }))
   })
 
-  it('falls back to deterministic child output when model output is not JSON', async () => {
+  it('fails when model output is not JSON', async () => {
     streamPiAiRuntimeEvents.mockImplementation(async function* () {
       await Promise.resolve()
       yield {
@@ -121,9 +121,6 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
         modelId: 'gpt-test',
         apiKey: 'test-key',
       },
-    })).resolves.toEqual({
-      output: { artifactId: 'deterministic-artifact' },
-      source: 'deterministic',
-    })
+    })).rejects.toThrow('Model child output did not contain a JSON object.')
   })
 })

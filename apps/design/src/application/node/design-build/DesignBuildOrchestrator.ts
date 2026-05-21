@@ -1,8 +1,7 @@
 import {
-  createMockDesignPatchArtifact,
+  createTemplateDesignPatchArtifact,
   type DesignBrief,
   type DesignBuildArtifact,
-  type DesignPatchArtifact,
 } from './DesignBuildArtifacts'
 import {
   createDefaultComponentAssetRegistry,
@@ -82,13 +81,13 @@ export function runDesignBuildOrchestrator(
   const brief = createDesignIntentBrief(input.prompt, revision)
   const context = createDesignBuildContext(revision)
   const components = createDefaultComponentAssetRegistry().searchComponents(input.prompt, { limit: 5 })
-  const artifact = maybeCreateRepairFixture(createMockDesignPatchArtifact({
+  const artifact = createTemplateDesignPatchArtifact({
     runId: input.runId,
     prompt: input.prompt,
     parentArtifactId: revision?.parentArtifactId,
     revision: revision?.revision,
     changeSummary: revision?.changeSummary,
-  }), input.metadata)
+  })
   const plan = createPagePlan(artifact)
   const review = reviewArtifact(artifact)
   return { brief, context, components, plan, artifact, review }
@@ -214,23 +213,6 @@ function reviewArtifact(artifact: DesignBuildArtifact): DesignBuildReview {
   }
 }
 
-function maybeCreateRepairFixture(
-  artifact: DesignPatchArtifact,
-  metadata: Record<string, unknown> | undefined,
-): DesignBuildArtifact {
-  const debug = recordField(metadata, 'designBuildDebug')
-  const forceRepair = booleanField(debug, 'forceRepair')
-  if (!forceRepair) return artifact
-
-  return {
-    ...artifact,
-    operations: artifact.operations.map(operation => ({
-      ...operation,
-      content: operation.content?.replace(/@\/packages\/ui\//g, '@/invalid-ui/'),
-    })),
-  }
-}
-
 function extractRevisionContext(metadata: Record<string, unknown> | undefined): DesignBuildRevisionContext | undefined {
   const designContext = recordField(metadata, 'designContext')
   const activeArtifact = recordField(designContext, 'activeArtifact')
@@ -307,12 +289,6 @@ function numberField(value: unknown, key: string): number | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const field = (value as Record<string, unknown>)[key]
   return typeof field === 'number' && Number.isFinite(field) ? field : undefined
-}
-
-function booleanField(value: unknown, key: string): boolean | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const field = (value as Record<string, unknown>)[key]
-  return typeof field === 'boolean' ? field : undefined
 }
 
 function arrayField(value: unknown, key: string): unknown[] {

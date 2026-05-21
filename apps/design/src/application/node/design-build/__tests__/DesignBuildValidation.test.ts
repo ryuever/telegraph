@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMockDesignPatchArtifact } from '../DesignBuildArtifacts'
+import { createTemplateDesignPatchArtifact } from '../DesignBuildArtifacts'
 import type { DesignBuildOrchestratorOutput } from '../DesignBuildOrchestrator'
 import {
   assertValidDesignBuildOutput,
@@ -35,7 +35,7 @@ describe('DesignBuildValidation', () => {
 })
 
 function outputFixture(): DesignBuildOrchestratorOutput {
-  const artifact = createMockDesignPatchArtifact({
+  const artifact = createTemplateDesignPatchArtifact({
     runId: 'run-validation',
     prompt: 'Create a dashboard',
   })

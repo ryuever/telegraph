@@ -12,8 +12,8 @@ interface SupervisorsPanelProps {
  * main process via IMainMetricsService.getSupervisorSnapshots() (called
  * by daemon's Diagnostics every 2s and folded into MonitorSnapshot).
  *
- * Mirrors the demo SupervisorsPanel from x-oasis multi-page-router-di
- * example (verified against §3.D supervisor diagnostics).
+ * Mirrors the supervisor diagnostics shape from x-oasis multi-page-router-di
+ * and renders live snapshots from main metrics.
  */
 export function SupervisorsPanel({
   supervisors,

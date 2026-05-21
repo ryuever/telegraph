@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSessionsStore, getSessionStore } from '@/packages/stores'
 import type { AgentService, ChatConversation, ChatMessage, ChatPermissionRequestSnapshot, LlmTracePayload } from './types'
-import { MockAgentService } from './mock-agent-service'
 import type { ChatMessage as CommonChatMessage } from '@/apps/chat/application/common'
 import { upsertToolCall } from './chat-tool-calls'
 import { upsertSubagentUpdate } from './chat-subagents'
@@ -17,7 +16,7 @@ function deriveTitle(text: string) {
 }
 
 export interface UseChatOptions {
-  agent?: AgentService
+  agent: AgentService
   onLlmTrace?: (info: { sessionId: string; runId: string; trace: LlmTracePayload }) => void
   onPermissionRequest?: (request: ChatPermissionRequestSnapshot) => void
 }
@@ -28,8 +27,8 @@ export interface SendMessageOptions {
   replay?: Parameters<AgentService['send']>[0]['replay']
 }
 
-export function useChat({ agent, onLlmTrace, onPermissionRequest }: UseChatOptions = {}) {
-  const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
+export function useChat({ agent, onLlmTrace, onPermissionRequest }: UseChatOptions) {
+  const agentRef = useRef<AgentService>(agent)
   const onLlmTraceRef = useRef(onLlmTrace)
   const onPermissionRequestRef = useRef(onPermissionRequest)
   const sendChainsRef = useRef<Map<string, Promise<unknown>>>(new Map())
@@ -50,7 +49,7 @@ export function useChat({ agent, onLlmTrace, onPermissionRequest }: UseChatOptio
   }, [])
 
   useEffect(() => {
-    agentRef.current = agent ?? new MockAgentService()
+    agentRef.current = agent
   }, [agent])
 
   useEffect(() => {

@@ -134,7 +134,7 @@ export const RUNTIME_CAPABILITY_DESCRIPTORS: RuntimeCapabilityDescriptor[] = [
     summary: 'orchestrator-core graph runtime for node, edge, checkpoint, and interrupt events.',
     productLayer: 'orchestrator',
     maturity: 'experimental',
-    selectable: true,
+    selectable: false,
     defaultTaskCapabilityProfile: 'default',
     capabilities: [
       capability('rawTrace', 'supported', 'Emits node, edge, checkpoint, interrupt, and raw graph data.'),
@@ -148,7 +148,7 @@ export const RUNTIME_CAPABILITY_DESCRIPTORS: RuntimeCapabilityDescriptor[] = [
       capability('patch', 'unsupported'),
     ],
     limitations: [
-      'Demo graph runtime only in current Chat wiring.',
+      'Internal graph diagnostics runtime; not exposed as a production chat backend.',
       'No graph builder or runtime selection UI beyond backend selection.',
       'Interrupt resume is not connected to renderer actions.',
     ],
