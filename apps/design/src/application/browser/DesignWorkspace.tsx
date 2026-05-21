@@ -14,10 +14,20 @@ import {
 import { extractDesignPatchOperations } from './design-artifact-view'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
+type DesignRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
+
+type Message =
+  | {
+    id: string
+    role: 'user'
+    content: string
+  }
+  | {
+    id: string
+    role: 'assistant'
+    content: string
+    runStatus?: DesignRunStatus
+  }
 
 interface DesignWorkspaceProps {
   initialPrompt: string
@@ -26,21 +36,26 @@ interface DesignWorkspaceProps {
 interface DesignTraceItem {
   id: string
   label: string
-  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  status: DesignRunStatus
   detail?: string
 }
 
+const GENERIC_COMPLETION_MESSAGE = '已完成。'
+
 export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.Element {
   const sessionId = useMemo(() => globalThis.crypto.randomUUID(), [])
+  const initialUserMessageId = useMemo(() => globalThis.crypto.randomUUID(), [])
+  const initialAssistantMessageId = useMemo(() => globalThis.crypto.randomUUID(), [])
   const agent = useMemo(() => new PageletDesignAgentService(), [])
   const initialRunStarted = useRef(false)
-  const activeControllers = useRef<Set<AbortController>>(new Set())
+  const activeControllers = useRef<Map<string, AbortController>>(new Map())
+  const assistantArtifactTitles = useRef<Map<string, string>>(new Map())
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'user', content: initialPrompt },
-    { role: 'assistant', content: '' },
+    { id: initialUserMessageId, role: 'user', content: initialPrompt },
+    { id: initialAssistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
   ])
   const [input, setInput] = useState('')
-  const [status, setStatus] = useState<'running' | 'completed' | 'failed' | 'cancelled'>('running')
+  const [status, setStatus] = useState<DesignRunStatus>('running')
   const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>([])
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
   const [artifactMode, setArtifactMode] = useState<'preview' | 'code' | 'inspect'>('preview')
@@ -49,33 +64,67 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
   const [traceItems, setTraceItems] = useState<DesignTraceItem[]>([])
 
-  const appendAssistantText = (text: string): void => {
+  const appendAssistantText = (text: string, messageId?: string): void => {
     setMessages((prev) => {
       const next = [...prev]
-      const last = next.at(-1)
-      if (last?.role === 'assistant') {
-        next[next.length - 1] = { ...last, content: `${last.content}${text}` }
+      const targetIndex = messageId
+        ? next.findIndex(message => message.role === 'assistant' && message.id === messageId)
+        : findLastAssistantIndex(next)
+      const target = targetIndex >= 0 ? next[targetIndex] : undefined
+      if (target?.role === 'assistant') {
+        next[targetIndex] = { ...target, content: `${target.content}${text}` }
         return next
       }
-      return [...next, { role: 'assistant', content: text }]
+      return [...next, { id: messageId ?? globalThis.crypto.randomUUID(), role: 'assistant', content: text }]
     })
   }
 
-  const runAgent = (prompt: string, context?: Record<string, unknown>): void => {
+  const setAssistantRunStatus = (messageId: string, nextStatus: DesignRunStatus): void => {
+    setMessages(prev => prev.map(message => {
+      if (message.role !== 'assistant' || message.id !== messageId) return message
+      const content = nextStatus === 'completed' && message.content.trim().length === 0
+        ? assistantCompletionMessage(assistantArtifactTitles.current.get(messageId))
+        : message.content
+      return { ...message, runStatus: nextStatus, content }
+    }))
+  }
+
+  const rememberAssistantArtifact = (messageId: string, artifact: DesignProjectedArtifact): void => {
+    const title = artifact.title ?? artifact.id
+    assistantArtifactTitles.current.set(messageId, title)
+    setMessages(prev => prev.map(message => {
+      if (
+        message.role !== 'assistant' ||
+        message.id !== messageId ||
+        message.runStatus !== 'completed' ||
+        message.content !== GENERIC_COMPLETION_MESSAGE
+      ) {
+        return message
+      }
+      return { ...message, content: assistantCompletionMessage(title) }
+    }))
+  }
+
+  const runAgent = (prompt: string, context?: Record<string, unknown>, assistantMessageId = globalThis.crypto.randomUUID()): void => {
     const abortController = new AbortController()
-    activeControllers.current.add(abortController)
+    activeControllers.current.set(assistantMessageId, abortController)
     setStatus('running')
+    setAssistantRunStatus(assistantMessageId, 'running')
     void agent.send({
       prompt,
       sessionId,
       context,
       signal: abortController.signal,
-      onStatus: nextStatus => { setStatus(nextStatus) },
-      onAssistantText: appendAssistantText,
+      onStatus: nextStatus => {
+        setStatus(nextStatus)
+        setAssistantRunStatus(assistantMessageId, nextStatus)
+      },
+      onAssistantText: text => { appendAssistantText(text, assistantMessageId) },
       onTraceEvent: event => {
         setTraceItems(prev => reduceTraceItems(prev, event))
       },
       onArtifact: artifact => {
+        rememberAssistantArtifact(assistantMessageId, artifact)
         setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
         setActiveArtifactId(artifact.id)
         setSelectedComponent(null)
@@ -86,15 +135,17 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
         return
       }
       setStatus('failed')
-      appendAssistantText(`\n${error instanceof Error ? error.message : String(error)}`)
+      setAssistantRunStatus(assistantMessageId, 'failed')
+      appendAssistantText(`\n${error instanceof Error ? error.message : String(error)}`, assistantMessageId)
     }).finally(() => {
-      activeControllers.current.delete(abortController)
+      activeControllers.current.delete(assistantMessageId)
     })
   }
 
   const stopAgentRuns = (): void => {
-    for (const controller of activeControllers.current) {
+    for (const [messageId, controller] of activeControllers.current) {
       controller.abort()
+      setAssistantRunStatus(messageId, 'cancelled')
     }
     activeControllers.current.clear()
     setStatus('cancelled')
@@ -103,9 +154,9 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   useEffect(() => {
     if (initialRunStarted.current) return
     initialRunStarted.current = true
-    runAgent(initialPrompt, { surface: 'design-workspace', initial: true })
+    runAgent(initialPrompt, { surface: 'design-workspace', initial: true }, initialAssistantMessageId)
     return () => {
-      for (const controller of activeControllers.current) {
+      for (const controller of activeControllers.current.values()) {
         controller.abort()
       }
       activeControllers.current.clear()
@@ -115,7 +166,12 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   const handleSend = () => {
     if (!input.trim()) return
     const prompt = input.trim()
-    setMessages((prev) => [...prev, { role: 'user', content: prompt }, { role: 'assistant', content: '' }])
+    const assistantMessageId = globalThis.crypto.randomUUID()
+    setMessages((prev) => [
+      ...prev,
+      { id: globalThis.crypto.randomUUID(), role: 'user', content: prompt },
+      { id: assistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
+    ])
     setInput('')
     runAgent(prompt, {
       surface: 'design-workspace',
@@ -123,7 +179,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
       prompt,
       activeArtifact: summarizeActiveArtifact(artifacts, activeArtifactId),
       selectedComponent: summarizeSelectedComponent(selectedComponent, activeArtifactId),
-    })
+    }, assistantMessageId)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
@@ -173,13 +229,15 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
     }
 
     setRequestedArtifactIds(prev => new Set(prev).add(artifact.id))
+    const assistantMessageId = globalThis.crypto.randomUUID()
     setMessages((prev) => [
       ...prev,
       {
+        id: globalThis.crypto.randomUUID(),
         role: 'user',
         content: `应用 ${artifact.title ?? artifact.id}`,
       },
-      { role: 'assistant', content: '' },
+      { id: assistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
     ])
     runAgent(`Apply design artifact "${artifact.title ?? artifact.id}".`, {
       surface: 'design-workspace',
@@ -187,7 +245,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
       artifactId: artifact.id,
       artifactKind: artifact.kind,
       artifact: artifact.output,
-    })
+    }, assistantMessageId)
   }
 
   const applyPatchArtifact = async (
@@ -269,8 +327,8 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
           </span>
         </div>
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {messages.map((msg, i) => (
-            <div key={i} className={msg.role === 'user' ? 'flex justify-end' : ''}>
+          {messages.map((msg) => (
+            <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : ''}>
               <div
                 className={
                   msg.role === 'user'
@@ -281,7 +339,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
                 {msg.role === 'assistant' && msg.content ? (
                   <MarkdownMessage content={msg.content} compact />
                 ) : (
-                  msg.content || (msg.role === 'assistant' && status === 'running' ? '正在生成...' : '')
+                  msg.content || (msg.role === 'assistant' && msg.runStatus === 'running' ? '正在生成...' : '')
                 )}
               </div>
             </div>
@@ -366,6 +424,17 @@ function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
       </div>
     </div>
   )
+}
+
+function findLastAssistantIndex(messages: Message[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'assistant') return index
+  }
+  return -1
+}
+
+function assistantCompletionMessage(title: string | undefined): string {
+  return title ? `已生成「${title}」预览。` : GENERIC_COMPLETION_MESSAGE
 }
 
 function traceStatusDotClassName(status: DesignTraceItem['status']): string {

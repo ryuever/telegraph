@@ -136,6 +136,8 @@ describe('DesignWorkspace', () => {
       container?.querySelector<HTMLButtonElement>('button[aria-label="Apply artifact"]')
 
     expect(applyButton()?.textContent).toContain('预览 Patch')
+    expect(container.textContent).toContain('已生成「Hero patch」预览。')
+    expect(container.textContent).not.toContain('正在生成...')
     expect(container.textContent).toContain('Intent Brief')
     expect(container.textContent).toContain('Design Component Scout')
     expect(container.textContent).toContain('1 components')
