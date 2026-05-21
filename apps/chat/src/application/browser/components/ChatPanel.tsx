@@ -11,6 +11,7 @@ import {
   clearLlmTraceRowsForSession,
   getLlmTraceRowsSnapshot,
   subscribeLlmTraceRows,
+  type LlmTraceRow,
 } from '../llm-trace-store'
 import { useChat } from '../use-chat'
 import { useSessionsStore } from '@/packages/stores'
@@ -23,6 +24,15 @@ import {
   type ChatModelSettings,
 } from '../model-settings'
 import type { AgentService, LlmTracePayload } from '../types'
+import type {
+  ChatAgentRunEventRecordSnapshot,
+  ChatAgentRunRecordSnapshot,
+  ChatPermissionRequestSnapshot,
+  ChatRunTraceBundle,
+  ChatRuntimeCapabilityDescriptorSnapshot,
+} from '@/apps/chat/application/common'
+import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
+import type { AgentRunReplayMode } from '@/packages/agent/persistence/AgentRunRepository'
 
 interface Props {
   agent?: AgentService
@@ -51,6 +61,14 @@ export function ChatPanel({ agent }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [_isLoadingEnv, setIsLoadingEnv] = useState(true)
   const [tracePanelOpen, setTracePanelOpenInner] = useState(readLlmTraceOpenFromStorage)
+  const [persistedRuns, setPersistedRuns] = useState<ChatAgentRunRecordSnapshot[]>([])
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [selectedRunRows, setSelectedRunRows] = useState<LlmTraceRow[]>([])
+  const [runConsoleLoading, setRunConsoleLoading] = useState(false)
+  const [pendingPermissions, setPendingPermissions] = useState<ChatPermissionRequestSnapshot[]>([])
+  const [runtimeCapabilities, setRuntimeCapabilities] = useState<ChatRuntimeCapabilityDescriptorSnapshot[]>(
+    () => listRuntimeCapabilityDescriptors()
+  )
 
   const setTracePanelOpen = useCallback((next: React.SetStateAction<boolean>) => {
     setTracePanelOpenInner(prev => {
@@ -111,6 +129,55 @@ export function ChatPanel({ agent }: Props) {
     return new PageletAgentService()
   }, [agent])
 
+  useEffect(() => {
+    if (!settingsOpen || !agentService.listRuntimeCapabilities) return
+    const controller = new AbortController()
+    agentService.listRuntimeCapabilities(controller.signal)
+      .then(items => {
+        if (!controller.signal.aborted && items.length > 0) {
+          setRuntimeCapabilities(items)
+        }
+      })
+      .catch(() => {
+        // Keep static descriptors when the pagelet RPC channel is not ready.
+      })
+    return () => { controller.abort(); }
+  }, [agentService, settingsOpen])
+
+  const rememberPermissionRequest = useCallback((request: ChatPermissionRequestSnapshot) => {
+    setPendingPermissions(prev => {
+      const next = prev.filter(item => item.id !== request.id)
+      next.push(request)
+      return next
+    })
+  }, [])
+
+  const resolvePermission = useCallback(async (requestId: string, granted: boolean) => {
+    if (!agentService.resolvePermissionRequest) return
+    const ok = await agentService.resolvePermissionRequest(requestId, {
+      granted,
+      reason: granted ? 'Approved in Chat permission UI' : 'Denied in Chat permission UI',
+    })
+    if (ok) {
+      setPendingPermissions(prev => prev.filter(item => item.id !== requestId))
+    }
+  }, [agentService])
+
+  useEffect(() => {
+    if (!agentService.listPendingPermissions) return
+    const controller = new AbortController()
+    agentService.listPendingPermissions(undefined, controller.signal)
+      .then(items => {
+        if (!controller.signal.aborted) {
+          setPendingPermissions(items)
+        }
+      })
+      .catch(() => {
+        // Pending permission recovery is best effort; live stream events remain authoritative.
+      })
+    return () => { controller.abort(); }
+  }, [agentService])
+
   const {
     conversations,
     active,
@@ -122,13 +189,126 @@ export function ChatPanel({ agent }: Props) {
     renameConversation,
     sendMessage,
     stop,
-  } = useChat({ agent: agentService, onLlmTrace: appendLlmTrace })
+  } = useChat({
+    agent: agentService,
+    onLlmTrace: appendLlmTrace,
+    onPermissionRequest: rememberPermissionRequest,
+  })
 
   const displayedTraceRows = useMemo(
     () =>
       traceScopeAllChats ? traceRows : traceRows.filter(r => r.sessionId === activeId),
     [traceScopeAllChats, traceRows, activeId]
   )
+
+  const loadPersistedRuns = useCallback(async () => {
+    if (!agentService.listRuns) return
+    setRunConsoleLoading(true)
+    try {
+      const runs = await agentService.listRuns({
+        sessionId: traceScopeAllChats ? undefined : activeId,
+        limit: 80,
+      })
+      setPersistedRuns(runs)
+      if (selectedRunId && !runs.some(run => run.runId === selectedRunId)) {
+        setSelectedRunId(null)
+        setSelectedRunRows([])
+      }
+    } finally {
+      setRunConsoleLoading(false)
+    }
+  }, [activeId, agentService, selectedRunId, traceScopeAllChats])
+
+  useEffect(() => {
+    if (!tracePanelOpen) return
+    void loadPersistedRuns()
+  }, [loadPersistedRuns, tracePanelOpen, traceRows.length])
+
+  const selectPersistedRun = useCallback(async (runId: string | null) => {
+    setSelectedRunId(runId)
+    if (!runId) {
+      setSelectedRunRows([])
+      return
+    }
+    if (!agentService.listRunEvents) return
+    setRunConsoleLoading(true)
+    try {
+      const events = await agentService.listRunEvents(runId)
+      setSelectedRunRows(runEventsToTraceRows(events))
+    } finally {
+      setRunConsoleLoading(false)
+    }
+  }, [agentService])
+
+  const replayPersistedRun = useCallback(async (
+    runId: string,
+    mode: AgentRunReplayMode,
+    source?: { sourceEventSeq?: number; sourceChildRunId?: string },
+  ) => {
+    const run = persistedRuns.find(item => item.runId === runId) ?? await agentService.getRun?.(runId)
+    if (!run) return
+    const message = run.input?.message ?? run.inputPreview
+    if (!message) return
+    const diff = replaySettingsDiff(run, settings)
+    if (diff.length > 0 && !window.confirm([
+      'Replay will use the current Chat settings, which differ from the selected run:',
+      '',
+      ...diff.map(item => `- ${item}`),
+      '',
+      'Continue?',
+    ].join('\n'))) {
+      return
+    }
+
+    const targetSessionId = mode === 'retry'
+      ? run.sessionId
+      : useSessionsStore.getState().createSession()
+
+    setActiveId(targetSessionId)
+    await sendMessage(message, {
+      targetSessionId,
+      parentRunId: run.runId,
+      replay: {
+        mode,
+        sourceRunId: run.runId,
+        sourceEventSeq: source?.sourceEventSeq,
+        sourceChildRunId: source?.sourceChildRunId,
+      },
+    })
+    void loadPersistedRuns()
+  }, [agentService, loadPersistedRuns, persistedRuns, sendMessage, setActiveId, settings])
+
+  const forkPersistedNode = useCallback((source: {
+    sourceRunId: string
+    sourceEventSeq?: number
+    sourceChildRunId?: string
+  }) => {
+    void replayPersistedRun(source.sourceRunId, 'fork', source)
+  }, [replayPersistedRun])
+
+  const exportPersistedRun = useCallback(async (runId: string) => {
+    if (!agentService.exportRunTraceBundle) return
+    const bundle = await agentService.exportRunTraceBundle(runId)
+    if (!bundle) return
+
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    try {
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `telegraph-run-${shortRunId(runId)}.trace.json`
+      anchor.click()
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }, [agentService])
+
+  const importTraceBundle = useCallback(async (bundle: ChatRunTraceBundle) => {
+    if (!agentService.importRunTraceBundle) return
+    const result = await agentService.importRunTraceBundle(bundle)
+    await loadPersistedRuns()
+    await selectPersistedRun(result.record.runId)
+  }, [agentService, loadPersistedRuns, selectPersistedRun])
 
   const clearVisibleTraces = useCallback(() => {
     clearLlmTraceRowsForSession(activeId)
@@ -189,6 +369,7 @@ export function ChatPanel({ agent }: Props) {
               isStreaming={isStreaming}
               provider={settings.provider}
               modelId={settings.modelId}
+              runtimeCapability={findEffectiveRuntimeCapability(runtimeCapabilities, settings)}
               tracePanelOpen={tracePanelOpen}
               onToggleTracePanel={() => { setTracePanelOpen(o => !o); }}
               onOpenSettings={() => { setSettingsOpen(true); }}
@@ -218,13 +399,28 @@ export function ChatPanel({ agent }: Props) {
               onStop={stop}
               isStreaming={isStreaming}
             />
+            <PermissionApprovalTray
+              requests={pendingPermissions.filter(item => !activeId || item.sessionId === activeId)}
+              onApprove={requestId => { void resolvePermission(requestId, true); }}
+              onDeny={requestId => { void resolvePermission(requestId, false); }}
+            />
           </main>
           <LlmTracePanel
             open={tracePanelOpen}
             rows={displayedTraceRows}
             storedTraceRowCount={traceRows.length}
+            persistedRuns={persistedRuns}
+            selectedRunId={selectedRunId}
+            selectedRunRows={selectedRunRows}
+            runConsoleLoading={runConsoleLoading}
             scopeAllChats={traceScopeAllChats}
             onScopeAllChatsChange={setTraceScopeAllChats}
+            onSelectPersistedRun={selectPersistedRun}
+            onRefreshPersistedRuns={loadPersistedRuns}
+            onReplayPersistedRun={replayPersistedRun}
+            onForkPersistedNode={forkPersistedNode}
+            onExportPersistedRun={exportPersistedRun}
+            onImportTraceBundle={importTraceBundle}
             onClear={clearVisibleTraces}
             onClose={() => { setTracePanelOpen(false); }}
           />
@@ -234,11 +430,128 @@ export function ChatPanel({ agent }: Props) {
       <ChatSettingsDialog
         open={settingsOpen}
         settings={settings}
+        runtimeCapabilities={runtimeCapabilities}
         onClose={() => { setSettingsOpen(false); }}
         onSave={handleSaveSettings}
       />
     </div>
   )
+}
+
+function replaySettingsDiff(run: ChatAgentRunRecordSnapshot, settings: ChatModelSettings): string[] {
+  const checks: Array<[string, string | undefined | null, string | undefined | null]> = [
+    ['provider', run.settings.provider, settings.provider],
+    ['model', run.settings.modelId, settings.modelId],
+    ['backend', run.settings.backend ?? run.runtimeId, settings.backend ?? 'pi-ai'],
+    ['orchestration', run.settings.orchestration, settings.orchestration ?? 'none'],
+    ['pattern', run.settings.orchestrationPattern, settings.orchestrationPattern ?? null],
+    ['team', run.teamId ?? run.settings.orchestration, settings.orchestration],
+    ['permission profile', run.settings.taskCapabilityProfile ?? 'default', settings.taskCapabilityProfile?.kind ?? 'default'],
+  ]
+  return checks
+    .filter(([, before, after]) => (before ?? '-') !== (after ?? '-'))
+    .map(([label, before, after]) => `${label}: ${before ?? '-'} -> ${after ?? '-'}`)
+}
+
+function runEventsToTraceRows(events: ChatAgentRunEventRecordSnapshot[]): LlmTraceRow[] {
+  return events.map(item => ({
+    sessionId: item.sessionId ?? item.runId,
+    runId: item.runId,
+    seq: item.seq,
+    ts: item.ts,
+    trace: { kind: 'runtime_event', event: item.event },
+  }))
+}
+
+function findEffectiveRuntimeCapability(
+  capabilities: ChatRuntimeCapabilityDescriptorSnapshot[],
+  settings: ChatModelSettings,
+): ChatRuntimeCapabilityDescriptorSnapshot | undefined {
+  const runtimeId = settings.orchestration === 'telegraph-subagents'
+    ? 'telegraph-subagents'
+    : settings.backend
+  return capabilities.find(item => item.id === runtimeId)
+}
+
+function PermissionApprovalTray({
+  requests,
+  onApprove,
+  onDeny,
+}: {
+  requests: ChatPermissionRequestSnapshot[]
+  onApprove: (requestId: string) => void
+  onDeny: (requestId: string) => void
+}) {
+  if (requests.length === 0) return null
+  return (
+    <div className="border-t border-amber-900/40 bg-amber-950/20 px-4 py-2">
+      <div className="mx-auto flex max-w-3xl flex-col gap-2">
+        {requests.map(request => (
+          <div
+            key={request.id}
+            className="rounded-md border border-amber-800/60 bg-zinc-950/80 px-3 py-2 shadow-lg"
+          >
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] uppercase text-amber-200">
+                permission
+              </span>
+              <span className="font-mono text-[10.5px] text-zinc-400">{shortRunId(request.runId)}</span>
+              <span className="text-[11px] text-zinc-300">{permissionTitle(request)}</span>
+            </div>
+            <div className="mb-2 text-[11px] leading-relaxed text-zinc-500">
+              {request.proposedDecision.reason}
+              {request.context.operation ? ` · ${operationSummary(request.context.operation)}` : ''}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { onDeny(request.id); }}
+                className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+              >
+                Deny
+              </button>
+              <button
+                type="button"
+                onClick={() => { onApprove(request.id); }}
+                className="rounded-md bg-amber-200 px-2.5 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100"
+              >
+                Approve
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function permissionTitle(request: ChatPermissionRequestSnapshot): string {
+  const permission = request.permission
+  if (permission.type === 'filesystem') return `Filesystem ${permission.access}: ${permission.scope}`
+  if (permission.type === 'shell') return `Shell execution: ${permission.risk} risk`
+  if (permission.type === 'network') return `Network access: ${permission.hosts?.join(', ') ?? 'unspecified host'}`
+  if (permission.type === 'process') return `Process access: ${permission.commands?.join(', ') ?? 'unspecified command'}`
+  if (permission.type === 'secrets') return `Secrets access: ${permission.keys?.join(', ') ?? 'unspecified key'}`
+  return permission satisfies never
+}
+
+function operationSummary(operation: ChatPermissionRequestSnapshot['context']['operation']): string {
+  if (!operation) return ''
+  switch (operation.kind) {
+    case 'filesystem.read':
+    case 'filesystem.write':
+      return operation.path ?? operation.kind
+    case 'shell.exec':
+      return [operation.command, operation.cwd].filter(Boolean).join(' @ ')
+    case 'network.request':
+      return operation.url ?? operation.host ?? operation.kind
+    default:
+      return operation satisfies never
+  }
+}
+
+function shortRunId(runId: string): string {
+  return runId.length > 12 ? `${runId.slice(0, 12)}...` : runId
 }
 
 function Header({
@@ -247,6 +560,7 @@ function Header({
   isStreaming,
   provider,
   modelId,
+  runtimeCapability,
   tracePanelOpen,
   onToggleTracePanel,
   onOpenSettings,
@@ -256,6 +570,7 @@ function Header({
   isStreaming: boolean
   provider: string
   modelId: string
+  runtimeCapability?: ChatRuntimeCapabilityDescriptorSnapshot
   tracePanelOpen: boolean
   onToggleTracePanel: () => void
   onOpenSettings: () => void
@@ -294,6 +609,18 @@ function Header({
         >
           {isStreaming ? 'streaming' : 'idle'}
         </span>
+        {runtimeCapability && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            title={runtimeCapability.summary}
+            className="rounded-full border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-zinc-300 hover:border-zinc-600"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            {runtimeCapability.label}{' '}
+            <span className="ml-1 text-zinc-500">{runtimeCapability.maturity}</span>
+          </button>
+        )}
         <ModelBadge provider={provider} modelId={modelId} onClick={onOpenSettings} />
       </div>
     </header>

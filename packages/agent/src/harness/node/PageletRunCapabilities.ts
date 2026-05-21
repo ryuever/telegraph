@@ -16,6 +16,7 @@ import {
   PermissionBroker,
   type PageletKind,
   type PermissionBrokerRequestContext,
+  type PermissionPromptHandler,
   type WorkspacePermissionPolicy,
 } from '@/packages/agent/harness/PermissionBroker'
 import {
@@ -32,6 +33,7 @@ export interface PageletRunCapabilityOptions {
   settings: RuntimeSettings
   feedback?: FeedbackAPI
   emit?: (event: AgentEvent, context: PermissionBrokerRequestContext) => void | Promise<void>
+  prompt?: PermissionPromptHandler
   workspaceRoot?: string
   allowedEnvKeys?: string[]
 }
@@ -41,7 +43,7 @@ export function createPageletRunCapabilities(options: PageletRunCapabilityOption
   const context = createPermissionContext(options, taskProfile)
   const broker = new PermissionBroker({
     emit: options.emit,
-    prompt: () => false,
+    prompt: options.prompt ?? (() => false),
   })
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd())
 

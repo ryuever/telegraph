@@ -1,5 +1,18 @@
 import { createId } from '@x-oasis/di'
 import type { AgentEvent, RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
+import type { PermissionRequest } from '@/packages/agent-protocol'
+import type {
+  PermissionBrokerRequestContext,
+  PermissionDecision,
+} from '@/packages/agent/harness/PermissionBroker'
+import type {
+  AgentRunEventRecord,
+  AgentRunRecord,
+  AgentRunReplaySource,
+  AgentRunStatus,
+  ImportAgentRunBundleResult,
+} from '@/packages/agent/persistence/AgentRunRepository'
+import type { RuntimeCapabilityDescriptor } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
 
 export const CHAT_PAGELET_SERVICE_PATH = 'chat-pagelet-api'
 
@@ -29,13 +42,14 @@ export type AgentOrchestrationPattern = 'chain' | 'parallel'
 // ---------------------------------------------------------------------------
 
 export interface ChatStreamEvent {
-  type: 'run_queued' | 'run_started' | 'text_delta' | 'run_completed' | 'run_failed' | 'done' | 'error' | 'llm_trace' | 'runtime_event'
+  type: 'run_queued' | 'run_started' | 'text_delta' | 'run_completed' | 'run_failed' | 'done' | 'error' | 'llm_trace' | 'runtime_event' | 'permission_pending'
   runId: string
   sessionId?: string
   text?: string
   error?: string
   trace?: LlmTracePayload
   event?: AgentEvent
+  permissionRequest?: ChatPermissionRequestSnapshot
 }
 
 export interface EventSubscription {
@@ -47,13 +61,47 @@ export interface ChatSendRequest {
   settings: AgentRuntimeSettings
   runId: string
   sessionId: string
+  parentRunId?: string
+  replay?: AgentRunReplaySource
 }
 
 export interface ChatSendResult {
   runId: string
-  status: 'completed' | 'failed'
+  status: 'completed' | 'failed' | 'cancelled'
   text?: string
   error?: string
+}
+
+export type ChatAgentRunStatus = AgentRunStatus
+
+export type ChatAgentRunRecordSnapshot = AgentRunRecord
+
+export type ChatAgentRunEventRecordSnapshot = AgentRunEventRecord
+
+export type ChatRuntimeCapabilityDescriptorSnapshot = RuntimeCapabilityDescriptor
+
+export interface ChatRunTraceBundle {
+  schemaVersion: 1
+  exportedAt: number
+  run: ChatAgentRunRecordSnapshot
+  events: ChatAgentRunEventRecordSnapshot[]
+}
+
+export type ChatRunTraceImportResult = ImportAgentRunBundleResult
+
+export interface ChatPermissionRequestSnapshot {
+  id: string
+  runId: string
+  sessionId?: string
+  permission: PermissionRequest
+  context: PermissionBrokerRequestContext
+  proposedDecision: PermissionDecision
+  createdAt: number
+}
+
+export interface ChatPermissionResolution {
+  granted: boolean
+  reason?: string
 }
 
 export interface ChatSubagentRecordSnapshot {
@@ -127,6 +175,19 @@ export interface IChatPageletService {
   info(): Promise<string>
   send(request: ChatSendRequest): Promise<ChatSendResult>
   cancel(runId: string): Promise<boolean>
+  listRuns(options?: {
+    sessionId?: string
+    status?: ChatAgentRunStatus
+    limit?: number
+    offset?: number
+  }): Promise<ChatAgentRunRecordSnapshot[]>
+  getRun(runId: string): Promise<ChatAgentRunRecordSnapshot | null>
+  listRunEvents(runId: string): Promise<ChatAgentRunEventRecordSnapshot[]>
+  listRuntimeCapabilities(): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>
+  exportRunTraceBundle(runId: string): Promise<ChatRunTraceBundle | null>
+  importRunTraceBundle(bundle: ChatRunTraceBundle): Promise<ChatRunTraceImportResult>
+  listPendingPermissions(runId?: string): Promise<ChatPermissionRequestSnapshot[]>
+  resolvePermissionRequest(requestId: string, resolution: ChatPermissionResolution): Promise<boolean>
   listSubagents(): Promise<ChatSubagentRecordSnapshot[]>
   getSubagentResult(childRunId: string, consume?: boolean): Promise<ChatSubagentRecordSnapshot | null>
   cancelSubagent(childRunId: string): Promise<boolean>

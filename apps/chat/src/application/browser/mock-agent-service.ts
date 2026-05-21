@@ -1,4 +1,14 @@
-import type { AgentSendOptions, AgentService, ChatSubagentRecordSnapshot } from './types'
+import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
+import type {
+  AgentSendOptions,
+  AgentService,
+  ChatRuntimeCapabilityDescriptorSnapshot,
+  ChatPermissionRequestSnapshot,
+  ChatPermissionResolution,
+  ChatRunTraceBundle,
+  ChatRunTraceImportResult,
+  ChatSubagentRecordSnapshot,
+} from './types'
 
 export class MockAgentService implements AgentService {
   async send({ conversation, onChunk, onSubagentUpdate, signal, onLlmTrace }: AgentSendOptions): Promise<void> {
@@ -84,6 +94,29 @@ export class MockAgentService implements AgentService {
 
   async listSubagents(): Promise<ChatSubagentRecordSnapshot[]> {
     return []
+  }
+
+  async listRuntimeCapabilities(): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]> {
+    return listRuntimeCapabilityDescriptors()
+  }
+
+  async listPendingPermissions(): Promise<ChatPermissionRequestSnapshot[]> {
+    return []
+  }
+
+  async resolvePermissionRequest(_requestId: string, _resolution: ChatPermissionResolution): Promise<boolean> {
+    return false
+  }
+
+  async exportRunTraceBundle(): Promise<ChatRunTraceBundle | null> {
+    return null
+  }
+
+  async importRunTraceBundle(bundle: ChatRunTraceBundle): Promise<ChatRunTraceImportResult> {
+    return {
+      status: 'existing',
+      record: bundle.run,
+    }
   }
 
   async getSubagentResult(): Promise<ChatSubagentRecordSnapshot | null> {

@@ -126,6 +126,53 @@ export interface SubagentParallelTask {
 }
 
 // ---------------------------------------------------------------------------
+// Team Router v0
+// ---------------------------------------------------------------------------
+
+export interface TeamSpec {
+  id: string
+  label: string
+  members: TeamMemberSpec[]
+  router: TeamRouterSpec
+  policies?: TeamPolicySpec
+}
+
+export interface TeamMemberSpec {
+  id: string
+  role: 'scout' | 'planner' | 'worker' | 'reviewer' | 'custom'
+  label: string
+  description?: string
+  agent: string
+  defaultRuntime?: string
+  allowedTools?: string[]
+  handoffContract?: string
+}
+
+export interface TeamRouterSpec {
+  id: string
+  strategy: 'model-router-v0'
+  allowedDecisions: TeamRouteDecision['kind'][]
+}
+
+export interface TeamPolicySpec {
+  maxParallel?: number
+  requireReviewFor?: Array<'filesystem' | 'shell' | 'patch' | 'high-risk'>
+}
+
+export type TeamRouteDecision =
+  | { kind: 'direct'; reason: string }
+  | { kind: 'clarify'; question: string; reason: string }
+  | { kind: 'single'; memberId: string; task: string; reason: string }
+  | { kind: 'parallel'; tasks: TeamRouteTask[]; reason: string }
+  | { kind: 'review'; workerTask: string; reviewerTask: string; reason: string }
+
+export interface TeamRouteTask {
+  memberId: string
+  task: string
+  label?: string
+}
+
+// ---------------------------------------------------------------------------
 // Child run result (internal)
 // ---------------------------------------------------------------------------
 

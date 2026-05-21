@@ -187,6 +187,10 @@ export const wikiSidebar = {
         {
           "text": "P-006 Harness Capability 与 Extension 分层执行计划",
           "link": "/roadmap/20260518-harness-capability-extension-plan"
+        },
+        {
+          "text": "P-007 Agent Run Cockpit 可跟踪实施计划",
+          "link": "/roadmap/20260521-agent-run-cockpit-implementation-plan"
         }
       ]
     }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSessionsStore, getSessionStore } from '@/packages/stores'
-import type { AgentService, ChatConversation, ChatMessage, LlmTracePayload } from './types'
+import type { AgentService, ChatConversation, ChatMessage, ChatPermissionRequestSnapshot, LlmTracePayload } from './types'
 import { MockAgentService } from './mock-agent-service'
 import type { ChatMessage as CommonChatMessage } from '@/apps/chat/application/common'
 import { upsertToolCall } from './chat-tool-calls'
@@ -19,11 +19,19 @@ function deriveTitle(text: string) {
 export interface UseChatOptions {
   agent?: AgentService
   onLlmTrace?: (info: { sessionId: string; runId: string; trace: LlmTracePayload }) => void
+  onPermissionRequest?: (request: ChatPermissionRequestSnapshot) => void
 }
 
-export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
+export interface SendMessageOptions {
+  targetSessionId?: string
+  parentRunId?: Parameters<AgentService['send']>[0]['parentRunId']
+  replay?: Parameters<AgentService['send']>[0]['replay']
+}
+
+export function useChat({ agent, onLlmTrace, onPermissionRequest }: UseChatOptions = {}) {
   const agentRef = useRef<AgentService>(agent ?? new MockAgentService())
   const onLlmTraceRef = useRef(onLlmTrace)
+  const onPermissionRequestRef = useRef(onPermissionRequest)
   const sendChainsRef = useRef<Map<string, Promise<unknown>>>(new Map())
   const { sessions, activeSessionId, createSession, deleteSession, setActiveSession, renameSession } = useSessionsStore()
   const [updateTrigger, setUpdateTrigger] = useState(0)
@@ -48,6 +56,10 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
   useEffect(() => {
     onLlmTraceRef.current = onLlmTrace
   }, [onLlmTrace])
+
+  useEffect(() => {
+    onPermissionRequestRef.current = onPermissionRequest
+  }, [onPermissionRequest])
 
   useLayoutEffect(() => {
     const list = sessionsRef.current
@@ -94,11 +106,11 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
   }, [sessions, updateTrigger])
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, options: SendMessageOptions = {}) => {
       const trimmed = text.trim()
       if (!trimmed) return
 
-      let targetSessionId = useSessionsStore.getState().activeSessionId
+      let targetSessionId = options.targetSessionId ?? useSessionsStore.getState().activeSessionId
       if (!targetSessionId) {
         targetSessionId = createSession()
       }
@@ -147,6 +159,8 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
 
           await agentRef.current.send({
             conversation: snapshot,
+            parentRunId: options.parentRunId,
+            replay: options.replay,
             signal: controller.signal,
             onStatus: status => {
               store.updateMessage(assistantMsg.id, (m: CommonChatMessage) => {
@@ -174,6 +188,9 @@ export function useChat({ agent, onLlmTrace }: UseChatOptions = {}) {
                 ...m,
                 subagentGroups: upsertSubagentUpdate(m.subagentGroups ?? [], update),
               }))
+            },
+            onPermissionRequest: request => {
+              onPermissionRequestRef.current?.(request)
             },
             onLlmTrace: info =>
               onLlmTraceRef.current?.({

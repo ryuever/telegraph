@@ -81,6 +81,19 @@ export {
   createPiAiRuntime,
 } from '@/packages/agent/runtime/createRuntime'
 export {
+  RUNTIME_CAPABILITY_DESCRIPTORS,
+  RUNTIME_CAPABILITY_KEYS,
+  capabilitySupport,
+  getRuntimeCapabilityDescriptor,
+  listRuntimeCapabilityDescriptors,
+  type RuntimeCapabilityDescriptor,
+  type RuntimeCapabilityItem,
+  type RuntimeCapabilityKey,
+  type RuntimeCapabilitySupport,
+  type RuntimeMaturity,
+  type RuntimeProductLayer,
+} from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
+export {
   RuntimeRegistry,
   createAgentHarness,
   isAgentEvent,

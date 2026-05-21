@@ -3,6 +3,7 @@ import type { LlmTracePayload } from '@/apps/chat/application/common'
 export interface LlmTraceRow {
   sessionId: string
   runId: string
+  seq?: number
   ts: number
   trace: LlmTracePayload
 }

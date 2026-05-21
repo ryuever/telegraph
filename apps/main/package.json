@@ -14,7 +14,7 @@
     "start": "electron-forge start --inspect-electron",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "dev": "vite",
+    "dev": "vite --config vite.renderer.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src/"

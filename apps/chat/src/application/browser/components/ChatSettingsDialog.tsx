@@ -10,10 +10,18 @@ import {
   getProviderOptions,
   getModelOptions,
 } from '../model-settings'
+import {
+  capabilitySupport,
+  listRuntimeCapabilityDescriptors,
+  type RuntimeCapabilityDescriptor,
+  type RuntimeCapabilitySupport,
+} from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
+import type { ChatRuntimeCapabilityDescriptorSnapshot } from '@/apps/chat/application/common'
 
 interface Props {
   open: boolean
   settings: ChatModelSettings
+  runtimeCapabilities?: ChatRuntimeCapabilityDescriptorSnapshot[]
   onClose: () => void
   onSave: (next: ChatModelSettings) => void
 }
@@ -26,7 +34,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'extensions', label: 'Extensions' },
 ]
 
-export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
+export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClose, onSave }: Props) {
   const [draft, setDraft] = useState<ChatModelSettings>(settings)
   const [envModels, setEnvModels] = useState<EnvModelConfig[]>([])
   const [connectionStatus, setConnectionStatus] = useState<Map<string, ModelConnectionStatus>>(
@@ -66,6 +74,16 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
   const provider = draft.provider
   const providerOptions = useMemo(() => getProviderOptions(), [])
   const modelOptions = useMemo(() => getModelOptions(provider), [provider])
+  const capabilityDescriptors = useMemo(
+    () => runtimeCapabilities && runtimeCapabilities.length > 0
+      ? runtimeCapabilities
+      : listRuntimeCapabilityDescriptors(),
+    [runtimeCapabilities]
+  )
+  const selectedRuntime = useMemo(
+    () => findEffectiveRuntimeDescriptor(capabilityDescriptors, draft),
+    [capabilityDescriptors, draft]
+  )
 
   const currentStatus = connectionStatus.get(`${provider}:${draft.modelId}`)
 
@@ -177,6 +195,8 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
               currentStatus={currentStatus}
               providerOptions={providerOptions}
               modelOptions={modelOptions}
+              runtimeCapabilities={capabilityDescriptors}
+              selectedRuntime={selectedRuntime}
               onSetProvider={setProvider}
               onSetModel={setModel}
               onSetBackend={setBackend}
@@ -187,6 +207,7 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
           {activeTab === 'orchestration' && (
             <OrchestrationTab
               draft={draft}
+              selectedRuntime={selectedRuntime}
               onSetOrchestration={setOrchestration}
               onSetOrchestrationPattern={setOrchestrationPattern}
               onSetWorktreeIsolation={setWorktreeIsolation}
@@ -195,6 +216,7 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
           {activeTab === 'extensions' && (
             <ExtensionsTab
               draft={draft}
+              selectedRuntime={selectedRuntime}
               onSetBlocklist={setExtensionBlocklistText}
               onSetTaskCapabilityProfile={setTaskCapabilityProfile}
             />
@@ -241,6 +263,8 @@ function ModelTab({
   currentStatus,
   providerOptions,
   modelOptions,
+  runtimeCapabilities,
+  selectedRuntime,
   onSetProvider,
   onSetModel,
   onSetBackend,
@@ -254,6 +278,8 @@ function ModelTab({
   currentStatus: ModelConnectionStatus | undefined
   providerOptions: { id: string; label: string }[]
   modelOptions: { provider: string; id: string; label: string }[]
+  runtimeCapabilities: RuntimeCapabilityDescriptor[]
+  selectedRuntime?: RuntimeCapabilityDescriptor
   onSetProvider: (id: string) => void
   onSetModel: (id: string) => void
   onSetBackend: (backend: ChatModelSettings['backend']) => void
@@ -368,13 +394,22 @@ function ModelTab({
           onChange={e => { onSetBackend(e.target.value as ChatModelSettings['backend']); }}
           className={selectClass}
         >
-          <option value="pi-ai">pi-ai (default)</option>
-          <option value="pi-embedded">pi-embedded (tool loop)</option>
-          <option value="telegraph-orchestrator">telegraph-orchestrator (experimental)</option>
+          {runtimeCapabilities.map(runtime => (
+            <option key={runtime.id} value={runtime.id} disabled={!runtime.selectable}>
+              {runtime.label} ({runtime.maturity})
+            </option>
+          ))}
+          {!runtimeCapabilities.some(runtime => runtime.id === draft.backend) && (
+            <option value={draft.backend} disabled>
+              {draft.backend} (not available)
+            </option>
+          )}
           <option value="langgraph" disabled>langgraph (not validated)</option>
           <option value="vercel-ai" disabled>vercel-ai (not validated)</option>
         </select>
       </Field>
+
+      <RuntimeCapabilityMatrix descriptor={selectedRuntime} />
 
       <Field label="API Key" hint="Stored in localStorage (MVP)">
         <div className="flex items-center gap-2">
@@ -418,15 +453,20 @@ function ModelTab({
 
 function OrchestrationTab({
   draft,
+  selectedRuntime,
   onSetOrchestration,
   onSetOrchestrationPattern,
   onSetWorktreeIsolation,
 }: {
   draft: ChatModelSettings
+  selectedRuntime?: RuntimeCapabilityDescriptor
   onSetOrchestration: (v: ChatModelSettings['orchestration']) => void
   onSetOrchestrationPattern: (v: ChatModelSettings['orchestrationPattern']) => void
   onSetWorktreeIsolation: (v: boolean) => void
 }) {
+  const childRunSupport = capabilitySupport(selectedRuntime, 'childRun')
+  const selectedRuntimeBlocksChildRuns = draft.orchestration !== 'telegraph-subagents' && childRunSupport === 'unsupported'
+
   return (
     <div className="space-y-4">
       <Field label="Orchestration mode">
@@ -438,13 +478,20 @@ function OrchestrationTab({
           className={selectClass}
         >
           <option value="none">none</option>
-          <option value="telegraph-subagents">Telegraph native subagents</option>
+          <option value="telegraph-subagents">Team Router v0</option>
         </select>
       </Field>
 
+      {selectedRuntimeBlocksChildRuns && (
+        <div className="rounded-md border border-zinc-800 bg-zinc-900/35 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
+          Current backend does not emit child runs. Select Team Router v0 to enable routed
+          child-agent execution.
+        </div>
+      )}
+
       {draft.orchestration === 'telegraph-subagents' && (
         <>
-          <Field label="Orchestration pattern">
+          <Field label="Router preference">
             <select
               value={draft.orchestrationPattern}
               onChange={e =>
@@ -454,8 +501,8 @@ function OrchestrationTab({
               }
               className={selectClass}
             >
-              <option value="chain">chain (scout → planner → worker → reviewer)</option>
-              <option value="parallel">parallel (scout/planner/worker/reviewer)</option>
+              <option value="chain">review handoff</option>
+              <option value="parallel">parallel specialists</option>
             </select>
           </Field>
 
@@ -471,7 +518,7 @@ function OrchestrationTab({
 
           <div className="text-[11px] text-zinc-500">
             Uses Telegraph native agent profiles from `~/.telegraph/agents` and project
-            `.telegraph/agents`. Pi extensions should run through Pi CLI external runtime.
+            `.telegraph/agents`. The router chooses direct, clarify, single, parallel, or review.
           </div>
         </>
       )}
@@ -481,14 +528,19 @@ function OrchestrationTab({
 
 function ExtensionsTab({
   draft,
+  selectedRuntime,
   onSetBlocklist,
   onSetTaskCapabilityProfile,
 }: {
   draft: ChatModelSettings
+  selectedRuntime?: RuntimeCapabilityDescriptor
   onSetBlocklist: (raw: string) => void
   onSetTaskCapabilityProfile: (profile: ChatModelSettings['taskCapabilityProfile']) => void
 }) {
   const profile = draft.taskCapabilityProfile
+  const supportsReadonly = capabilitySupport(selectedRuntime, 'filesystem') !== 'unsupported'
+  const supportsShell = capabilitySupport(selectedRuntime, 'shell') !== 'unsupported'
+  const supportsPatch = capabilitySupport(selectedRuntime, 'patch') !== 'unsupported'
   const setProfileKind = (kind: ChatModelSettings['taskCapabilityProfile']['kind']) => {
     if (kind === 'readonly-workspace') {
       onSetTaskCapabilityProfile({ kind, scopes: ['repo:read'] })
@@ -523,12 +575,19 @@ function ExtensionsTab({
           className={selectClass}
         >
           <option value="default">default (chat only)</option>
-          <option value="readonly-workspace">readonly workspace</option>
-          <option value="shell-automation">shell automation</option>
-          <option value="coding-edit">coding edit</option>
-          <option value="design-build">design build</option>
+          <option value="readonly-workspace" disabled={!supportsReadonly}>readonly workspace</option>
+          <option value="shell-automation" disabled={!supportsShell}>shell automation</option>
+          <option value="coding-edit" disabled={!supportsPatch}>coding edit</option>
+          <option value="design-build" disabled={!supportsReadonly}>design build</option>
         </select>
       </Field>
+
+      {profile.kind !== 'default' && (
+        <div className="rounded-md border border-zinc-800 bg-zinc-900/35 px-3 py-2 text-[11px] leading-relaxed text-zinc-500">
+          Risky capabilities remain gated by the permission broker. Renderer approval is Phase D;
+          unsupported profiles are disabled for the selected runtime.
+        </div>
+      )}
 
       {profile.kind === 'shell-automation' && (
         <Field label="Allowed shell commands" hint="Comma or newline separated executable names">
@@ -626,6 +685,85 @@ function splitList(raw: string): string[] {
     .split(/[,\n]+/)
     .map(s => s.trim())
     .filter(Boolean)
+}
+
+function RuntimeCapabilityMatrix({ descriptor }: { descriptor?: RuntimeCapabilityDescriptor }) {
+  if (!descriptor) {
+    return (
+      <div className="rounded-md border border-zinc-800 bg-zinc-900/35 px-3 py-2 text-[11px] text-zinc-500">
+        Runtime capability descriptor is not available.
+      </div>
+    )
+  }
+
+  return (
+    <section className="rounded-lg border border-zinc-800 bg-zinc-900/25 p-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-semibold text-zinc-200">{descriptor.label}</span>
+            <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] uppercase', maturityClass(descriptor.maturity))}>
+              {descriptor.maturity}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{descriptor.summary}</p>
+        </div>
+        <span className="shrink-0 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[9.5px] uppercase text-zinc-400">
+          {descriptor.productLayer}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {descriptor.capabilities.map(item => (
+          <div
+            key={item.key}
+            title={item.note}
+            className={cn(
+              'min-w-0 rounded-md border px-2 py-1',
+              supportClass(item.support)
+            )}
+          >
+            <div className="truncate text-[10.5px] font-medium">{item.label}</div>
+            <div className="text-[9.5px] uppercase opacity-80">{supportLabel(item.support)}</div>
+          </div>
+        ))}
+      </div>
+      {descriptor.limitations.length > 0 && (
+        <ul className="mt-2 space-y-1 text-[10.5px] leading-relaxed text-zinc-500">
+          {descriptor.limitations.map(item => (
+            <li key={item}>- {item}</li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function findEffectiveRuntimeDescriptor(
+  descriptors: RuntimeCapabilityDescriptor[],
+  settings: ChatModelSettings,
+): RuntimeCapabilityDescriptor | undefined {
+  const runtimeId = settings.orchestration === 'telegraph-subagents'
+    ? 'telegraph-subagents'
+    : settings.backend
+  return descriptors.find(item => item.id === runtimeId)
+}
+
+function supportLabel(support: RuntimeCapabilitySupport): string {
+  if (support === 'supported') return 'yes'
+  if (support === 'partial') return 'partial'
+  return 'no'
+}
+
+function supportClass(support: RuntimeCapabilitySupport): string {
+  if (support === 'supported') return 'border-emerald-800/70 bg-emerald-950/25 text-emerald-200'
+  if (support === 'partial') return 'border-amber-800/70 bg-amber-950/25 text-amber-200'
+  return 'border-zinc-800 bg-zinc-950/35 text-zinc-500'
+}
+
+function maturityClass(maturity: RuntimeCapabilityDescriptor['maturity']): string {
+  if (maturity === 'ready') return 'bg-emerald-500/15 text-emerald-200'
+  if (maturity === 'scaffold') return 'bg-amber-500/15 text-amber-200'
+  return 'bg-violet-500/15 text-violet-200'
 }
 
 function Field({

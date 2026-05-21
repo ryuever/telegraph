@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { cn } from '@/packages/ui/lib/utils'
 import type { LlmTraceRow } from '../llm-trace-store'
+import type { ChatAgentRunRecordSnapshot, ChatRunTraceBundle } from '@/apps/chat/application/common'
+import type { AgentRunReplayMode } from '@/packages/agent/persistence/AgentRunRepository'
+import {
+  assertChatRunTraceBundle,
+  taskCapabilityProfileSummary,
+} from '@/apps/chat/application/common/trace-bundle'
 import {
   buildTraceTimeline,
   formatTraceJson,
@@ -108,12 +114,14 @@ function TraceNodeSection({
   status,
   rows,
   scopeAllChats,
+  onFork,
 }: {
   title: string
   subtitle?: string
   status: TimelineStatus
   rows: LlmTraceRow[]
   scopeAllChats: boolean
+  onFork?: () => void
 }) {
   return (
     <section className="border-l border-zinc-800/80 pl-3">
@@ -122,6 +130,15 @@ function TraceNodeSection({
         {subtitle && <span className="font-mono text-[10px] text-zinc-500">{subtitle}</span>}
         <span className={cn('rounded px-1.5 py-0.5 text-[9px] uppercase', statusClass(status))}>{status}</span>
         <span className="text-[10px] text-zinc-500">{rows.length} event{rows.length === 1 ? '' : 's'}</span>
+        {onFork && (
+          <button
+            type="button"
+            onClick={onFork}
+            className="ml-auto rounded border border-zinc-800 px-1.5 py-0.5 text-[9.5px] text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100"
+          >
+            Fork
+          </button>
+        )}
       </div>
       <TraceEventList rows={rows} scopeAllChats={scopeAllChats} />
     </section>
@@ -132,28 +149,71 @@ export function LlmTracePanel({
   open,
   rows,
   storedTraceRowCount,
+  persistedRuns,
+  selectedRunId,
+  selectedRunRows,
+  runConsoleLoading,
   scopeAllChats,
   onScopeAllChatsChange,
+  onSelectPersistedRun,
+  onRefreshPersistedRuns,
+  onReplayPersistedRun,
+  onForkPersistedNode,
+  onExportPersistedRun,
+  onImportTraceBundle,
   onClear,
   onClose,
 }: {
   open: boolean
   rows: LlmTraceRow[]
   storedTraceRowCount: number
+  persistedRuns: ChatAgentRunRecordSnapshot[]
+  selectedRunId: string | null
+  selectedRunRows: LlmTraceRow[]
+  runConsoleLoading: boolean
   scopeAllChats: boolean
   onScopeAllChatsChange: (value: boolean) => void
+  onSelectPersistedRun: (runId: string | null) => void
+  onRefreshPersistedRuns: () => void
+  onReplayPersistedRun: (runId: string, mode: AgentRunReplayMode) => void
+  onForkPersistedNode: (source: {
+    sourceRunId: string
+    sourceEventSeq?: number
+    sourceChildRunId?: string
+  }) => void
+  onExportPersistedRun: (runId: string) => void
+  onImportTraceBundle: (bundle: ChatRunTraceBundle) => void
   onClear: () => void
   onClose: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const visibleRows = selectedRunId ? selectedRunRows : rows
   useEffect(() => {
     if (!open) return
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [rows.length, open])
+  }, [visibleRows.length, open])
 
-  const timelineRuns = useMemo(() => buildTraceTimeline(rows), [rows])
+  const timelineRuns = useMemo(() => buildTraceTimeline(visibleRows), [visibleRows])
+  const selectedRun = selectedRunId
+    ? persistedRuns.find(run => run.runId === selectedRunId)
+    : null
+  const compareRun = selectedRun
+    ? findCompareRun(selectedRun, persistedRuns)
+    : null
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const bundle = assertChatRunTraceBundle(JSON.parse(await file.text()))
+      onImportTraceBundle(bundle)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    }
+  }
 
   return (
     <aside
@@ -169,9 +229,11 @@ export function LlmTracePanel({
         <div className="min-w-0">
           <div className="text-[12px] font-semibold tracking-tight text-zinc-100">LLM trace</div>
           <div className="truncate text-[10px] text-zinc-500">
-            {scopeAllChats
-              ? 'All chats · legacy trace + RuntimeEvent (v1)'
-              : 'Active chat · legacy trace + RuntimeEvent (v1)'}
+            {selectedRun
+              ? `Persisted run · ${selectedRun.status} · ${selectedRun.eventCount} events`
+              : scopeAllChats
+                ? 'All chats · live trace + persisted runs'
+                : 'Active chat · live trace + persisted runs'}
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -204,18 +266,120 @@ export function LlmTracePanel({
           <span className="text-zinc-300">active</span> conversation is shown.
         </span>
       </label>
+      <div className="border-b border-zinc-800/60 px-2 py-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            Run Console
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { onSelectPersistedRun(null); }}
+              className={cn(
+                'rounded px-2 py-1 text-[10.5px]',
+                selectedRunId
+                  ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+                  : 'bg-zinc-800 text-zinc-100'
+              )}
+            >
+              Live
+            </button>
+            <button
+              type="button"
+              onClick={onRefreshPersistedRuns}
+              className="rounded px-2 py-1 text-[10.5px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              {runConsoleLoading ? 'Loading' : 'Refresh'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { importInputRef.current?.click(); }}
+              className="rounded px-2 py-1 text-[10.5px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              Import
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={event => { void handleImportFile(event); }}
+              className="hidden"
+            />
+          </div>
+        </div>
+        {selectedRun && (
+          <>
+            <div className="mb-2 grid grid-cols-4 gap-1">
+              <RunActionButton onClick={() => { onReplayPersistedRun(selectedRun.runId, 'manual_rerun'); }}>
+                Rerun
+              </RunActionButton>
+              <RunActionButton onClick={() => { onReplayPersistedRun(selectedRun.runId, 'retry'); }}>
+                Retry
+              </RunActionButton>
+              <RunActionButton onClick={() => { onReplayPersistedRun(selectedRun.runId, 'fork'); }}>
+                Fork
+              </RunActionButton>
+              <RunActionButton onClick={() => { onExportPersistedRun(selectedRun.runId); }}>
+                Export
+              </RunActionButton>
+            </div>
+            <RunComparePanel primary={selectedRun} compare={compareRun} />
+          </>
+        )}
+        {persistedRuns.length === 0 ? (
+          <div className="rounded-md border border-zinc-800/70 bg-zinc-900/25 px-2 py-2 text-[11px] text-zinc-500">
+            No persisted runs yet.
+          </div>
+        ) : (
+          <ul className="max-h-40 space-y-1 overflow-y-auto pr-1">
+            {persistedRuns.map(run => (
+              <li key={run.runId}>
+                <button
+                  type="button"
+                  onClick={() => { onSelectPersistedRun(run.runId); }}
+                  className={cn(
+                    'w-full rounded-md border px-2 py-1.5 text-left transition-colors',
+                    selectedRunId === run.runId
+                      ? 'border-zinc-500 bg-zinc-800/70'
+                      : 'border-zinc-800/70 bg-zinc-900/25 hover:border-zinc-700 hover:bg-zinc-900/60'
+                  )}
+                >
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-zinc-300">{shortId(run.runId)}</span>
+                    <span className={cn('rounded px-1.5 py-0.5 text-[9px] uppercase', statusClass(runStatus(run.status)))}>
+                      {run.status}
+                    </span>
+                    <span className="ml-auto text-[9.5px] text-zinc-500">{run.eventCount} ev</span>
+                  </div>
+                  <div className="truncate text-[10.5px] text-zinc-500">
+                    {run.inputPreview ?? `${run.settings.backend ?? run.runtimeId} · ${run.settings.modelId ?? 'model'}`}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {rows.length === 0 ? (
+        {visibleRows.length === 0 ? (
           storedTraceRowCount > 0 ? (
             <p className="px-2 py-6 text-center text-[12px] leading-relaxed text-zinc-400">
-              No traces for{' '}
-              <span className="text-zinc-300">this sidebar conversation</span>. Entries are scoped to the active
-              chat ({storedTraceRowCount} row{storedTraceRowCount === 1 ? '' : 's'} still in memory elsewhere —
-              switch chats in the sidebar, or enable <span className="text-zinc-300">All chats</span> above).
+              {selectedRunId
+                ? 'No persisted events were found for this run.'
+                : (
+                  <>
+                    No traces for{' '}
+                    <span className="text-zinc-300">this sidebar conversation</span>. Entries are scoped to the active
+                    chat ({storedTraceRowCount} row{storedTraceRowCount === 1 ? '' : 's'} still in memory elsewhere —
+                    switch chats in the sidebar, or enable <span className="text-zinc-300">All chats</span> above).
+                  </>
+                )}
             </p>
           ) : (
             <p className="px-2 py-6 text-center text-[12px] text-zinc-500">
-              Send a message to capture turn context and backend LLM payloads for this chat.
+              {selectedRunId
+                ? 'No persisted events were found for this run.'
+                : 'Send a message to capture turn context and backend LLM payloads for this chat.'}
             </p>
           )
         ) : (
@@ -248,6 +412,12 @@ export function LlmTracePanel({
                       status={childRun.status}
                       rows={childRun.rows}
                       scopeAllChats={scopeAllChats}
+                      onFork={selectedRunId ? () => {
+                        onForkPersistedNode({
+                          sourceRunId: run.id,
+                          sourceChildRunId: childRun.id,
+                        })
+                      } : undefined}
                     />
                   ))}
                   {run.steps.map(step => (
@@ -258,6 +428,12 @@ export function LlmTracePanel({
                       status={step.status}
                       rows={step.rows}
                       scopeAllChats={scopeAllChats}
+                      onFork={selectedRunId ? () => {
+                        onForkPersistedNode({
+                          sourceRunId: run.id,
+                          sourceEventSeq: firstSeq(step.rows),
+                        })
+                      } : undefined}
                     />
                   ))}
                 </div>
@@ -268,4 +444,97 @@ export function LlmTracePanel({
       </div>
     </aside>
   )
+}
+
+function RunActionButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded border border-zinc-800 bg-zinc-900/35 px-2 py-1 text-[10px] text-zinc-300 hover:border-zinc-700 hover:bg-zinc-800"
+    >
+      {children}
+    </button>
+  )
+}
+
+function RunComparePanel({
+  primary,
+  compare,
+}: {
+  primary: ChatAgentRunRecordSnapshot
+  compare: ChatAgentRunRecordSnapshot | null
+}) {
+  if (!compare) {
+    return (
+      <div className="mb-2 rounded-md border border-zinc-800/70 bg-zinc-900/25 px-2 py-2 text-[10.5px] text-zinc-500">
+        No comparable run found.
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-2 rounded-md border border-zinc-800/70 bg-zinc-900/25 p-2">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        Compare
+      </div>
+      <div className="grid grid-cols-[5rem_1fr_1fr] gap-x-2 gap-y-1 text-[10.5px]">
+        <CompareRow label="run" primary={shortId(primary.runId)} compare={shortId(compare.runId)} />
+        <CompareRow label="status" primary={primary.status} compare={compare.status} />
+        <CompareRow label="runtime" primary={primary.runtimeId} compare={compare.runtimeId} />
+        <CompareRow label="model" primary={primary.settings.modelId ?? '-'} compare={compare.settings.modelId ?? '-'} />
+        <CompareRow label="team" primary={primary.teamId ?? primary.settings.orchestration ?? '-'} compare={compare.teamId ?? compare.settings.orchestration ?? '-'} />
+        <CompareRow label="profile" primary={taskCapabilityProfileSummary(primary)} compare={taskCapabilityProfileSummary(compare)} />
+        <CompareRow label="events" primary={String(primary.eventCount)} compare={String(compare.eventCount)} />
+      </div>
+    </div>
+  )
+}
+
+function CompareRow({
+  label,
+  primary,
+  compare,
+}: {
+  label: string
+  primary: string
+  compare: string
+}) {
+  const changed = primary !== compare
+  return (
+    <>
+      <div className="text-zinc-600">{label}</div>
+      <div className={cn('truncate font-mono', changed ? 'text-amber-200' : 'text-zinc-300')}>{primary}</div>
+      <div className="truncate font-mono text-zinc-500">{compare}</div>
+    </>
+  )
+}
+
+function findCompareRun(
+  selectedRun: ChatAgentRunRecordSnapshot,
+  runs: ChatAgentRunRecordSnapshot[],
+): ChatAgentRunRecordSnapshot | null {
+  const candidates = runs.filter(run => run.runId !== selectedRun.runId)
+  return candidates.find(run => run.parentRunId === selectedRun.parentRunId && run.parentRunId) ??
+    candidates.find(run => run.inputPreview === selectedRun.inputPreview) ??
+    candidates[0] ??
+    null
+}
+
+function firstSeq(rows: LlmTraceRow[]): number | undefined {
+  return rows.find(row => typeof row.seq === 'number')?.seq
+}
+
+function runStatus(status: ChatAgentRunRecordSnapshot['status']): TimelineStatus {
+  if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  if (status === 'cancelled') return 'cancelled'
+  if (status === 'running' || status === 'queued') return 'running'
+  return 'unknown'
 }

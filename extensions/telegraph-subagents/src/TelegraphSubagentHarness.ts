@@ -25,8 +25,15 @@ import {
 } from './constants'
 import { orchestrate } from './orchestrator'
 import { SubagentManager } from './SubagentManager'
-import type { SubagentOrchestratorInput, SubagentRecord } from './types'
+import type { SubagentOrchestratorInput, SubagentRecord, TeamRouteDecision, TeamSpec } from './types'
 import { createTelegraphSubagentsSnapshot, subagentDefinitionsFromSnapshot } from './agentDiscovery'
+import {
+  createDefaultTeamSpec,
+  orchestratorInputFromRouteDecision,
+  routeDecisionFromOrchestratorInput,
+  teamRouteSummary,
+  teamRouteTaskCount,
+} from './teamRouter'
 
 const SV = RUNTIME_CONTRACT_SCHEMA_VERSION
 const PV = TELEGRAPH_SUBAGENTS_PRODUCER_VERSION
@@ -86,22 +93,41 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
 
       const snapshot = createTelegraphSubagentsSnapshot({ cwd: process.cwd() })
       const agents = subagentDefinitionsFromSnapshot(snapshot)
-      const orchInput = yield* selectOrchestrationWithModel({
+      const team = createDefaultTeamSpec(snapshot)
+      const route = yield* selectTeamRouteWithModel({
         runId,
         message,
         settings: agentSettings,
         signal,
         pattern,
         snapshot,
+        team,
       })
+      yield teamRouteStarted(runId, team, route)
+      yield teamRouteCompleted(runId, team, route)
+
+      const orchInput = orchestratorInputFromRouteDecision(route, team, message)
       if (!orchInput) {
+        if (route.kind === 'clarify') {
+          yield {
+            type: 'assistant_delta',
+            schemaVersion: SV,
+            producerVersion: PV,
+            origin,
+            runId,
+            requestId: this.generateRequestId(runId),
+            text: route.question,
+            ts: Date.now(),
+            raw: { source: 'team-router-clarify', route },
+          } as RuntimeEvent
+        }
         yield {
           type: 'run_completed',
           schemaVersion: SV,
           producerVersion: PV,
           origin,
           runId,
-          output: { mode: 'direct' },
+          output: { mode: 'direct', route },
           ts: Date.now(),
         } as RuntimeEvent
         return
@@ -189,6 +215,7 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         origin,
         runId,
         output: { mode: orchInput.mode },
+        raw: { route },
         ts: Date.now(),
       } as RuntimeEvent
     } catch (error) {
@@ -394,25 +421,70 @@ function finalSynthesisFallbackLog(runId: string, message: string, details?: unk
   } as RuntimeEvent
 }
 
+function teamRouteStarted(runId: string, team: TeamSpec, route: TeamRouteDecision): RuntimeEvent {
+  return {
+    type: 'step_started',
+    schemaVersion: SV,
+    producerVersion: PV,
+    runId,
+    stepId: `${runId}:team-router`,
+    label: 'Team Router',
+    kind: 'router',
+    raw: {
+      team,
+      route,
+      summary: teamRouteSummary(route),
+    },
+    ts: Date.now(),
+  } as RuntimeEvent
+}
+
+function teamRouteCompleted(runId: string, team: TeamSpec, route: TeamRouteDecision): RuntimeEvent {
+  return {
+    type: 'step_completed',
+    schemaVersion: SV,
+    producerVersion: PV,
+    runId,
+    stepId: `${runId}:team-router`,
+    output: {
+      teamId: team.id,
+      decision: route,
+      taskCount: teamRouteTaskCount(route),
+      summary: teamRouteSummary(route),
+    },
+    raw: {
+      teamMembers: team.members,
+      policies: team.policies,
+    },
+    ts: Date.now(),
+  } as RuntimeEvent
+}
+
 // ---------------------------------------------------------------------------
 // Model-driven delegation
 // ---------------------------------------------------------------------------
 
-async function* selectOrchestrationWithModel(options: {
+async function* selectTeamRouteWithModel(options: {
   runId: string
   message: string
   settings: AgentRuntimeSettings
   signal?: AbortSignal
   pattern: 'chain' | 'parallel'
   snapshot: HarnessContributionSnapshot
-}): AsyncGenerator<RuntimeEvent, SubagentOrchestratorInput | undefined, void> {
+  team: TeamSpec
+}): AsyncGenerator<RuntimeEvent, TeamRouteDecision, void> {
   let selectedInput: SubagentOrchestratorInput | undefined
+  let selectedRoute: TeamRouteDecision | undefined
   const subagentTool = createSubagentSelectionTool({
     message: options.message,
     pattern: options.pattern,
     snapshot: options.snapshot,
+    team: options.team,
     onSelect: input => {
       selectedInput = input
+    },
+    onRoute: route => {
+      selectedRoute = route
     },
   })
 
@@ -428,7 +500,10 @@ async function* selectOrchestrationWithModel(options: {
     if (event.type === 'run_failed') {
       if (!selectedInput) {
         yield event
-        return undefined
+        return {
+          kind: 'direct',
+          reason: `Router model failed before selecting a team route: ${event.error.message}`,
+        }
       }
       break
     }
@@ -441,14 +516,21 @@ async function* selectOrchestrationWithModel(options: {
     yield event
   }
 
-  return selectedInput
+  return selectedRoute ?? routeDecisionFromOrchestratorInput(
+    selectedInput,
+    options.team,
+    options.message,
+    selectedInput ? 'Model router selected a Telegraph team route.' : undefined,
+  )
 }
 
 function createSubagentSelectionTool(options: {
   message: string
   pattern: 'chain' | 'parallel'
   snapshot: HarnessContributionSnapshot
+  team: TeamSpec
   onSelect: (input: SubagentOrchestratorInput) => void
+  onRoute: (route: TeamRouteDecision) => void
 }): PiAiExecutableTool {
   const agentAliases = agentAliasList(options.snapshot)
   const agentSchema = agentAliases.length > 0
@@ -457,9 +539,9 @@ function createSubagentSelectionTool(options: {
   return {
     name: 'subagent',
     description: [
-      'Delegate work to one or more specialized subagents.',
-      'Use agent + task for a single delegate, tasks[] for parallel work, or chain[] for sequential handoff.',
-      'Call this only when delegation materially helps the user request.',
+      'Route work to the Telegraph team.',
+      'Use agent + task for a single member, tasks[] for parallel members, or chain[] for worker-review handoff.',
+      'Call this only when team delegation materially helps the user request.',
     ].join(' '),
     parameters: objectSchema({
       agent: agentSchema,
@@ -506,13 +588,76 @@ function createSubagentSelectionTool(options: {
         enum: ['fresh', 'fork'],
         description: 'Context strategy for child runs.',
       },
+      reason: stringSchema('Why this route is appropriate. This becomes routing rationale in Run Console.'),
+      clarifyQuestion: stringSchema('Question to ask if the request is too ambiguous for routing.'),
+      routeKind: {
+        type: 'string',
+        enum: ['direct', 'clarify', 'single', 'parallel', 'review'],
+        description: 'High-level Team Router v0 decision kind.',
+      },
     }, []),
     async execute(input) {
+      const routeKind = readRouteKind(input.routeKind)
+      const reason = readString(input.reason) ?? 'Model selected a team route.'
+      const task = readString(input.task) ?? options.message
+      const hasExplicitDelegation =
+        Boolean(readString(input.agent)) ||
+        readParallelTasks(input.tasks).length > 0 ||
+        readChainSteps(input.chain).length > 0
+
+      if (routeKind === 'direct') {
+        options.onRoute({
+          kind: 'direct',
+          reason,
+        })
+        return {
+          accepted: true,
+          mode: 'direct',
+          teamId: options.team.id,
+          reason,
+          childRuns: 0,
+        }
+      }
+
+      if (routeKind === 'clarify') {
+        const question = readString(input.clarifyQuestion) ?? 'Can you clarify the intended team task and success criteria?'
+        options.onRoute({
+          kind: 'clarify',
+          question,
+          reason,
+        })
+        return {
+          accepted: true,
+          mode: 'clarify',
+          teamId: options.team.id,
+          reason,
+          childRuns: 0,
+        }
+      }
+
+      if (routeKind === 'review' && !hasExplicitDelegation) {
+        options.onRoute({
+          kind: 'review',
+          workerTask: task,
+          reviewerTask: 'Review the worker output for correctness, regressions, and gaps.',
+          reason,
+        })
+        return {
+          accepted: true,
+          mode: 'review',
+          teamId: options.team.id,
+          reason,
+          childRuns: 2,
+        }
+      }
+
       const selected = readToolOrchestratorInput(input, options.message, options.pattern, agentAliases)
       options.onSelect(selected)
       return {
         accepted: true,
         mode: selected.mode,
+        teamId: options.team.id,
+        reason,
         childRuns: selected.mode === 'parallel'
           ? selected.tasks?.length ?? 0
           : selected.mode === 'chain'
@@ -529,11 +674,12 @@ function buildParentOrchestratorSystemPrompt(
 ): string {
   return [
     'You are the Telegraph parent agent.',
-    'Decide from the user message whether subagents are useful.',
-    'Available subagent profiles for this run:',
+    'Act as Team Router v0. Decide whether the request should be direct, clarify, single, parallel, or review.',
+    'Available team members for this run:',
     agentCatalogText(snapshot),
-    'If the user asks for subagents, parallel reviewers, delegated investigation, implementation plus review, or work that benefits from isolated specialist runs, call the subagent tool exactly once.',
+    'If the user asks for subagents, parallel reviewers, delegated investigation, implementation plus review, or work that benefits from isolated specialist runs, call the subagent tool exactly once and include a concise reason.',
     'If the request is simple enough for one assistant response, answer directly without calling tools.',
+    'If the request is too ambiguous to route safely, answer with a concise clarifying question without calling tools.',
     `The UI preference is ${pattern}, but the user message and your judgment decide the actual subagent shape.`,
     'Do not ask the user to write JSON. Natural language is the product interface; the tool call arguments are your private structured decision.',
   ].join('\n')
@@ -692,6 +838,19 @@ function readChainStep(value: unknown): NonNullable<SubagentOrchestratorInput['c
 
 function readContext(value: unknown): SubagentOrchestratorInput['context'] | undefined {
   return value === 'fresh' || value === 'fork' ? value : undefined
+}
+
+function readRouteKind(value: unknown): TeamRouteDecision['kind'] | undefined {
+  if (
+    value === 'direct' ||
+    value === 'clarify' ||
+    value === 'single' ||
+    value === 'parallel' ||
+    value === 'review'
+  ) {
+    return value
+  }
+  return undefined
 }
 
 function readString(value: unknown): string | undefined {
