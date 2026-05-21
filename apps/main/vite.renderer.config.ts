@@ -211,7 +211,6 @@ export default defineConfig(({ command }) => ({
       path: 'path-browserify',
       'node:path': 'path-browserify',
       perf_hooks: resolve(__dirname, 'src/application/browser/sandpacker-node-stubs/perf-hooks.ts'),
-      picomatch: resolve(__dirname, 'src/application/browser/sandpacker-node-stubs/picomatch.ts'),
       process: 'process/browser',
       stream: 'stream-browserify',
       tty: 'tty-browserify',
@@ -250,6 +249,23 @@ export default defineConfig(({ command }) => ({
     fs: {
       allow: ['..', '../..'],
     },
+  },
+  optimizeDeps: {
+    include: [
+      // Sandpacker pulls a few CommonJS-only parser helpers through its browser worker graph.
+      // Pre-bundling them makes Vite expose stable ESM default exports in the renderer.
+      'acorn-class-fields',
+      'acorn-private-class-elements',
+      'acorn-static-class-features',
+      'convert-source-map',
+      'esbuild',
+      'etag',
+      'fast-glob',
+      'is-reference',
+      'micromatch',
+      'picomatch',
+      'resolve',
+    ],
   },
   define: {
     global: 'globalThis',
