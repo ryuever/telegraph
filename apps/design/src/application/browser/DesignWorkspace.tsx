@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import { SendHorizontal, Square } from 'lucide-react'
+import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
+import { cn } from '@/packages/ui/lib/utils'
 import type { DesignAgentStreamEvent } from '@/apps/design/application/common'
 import type { DesignProjectedArtifact } from './design-agent-projector'
 import {
@@ -14,7 +15,13 @@ import {
 import { extractDesignPatchOperations } from './design-artifact-view'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
-type DesignRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
+export type DesignRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
+
+export interface DesignWorkspaceSummary {
+  status: DesignRunStatus
+  artifactCount: number
+  activeArtifactTitle?: string
+}
 
 type Message =
   | {
@@ -31,6 +38,11 @@ type Message =
 
 interface DesignWorkspaceProps {
   initialPrompt: string
+  sessionId?: string
+  sessionTitle?: string
+  onOpenSettings?: () => void
+  onReturnToEntry?: () => void
+  onSessionUpdate?: (sessionId: string, summary: DesignWorkspaceSummary) => void
 }
 
 interface DesignTraceItem {
@@ -42,8 +54,15 @@ interface DesignTraceItem {
 
 const GENERIC_COMPLETION_MESSAGE = '已完成。'
 
-export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.Element {
-  const sessionId = useMemo(() => globalThis.crypto.randomUUID(), [])
+export function DesignWorkspace({
+  initialPrompt,
+  sessionId: providedSessionId,
+  sessionTitle,
+  onOpenSettings,
+  onReturnToEntry,
+  onSessionUpdate,
+}: DesignWorkspaceProps): JSX.Element {
+  const sessionId = useMemo(() => providedSessionId ?? globalThis.crypto.randomUUID(), [providedSessionId])
   const initialUserMessageId = useMemo(() => globalThis.crypto.randomUUID(), [])
   const initialAssistantMessageId = useMemo(() => globalThis.crypto.randomUUID(), [])
   const agent = useMemo(() => new PageletDesignAgentService(), [])
@@ -163,6 +182,15 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
     }
   }, [initialPrompt])
 
+  useEffect(() => {
+    const activeArtifact = artifacts.find(artifact => artifact.id === activeArtifactId)
+    onSessionUpdate?.(sessionId, {
+      status,
+      artifactCount: artifacts.length,
+      activeArtifactTitle: activeArtifact?.title ?? activeArtifact?.id,
+    })
+  }, [activeArtifactId, artifacts, onSessionUpdate, sessionId, status])
+
   const handleSend = () => {
     if (!input.trim()) return
     const prompt = input.trim()
@@ -200,7 +228,9 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
 
   const handleSelectComponent = (component: DesignSelectedComponent): void => {
     setSelectedComponent(component)
-    setArtifactMode('inspect')
+    if (component.source !== 'preview-dom') {
+      setArtifactMode('inspect')
+    }
   }
 
   const handlePatchOperationsChange = (
@@ -315,74 +345,91 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   }
 
   return (
-    <div className="flex h-full bg-background">
-      <div className="flex w-[410px] shrink-0 flex-col border-r border-border bg-card/70">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-foreground">Design brief</div>
-            <div className="text-[11px] text-muted-foreground">当前会话</div>
-          </div>
-          <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-            {status}
-          </span>
-        </div>
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {messages.map((msg) => (
-            <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : ''}>
-              <div
-                className={
-                  msg.role === 'user'
-                    ? 'max-w-[86%] whitespace-pre-wrap break-words rounded-md bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm'
-                    : 'min-w-0 rounded-md border border-border bg-background px-3 py-2 shadow-sm'
-                }
-              >
-                {msg.role === 'assistant' && msg.content ? (
-                  <MarkdownMessage content={msg.content} compact />
-                ) : (
-                  msg.content || (msg.role === 'assistant' && msg.runStatus === 'running' ? '正在生成...' : '')
+    <div className="grid h-full min-h-0 grid-cols-[minmax(300px,340px)_minmax(0,1fr)] bg-background">
+      <aside className="flex min-h-0 flex-col border-r border-border bg-card">
+        <div className="shrink-0 border-b border-border px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                {onReturnToEntry && (
+                  <button
+                    type="button"
+                    title="Back to design entry"
+                    aria-label="Back to design entry"
+                    onClick={onReturnToEntry}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
+                  >
+                    <ArrowLeft size={14} />
+                  </button>
                 )}
+                <Sparkles size={15} className="shrink-0" />
+                <span className="truncate">{sessionTitle ?? 'Design'}</span>
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Layers3 size={12} />
+                <span>{String(artifacts.length)} artifacts</span>
               </div>
             </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  title="Design settings"
+                  aria-label="Design settings"
+                  onClick={onOpenSettings}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
+                >
+                  <Settings size={14} />
+                </button>
+              )}
+              <StatusPill status={status} />
+            </div>
+          </div>
+        </div>
+        <TraceTimeline items={traceItems} />
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          {messages.map((message) => (
+            <MessageBubble key={message.id} message={message} />
           ))}
         </div>
-        <div className="border-t border-border bg-card p-3">
-          <div className="flex items-end gap-2">
+        <div className="shrink-0 border-t border-border bg-card px-3 py-3">
+          <div className="rounded-md border border-border bg-background shadow-sm">
             <Textarea
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="追问或修改需求..."
-              className="max-h-[120px] min-h-[40px] resize-none text-sm shadow-none"
-              rows={1}
+              className="max-h-[140px] min-h-[74px] resize-none border-0 bg-transparent px-3 py-3 text-sm shadow-none focus-visible:ring-0"
+              rows={3}
             />
-            <Button size="sm" onClick={handleSend} disabled={!input.trim()}>
-              <SendHorizontal size={14} />
-              发送
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={stopAgentRuns}
-              disabled={status !== 'running'}
-            >
-              <Square size={13} />
-              停止
-            </Button>
+            <div className="flex items-center justify-between gap-2 border-t border-border/70 px-2.5 py-2">
+              <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                {status === 'running' ? <CircleDashed size={12} /> : <CheckCircle2 size={12} />}
+                <span className="truncate">{statusLabel(status)}</span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={stopAgentRuns}
+                  disabled={status !== 'running'}
+                  aria-label="Stop design generation"
+                  className="h-8 px-2"
+                >
+                  <Square size={13} />
+                  停止
+                </Button>
+                <Button size="sm" onClick={handleSend} disabled={!input.trim()} aria-label="Send design prompt" className="h-8">
+                  <SendHorizontal size={14} />
+                  发送
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-4">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-foreground">Preview workbench</div>
-            <div className="text-[11px] text-muted-foreground">预览与检查</div>
-          </div>
-          <span className="rounded-md bg-surface-soft px-2 py-1 text-[11px] text-muted-foreground">
-            {String(artifacts.length)} artifacts
-          </span>
-        </div>
-        <TraceTimeline items={traceItems} />
+      <section className="flex min-h-0 min-w-0 flex-col bg-surface-soft/35">
         <DesignArtifactWorkbench
           artifacts={artifacts}
           activeArtifactId={activeArtifactId}
@@ -397,33 +444,155 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
           onPatchOperationsChange={handlePatchOperationsChange}
           onApplyArtifact={applyArtifact}
         />
-      </div>
+      </section>
     </div>
   )
 }
 
 function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
+  const [expanded, setExpanded] = useState(false)
   if (items.length === 0) return <></>
+  const latestRunning = [...items].reverse().find(item => item.status === 'running')
+  const latestItem = latestRunning ?? items.at(-1)
+  const completedCount = items.filter(item => item.status === 'completed').length
+  const failedCount = items.filter(item => item.status === 'failed').length
+
   return (
-    <div className="shrink-0 border-b border-border bg-card/55 px-4 py-2">
-      <div className="flex gap-2 overflow-x-auto">
-        {items.map(item => (
-          <div
-            key={item.id}
-            className="min-w-36 max-w-56 shrink-0 rounded-md border border-border bg-background px-2.5 py-2 shadow-sm"
-          >
-            <div className="flex items-center gap-2">
-              <span className={traceStatusDotClassName(item.status)} />
-              <span className="min-w-0 truncate text-xs font-medium text-foreground">{item.label}</span>
-            </div>
-            {item.detail && (
-              <div className="mt-1 truncate text-[10px] text-muted-foreground">{item.detail}</div>
-            )}
+    <div className="relative z-20 shrink-0 border-b border-border bg-surface-soft/55 px-3 py-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label="Toggle build progress"
+        onClick={() => { setExpanded(current => !current) }}
+        className="flex w-full items-center gap-2 rounded-md border border-border bg-background px-2.5 py-2 text-left shadow-sm transition-colors hover:bg-card"
+      >
+        <span className={traceStatusDotClassName(latestItem?.status ?? 'running')} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xs font-medium text-foreground">
+            {latestItem?.label ?? 'Build progress'}
+          </span>
+          <span className="block truncate text-[10px] text-muted-foreground">
+            {traceSummary({ total: items.length, completed: completedCount, failed: failedCount, detail: latestItem?.detail })}
+          </span>
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn(
+            'shrink-0 text-muted-foreground transition-transform',
+            expanded && 'rotate-180',
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="absolute left-3 right-3 top-[calc(100%-4px)] z-50 max-h-72 overflow-y-auto rounded-md border border-border bg-background px-2 py-2 shadow-lg">
+          <div className="mb-2 flex items-center justify-between border-b border-border px-1 pb-2">
+            <div className="text-xs font-medium text-foreground">Build progress</div>
+            <div className="text-[10px] text-muted-foreground">{String(completedCount)}/{String(items.length)} steps</div>
           </div>
-        ))}
-      </div>
+          <div className="space-y-1.5">
+            {items.map((item, index) => (
+              <div key={item.id} className="grid grid-cols-[14px_minmax(0,1fr)] gap-2">
+                <div className="flex flex-col items-center pt-1">
+                  <span className={traceStatusDotClassName(item.status)} />
+                  {index < items.length - 1 && <span className="mt-1 h-full min-h-4 w-px bg-border" />}
+                </div>
+                <div className="min-w-0 pb-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-xs font-medium text-foreground">{item.label}</div>
+                    <span className="shrink-0 rounded bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {statusLabel(item.status)}
+                    </span>
+                  </div>
+                  {item.detail && (
+                    <div className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
+                      {item.detail}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function traceSummary({
+  total,
+  completed,
+  failed,
+  detail,
+}: {
+  total: number
+  completed: number
+  failed: number
+  detail?: string
+}): string {
+  const parts = [`${String(completed)}/${String(total)} steps`]
+  if (failed > 0) parts.push(`${String(failed)} failed`)
+  if (detail) parts.push(detail)
+  return parts.join(' / ')
+}
+
+function MessageBubble({ message }: { message: Message }): JSX.Element {
+  const isUser = message.role === 'user'
+  const content = message.role === 'assistant' && message.content.length === 0 && message.runStatus === 'running'
+    ? '正在生成...'
+    : message.content
+
+  return (
+    <div className={cn('flex gap-2', isUser && 'justify-end')}>
+      {!isUser && (
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+          <Bot size={14} />
+        </div>
+      )}
+      <div
+        className={cn(
+          'min-w-0 max-w-[88%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm leading-relaxed shadow-sm',
+          isUser
+            ? 'bg-primary text-primary-foreground'
+            : 'border border-border bg-background text-foreground',
+        )}
+      >
+        {message.role === 'assistant' && content ? (
+          <MarkdownMessage content={content} compact />
+        ) : (
+          content
+        )}
+      </div>
+      {isUser && (
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <UserRound size={14} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatusPill({ status }: { status: DesignRunStatus }): JSX.Element {
+  return (
+    <span
+      className={cn(
+        'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium',
+        status === 'running' && 'border-amber-400/30 bg-amber-400/10 text-amber-700',
+        status === 'completed' && 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700',
+        status === 'failed' && 'border-destructive/30 bg-destructive/10 text-destructive',
+        status === 'cancelled' && 'border-border bg-surface-soft text-muted-foreground',
+      )}
+    >
+      {status === 'running' ? <CircleDashed size={12} /> : <CheckCircle2 size={12} />}
+      {statusLabel(status)}
+    </span>
+  )
+}
+
+function statusLabel(status: DesignRunStatus): string {
+  if (status === 'running') return '生成中'
+  if (status === 'completed') return '已完成'
+  if (status === 'failed') return '失败'
+  return '已停止'
 }
 
 function findLastAssistantIndex(messages: Message[]): number {
