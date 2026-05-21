@@ -451,6 +451,27 @@ export function DesignWorkspace({
 
 function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!expanded) return
+    const ownerDocument = containerRef.current?.ownerDocument ?? document
+    const handlePointerOutside = (event: MouseEvent | TouchEvent): void => {
+      const target = event.target
+      if (target instanceof Node && containerRef.current?.contains(target)) return
+      setExpanded(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+    ownerDocument.addEventListener('mousedown', handlePointerOutside)
+    ownerDocument.addEventListener('touchstart', handlePointerOutside)
+    ownerDocument.addEventListener('keydown', handleKeyDown)
+    return () => {
+      ownerDocument.removeEventListener('mousedown', handlePointerOutside)
+      ownerDocument.removeEventListener('touchstart', handlePointerOutside)
+      ownerDocument.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [expanded])
   if (items.length === 0) return <></>
   const latestRunning = [...items].reverse().find(item => item.status === 'running')
   const latestItem = latestRunning ?? items.at(-1)
@@ -458,7 +479,7 @@ function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
   const failedCount = items.filter(item => item.status === 'failed').length
 
   return (
-    <div className="relative z-20 shrink-0 border-b border-border bg-surface-soft/55 px-3 py-2">
+    <div ref={containerRef} className="relative z-20 shrink-0 border-b border-border bg-surface-soft/55 px-3 py-2">
       <button
         type="button"
         aria-expanded={expanded}

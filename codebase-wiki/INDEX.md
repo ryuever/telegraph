@@ -86,6 +86,7 @@ features:
 | I-003 | [20260508-renderer-design-rpc-ping-debug.md](./issue/20260508-renderer-design-rpc-ping-debug.md) | Renderer ↔ Design Utility RPC Ping 全链路调试复盘（Phase 4–5） | 三个独立 Bug：port 提前到达被丢弃（earlyPorts 队列修复）、MessagePort 无法跨 contextBridge（移入 preload 修复）、RPCServiceHost 空数组误判导致 handler 静默丢弃（isHandlerMap 加 length > 0 修复）。 |
 | I-004 | [20260519-pi-subagents-structured-plan-parsing.md](./issue/20260519-pi-subagents-structured-plan-parsing.md) | pi-subagents 触发不应由自然语言 parser 决定 | Chat Subagents 卡片已可见后，记录第一次 parser 修复为何破坏使用性；正确链路是 parent model 通过 `subagent` tool call 决定是否 delegation。 |
 | I-005 | [20260521-design-page-preview-sandpacker-stabilization.md](./issue/20260521-design-page-preview-sandpacker-stabilization.md) | Design Page Preview 与 Sandpacker 稳定化问题串复盘 | 归档 Design Page 一句话出码到 iframe preview 可运行过程中暴露的页面状态、消息 pending、JSON 输出、Sandpacker 依赖、service worker scope、entry 请求、JSX tagger、CDN 与 UI stub 缺失问题。 |
+| I-006 | [20260522-design-build-child-structured-output-contract.md](./issue/20260522-design-build-child-structured-output-contract.md) | DesignBuild Child 输出不应依赖自然语言 JSON 文本解析 | 记录 DesignBuild child agent 因非严格 JSON、连续 JSON、漏逗号、未输出 JSON object 导致 run 失败的根因；结论是改用 tool calling 结构化提交与 stage schema 校验。 |
 
 ### reference/ — 参考手册
 

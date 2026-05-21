@@ -194,6 +194,36 @@ describe('DesignWorkspace', () => {
     expect(applyButton()?.textContent).toContain('已应用')
   })
 
+  it('closes the build progress dropdown when clicking outside', async () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      await Promise.resolve()
+    })
+
+    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="Toggle build progress"]')
+    expect(toggle).not.toBeNull()
+
+    await act(async () => {
+      toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+    expect(container.textContent).toContain('Build progress')
+
+    await act(async () => {
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+    expect(container.textContent).not.toContain('Build progress')
+  })
+
   it('passes active artifact context into follow-up design runs', async () => {
     container = document.createElement('div')
     document.body.append(container)

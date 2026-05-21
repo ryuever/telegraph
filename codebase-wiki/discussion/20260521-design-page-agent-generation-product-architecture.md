@@ -7,7 +7,7 @@ description: >
   patch artifact 与 subagents 编排边界。
 category: discussion
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-05-22
 tags:
   - design-page
   - design-build
@@ -29,6 +29,9 @@ references:
   - id: P-009
     rel: derives
     file: ../roadmap/20260521-design-page-preview-editor-handoff.md
+  - id: I-006
+    rel: derives
+    file: ../issue/20260522-design-build-child-structured-output-contract.md
 ---
 
 # Design Page 一句话生成页面的产品定位与 Agent 编排架构

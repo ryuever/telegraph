@@ -157,6 +157,10 @@ export const wikiSidebar = {
         {
           "text": "I-005 Design Page Preview 与 Sandpacker 稳定化问题串复盘",
           "link": "/issue/20260521-design-page-preview-sandpacker-stabilization"
+        },
+        {
+          "text": "I-006 DesignBuild Child 输出不应依赖自然语言 JSON 文本解析",
+          "link": "/issue/20260522-design-build-child-structured-output-contract"
         }
       ]
     }

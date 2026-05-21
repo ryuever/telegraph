@@ -7,7 +7,7 @@ description: >
   scope、entry 请求、JSX tagger、CDN 绕行以及 UI stub 缺失等。
 category: issue
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-05-22
 tags:
   - design-page
   - preview
@@ -21,6 +21,9 @@ references:
   - id: P-009
     rel: derived-from
     file: ../roadmap/20260521-design-page-preview-editor-handoff.md
+  - id: I-006
+    rel: related-to
+    file: ./20260522-design-build-child-structured-output-contract.md
 ---
 
 # Design Page Preview 与 Sandpacker 稳定化问题串复盘
