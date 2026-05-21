@@ -34,8 +34,8 @@ export function DesignPanel(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full">
-      <nav className="flex w-12 flex-col items-center border-r border-border bg-zinc-950 py-3">
+    <div className="flex h-full bg-background text-foreground">
+      <nav className="flex w-12 flex-col items-center border-r border-border bg-card/80 py-3">
         <div className="flex flex-1 flex-col items-center gap-1">
           {SUB_NAV.map((item) => {
             const Icon = item.icon
@@ -46,7 +46,7 @@ export function DesignPanel(): JSX.Element {
                 title={item.label}
                 className={cn(
                   'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
-                  'bg-accent text-accent-foreground',
+                  'bg-accent-lilac text-white shadow-sm',
                 )}
               >
                 <Icon size={18} />
@@ -61,13 +61,13 @@ export function DesignPanel(): JSX.Element {
           onClick={() => { setSettingsOpen(true) }}
           className={cn(
             'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
-            'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100',
+            'text-muted-foreground hover:bg-surface-soft hover:text-foreground',
           )}
         >
           <Settings size={18} />
         </button>
       </nav>
-      <main className="flex-1 overflow-hidden">
+      <main className="min-w-0 flex-1 overflow-hidden">
         <DesignView />
       </main>
       <DesignRuntimeSettingsDialog

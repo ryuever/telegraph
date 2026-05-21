@@ -99,11 +99,11 @@ export function shortId(id: string): string {
 }
 
 export function statusClass(status: TimelineStatus): string {
-  if (status === 'completed') return 'bg-emerald-500/15 text-emerald-200'
-  if (status === 'failed') return 'bg-red-500/15 text-red-200'
-  if (status === 'cancelled') return 'bg-zinc-600/40 text-zinc-300'
-  if (status === 'running') return 'bg-sky-500/15 text-sky-200'
-  return 'bg-zinc-800 text-zinc-400'
+  if (status === 'completed') return 'bg-emerald-100 text-emerald-700'
+  if (status === 'failed') return 'bg-rose-100 text-rose-700'
+  if (status === 'cancelled') return 'bg-muted text-muted-foreground'
+  if (status === 'running') return 'bg-sky-100 text-sky-700'
+  return 'bg-muted text-muted-foreground'
 }
 
 function eventRunId(event: AgentEvent | null, fallbackRunId: string): string {

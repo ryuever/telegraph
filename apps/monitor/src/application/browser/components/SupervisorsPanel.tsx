@@ -32,7 +32,7 @@ export function SupervisorsPanel({
 
   if (!supervisors) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-zinc-500">
+      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
         Waiting for first supervisor snapshot…
       </div>
     );
@@ -40,7 +40,7 @@ export function SupervisorsPanel({
 
   if (supervisors.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-zinc-500">
+      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
         No supervisors registered.
       </div>
     );
@@ -52,7 +52,7 @@ export function SupervisorsPanel({
         <SupervisorCard key={snap.participantId} snapshot={snap} />
       ))}
       {filtered.length === 0 && (
-        <div className="col-span-full py-8 text-center text-xs text-zinc-500">
+        <div className="col-span-full py-8 text-center text-xs text-muted-foreground">
           No supervisors match &ldquo;{query}&rdquo;.
         </div>
       )}
@@ -61,7 +61,7 @@ export function SupervisorsPanel({
 }
 
 const STATE_TONE: Record<string, string> = {
-  idle: 'bg-zinc-700/60 text-zinc-200',
+  idle: 'bg-surface-soft text-muted-foreground',
   spawning: 'bg-amber-500/20 text-amber-300',
   running: 'bg-emerald-500/20 text-emerald-300',
   restarting: 'bg-amber-500/20 text-amber-300',
@@ -74,26 +74,26 @@ function SupervisorCard({
 }: {
   snapshot: SupervisorInspectorSnapshot;
 }) {
-  const tone = STATE_TONE[snapshot.state] ?? 'bg-zinc-700/60 text-zinc-200';
+  const tone = STATE_TONE[snapshot.state] ?? 'bg-surface-soft text-muted-foreground';
   const recent = snapshot.restartHistory.slice(-5).reverse();
 
   return (
-    <section className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 shadow-sm">
+    <section className="rounded-md border border-border bg-card p-4 shadow-sm">
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate font-mono text-[13px] font-semibold text-zinc-100">
+          <div className="truncate font-mono text-[13px] font-semibold text-foreground">
             {snapshot.participantId}
           </div>
-          <div className="mt-0.5 flex items-center gap-3 text-[11px] text-zinc-500">
+          <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
             <span>
               pid:&nbsp;
-              <span className="font-mono text-zinc-300">
+              <span className="font-mono text-foreground">
                 {snapshot.currentPid ?? '—'}
               </span>
             </span>
             <span>
               orchestrators:&nbsp;
-              <span className="font-mono text-zinc-300">
+              <span className="font-mono text-foreground">
                 {snapshot.orchestratorCount}
               </span>
             </span>
@@ -101,7 +101,7 @@ function SupervisorCard({
         </div>
         <span
           className={cn(
-            'rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider',
+            'rounded px-2 py-0.5 text-[10px] font-medium uppercase',
             tone
           )}
         >
@@ -150,11 +150,11 @@ function SupervisorCard({
       </div>
 
       <div className="mt-3">
-        <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+        <div className="mb-1.5 text-[10px] font-medium uppercase text-muted-foreground">
           Recent restarts
         </div>
         {recent.length === 0 ? (
-          <div className="rounded-md bg-zinc-800/40 px-2 py-1.5 text-[11px] text-zinc-500">
+          <div className="rounded-md bg-surface-soft px-2 py-1.5 text-[11px] text-muted-foreground">
             No restarts yet.
           </div>
         ) : (
@@ -187,13 +187,13 @@ function Stat({
 }) {
   return (
     <div
-      className="flex items-baseline justify-between rounded-md bg-zinc-800/40 px-2 py-1"
+      className="flex items-baseline justify-between rounded-md bg-surface-soft px-2 py-1"
       title={title}
     >
-      <span className="text-[10px] uppercase tracking-wider text-zinc-500">
+      <span className="text-[10px] uppercase text-muted-foreground">
         {label}
       </span>
-      <span className={cn('font-mono tabular-nums text-zinc-200', tone)}>
+      <span className={cn('font-mono tabular-nums text-foreground', tone)}>
         {value}
       </span>
     </div>
@@ -244,18 +244,18 @@ function RestartRow({
   ).padStart(2, '0')}:${String(t.getSeconds()).padStart(2, '0')}`;
 
   return (
-    <li className="flex items-center gap-2 rounded-md bg-zinc-800/30 px-2 py-1 text-[11px]">
-      <span className="font-mono tabular-nums text-zinc-500">{stamp}</span>
+    <li className="flex items-center gap-2 rounded-md bg-surface-soft px-2 py-1 text-[11px]">
+      <span className="font-mono tabular-nums text-muted-foreground">{stamp}</span>
       <span className={cn('shrink-0 text-[10px] uppercase', statusTone)}>
         {status}
       </span>
       <span
-        className="min-w-0 flex-1 truncate text-zinc-300"
+        className="min-w-0 flex-1 truncate text-foreground"
         title={entry.reason}
       >
         {entry.reason}
       </span>
-      <span className="font-mono text-[10px] text-zinc-500">
+      <span className="font-mono text-[10px] text-muted-foreground">
         pid {entry.prevPid ?? '—'}
         {entry.newPid ? ` → ${String(entry.newPid)}` : ''}
       </span>

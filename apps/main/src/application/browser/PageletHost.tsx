@@ -45,6 +45,8 @@ export function PageletHost({
       style={{
         position: 'relative',
         flex: 1,
+        width: '100%',
+        height: '100%',
         minWidth: 0,
         minHeight: 0,
         overflow: 'hidden',

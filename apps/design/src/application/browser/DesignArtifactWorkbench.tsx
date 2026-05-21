@@ -56,8 +56,10 @@ export function DesignArtifactWorkbench({
   if (!activeArtifact) {
     return (
       <div className="flex flex-1 items-center justify-center bg-background p-8">
-        <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-          <p className="text-center text-sm text-muted-foreground">生成的界面将在这里预览</p>
+        <div className="rounded-md border border-border bg-card px-8 py-7 text-center shadow-sm">
+          <div className="mx-auto mb-3 h-2 w-16 rounded-full bg-accent-mint" />
+          <p className="text-sm font-medium text-foreground">生成的界面将在这里预览</p>
+          <p className="mt-1 text-xs text-muted-foreground">等待第一个 artifact</p>
         </div>
       </div>
     )
@@ -74,7 +76,7 @@ export function DesignArtifactWorkbench({
 
   return (
     <div className="flex min-h-0 flex-1 bg-background">
-      <aside className="w-56 shrink-0 overflow-y-auto border-r border-border bg-muted/20 p-2">
+      <aside className="w-60 shrink-0 overflow-y-auto border-r border-border bg-card/50 p-2.5">
         <div className="space-y-1">
           {artifacts.map(artifact => {
             const selected = artifact.id === activeArtifact.id
@@ -85,10 +87,10 @@ export function DesignArtifactWorkbench({
                 type="button"
                 onClick={() => { onSelectArtifact(artifact.id) }}
                 className={cn(
-                  'block w-full rounded-md px-2.5 py-2 text-left transition-colors',
+                  'block w-full rounded-md border px-2.5 py-2 text-left transition-colors',
                   selected
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                    ? 'border-border bg-background text-foreground shadow-sm'
+                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-background/70 hover:text-foreground',
                 )}
               >
                 <span className="block truncate text-xs font-medium">
@@ -111,7 +113,7 @@ export function DesignArtifactWorkbench({
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-10 items-center justify-between border-b border-border px-4">
+        <div className="flex h-12 items-center justify-between border-b border-border bg-card/35 px-4">
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-foreground">{viewModel.title}</div>
             <div className="truncate text-[10px] text-muted-foreground">
@@ -186,7 +188,7 @@ export function DesignArtifactWorkbench({
               onClearSelectedComponent={onClearSelectedComponent}
             />
           ) : (
-            <pre className="min-h-full whitespace-pre-wrap rounded-md border border-border bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100">
+            <pre className="min-h-full whitespace-pre-wrap rounded-md border border-border bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100">
               {viewModel.code}
             </pre>
           )}
@@ -270,7 +272,7 @@ function ArtifactPreview({
           <PatchCount label="Delete" value={viewModel.patchSummary.deletes} />
         </div>
         {applyState?.preview && (
-          <div className="rounded-md border border-border bg-card p-3">
+          <div className="rounded-md border border-border bg-card p-3 shadow-sm">
             <div className="text-xs font-medium text-foreground">Normalized patch preview</div>
             <div className="mt-2 space-y-1">
               {applyState.preview.operations.map(operation => (
@@ -288,7 +290,7 @@ function ArtifactPreview({
           </div>
         )}
         {targets.length > 0 && (
-          <div className="rounded-md border border-border bg-card p-3">
+          <div className="rounded-md border border-border bg-card p-3 shadow-sm">
             <div className="text-xs font-medium text-foreground">Component targets</div>
             <div className="mt-2 space-y-1">
               {targets.map(target => (
@@ -319,7 +321,7 @@ function ArtifactPreview({
   }
 
   return (
-    <pre className="max-h-[640px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-card p-4 font-mono text-xs leading-relaxed text-muted-foreground">
+    <pre className="max-h-[640px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-card p-4 font-mono text-xs leading-relaxed text-muted-foreground shadow-sm">
       {viewModel.code}
     </pre>
   )
@@ -341,7 +343,7 @@ function ComponentInspector({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="rounded-md border border-border bg-card p-3">
+      <div className="rounded-md border border-border bg-card p-3 shadow-sm">
         <div className="text-xs font-medium text-foreground">Selectable targets</div>
         <div className="mt-2 space-y-1">
           {targets.length === 0 ? (
@@ -366,7 +368,7 @@ function ComponentInspector({
         </div>
       </div>
 
-      <aside className="rounded-md border border-border bg-card p-3">
+      <aside className="rounded-md border border-border bg-card p-3 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="text-xs font-medium text-foreground">Inspector</div>
           {active && (
@@ -433,7 +435,7 @@ function componentLabelFromPath(path: string): string {
 
 function PatchCount({ label, value }: { label: string; value: number }): JSX.Element {
   return (
-    <div className="rounded-md border border-border bg-card p-3">
+    <div className="rounded-md border border-border bg-card p-3 shadow-sm">
       <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-foreground">{String(value)}</div>
     </div>

@@ -45,7 +45,7 @@ export function MonitorPanel() {
   );
 
   return (
-    <div className="flex h-full w-full flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-full w-full flex-col bg-background text-foreground">
       <Header
         query={query}
         setQuery={setQuery}
@@ -53,7 +53,7 @@ export function MonitorPanel() {
         updatedAt={updatedAt}
       />
 
-      <div className="flex items-center gap-1 border-b border-zinc-800/80 bg-zinc-900/40 px-5 py-1.5">
+      <div className="flex items-center gap-1 border-b border-border bg-card/55 px-5 py-1.5">
         {TABS.map((t) => {
           const active = t.id === tab;
           return (
@@ -64,8 +64,8 @@ export function MonitorPanel() {
               className={cn(
                 'rounded px-2.5 py-0.5 text-[11px] font-medium transition-colors',
                 active
-                  ? 'bg-zinc-700/80 text-zinc-50 shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:bg-surface-soft hover:text-foreground'
               )}
             >
               {t.label}
@@ -120,19 +120,19 @@ function Header({
       ? Math.max(0, Math.round((Date.now() - updatedAt) / 1000))
       : null;
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-900/40 px-5 py-3">
+    <header className="flex items-center justify-between gap-3 border-b border-border bg-card/55 px-5 py-3">
       <div className="flex items-baseline gap-3">
-        <h1 className="text-base font-semibold tracking-tight text-zinc-100">
+        <h1 className="text-base font-semibold text-foreground">
           Monitor
         </h1>
-        <span className="text-[11px] text-zinc-500">
+        <span className="text-[11px] text-muted-foreground">
           {snapshot?.processes
             ? `${String(snapshot.processes.length)} processes`
             : 'connecting…'}
         </span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-[11px] tabular-nums text-zinc-500">
+        <span className="text-[11px] tabular-nums text-muted-foreground">
           {ago != null ? `updated ${String(ago)}s ago` : ''}
         </span>
         <SearchInput value={query} onChange={setQuery} />
@@ -157,7 +157,7 @@ function SearchInput({
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
+        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
       >
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
@@ -167,7 +167,7 @@ function SearchInput({
         value={value}
         onChange={(e) => { onChange(e.target.value); }}
         placeholder="Search processes…"
-        className="h-7 w-full rounded-md border border-zinc-800 bg-zinc-900/60 pl-7 pr-2 text-[12px] text-zinc-100 placeholder:text-zinc-500 focus:border-sky-500/60 focus:outline-none focus:ring-1 focus:ring-sky-500/40"
+        className="h-7 w-full rounded-md border border-input bg-background pl-7 pr-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
       />
     </div>
   );
@@ -232,9 +232,9 @@ function Overview({
           label="Processes"
           value={String(snapshot.processes.length)}
           unit="active"
-          accentClass="text-zinc-100"
+          accentClass="text-foreground"
         >
-          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-zinc-400">
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
             <MiniStat
               label="utility"
               value={countByType(snapshot.processes, 'Utility')}
@@ -280,8 +280,8 @@ function StatCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900/80 to-zinc-900/40 p-4 shadow-sm">
-      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+    <div className="rounded-md border border-border bg-card p-4 shadow-sm">
+      <div className="text-[10px] font-medium uppercase text-muted-foreground">
         {label}
       </div>
       <div className="mt-1 flex items-baseline gap-1.5">
@@ -293,7 +293,7 @@ function StatCard({
         >
           {value}
         </span>
-        <span className="text-xs text-zinc-500">{unit}</span>
+        <span className="text-xs text-muted-foreground">{unit}</span>
       </div>
       {children}
     </div>
@@ -302,9 +302,9 @@ function StatCard({
 
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-baseline justify-between rounded-md bg-zinc-800/40 px-2 py-1">
-      <span className="text-zinc-500">{label}</span>
-      <span className="font-mono tabular-nums text-zinc-200">{value}</span>
+    <div className="flex items-baseline justify-between rounded-md bg-surface-soft px-2 py-1">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono tabular-nums text-foreground">{value}</span>
     </div>
   );
 }
@@ -333,13 +333,13 @@ function TopCard({
   colorize: 'cpu' | 'mem';
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 shadow-sm">
-      <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+    <div className="rounded-md border border-border bg-card p-4 shadow-sm">
+      <div className="mb-3 text-[10px] font-medium uppercase text-muted-foreground">
         {title}
       </div>
       <ul className="space-y-2.5">
         {rows.length === 0 && (
-          <li className="text-xs text-zinc-500">No data.</li>
+          <li className="text-xs text-muted-foreground">No data.</li>
         )}
         {rows.map((p) => {
           const v = p[field];
@@ -349,21 +349,21 @@ function TopCard({
               <div className="flex items-center justify-between gap-2 text-[12px]">
                 <span className="flex min-w-0 items-center gap-2">
                   <span
-                    className="truncate text-zinc-200"
+                    className="truncate text-foreground"
                     title={p.name ?? p.type}
                   >
                     {p.name ?? p.type}
                   </span>
-                  <span className="shrink-0 font-mono text-[10px] text-zinc-500">
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                     [{p.pid}]
                   </span>
                 </span>
-                <span className="font-mono tabular-nums text-zinc-300">
+                <span className="font-mono tabular-nums text-foreground">
                   {v.toFixed(field === 'cpu' ? 2 : 1)}
                   {unit}
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/70">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-soft">
                 <div
                   className={cn(
                     'h-full rounded-full transition-all',
@@ -388,7 +388,7 @@ function barColorCpu(v: number) {
 
 function Footer({ snapshot }: { snapshot: MonitorSnapshot | null }) {
   return (
-    <footer className="flex items-center gap-5 border-t border-zinc-800/80 bg-zinc-950/80 px-5 py-2 text-[11px] backdrop-blur">
+    <footer className="flex items-center gap-5 border-t border-border bg-card/70 px-5 py-2 text-[11px] backdrop-blur">
       <FooterStat
         label="CPU"
         value={snapshot ? `${snapshot.totals.cpu.toFixed(1)}%` : '—'}
@@ -403,7 +403,7 @@ function Footer({ snapshot }: { snapshot: MonitorSnapshot | null }) {
         label="Procs"
         value={snapshot ? String(snapshot.processes.length) : '—'}
       />
-      <span className="ml-auto text-zinc-500">
+      <span className="ml-auto text-muted-foreground">
         {snapshot
           ? `snapshot @ ${new Date(snapshot.timestamp).toLocaleTimeString()}`
           : ''}
@@ -415,8 +415,8 @@ function Footer({ snapshot }: { snapshot: MonitorSnapshot | null }) {
 function FooterStat({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline gap-1.5">
-      <span className="text-zinc-500">{label}</span>
-      <span className="font-mono tabular-nums text-zinc-200">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono tabular-nums text-foreground">{value}</span>
     </span>
   );
 }
@@ -426,8 +426,8 @@ function EmptyState() {
     <div className="flex h-full items-center justify-center">
       <div className="text-center">
         <div className="mx-auto mb-3 h-8 w-8 animate-pulse rounded-full bg-sky-500/20" />
-        <p className="text-sm text-zinc-300">Waiting for first snapshot…</p>
-        <p className="mt-1 text-[11px] text-zinc-500">
+        <p className="text-sm text-foreground">Waiting for first snapshot…</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
           Waiting for monitor-pagelet connection…
         </p>
       </div>

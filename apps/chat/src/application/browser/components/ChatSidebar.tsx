@@ -26,7 +26,7 @@ export function ChatSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-zinc-800/80 bg-zinc-950/60 transition-[width] duration-200',
+        'flex h-full flex-col border-r border-border bg-card/70 transition-[width] duration-200',
         collapsed ? 'w-12' : 'w-64'
       )}
     >
@@ -35,7 +35,7 @@ export function ChatSidebar({
           type="button"
           onClick={onToggleCollapse}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-100"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-soft hover:text-foreground"
         >
           <Icon name="panel" />
         </button>
@@ -43,7 +43,7 @@ export function ChatSidebar({
           <button
             type="button"
             onClick={onCreate}
-            className="ml-1 flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-[12px] font-medium text-zinc-200 transition-colors hover:border-zinc-700 hover:bg-zinc-800/80"
+            className="ml-1 flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-background text-[12px] font-medium text-foreground transition-colors hover:bg-surface-soft"
           >
             <Icon name="plus" />
             New chat
@@ -56,7 +56,7 @@ export function ChatSidebar({
           type="button"
           onClick={onCreate}
           aria-label="New chat"
-          className="mx-2 mb-2 flex h-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/60 text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800/80"
+          className="mx-2 mb-2 flex h-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-surface-soft"
         >
           <Icon name="plus" />
         </button>
@@ -76,7 +76,7 @@ export function ChatSidebar({
       )}
 
       {!collapsed && (
-        <div className="border-t border-zinc-800/80 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-zinc-600">
+        <div className="border-t border-border px-3 py-2 text-[10px] uppercase text-muted-foreground">
           Telegraph · Chat
         </div>
       )}
@@ -111,11 +111,11 @@ function ConversationRow({
       className={cn(
         'group flex h-9 items-center gap-1 rounded-md px-2 text-[12.5px] transition-colors',
         active
-          ? 'bg-zinc-800/80 text-zinc-50'
-          : 'text-zinc-400 hover:bg-zinc-900/80 hover:text-zinc-200'
+          ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+          : 'text-muted-foreground hover:bg-surface-soft hover:text-foreground'
       )}
     >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-500">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
         <Icon name="message" />
       </span>
       {editing ? (
@@ -131,7 +131,7 @@ function ConversationRow({
               setEditing(false)
             }
           }}
-          className="min-w-0 flex-1 truncate rounded bg-zinc-900 px-1.5 py-0.5 text-[12.5px] text-zinc-100 outline-none ring-1 ring-zinc-700"
+          className="min-w-0 flex-1 truncate rounded bg-card px-1.5 py-0.5 text-[12.5px] text-foreground outline-none ring-1 ring-border"
         />
       ) : (
         <button
@@ -149,7 +149,7 @@ function ConversationRow({
         onClick={onDelete}
         aria-label="Delete chat"
         className={cn(
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-rose-400 group-hover:opacity-100',
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-surface-soft hover:text-destructive group-hover:opacity-100',
           active && 'opacity-100'
         )}
       >

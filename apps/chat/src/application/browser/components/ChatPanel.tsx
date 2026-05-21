@@ -339,10 +339,10 @@ export function ChatPanel({ agent }: Props) {
   }
 
   return (
-    <div className="flex h-full w-full flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-full w-full flex-col bg-background text-foreground">
       <Toolbar>
         <div
-          className="text-[11px] font-medium tracking-tight text-zinc-300"
+          className="text-[11px] font-medium text-muted-foreground"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {active.title}
@@ -415,12 +415,12 @@ export function ChatPanel({ agent }: Props) {
             runConsoleLoading={runConsoleLoading}
             scopeAllChats={traceScopeAllChats}
             onScopeAllChatsChange={setTraceScopeAllChats}
-            onSelectPersistedRun={selectPersistedRun}
-            onRefreshPersistedRuns={loadPersistedRuns}
-            onReplayPersistedRun={replayPersistedRun}
-            onForkPersistedNode={forkPersistedNode}
-            onExportPersistedRun={exportPersistedRun}
-            onImportTraceBundle={importTraceBundle}
+            onSelectPersistedRun={runId => { void selectPersistedRun(runId); }}
+            onRefreshPersistedRuns={() => { void loadPersistedRuns(); }}
+            onReplayPersistedRun={(runId, mode) => { void replayPersistedRun(runId, mode); }}
+            onForkPersistedNode={source => { forkPersistedNode(source); }}
+            onExportPersistedRun={runId => { void exportPersistedRun(runId); }}
+            onImportTraceBundle={bundle => { void importTraceBundle(bundle); }}
             onClear={clearVisibleTraces}
             onClose={() => { setTracePanelOpen(false); }}
           />
@@ -442,11 +442,11 @@ function replaySettingsDiff(run: ChatAgentRunRecordSnapshot, settings: ChatModel
   const checks: Array<[string, string | undefined | null, string | undefined | null]> = [
     ['provider', run.settings.provider, settings.provider],
     ['model', run.settings.modelId, settings.modelId],
-    ['backend', run.settings.backend ?? run.runtimeId, settings.backend ?? 'pi-ai'],
-    ['orchestration', run.settings.orchestration, settings.orchestration ?? 'none'],
-    ['pattern', run.settings.orchestrationPattern, settings.orchestrationPattern ?? null],
+    ['backend', run.settings.backend ?? run.runtimeId, settings.backend],
+    ['orchestration', run.settings.orchestration, settings.orchestration],
+    ['pattern', run.settings.orchestrationPattern, settings.orchestrationPattern],
     ['team', run.teamId ?? run.settings.orchestration, settings.orchestration],
-    ['permission profile', run.settings.taskCapabilityProfile ?? 'default', settings.taskCapabilityProfile?.kind ?? 'default'],
+    ['permission profile', run.settings.taskCapabilityProfile ?? 'default', settings.taskCapabilityProfile.kind],
   ]
   return checks
     .filter(([, before, after]) => (before ?? '-') !== (after ?? '-'))
@@ -487,18 +487,15 @@ function PermissionApprovalTray({
     <div className="border-t border-amber-900/40 bg-amber-950/20 px-4 py-2">
       <div className="mx-auto flex max-w-3xl flex-col gap-2">
         {requests.map(request => (
-          <div
-            key={request.id}
-            className="rounded-md border border-amber-800/60 bg-zinc-950/80 px-3 py-2 shadow-lg"
-          >
+          <div key={request.id} className="rounded-md border border-amber-300/70 bg-card px-3 py-2 shadow-lg">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] uppercase text-amber-200">
                 permission
               </span>
-              <span className="font-mono text-[10.5px] text-zinc-400">{shortRunId(request.runId)}</span>
-              <span className="text-[11px] text-zinc-300">{permissionTitle(request)}</span>
+              <span className="font-mono text-[10.5px] text-muted-foreground">{shortRunId(request.runId)}</span>
+              <span className="text-[11px] text-foreground">{permissionTitle(request)}</span>
             </div>
-            <div className="mb-2 text-[11px] leading-relaxed text-zinc-500">
+            <div className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
               {request.proposedDecision.reason}
               {request.context.operation ? ` · ${operationSummary(request.context.operation)}` : ''}
             </div>
@@ -506,7 +503,7 @@ function PermissionApprovalTray({
               <button
                 type="button"
                 onClick={() => { onDeny(request.id); }}
-                className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-surface-soft"
               >
                 Deny
               </button>
@@ -531,8 +528,7 @@ function permissionTitle(request: ChatPermissionRequestSnapshot): string {
   if (permission.type === 'shell') return `Shell execution: ${permission.risk} risk`
   if (permission.type === 'network') return `Network access: ${permission.hosts?.join(', ') ?? 'unspecified host'}`
   if (permission.type === 'process') return `Process access: ${permission.commands?.join(', ') ?? 'unspecified command'}`
-  if (permission.type === 'secrets') return `Secrets access: ${permission.keys?.join(', ') ?? 'unspecified key'}`
-  return permission satisfies never
+  return `Secrets access: ${permission.keys?.join(', ') ?? 'unspecified key'}`
 }
 
 function operationSummary(operation: ChatPermissionRequestSnapshot['context']['operation']): string {
@@ -576,25 +572,25 @@ function Header({
   onOpenSettings: () => void
 }) {
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-950/40 px-5 py-3">
+    <header className="flex items-center justify-between gap-3 border-b border-border bg-card/55 px-5 py-3">
       <div className="flex min-w-0 items-baseline gap-3">
-        <h1 className="truncate text-[13.5px] font-semibold tracking-tight text-zinc-100">
+        <h1 className="truncate text-[13.5px] font-semibold text-foreground">
           {title}
         </h1>
-        <span className="shrink-0 text-[11px] text-zinc-500">
+        <span className="shrink-0 text-[11px] text-muted-foreground">
           {messageCount === 0
             ? 'no messages yet'
             : `${String(messageCount)} message${messageCount === 1 ? '' : 's'}`}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <button
           type="button"
           onClick={onToggleTracePanel}
           className={
             tracePanelOpen
-              ? 'rounded-full border border-violet-500/50 bg-violet-500/15 px-2.5 py-0.5 text-violet-200'
-              : 'rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-0.5 text-zinc-300 hover:border-zinc-600'
+              ? 'rounded-md border border-border bg-accent px-2.5 py-0.5 text-accent-foreground'
+              : 'rounded-md border border-border bg-background px-2.5 py-0.5 text-muted-foreground hover:bg-surface-soft'
           }
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
@@ -603,8 +599,8 @@ function Header({
         <span
           className={
             isStreaming
-              ? 'rounded-full border border-sky-500/40 bg-sky-500/15 px-2 py-0.5 text-sky-200'
-              : 'rounded-full border border-zinc-800 bg-zinc-900/60 px-2 py-0.5'
+              ? 'rounded-md border border-border bg-surface-tint px-2 py-0.5 text-foreground'
+              : 'rounded-md border border-border bg-background px-2 py-0.5'
           }
         >
           {isStreaming ? 'streaming' : 'idle'}
@@ -614,11 +610,11 @@ function Header({
             type="button"
             onClick={onOpenSettings}
             title={runtimeCapability.summary}
-            className="rounded-full border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-zinc-300 hover:border-zinc-600"
+            className="rounded-md border border-border bg-background px-2 py-0.5 text-muted-foreground hover:bg-surface-soft"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             {runtimeCapability.label}{' '}
-            <span className="ml-1 text-zinc-500">{runtimeCapability.maturity}</span>
+            <span className="ml-1 text-muted-foreground">{runtimeCapability.maturity}</span>
           </button>
         )}
         <ModelBadge provider={provider} modelId={modelId} onClick={onOpenSettings} />
@@ -631,7 +627,7 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
   return (
     <div className="flex h-full items-center justify-center px-6">
       <div className="w-full max-w-xl text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 shadow-lg ring-1 ring-white/10">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
           <svg
             width="22"
             height="22"
@@ -647,10 +643,10 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
             <circle cx="12" cy="12" r="4" />
           </svg>
         </div>
-        <h2 className="text-[18px] font-semibold tracking-tight text-zinc-100">
+        <h2 className="text-[18px] font-semibold text-foreground">
           How can I help you today?
         </h2>
-        <p className="mt-1.5 text-[12.5px] text-zinc-500">
+        <p className="mt-1.5 text-[12.5px] text-muted-foreground">
           Start a conversation, or pick a starter prompt.
         </p>
 
@@ -660,7 +656,7 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
               key={s}
               type="button"
               onClick={() => { onSuggest(s); }}
-              className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5 text-left text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100"
+              className="rounded-md border border-border bg-card px-3 py-2.5 text-left text-[12.5px] text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
             >
               {s}
             </button>

@@ -44,7 +44,7 @@ function MessageRow({ message }: { message: ChatMessage }) {
 function UserMessage({ message }: { message: ChatMessage }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-tr-md bg-zinc-800/80 px-4 py-2.5 text-[13.5px] leading-relaxed text-zinc-50 shadow-sm">
+      <div className="max-w-[80%] whitespace-pre-wrap rounded-md bg-primary px-4 py-2.5 text-[13.5px] leading-relaxed text-primary-foreground shadow-sm">
         {message.content}
       </div>
     </div>
@@ -61,23 +61,23 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
     <div className="flex gap-3">
       <Avatar />
       <div className="min-w-0 flex-1 pt-0.5">
-        <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-500">
-          <span className="font-medium text-zinc-400">Assistant</span>
+        <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="font-medium text-muted-foreground">Assistant</span>
           {isStreaming && <Pulse label="thinking" />}
-          {isError && <span className="text-rose-400">error</span>}
+          {isError && <span className="text-destructive">error</span>}
         </div>
 
         {message.toolCalls?.map(call => (
           <div
             key={call.id}
-            className="mb-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px]"
+            className="mb-2 rounded-md border border-border bg-card px-3 py-2 text-[12px] shadow-sm"
           >
-            <div className="flex items-center gap-2 text-zinc-400">
-              <span className="text-zinc-500">tool</span>
-              <span className="font-mono text-zinc-200">{call.name}</span>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>tool</span>
+              <span className="font-mono text-foreground">{call.name}</span>
               <span
                 className={cn(
-                  'ml-auto rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide',
+                  'ml-auto rounded px-1.5 py-0.5 text-[10px] uppercase',
                   call.status === 'running' && 'bg-amber-500/15 text-amber-300',
                   call.status === 'done' && 'bg-emerald-500/15 text-emerald-300',
                   call.status === 'error' && 'bg-rose-500/15 text-rose-300'
@@ -90,7 +90,7 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
               <div className="mt-1 text-[11.5px] text-rose-300">{call.errorMessage}</div>
             )}
             {call.output !== undefined && (
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-zinc-800/80 bg-zinc-950/70 p-2 font-mono text-[11px] leading-relaxed text-zinc-400">
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-slate-950 p-2 font-mono text-[11px] leading-relaxed text-slate-100">
                 {formatToolOutput(call.output)}
               </pre>
             )}
@@ -106,19 +106,19 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
         ) : (
           <div
             className={cn(
-              'whitespace-pre-wrap text-[13.5px] leading-relaxed text-zinc-100',
-              isError && 'text-rose-300'
+              'whitespace-pre-wrap text-[13.5px] leading-relaxed text-foreground',
+              isError && 'text-destructive'
             )}
           >
             {message.content}
             {showCursor && message.content.length > 0 && (
-              <span className="ml-0.5 inline-block h-[1em] w-[1.5px] -translate-y-[1px] animate-pulse bg-zinc-200 align-middle" />
+              <span className="ml-0.5 inline-block h-[1em] w-[1.5px] -translate-y-[1px] animate-pulse bg-primary align-middle" />
             )}
           </div>
         )}
 
         {isError && message.errorMessage && (
-          <div className="mt-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-200">
+          <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
             {message.errorMessage}
           </div>
         )}
@@ -139,32 +139,32 @@ function SubagentGroupCard({ group }: { group: ChatSubagentGroup }) {
       : 'complete'
 
   return (
-    <div className="mb-3 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/55 text-[12px] shadow-sm">
-      <div className="flex items-center gap-2 border-b border-zinc-800/80 px-3 py-2">
-        <span className="font-medium text-zinc-200">{group.title}</span>
-        <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
+    <div className="mb-3 overflow-hidden rounded-md border border-border bg-card text-[12px] shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <span className="font-medium text-foreground">{group.title}</span>
+        <span className="rounded bg-surface-soft px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
           {statusLabel}
         </span>
       </div>
-      <div className="divide-y divide-zinc-800/70">
+      <div className="divide-y divide-border">
         {group.agents.map(agent => (
           <div key={agent.runId} className="grid grid-cols-[auto_1fr_auto] gap-2 px-3 py-2">
             <StatusDot status={agent.status} />
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium text-zinc-200">{agent.name}</span>
-                <span className="shrink-0 text-[11px] text-zinc-500">{agent.status}</span>
+                <span className="truncate font-medium text-foreground">{agent.name}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{agent.status}</span>
               </div>
               {agent.task && (
-                <div className="mt-0.5 truncate text-[11px] text-zinc-500">{agent.task}</div>
+                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{agent.task}</div>
               )}
               {(agent.summary || agent.lastUpdate) && (
-                <div className="mt-1 max-h-[2.9em] overflow-hidden text-[11.5px] leading-relaxed text-zinc-400">
+                <div className="mt-1 max-h-[2.9em] overflow-hidden text-[11.5px] leading-relaxed text-muted-foreground">
                   {agent.summary ?? agent.lastUpdate}
                 </div>
               )}
             </div>
-            <div className="pt-0.5 text-[11px] tabular-nums text-zinc-600">
+            <div className="pt-0.5 text-[11px] tabular-nums text-muted-foreground">
               {agent.elapsedMs !== undefined ? formatElapsed(agent.elapsedMs) : ''}
             </div>
           </div>
@@ -182,7 +182,7 @@ function StatusDot({ status }: { status: ChatSubagentStatus }) {
         (status === 'queued' || status === 'running') && 'bg-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.12)]',
         status === 'completed' && 'bg-emerald-400',
         status === 'failed' && 'bg-rose-400',
-        status === 'cancelled' && 'bg-zinc-500'
+        status === 'cancelled' && 'bg-muted-foreground'
       )}
     />
   )
@@ -204,7 +204,7 @@ function formatToolOutput(output: unknown): string {
 
 function Avatar() {
   return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-violet-600 text-[11px] font-semibold text-white shadow-sm ring-1 ring-white/10">
+    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-lilac text-[11px] font-semibold text-white shadow-sm">
       <svg
         width="13"
         height="13"
@@ -224,10 +224,10 @@ function Avatar() {
 
 function Pulse({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 text-zinc-500">
+    <span className="inline-flex items-center gap-1 text-muted-foreground">
       <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-sky-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-mint opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-mint" />
       </span>
       {label}
     </span>
@@ -240,7 +240,7 @@ function ThinkingIndicator() {
       {[0, 150, 300].map(d => (
         <span
           key={d}
-          className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500"
+          className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground"
           style={{ animationDelay: `${String(d)}ms` }}
         />
       ))}

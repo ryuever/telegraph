@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
+import { SendHorizontal, Square } from 'lucide-react'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
 import type { DesignAgentStreamEvent } from '@/apps/design/application/common'
@@ -255,16 +256,25 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   }
 
   return (
-    <div className="flex h-full">
-      <div className="flex w-[400px] shrink-0 flex-col border-r border-border">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex h-full bg-background">
+      <div className="flex w-[410px] shrink-0 flex-col border-r border-border bg-card/70">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-foreground">Design brief</div>
+            <div className="text-[11px] text-muted-foreground">当前会话</div>
+          </div>
+          <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+            {status}
+          </span>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {messages.map((msg, i) => (
             <div key={i} className={msg.role === 'user' ? 'flex justify-end' : ''}>
               <div
                 className={
                   msg.role === 'user'
-                    ? 'max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground'
-                    : 'text-sm text-foreground whitespace-pre-wrap'
+                    ? 'max-w-[86%] rounded-md bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm'
+                    : 'whitespace-pre-wrap rounded-md border border-border bg-background px-3 py-2 text-sm leading-relaxed text-foreground'
                 }
               >
                 {msg.content || (msg.role === 'assistant' && status === 'running' ? '正在生成...' : '')}
@@ -272,17 +282,18 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
             </div>
           ))}
         </div>
-        <div className="border-t border-border p-3">
+        <div className="border-t border-border bg-card p-3">
           <div className="flex items-end gap-2">
             <Textarea
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="追问或修改需求..."
-              className="min-h-[40px] max-h-[120px] resize-none text-sm"
+              className="max-h-[120px] min-h-[40px] resize-none text-sm shadow-none"
               rows={1}
             />
             <Button size="sm" onClick={handleSend} disabled={!input.trim()}>
+              <SendHorizontal size={14} />
               发送
             </Button>
             <Button
@@ -291,6 +302,7 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
               onClick={stopAgentRuns}
               disabled={status !== 'running'}
             >
+              <Square size={13} />
               停止
             </Button>
           </div>
@@ -298,10 +310,14 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-10 shrink-0 items-center justify-end border-b border-border px-4">
-            <span className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-              {status}
-            </span>
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-4">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-foreground">Preview workbench</div>
+            <div className="text-[11px] text-muted-foreground">预览与检查</div>
+          </div>
+          <span className="rounded-md bg-surface-soft px-2 py-1 text-[11px] text-muted-foreground">
+            {String(artifacts.length)} artifacts
+          </span>
         </div>
         <TraceTimeline items={traceItems} />
         <DesignArtifactWorkbench
@@ -326,12 +342,12 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
 function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
   if (items.length === 0) return <></>
   return (
-    <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-2">
+    <div className="shrink-0 border-b border-border bg-card/55 px-4 py-2">
       <div className="flex gap-2 overflow-x-auto">
         {items.map(item => (
           <div
             key={item.id}
-            className="min-w-36 max-w-56 shrink-0 rounded-md border border-border bg-background px-2.5 py-2"
+            className="min-w-36 max-w-56 shrink-0 rounded-md border border-border bg-background px-2.5 py-2 shadow-sm"
           >
             <div className="flex items-center gap-2">
               <span className={traceStatusDotClassName(item.status)} />
