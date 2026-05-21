@@ -294,7 +294,7 @@ function ensureSandpackerServiceWorker(): Promise<void> {
   return serviceWorkerPromise
 }
 
-function createSandpackerFiles(
+export function createSandpackerFiles(
   operations: DesignPatchFileOperation[],
   title: string,
 ): {
@@ -407,7 +407,7 @@ function renderIndexHtml(title: string): string {
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/index.tsx?entry"></script>
+    <script type="module" src="./src/index.tsx?entry"></script>
   </body>
 </html>`
 }
