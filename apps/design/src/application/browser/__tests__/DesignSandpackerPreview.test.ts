@@ -59,4 +59,12 @@ describe('createSandpackerFiles', () => {
     expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
     expect(result.files['/index.html']).not.toContain('src="/src/index.tsx?entry"')
   })
+
+  it('keeps the shared UI stub free of TypeScript generic syntax that the JSX tagger can corrupt', () => {
+    const result = createSandpackerFiles([], 'Empty preview')
+    const uiStub = result.files['/src/telegraph-ui.tsx']
+
+    expect(uiStub).toContain('type StubProps =')
+    expect(uiStub).not.toContain('ElementProps<')
+  })
 })
