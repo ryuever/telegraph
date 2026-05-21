@@ -8,7 +8,7 @@ description: >
   以 Run、Trace、Permission、Handoff Contract、Replay 与 Capability Matrix 形成差异化。
 category: discussion
 created: 2026-05-19
-updated: 2026-05-20
+updated: 2026-05-21
 tags:
   - chat
   - agent-team
@@ -91,6 +91,143 @@ references:
 - [Multica Docs - AI coding tools matrix](https://multica.ai/docs/providers)
 
 ---
+
+## 0. 最初问题与第一轮结论
+
+> 本节补录本次讨论最开始、尚未转入 Multica 调研之前的判断。它回答的是：如果 Telegraph Chat 的大方向是 agent team + open source tools integration，那么它怎样才不会变成又一个通用 agent chat、workflow builder 或 MCP 客户端。
+
+### 0.1 最初问题不是“能不能做”，而是“凭什么独特”
+
+用户最开始提出的产品直觉是：
+
+- Chat 不应只是单 agent 对话框。
+- Chat 应该支持 **agent team**，让多个角色化 agent 能协作完成任务。
+- Chat 应该支持一系列 **open source tools integration**，把开源社区里已有的工具、runtime、workflow 和能力接进来。
+- 需要参考开源社区中类似功能的应用，判断 Telegraph 如果要体现独特性，应该怎么做，以及实现路径应该怎样排。
+
+第一轮结论是：这个方向成立，但不能把“agent team + tools integration”本身当作独特性。到 2026 年，这已经变成 agent 产品的公共演进方向。Dify / Flowise 在做 workflow 和集成，CrewAI / AutoGen / LangGraph 在做多 agent 编排，OpenHands / Claude Code / Codex / OpenCode / Pi 在做 coding agent runtime，MCP 正在把工具接入标准化。
+
+因此，Telegraph 的问题不该表述为：
+
+```text
+我们如何做一个支持很多工具的多智能体 Chat？
+```
+
+而应该表述为：
+
+```text
+当工具、runtime 和 agent team 都会变成基础设施后，
+Telegraph 能不能成为用户观察、控制、治理和复盘这些 agent run 的本地工作台？
+```
+
+### 0.2 Chat 的产品定义应从“聊天入口”转为“运行工作台”
+
+第一轮讨论中更合理的 Chat 定义是：
+
+```text
+Chat = 面向用户的 agent run cockpit
+```
+
+它仍然可以有对话界面，但对话只是发起任务、补充上下文、进行 human-in-the-loop 决策的表面。真正的一等对象应该是：
+
+- `Run`：一次 agent 执行的生命周期。
+- `Trace`：这次执行中模型、工具、权限、子任务、artifact 的事实流。
+- `Tool / Skill / MCP`：agent 能调用的能力集合，而不是普通插件列表。
+- `Permission`：每类能力能否自动调用、是否需要审批、是否可回放。
+- `Handoff`：agent 之间、agent 与人之间交接的结构化产物。
+- `Replay / Fork`：用户对失败或不满意 run 的复盘、分叉与比较能力。
+
+这意味着 Telegraph Chat 不应只优化“回复更聪明”，而应优化用户对 agent execution 的控制感：
+
+- 我知道这个 agent 为什么这么做。
+- 我知道它调用了什么工具、读写了什么文件、产生了什么 artifact。
+- 我能在高风险动作前介入。
+- 我能把一次失败 run fork 出来换 runtime / 换 tool policy / 换 agent profile 再跑。
+- 我能把一个 agent 的结果交给另一个 agent，而不是只看到一段自然语言摘要。
+
+### 0.3 Agent team 不能先做成“多个 prompt 模板”
+
+第一轮讨论里对 agent team 的约束是：不要把团队成员简化为 persona 或 system prompt。那样会很快退化成普通多角色聊天，难以支撑真实任务。
+
+Telegraph 的 team member 应该至少由这些维度组成：
+
+| 维度 | 含义 |
+|------|------|
+| Role | 这个 agent 在团队中的职责，如 planner、implementer、reviewer、researcher |
+| Runtime binding | 它实际由哪个 runtime 执行，如 pi-ai、native harness、orchestrator |
+| Tool scope | 它能调用哪些 tool / MCP server / integration capability |
+| Permission profile | 哪些动作自动允许，哪些必须审批，哪些禁止 |
+| Context scope | 它能看到哪些 workspace、文件、历史 run、memory |
+| Output contract | 它交付什么 artifact，如 patch、plan、review finding、test result |
+| Handoff contract | 它如何把任务交给下一个 agent 或人类 |
+
+这带来的关键产品选择是：第一版 agent team 不必急着做复杂 DAG，也不必默认并行启动一堆 worker。更稳的第一步是 **Team Router**：
+
+1. 用户把任务交给一个 team。
+2. leader/router 读取任务、上下文和成员 capability。
+3. router 选择最合适的 agent，或要求用户补充信息。
+4. 被选中的 agent 运行，产出结构化 handoff / artifact。
+5. 后续需要时再唤醒 router 做下一步分配。
+
+这比“多 agent 同时聊天”更接近真实团队，也更容易被 trace、permission 和 replay 治理。
+
+### 0.4 Open source tools integration 的差异化在治理，不在数量
+
+第一轮讨论中还明确了一点：Telegraph 不能把 open source tools integration 做成“工具越多越好”的陈列式功能。因为 MCP、CLI agent、GitHub App、browser automation、local shell、document/spreadsheet tools、project skills 都会越来越容易接入。
+
+更值得做的是 **capability governance layer**：
+
+- 每个工具有结构化 schema、权限等级、side effect 描述和审计标签。
+- 每次调用都进入 `RuntimeEvent` / Run trace。
+- 高风险工具调用可以审批、拒绝、修改参数后继续。
+- 工具失败要有可归类的原因，而不是只显示 stderr。
+- skill / MCP / CLI runtime 的来源、信任等级和可见权限要能被用户检查。
+- 同一任务可以在不同 runtime / tool policy 下 replay 或 fork，对比结果。
+
+换句话说，Telegraph 接入开源工具的独特性不是“我也支持 MCP”，而是：
+
+```text
+我能让用户安全、可解释、可复盘地使用 MCP、CLI agent、skills 和本地工具。
+```
+
+### 0.5 第一版实现路径的原始排序
+
+在 Multica 调研之前，第一轮讨论已经形成了一个粗略排序。后文的 Multica 分析对它做了加强，但核心顺序没有变：
+
+1. **统一运行事实**  
+   先把 Chat 的执行从 message-first 调整为 run-first：每次执行都有 run id、状态、runtime、输入、terminal event、trace events。
+
+2. **RuntimeEvent 收敛**  
+   把模型事件、工具事件、权限事件、子 run、artifact、错误都尽量收敛到统一事件协议，避免每个 runtime 暴露自己的私有事件形态。
+
+3. **Run Console**  
+   把现有 trace panel 提升为可读、可过滤、可定位问题的 run console，让用户看到执行事实，而不是只看最终回复。
+
+4. **Capability Registry / Matrix**  
+   把 runtime、tool、skill、MCP server 的能力描述出来，让 UI 能解释“这个 agent 能做什么、不能做什么、为什么不能跑”。
+
+5. **Permission Profile**  
+   给 shell、filesystem、patch、browser、GitHub、MCP 等能力加权限策略，把危险动作从一开始纳入产品模型。
+
+6. **Team Router v0**  
+   在 run / trace / capability / permission 稳定后，再做最小 agent team：leader 选择成员并派发，而不是先做复杂 graph。
+
+7. **Replay / Fork / Compare**  
+   支持从失败步骤、不同 runtime、不同 tool policy、不同 prompt / skill profile 重新运行，形成 Telegraph 的 runtime lab 特征。
+
+8. **外部 control plane bridge**  
+   等本地运行面稳了，再考虑接入 GitHub issue、Linear、Multica 这类外部任务源，而不是把 Telegraph 主线改造成项目管理系统。
+
+### 0.6 最早结论与后续 Multica 调研的关系
+
+后续 Multica 调研没有推翻第一轮结论，而是验证并 sharpen 了它：
+
+- Multica 证明 **agent teammate / managed agents** 已经是强竞品方向。
+- Multica 把 task、daemon、runtime、skill、squad、Autopilot 做成项目管理控制平面。
+- 这反而说明 Telegraph 不应复制 PM control plane，而应强化本地 runtime cockpit。
+- Multica 的 Squad 设计也支持第一轮的 Team Router 判断：团队的第一价值是稳定路由和责任分配，不是复杂并行编排。
+
+因此，本文后续章节可以看作对第一轮结论的外部验证、源码映射和落地路径细化。
 
 ## 1. 讨论背景
 

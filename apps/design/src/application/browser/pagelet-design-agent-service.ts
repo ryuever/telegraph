@@ -2,13 +2,19 @@ import type { RuntimeSettings } from '@/packages/agent-protocol'
 import type {
   DesignAgentSendRequest,
   DesignAgentStreamEvent,
+  DesignAgentRunRecordSnapshot,
   DesignArtifactPatchApplyResult,
   DesignArtifactPatchPreviewResult,
   DesignPatchFileOperation,
   DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common'
-import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
+import {
+  AGENT_MODEL_SETTINGS_STORAGE_KEY,
+  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
+  readRuntimeSettingsFromStorage,
+} from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
+import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 import { getDesignPageletClient } from './getClient'
 import {
   projectAgentEventToDesign,
@@ -115,6 +121,18 @@ export class PageletDesignAgentService {
     return getDesignPageletClient().listSubagents()
   }
 
+  async listAgentRuns(signal?: AbortSignal): Promise<DesignAgentRunRecordSnapshot[]> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().listAgentRuns()
+  }
+
+  async getAgentRun(runId: string, signal?: AbortSignal): Promise<DesignAgentRunRecordSnapshot | null> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().getAgentRun(runId)
+  }
+
   async getSubagentResult(
     childRunId: string,
     options: { consume?: boolean; signal?: AbortSignal } = {},
@@ -168,6 +186,19 @@ export class PageletDesignAgentService {
 }
 
 function readRuntimeSettings(): RuntimeSettings {
+  const hasSavedSettings = localStorage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
+    localStorage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
+  if (!hasSavedSettings) {
+    return {
+      ...readRuntimeSettingsFromStorage(localStorage),
+      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      taskCapabilityProfile: {
+        kind: 'design-build',
+        scopes: ['artifact:write', 'repo:read'],
+        artifactPolicy: 'preview',
+      },
+    }
+  }
   return readRuntimeSettingsFromStorage(localStorage)
 }
 

@@ -9,6 +9,7 @@ export interface RuntimeInput {
   sessionId?: string
   message: string
   settings: RuntimeSettings
+  metadata?: Record<string, unknown>
   signal?: AbortSignal
 }
 

@@ -118,6 +118,10 @@ export const wikiSidebar = {
         {
           "text": "D-015 Agent Runtime 产品分层与 Telegraph Native Harness 对齐",
           "link": "/discussion/20260520-agent-runtime-product-layer-alignment"
+        },
+        {
+          "text": "D-016 Design Page 一句话生成页面的产品定位与 Agent 编排架构",
+          "link": "/discussion/20260521-design-page-agent-generation-product-architecture"
         }
       ]
     }
@@ -191,6 +195,10 @@ export const wikiSidebar = {
         {
           "text": "P-007 Agent Run Cockpit 可跟踪实施计划",
           "link": "/roadmap/20260521-agent-run-cockpit-implementation-plan"
+        },
+        {
+          "text": "P-008 Design Page 一句话生成页面可执行实施计划",
+          "link": "/roadmap/20260521-design-page-agent-generation-implementation-plan"
         }
       ]
     }

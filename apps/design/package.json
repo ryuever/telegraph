@@ -14,6 +14,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@sandpacker/core": "0.2.0",
+    "@sandpacker/editor-service": "0.2.0",
+    "@sandpacker/shared": "0.2.0",
+    "@sandpacker/style-editor": "0.2.0",
+    "@sandpacker/worker": "0.2.0",
     "@telegraph/agent": "workspace:*",
     "@telegraph/agent-protocol": "workspace:*",
     "@telegraph/daemon": "workspace:*",

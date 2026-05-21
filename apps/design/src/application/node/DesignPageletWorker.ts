@@ -8,6 +8,7 @@ import {
   type DesignAgentSendRequest,
   type DesignAgentSendResult,
   type DesignAgentStreamEvent,
+  type DesignAgentRunRecordSnapshot,
   type DesignArtifactPatchApplyResult,
   type DesignArtifactPatchPreviewResult,
   type DesignArtifactPatchRequest,
@@ -27,6 +28,9 @@ import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentMa
 import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
 import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
+import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build';
+import { DesignBuildRuntime } from './design-build/DesignBuildRuntime';
+import { DesignRunStore } from './DesignRunStore';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');
 
@@ -36,6 +40,7 @@ const activeAgentRuns = new Map<string, AbortController>();
 export class DesignPageletWorker extends PageletWorker {
   private agentListeners = new Set<(event: DesignAgentStreamEvent) => void>();
   private readonly subagents = new SubagentManager();
+  private readonly runStore = new DesignRunStore();
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -52,10 +57,14 @@ export class DesignPageletWorker extends PageletWorker {
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>
           Promise.resolve(this.cancelAgentRun(runId)),
+        listAgentRuns: (): Promise<DesignAgentRunRecordSnapshot[]> =>
+          Promise.resolve(this.runStore.list()),
+        getAgentRun: (runId: string): Promise<DesignAgentRunRecordSnapshot | null> =>
+          Promise.resolve(this.runStore.get(runId)),
         listSubagents: (): Promise<DesignSubagentRecordSnapshot[]> =>
           Promise.resolve(this.subagents.listRecords().map(snapshotSubagentRecord)),
-        getSubagentResult: (childRunId: string, consume = false): Promise<DesignSubagentRecordSnapshot | null> =>
-          Promise.resolve(snapshotNullableSubagentRecord(this.subagents.getResult(childRunId, { consume }))),
+        getSubagentResult: (childRunId: string, consume?: boolean): Promise<DesignSubagentRecordSnapshot | null> =>
+          Promise.resolve(snapshotNullableSubagentRecord(this.subagents.getResult(childRunId, { consume: consume === true }))),
         cancelSubagent: (childRunId: string): Promise<boolean> =>
           Promise.resolve(this.subagents.abort(childRunId)),
         previewArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult> =>
@@ -75,6 +84,7 @@ export class DesignPageletWorker extends PageletWorker {
   }
 
   private emitAgentEvent(event: DesignAgentStreamEvent): void {
+    this.runStore.append(event);
     for (const listener of this.agentListeners) {
       try {
         listener(event);
@@ -96,6 +106,11 @@ export class DesignPageletWorker extends PageletWorker {
     const sessionId = request.sessionId ?? `design-${request.runId}`;
     const abortController = new AbortController();
     activeAgentRuns.set(request.runId, abortController);
+    this.runStore.start({
+      runId: request.runId,
+      sessionId,
+      prompt: request.prompt,
+    });
     this.emitAgentEvent({ type: 'run_queued', runId: request.runId, sessionId });
 
     const agentRequest: AgentRunRequest = {
@@ -115,8 +130,9 @@ export class DesignPageletWorker extends PageletWorker {
       },
     };
     const agentHarness = createAgentHarness({
-      defaultRuntimeId: 'pi-ai',
+      defaultRuntimeId: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
       runtimes: [
+        { id: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID, create: () => new DesignBuildRuntime() },
         { id: 'pi-ai', create: () => new PiAiRuntime() },
         { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
         {
@@ -144,9 +160,17 @@ export class DesignPageletWorker extends PageletWorker {
     });
 
     try {
+      let terminal: { status: 'completed' | 'failed'; error?: string } | undefined;
       for await (const event of agentHarness.run(agentRequest, { signal: abortController.signal })) {
         if (abortController.signal.aborted) break;
         this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
+        if (event.type === 'run_completed') {
+          terminal = { status: 'completed' };
+        } else if (event.type === 'run_failed') {
+          terminal = { status: 'failed', error: event.error.message };
+        } else if (event.type === 'run_cancelled') {
+          terminal = { status: 'failed', error: event.reason ?? 'Cancelled' };
+        }
       }
 
       activeAgentRuns.delete(request.runId);
@@ -160,6 +184,11 @@ export class DesignPageletWorker extends PageletWorker {
         this.emitAgentEvent({ type: 'run_failed', runId: request.runId, sessionId, error: 'Cancelled' });
         return { runId: request.runId, status: 'failed', error: 'Cancelled' };
       }
+      if (terminal?.status === 'failed') {
+        this.runStore.complete(request.runId, 'failed', terminal.error);
+        return { runId: request.runId, status: 'failed', error: terminal.error };
+      }
+      this.runStore.complete(request.runId, 'completed');
       return { runId: request.runId, status: 'completed' };
     } catch (error) {
       activeAgentRuns.delete(request.runId);

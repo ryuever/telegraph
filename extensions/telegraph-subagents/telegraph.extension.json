@@ -68,6 +68,70 @@
           "defaultContext": "fresh",
           "preset": true
         }
+      },
+      {
+        "id": "design-product-planner",
+        "title": "Design Product Planner",
+        "description": "Turn a one-line design request into a concise product brief and acceptance criteria.",
+        "prompt": "./agents/design-product-planner.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true,
+          "surface": "design-build"
+        }
+      },
+      {
+        "id": "design-component-scout",
+        "title": "Design Component Scout",
+        "description": "Find reusable UI components, import paths, and usage constraints for a design-build run.",
+        "prompt": "./agents/design-component-scout.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true,
+          "surface": "design-build"
+        }
+      },
+      {
+        "id": "design-worker",
+        "title": "Design Worker",
+        "description": "Produce patch-first page source for a DesignBuild run.",
+        "prompt": "./agents/design-worker.md",
+        "tools": ["read", "grep", "glob", "edit"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true,
+          "surface": "design-build"
+        }
+      },
+      {
+        "id": "design-reviewer",
+        "title": "Design Reviewer",
+        "description": "Review DesignBuild artifacts for brief alignment, component usage, and patch safety.",
+        "prompt": "./agents/design-reviewer.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": true,
+          "inheritSkills": true,
+          "defaultContext": "fresh",
+          "preset": true,
+          "surface": "design-build"
+        }
       }
     ],
     "orchestrationTools": [

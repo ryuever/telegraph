@@ -2,8 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
+import type { DesignAgentStreamEvent } from '@/apps/design/application/common'
 import type { DesignProjectedArtifact } from './design-agent-projector'
-import { DesignArtifactWorkbench, type ArtifactApplyState } from './DesignArtifactWorkbench'
+import {
+  DesignArtifactWorkbench,
+  type ArtifactApplyState,
+  type DesignSelectedComponent,
+} from './DesignArtifactWorkbench'
 import { extractDesignPatchOperations } from './design-artifact-view'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
@@ -14,6 +19,13 @@ interface Message {
 
 interface DesignWorkspaceProps {
   initialPrompt: string
+}
+
+interface DesignTraceItem {
+  id: string
+  label: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  detail?: string
 }
 
 export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.Element {
@@ -29,9 +41,11 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   const [status, setStatus] = useState<'running' | 'completed' | 'failed' | 'cancelled'>('running')
   const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>([])
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
-  const [artifactMode, setArtifactMode] = useState<'preview' | 'code'>('preview')
+  const [artifactMode, setArtifactMode] = useState<'preview' | 'code' | 'inspect'>('preview')
+  const [selectedComponent, setSelectedComponent] = useState<DesignSelectedComponent | null>(null)
   const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
+  const [traceItems, setTraceItems] = useState<DesignTraceItem[]>([])
 
   const appendAssistantText = (text: string): void => {
     setMessages((prev) => {
@@ -56,9 +70,13 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
       signal: abortController.signal,
       onStatus: nextStatus => { setStatus(nextStatus) },
       onAssistantText: appendAssistantText,
+      onTraceEvent: event => {
+        setTraceItems(prev => reduceTraceItems(prev, event))
+      },
       onArtifact: artifact => {
         setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
         setActiveArtifactId(artifact.id)
+        setSelectedComponent(null)
       },
     }).catch((error: unknown) => {
       if (isCancelledError(error)) {
@@ -97,7 +115,13 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
     const prompt = input.trim()
     setMessages((prev) => [...prev, { role: 'user', content: prompt }, { role: 'assistant', content: '' }])
     setInput('')
-    runAgent(prompt, { surface: 'design-workspace', artifactCount: artifacts.length })
+    runAgent(prompt, {
+      surface: 'design-workspace',
+      artifactCount: artifacts.length,
+      prompt,
+      activeArtifact: summarizeActiveArtifact(artifacts, activeArtifactId),
+      selectedComponent: summarizeSelectedComponent(selectedComponent, activeArtifactId),
+    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
@@ -109,6 +133,34 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     setInput(e.target.value)
+  }
+
+  const handleSelectArtifact = (artifactId: string): void => {
+    setActiveArtifactId(artifactId)
+    setSelectedComponent((prev) => prev?.artifactId === artifactId ? prev : null)
+  }
+
+  const handleSelectComponent = (component: DesignSelectedComponent): void => {
+    setSelectedComponent(component)
+    setArtifactMode('inspect')
+  }
+
+  const handlePatchOperationsChange = (
+    artifactId: string,
+    operations: NonNullable<ReturnType<typeof extractDesignPatchOperations>>,
+  ): void => {
+    setArtifacts(prev => prev.map(artifact => {
+      if (artifact.id !== artifactId || !artifact.output || typeof artifact.output !== 'object' || Array.isArray(artifact.output)) {
+        return artifact
+      }
+      return {
+        ...artifact,
+        output: {
+          ...artifact.output,
+          operations,
+        },
+      }
+    }))
   }
 
   const applyArtifact = (artifact: DesignProjectedArtifact): void => {
@@ -251,14 +303,19 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
               {status}
             </span>
         </div>
+        <TraceTimeline items={traceItems} />
         <DesignArtifactWorkbench
           artifacts={artifacts}
           activeArtifactId={activeArtifactId}
           requestedArtifactIds={requestedArtifactIds}
           applyStates={artifactApplyStates}
           mode={artifactMode}
-          onSelectArtifact={setActiveArtifactId}
+          selectedComponent={selectedComponent}
+          onSelectArtifact={handleSelectArtifact}
           onModeChange={setArtifactMode}
+          onSelectComponent={handleSelectComponent}
+          onClearSelectedComponent={() => { setSelectedComponent(null) }}
+          onPatchOperationsChange={handlePatchOperationsChange}
           onApplyArtifact={applyArtifact}
         />
       </div>
@@ -266,6 +323,216 @@ export function DesignWorkspace({ initialPrompt }: DesignWorkspaceProps): JSX.El
   )
 }
 
+function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
+  if (items.length === 0) return <></>
+  return (
+    <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-2">
+      <div className="flex gap-2 overflow-x-auto">
+        {items.map(item => (
+          <div
+            key={item.id}
+            className="min-w-36 max-w-56 shrink-0 rounded-md border border-border bg-background px-2.5 py-2"
+          >
+            <div className="flex items-center gap-2">
+              <span className={traceStatusDotClassName(item.status)} />
+              <span className="min-w-0 truncate text-xs font-medium text-foreground">{item.label}</span>
+            </div>
+            {item.detail && (
+              <div className="mt-1 truncate text-[10px] text-muted-foreground">{item.detail}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function traceStatusDotClassName(status: DesignTraceItem['status']): string {
+  const base = 'h-2 w-2 shrink-0 rounded-full'
+  if (status === 'completed') return `${base} bg-emerald-500`
+  if (status === 'failed') return `${base} bg-destructive`
+  if (status === 'cancelled') return `${base} bg-muted-foreground`
+  return `${base} bg-amber-500`
+}
+
+function reduceTraceItems(prev: DesignTraceItem[], event: DesignAgentStreamEvent): DesignTraceItem[] {
+  const item = traceItemFromEvent(event, prev)
+  if (!item) return prev
+  const next = [...prev.filter(entry => entry.id !== item.id), item]
+  return next.slice(-80)
+}
+
+function traceItemFromEvent(
+  event: DesignAgentStreamEvent,
+  prev: DesignTraceItem[],
+): DesignTraceItem | null {
+  if (event.type === 'run_queued') {
+    return { id: `${event.runId}:queued`, label: 'Run queued', status: 'running' }
+  }
+  if (event.type === 'run_failed') {
+    return { id: `${event.runId}:terminal`, label: 'Run failed', status: 'failed', detail: event.error }
+  }
+
+  const runtimeEvent = event.event
+  switch (runtimeEvent.type) {
+    case 'run_started':
+      return { id: `${runtimeEvent.runId}:run`, label: 'Run started', status: 'running' }
+    case 'run_completed':
+      return {
+        id: `${runtimeEvent.runId}:terminal`,
+        label: 'Run completed',
+        status: 'completed',
+        detail: summarizeTraceOutput(runtimeEvent.output),
+      }
+    case 'run_failed':
+      return {
+        id: `${runtimeEvent.runId}:terminal`,
+        label: 'Run failed',
+        status: 'failed',
+        detail: runtimeEvent.error.message,
+      }
+    case 'run_cancelled':
+      return {
+        id: `${runtimeEvent.runId}:terminal`,
+        label: 'Run cancelled',
+        status: 'cancelled',
+        detail: runtimeEvent.reason,
+      }
+    case 'step_started':
+      return {
+        id: runtimeEvent.stepId,
+        label: runtimeEvent.label,
+        status: 'running',
+      }
+    case 'step_completed': {
+      const existing = prev.find(item => item.id === runtimeEvent.stepId)
+      return {
+        id: runtimeEvent.stepId,
+        label: existing?.label ?? runtimeEvent.stepId,
+        status: 'completed',
+        detail: summarizeTraceOutput(runtimeEvent.output),
+      }
+    }
+    case 'child_run_started':
+      return {
+        id: runtimeEvent.childRunId,
+        label: runtimeEvent.label ?? runtimeEvent.childRunId,
+        status: 'running',
+      }
+    case 'child_run_completed': {
+      const existing = prev.find(item => item.id === runtimeEvent.childRunId)
+      return {
+        id: runtimeEvent.childRunId,
+        label: existing?.label ?? runtimeEvent.childRunId,
+        status: 'completed',
+        detail: summarizeTraceOutput(runtimeEvent.output),
+      }
+    }
+    default:
+      return null
+  }
+}
+
+function summarizeTraceOutput(output: unknown): string | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return undefined
+  const record = output as Record<string, unknown>
+
+  const artifact = record.artifact
+  if (artifact && typeof artifact === 'object' && !Array.isArray(artifact)) {
+    const artifactRecord = artifact as Record<string, unknown>
+    const title = stringValue(artifactRecord.title)
+    const kind = stringValue(artifactRecord.kind)
+    return [kind, title].filter(Boolean).join(' / ') || undefined
+  }
+
+  const review = record.review
+  if (review && typeof review === 'object' && !Array.isArray(review)) {
+    const verdict = stringValue((review as Record<string, unknown>).verdict)
+    return verdict ? `review ${verdict}` : undefined
+  }
+
+  const brief = record.brief
+  if (brief && typeof brief === 'object' && !Array.isArray(brief)) {
+    return truncateTraceDetail(stringValue((brief as Record<string, unknown>).summary))
+  }
+
+  const components = record.components
+  if (Array.isArray(components)) {
+    return `${String(components.length)} components`
+  }
+
+  const summary = stringValue(record.summary)
+  if (summary) return truncateTraceDetail(summary)
+
+  const artifactId = stringValue(record.artifactId)
+  const kind = stringValue(record.kind)
+  if (artifactId || kind) return [kind, artifactId].filter(Boolean).join(' / ')
+
+  const verdict = stringValue(record.verdict)
+  if (verdict) return `review ${verdict}`
+
+  return undefined
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function truncateTraceDetail(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  return value.length > 72 ? `${value.slice(0, 69)}...` : value
+}
+
 function isCancelledError(error: unknown): boolean {
   return error instanceof Error && error.message === 'Cancelled'
+}
+
+function summarizeSelectedComponent(
+  selectedComponent: DesignSelectedComponent | null,
+  activeArtifactId: string | null,
+): Record<string, unknown> | null {
+  if (!selectedComponent || selectedComponent.artifactId !== activeArtifactId) return null
+  return {
+    id: selectedComponent.id,
+    artifactId: selectedComponent.artifactId,
+    label: selectedComponent.label,
+    source: selectedComponent.source,
+    path: selectedComponent.path,
+    operationKind: selectedComponent.operationKind,
+  }
+}
+
+function summarizeActiveArtifact(
+  artifacts: DesignProjectedArtifact[],
+  activeArtifactId: string | null,
+): Record<string, unknown> | undefined {
+  const artifact = artifacts.find(item => item.id === activeArtifactId) ?? artifacts.at(-1)
+  if (!artifact) return undefined
+
+  return {
+    id: artifact.id,
+    kind: artifact.kind,
+    title: artifact.title,
+    revision: revisionFromArtifact(artifact.output),
+    operationPaths: operationPathsFromArtifact(artifact.output),
+  }
+}
+
+function operationPathsFromArtifact(output: unknown): string[] {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return []
+  const operations = (output as { operations?: unknown }).operations
+  if (!Array.isArray(operations)) return []
+  return operations
+    .map(operation => {
+      if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return undefined
+      const path = (operation as { path?: unknown }).path
+      return typeof path === 'string' ? path : undefined
+    })
+    .filter((path): path is string => Boolean(path))
+}
+
+function revisionFromArtifact(output: unknown): number | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return undefined
+  const revision = (output as { revision?: unknown }).revision
+  return typeof revision === 'number' ? revision : undefined
 }

@@ -6,7 +6,8 @@ import {
 } from '@/packages/agent/browser/runtime-settings-storage'
 import type { RuntimeSettings } from '@/packages/agent-protocol'
 import { DesignRuntimeSettingsDialog } from '../DesignRuntimeSettingsDialog'
-import { saveDesignRuntimeSettings } from '../design-runtime-settings'
+import { loadDesignRuntimeSettings, saveDesignRuntimeSettings } from '../design-runtime-settings'
+import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
@@ -24,6 +25,21 @@ describe('DesignRuntimeSettingsDialog', () => {
     container?.remove()
     container = undefined
     root = undefined
+  })
+
+  it('loads design-build defaults when no runtime settings were saved', () => {
+    const settings = loadDesignRuntimeSettings({
+      getItem: () => null,
+    })
+
+    expect(settings).toEqual(expect.objectContaining({
+      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      taskCapabilityProfile: {
+        kind: 'design-build',
+        scopes: ['artifact:write', 'repo:read'],
+        artifactPolicy: 'preview',
+      },
+    }))
   })
 
   it('saves a design-build run profile into runtime settings storage', () => {

@@ -36,6 +36,9 @@ references:
   - id: R-002
     rel: related-to
     file: ../reference/20260521-pi-subagents-implementation-study.md
+  - id: D-016
+    rel: related-to
+    file: ../discussion/20260521-design-page-agent-generation-product-architecture.md
 ---
 
 # Telegraph Harness Extension 架构设计

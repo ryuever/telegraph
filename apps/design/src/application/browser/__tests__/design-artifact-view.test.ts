@@ -23,6 +23,26 @@ describe('createDesignArtifactViewModel', () => {
     })
   })
 
+  it('renders design-preview artifacts as iframe-ready previews', () => {
+    const model = createDesignArtifactViewModel(artifact({
+      kind: 'design-preview',
+      output: {
+        id: 'preview-1',
+        kind: 'design-preview',
+        title: 'Dashboard preview',
+        html: '<main><h1>Dashboard</h1></main>',
+        prompt: 'Create a dashboard',
+      },
+    }))
+
+    expect(model).toMatchObject({
+      title: 'Dashboard preview',
+      kind: 'design-preview',
+      viewKind: 'html',
+      previewHtml: '<main><h1>Dashboard</h1></main>',
+    })
+  })
+
   it('summarizes structured patch artifacts', () => {
     const model = createDesignArtifactViewModel(artifact({
       kind: 'canvas_patch',
@@ -39,7 +59,29 @@ describe('createDesignArtifactViewModel', () => {
 
     expect(model.viewKind).toBe('patch')
     expect(model.patchSummary).toEqual({ adds: 1, updates: 1, deletes: 1 })
-    expect(model.code).toContain('"operations"')
+    expect(model.code).toContain('// ADD a.tsx')
+    expect(model.code).toContain('// UPDATE b.tsx')
+    expect(model.code).toContain('// DELETE c.tsx')
+  })
+
+  it('summarizes design-patch artifacts', () => {
+    const model = createDesignArtifactViewModel(artifact({
+      kind: 'design-patch',
+      output: {
+        id: 'patch-1',
+        kind: 'design-patch',
+        title: 'Create dashboard files',
+        operations: [
+          { kind: 'add', path: 'dashboard.tsx', content: 'dashboard' },
+          { kind: 'update', path: 'index.tsx', content: 'index' },
+        ],
+      },
+    }))
+
+    expect(model.viewKind).toBe('patch')
+    expect(model.patchSummary).toEqual({ adds: 1, updates: 1, deletes: 0 })
+    expect(model.code).toContain('// ADD dashboard.tsx')
+    expect(model.code).toContain('dashboard')
   })
 
   it('extracts valid patch operations and rejects malformed operations', () => {

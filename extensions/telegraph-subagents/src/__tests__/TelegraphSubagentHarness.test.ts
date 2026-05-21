@@ -241,9 +241,22 @@ describe('TelegraphSubagentHarness', () => {
     })
 
     expect([...agents.keys()]).toEqual(
-      expect.arrayContaining(['scout', 'planner', 'worker', 'reviewer']),
+      expect.arrayContaining([
+        'scout',
+        'planner',
+        'worker',
+        'reviewer',
+        'design-product-planner',
+        'design-component-scout',
+        'design-worker',
+        'design-reviewer',
+      ]),
     )
     expect(agents.get('scout')?.sourcePath).toContain('extensions/telegraph-subagents/agents/scout.md')
+    expect(agents.get('design-component-scout')).toMatchObject({
+      description: 'Find reusable UI components, import paths, and usage constraints for a design-build run.',
+      tools: ['read', 'grep', 'glob'],
+    })
   })
 
   it('discovers custom agents by filename without requiring a name frontmatter field', async () => {

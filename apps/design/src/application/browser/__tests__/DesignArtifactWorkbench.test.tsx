@@ -4,6 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DesignArtifactWorkbench } from '../DesignArtifactWorkbench'
 import type { DesignProjectedArtifact } from '../design-agent-projector'
 
+vi.mock('../DesignSandpackerPreview', () => ({
+  DesignSandpackerPreview: () => <div data-testid="sandpacker-preview" />,
+}))
+
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
 
@@ -37,6 +41,9 @@ describe('DesignArtifactWorkbench', () => {
       kind: 'patch',
       sourceEventType: 'run_completed',
       output: {
+        parentArtifactId: 'artifact-html',
+        revision: 2,
+        changeSummary: 'Apply requested change: add panel',
         operations: [
           { kind: 'add', path: 'apps/design/src/NewPanel.tsx' },
           { kind: 'update', path: 'apps/design/src/DesignPanel.tsx' },
@@ -45,6 +52,7 @@ describe('DesignArtifactWorkbench', () => {
     }
     const onApplyArtifact = vi.fn()
     const onSelectArtifact = vi.fn()
+    const onSelectComponent = vi.fn()
     const onModeChange = vi.fn()
 
     container = document.createElement('div')
@@ -60,6 +68,7 @@ describe('DesignArtifactWorkbench', () => {
           mode="preview"
           onSelectArtifact={onSelectArtifact}
           onModeChange={onModeChange}
+          onSelectComponent={onSelectComponent}
           onApplyArtifact={onApplyArtifact}
         />
       )
@@ -74,6 +83,13 @@ describe('DesignArtifactWorkbench', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(onModeChange).toHaveBeenCalledWith('code')
+
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Inspect selected component"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onModeChange).toHaveBeenCalledWith('inspect')
 
     act(() => {
       container
@@ -100,6 +116,7 @@ describe('DesignArtifactWorkbench', () => {
           mode="preview"
           onSelectArtifact={onSelectArtifact}
           onModeChange={onModeChange}
+          onSelectComponent={onSelectComponent}
           onApplyArtifact={onApplyArtifact}
         />
       )
@@ -108,8 +125,29 @@ describe('DesignArtifactWorkbench', () => {
     expect(container.textContent).toContain('Add1')
     expect(container.textContent).toContain('Update1')
     expect(container.textContent).toContain('Delete0')
+    expect(container.textContent).toContain('rev 2')
+    expect(container.textContent).toContain('parent artifact-html')
+    expect(container.textContent).toContain('Apply requested change: add panel')
+
+    act(() => {
+      findButtonByText(container, 'apps/design/src/NewPanel.tsx')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onSelectComponent).toHaveBeenCalledWith(expect.objectContaining({
+      artifactId: 'artifact-patch',
+      label: 'NewPanel',
+      operationKind: 'add',
+      path: 'apps/design/src/NewPanel.tsx',
+      source: 'patch-operation',
+    }))
+
     expect(
       container.querySelector<HTMLButtonElement>('button[aria-label="Apply artifact"]')?.disabled,
     ).toBe(true)
   })
 })
+
+function findButtonByText(container: HTMLElement | undefined, text: string): HTMLButtonElement | undefined {
+  return [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+    .find(button => button.textContent.includes(text))
+}
