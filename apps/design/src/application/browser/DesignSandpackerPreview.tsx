@@ -7,7 +7,7 @@ import { editorService } from '@sandpacker/editor-service'
 import { StyleEditorPanel } from '@sandpacker/style-editor'
 import type { ElementSelectionShape, FileTree, SerializedDOMNode } from '@sandpacker/shared'
 import workerUrl from '@sandpacker/worker/worker-entry?worker&url'
-import serviceWorkerUrl from '@sandpacker/worker/service-worker-entry?worker&url'
+import productionServiceWorkerUrl from '@sandpacker/worker/service-worker-entry?worker&url'
 import { Button } from '@/packages/ui/components/ui/button'
 import { cn } from '@/packages/ui/lib/utils'
 import type {
@@ -16,6 +16,7 @@ import type {
 } from '@/apps/design/application/common'
 
 const backendFactory = new BrowserWorkerBackendFactory({ workerUrl })
+const serviceWorkerUrl = import.meta.env.DEV ? '/sandpacker-worker.js' : productionServiceWorkerUrl
 let serviceWorkerPromise: Promise<void> | null = null
 const SANDPACKER_MAX_OPERATION_FILES = 40
 const SANDPACKER_MAX_TOTAL_SOURCE_CHARS = 750_000
@@ -285,6 +286,10 @@ function ensureSandpackerServiceWorker(): Promise<void> {
           resolve()
         }, { once: true })
       })
+    })
+    .catch((error: unknown) => {
+      serviceWorkerPromise = null
+      throw error
     })
   return serviceWorkerPromise
 }

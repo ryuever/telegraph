@@ -19,9 +19,184 @@ function emptyNodeBuiltinPlugin(): Plugin {
   };
 }
 
+function devSandpackerServiceWorkerPlugin(): Plugin {
+  return {
+    name: 'telegraph:sandpacker-dev-service-worker',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/sandpacker-worker.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.setHeader('Service-Worker-Allowed', '/');
+        res.end(createDevSandpackerServiceWorkerSource());
+      });
+    },
+  };
+}
+
+function createDevSandpackerServiceWorkerSource(): string {
+  return `
+const DEFAULT_CACHE_NAME = 'sandpacker';
+const DEFAULT_CDN_CACHE_NAME = 'sandpacker-cdn';
+const DEFAULT_CDN_ORIGINS = ['https://esm.sh'];
+const buses = new Map();
+
+class BroadcastChannelTransport {
+  constructor(channelName) {
+    this.channel = new BroadcastChannel(channelName);
+    this.listeners = new Set();
+    this.handleMessage = (event) => this.listeners.forEach((listener) => listener(event.data));
+    this.channel.addEventListener('message', this.handleMessage);
+  }
+  post(message) {
+    this.channel.postMessage(message);
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  close() {
+    this.channel.removeEventListener('message', this.handleMessage);
+    this.channel.close();
+    this.listeners.clear();
+  }
+}
+
+class ProtocolBus {
+  constructor(transport, options = {}) {
+    this.transport = transport;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 30000;
+    this.commandSeq = 0;
+    this.pending = new Map();
+    this.unsubscribe = transport.subscribe((message) => this.handleEnvelope(message));
+  }
+  command(name, payload) {
+    const id = Date.now().toString(36) + '-' + (++this.commandSeq).toString(36);
+    this.transport.post({ kind: 'command', id, name, payload });
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error('Command timed out: ' + name));
+      }, this.requestTimeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+    });
+  }
+  handleEnvelope(message) {
+    if (!message || message.kind !== 'command-result') return;
+    const pending = this.pending.get(message.id);
+    if (!pending) return;
+    this.pending.delete(message.id);
+    clearTimeout(pending.timer);
+    if (message.ok) pending.resolve(message.payload);
+    else pending.reject(new Error(message.error?.message || 'Remote command failed'));
+  }
+  close() {
+    this.unsubscribe();
+    this.transport.close();
+    this.pending.clear();
+  }
+}
+
+function parseSandboxUrl(url) {
+  const match = /^\\/([^/]+)\\/vite\\/([^/]+)(\\/.*)?$/.exec(url.pathname);
+  if (!match) return null;
+  return {
+    busId: match[1],
+    workspaceId: match[2],
+    pathname: match[3] || '/index.html'
+  };
+}
+
+function getBus(busId) {
+  const existing = buses.get(busId);
+  if (existing) return existing;
+  const bus = new ProtocolBus(new BroadcastChannelTransport(busId));
+  buses.set(busId, bus);
+  return bus;
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (isCdnCacheRequest(event.request, url)) {
+    event.respondWith(serveCdnRequest(event.request));
+    return;
+  }
+
+  const parsed = parseSandboxUrl(url);
+  if (!parsed) return;
+  event.respondWith(serveSandboxRequest(event.request, url, parsed));
+});
+
+async function serveCdnRequest(request) {
+  const cache = await caches.open(DEFAULT_CDN_CACHE_NAME);
+  const cached = await cache.match(request);
+  if (cached) return cached.clone();
+  const response = await fetch(request);
+  if (response.ok || response.type === 'opaque') await cache.put(request, response.clone());
+  return response;
+}
+
+async function serveSandboxRequest(request, url, parsed) {
+  const result = await getBus(parsed.busId).command('asset.serve', {
+    ref: {
+      busId: parsed.busId,
+      workspaceId: parsed.workspaceId
+    },
+    pathname: parsed.pathname,
+    rawUrl: url.href,
+    accept: request.headers.get('accept') || undefined
+  });
+
+  if (result.cacheKey) {
+    const cache = await caches.open(DEFAULT_CACHE_NAME);
+    const cached = await waitForCache(cache, result.cacheKey);
+    if (cached) return cached.clone();
+  }
+
+  if (result.error) {
+    return new Response(JSON.stringify({ error: result.error }), {
+      status: 502,
+      statusText: 'BAD GATEWAY',
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  return new Response('Unexpected worker response', {
+    status: 500,
+    statusText: 'SERVER ERROR'
+  });
+}
+
+async function waitForCache(cache, cacheKey) {
+  let cached = await cache.match(cacheKey);
+  let retry = 0;
+  while (!cached && retry < 10) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    cached = await cache.match(cacheKey);
+    retry += 1;
+  }
+  return cached;
+}
+
+function isCdnCacheRequest(request, url) {
+  if (request.method !== 'GET') return false;
+  if (!DEFAULT_CDN_ORIGINS.includes(url.origin)) return false;
+  if (request.destination === 'script' || request.destination === 'style') return true;
+  return /\\.(?:mjs|js|css)(?:$|[?#])/.test(url.pathname);
+}
+`;
+}
+
 export default defineConfig(({ command }) => ({
   ...(command === 'serve' ? { base: '/' } : {}),
-  plugins: [react(), emptyNodeBuiltinPlugin()],
+  plugins: [react(), emptyNodeBuiltinPlugin(), devSandpackerServiceWorkerPlugin()],
   resolve: {
     alias: {
       assert: 'assert',
@@ -73,7 +248,7 @@ export default defineConfig(({ command }) => ({
       'Service-Worker-Allowed': '/',
     },
     fs: {
-      allow: ['..'],
+      allow: ['..', '../..'],
     },
   },
   define: {
