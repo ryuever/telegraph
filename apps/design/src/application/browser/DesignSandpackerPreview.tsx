@@ -444,59 +444,67 @@ createRoot(document.getElementById('root')!).render(
 
 const telegraphUiStubSource = `import React from 'react'
 
-function cx(...items) {
+type ElementProps<Tag extends keyof React.JSX.IntrinsicElements> = React.JSX.IntrinsicElements[Tag] & {
+  className?: string
+}
+
+type VariantProps = {
+  variant?: 'default' | 'secondary' | 'outline'
+}
+
+function cx(...items: Array<string | false | null | undefined>): string {
   return items.filter(Boolean).join(' ')
 }
 
-export function Badge({ className, variant, ...props }) {
+export function Badge({ className, variant, ...props }: ElementProps<'span'> & VariantProps) {
   return <span className={cx('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium', variant === 'secondary' ? 'bg-slate-100 text-slate-700' : variant === 'outline' ? 'bg-white' : 'bg-slate-900 text-white', className)} {...props} />
 }
 
-export function Button({ className, variant, ...props }) {
+export function Button({ className, variant, ...props }: ElementProps<'button'> & VariantProps) {
   return <button className={cx('inline-flex min-h-9 items-center justify-center rounded-md border px-3 text-sm font-medium', variant === 'outline' ? 'bg-white text-slate-900' : 'bg-slate-900 text-white', className)} {...props} />
 }
 
-export function Card({ className, ...props }) {
+export function Card({ className, ...props }: ElementProps<'div'>) {
   return <div className={cx('rounded-lg border bg-white text-slate-950 shadow-sm', className)} {...props} />
 }
 
-export function CardHeader({ className, ...props }) {
+export function CardHeader({ className, ...props }: ElementProps<'div'>) {
   return <div className={cx('flex flex-col gap-1.5 p-6', className)} {...props} />
 }
 
-export function CardContent({ className, ...props }) {
+export function CardContent({ className, ...props }: ElementProps<'div'>) {
   return <div className={cx('p-6 pt-0', className)} {...props} />
 }
 
-export function CardTitle({ className, ...props }) {
+export function CardTitle({ className, ...props }: ElementProps<'h3'>) {
   return <h3 className={cx('text-xl font-semibold leading-none', className)} {...props} />
 }
 
-export function CardDescription({ className, ...props }) {
+export function CardDescription({ className, ...props }: ElementProps<'p'>) {
   return <p className={cx('text-sm text-slate-500', className)} {...props} />
 }
 
-export function Input({ className, ...props }) {
+export function Input({ className, ...props }: ElementProps<'input'>) {
   return <input className={cx('flex h-10 w-full rounded-md border px-3 text-sm', className)} {...props} />
 }
 
-export function Textarea({ className, ...props }) {
+export function Textarea({ className, ...props }: ElementProps<'textarea'>) {
   return <textarea className={cx('min-h-24 w-full rounded-md border px-3 py-2 text-sm', className)} {...props} />
 }
 
-export function Tabs({ className, ...props }) {
+export function Tabs({ className, ...props }: ElementProps<'div'>) {
   return <div className={cx('space-y-3', className)} {...props} />
 }
 
-export function TabsList({ className, ...props }) {
+export function TabsList({ className, ...props }: ElementProps<'div'>) {
   return <div className={cx('inline-flex rounded-md bg-slate-100 p-1', className)} {...props} />
 }
 
-export function TabsTrigger({ className, ...props }) {
+export function TabsTrigger({ className, ...props }: ElementProps<'button'>) {
   return <button className={cx('rounded px-3 py-1.5 text-sm font-medium', className)} {...props} />
 }
 
-export function TabsContent({ className, ...props }) {
+export function TabsContent({ className, ...props }: ElementProps<'div'>) {
   return <div className={className} {...props} />
 }
 `

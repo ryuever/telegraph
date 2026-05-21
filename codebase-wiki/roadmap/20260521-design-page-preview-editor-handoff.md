@@ -21,6 +21,9 @@ references:
   - id: D-016
     rel: derived-from
     file: ../discussion/20260521-design-page-agent-generation-product-architecture.md
+  - id: I-005
+    rel: derives
+    file: ../issue/20260521-design-page-preview-sandpacker-stabilization.md
 ---
 
 # Design Page Preview 与组件编辑器接入 Handoff

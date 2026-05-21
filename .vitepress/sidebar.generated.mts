@@ -149,6 +149,10 @@ export const wikiSidebar = {
         {
           "text": "I-004 pi-subagents 触发不应由自然语言 parser 决定",
           "link": "/issue/20260519-pi-subagents-structured-plan-parsing"
+        },
+        {
+          "text": "I-005 Design Page Preview 与 Sandpacker 稳定化问题串复盘",
+          "link": "/issue/20260521-design-page-preview-sandpacker-stabilization"
         }
       ]
     }

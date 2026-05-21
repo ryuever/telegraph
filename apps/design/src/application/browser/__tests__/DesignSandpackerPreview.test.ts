@@ -60,16 +60,14 @@ describe('createSandpackerFiles', () => {
     expect(result.files['/index.html']).not.toContain('src="/src/index.tsx?entry"')
   })
 
-  it('keeps the shared UI stub free of TypeScript syntax that the JSX tagger can corrupt', () => {
+  it('keeps the shared UI stub typed with TSX generics', () => {
     const result = createSandpackerFiles([], 'Empty preview')
     const uiStub = result.files['/src/telegraph-ui.tsx']
 
-    expect(uiStub).toContain('function cx(...items)')
+    expect(uiStub).toContain('type ElementProps<Tag extends keyof React.JSX.IntrinsicElements>')
+    expect(uiStub).toContain("ElementProps<'textarea'>")
+    expect(uiStub).toContain('Array<string | false | null | undefined>')
     expect(uiStub).toContain('export function Textarea')
-    expect(uiStub).not.toContain('type StubProps =')
-    expect(uiStub).not.toContain('ElementProps<')
-    expect(uiStub).not.toContain('Array<')
-    expect(uiStub).not.toContain(': StubProps')
   })
 
   it('injects shared UI stubs when generated code uses Textarea without an import', () => {

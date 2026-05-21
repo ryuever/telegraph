@@ -165,8 +165,8 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@sandpacker/worker':
-        specifier: 0.2.0
-        version: 0.2.0(react@18.3.1)(typescript@5.9.3)
+        specifier: 0.2.1
+        version: 0.2.1(react@18.3.1)(typescript@5.9.3)
       '@telegraph/agent':
         specifier: workspace:*
         version: link:../../packages/agent
@@ -2033,8 +2033,8 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@sandpacker/worker@0.2.0':
-    resolution: {integrity: sha512-lRz2l8fUDEzaoyW+5y0h/XPs+k6+gaKSrH7082JfkyDXq+RJTT7QBB2bIDvWkNcrxFi1kQK0YTlKVQfFZVkWXQ==}
+  '@sandpacker/worker@0.2.1':
+    resolution: {integrity: sha512-md+85ycEOUXSiijTZmZNgWyM8HJXpsHClMFAVSk+I22x2G9lzzwPbDa3pm6uCqom/mLDL/123vN88U9zRqRyWg==}
 
   '@shikijs/core@2.5.0':
     resolution: {integrity: sha512-uu/8RExTKtavlpH7XqnVYBrfBkUc20ngXiX9NSrBhOVZYv/7XQRKUyhtkeflY5QsxC0GbJThCerruZfsUaSldg==}
@@ -9051,7 +9051,7 @@ snapshots:
       - '@types/react-dom'
       - react-dom
 
-  '@sandpacker/worker@0.2.0(react@18.3.1)(typescript@5.9.3)':
+  '@sandpacker/worker@0.2.1(react@18.3.1)(typescript@5.9.3)':
     dependencies:
       '@sandpacker/core': 0.2.0(react@18.3.1)
       '@sandpacker/shared': 0.2.0
