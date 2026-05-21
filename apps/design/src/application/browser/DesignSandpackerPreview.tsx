@@ -21,6 +21,24 @@ let serviceWorkerPromise: Promise<void> | null = null
 const SANDPACKER_MAX_OPERATION_FILES = 40
 const SANDPACKER_MAX_TOTAL_SOURCE_CHARS = 750_000
 const SANDPACKER_MAX_FILE_SOURCE_CHARS = 250_000
+const TELEGRAPH_UI_COMPONENTS = [
+  'Badge',
+  'Button',
+  'Card',
+  'CardContent',
+  'CardDescription',
+  'CardHeader',
+  'CardTitle',
+  'Input',
+  'Tabs',
+  'TabsContent',
+  'TabsList',
+  'TabsTrigger',
+  'Textarea',
+]
+const TELEGRAPH_UI_IMPORT_SOURCE = `import { ${TELEGRAPH_UI_COMPONENTS.join(', ')} } from '/src/telegraph-ui.tsx'\n`
+const TELEGRAPH_UI_MODULE_IMPORT_PATTERN = /import\s+[\s\S]*?from ['"]@\/packages\/ui\/components\/ui\/(?:badge|button|card|input|tabs|textarea)['"];?\n?/g
+const TELEGRAPH_UI_STUB_IMPORT_PATTERN = /import\s+\{[\s\S]*?\}\s+from ['"]\/src\/telegraph-ui\.tsx['"];?\n?/g
 
 export interface DesignSandpackerPreviewProps {
   artifactId: string
@@ -359,24 +377,23 @@ function normalizeTelegraphImports(source: string): {
   source: string
   restore: (updatedSource: string) => string
 } {
-  const importPattern = /import\s+[\s\S]*?from ['"]@\/packages\/ui\/components\/ui\/(?:badge|button|card|input|tabs)['"];?\n?/g
-  const matches = source.match(importPattern) ?? []
-  if (matches.length === 0) return { source, restore: updatedSource => updatedSource }
+  const matches = source.match(TELEGRAPH_UI_MODULE_IMPORT_PATTERN) ?? []
+  const sourceWithoutStubImport = source.replace(TELEGRAPH_UI_STUB_IMPORT_PATTERN, '')
+  const sourceWithoutUiImports = sourceWithoutStubImport.replace(TELEGRAPH_UI_MODULE_IMPORT_PATTERN, '')
+  const usesStubComponent = TELEGRAPH_UI_COMPONENTS.some(component =>
+    new RegExp(`<${component}(?:[\\s>/])`).test(sourceWithoutUiImports),
+  )
+  if (matches.length === 0 && !usesStubComponent) return { source, restore: updatedSource => updatedSource }
 
   const originalImportBlock = matches.join('').trimEnd()
-  let inserted = false
-  const normalized = source.replace(importPattern, () => {
-    if (inserted) return ''
-    inserted = true
-    return `import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger } from '/src/telegraph-ui.tsx'\n`
-  })
+  const normalized = `${TELEGRAPH_UI_IMPORT_SOURCE}${sourceWithoutUiImports}`
 
   return {
     source: normalized,
-    restore: updatedSource => updatedSource.replace(
-      /import \{ Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger \} from ['"]\/src\/telegraph-ui\.tsx['"];?\n?/,
-      `${originalImportBlock}\n`,
-    ),
+    restore: updatedSource => {
+      const restored = updatedSource.replace(TELEGRAPH_UI_STUB_IMPORT_PATTERN, '')
+      return originalImportBlock ? `${originalImportBlock}\n${restored}` : restored
+    },
   }
 }
 
@@ -461,6 +478,10 @@ export function CardDescription({ className, ...props }) {
 
 export function Input({ className, ...props }) {
   return <input className={cx('flex h-10 w-full rounded-md border px-3 text-sm', className)} {...props} />
+}
+
+export function Textarea({ className, ...props }) {
+  return <textarea className={cx('min-h-24 w-full rounded-md border px-3 py-2 text-sm', className)} {...props} />
 }
 
 export function Tabs({ className, ...props }) {

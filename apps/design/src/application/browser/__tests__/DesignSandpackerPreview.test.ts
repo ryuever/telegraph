@@ -65,9 +65,49 @@ describe('createSandpackerFiles', () => {
     const uiStub = result.files['/src/telegraph-ui.tsx']
 
     expect(uiStub).toContain('function cx(...items)')
+    expect(uiStub).toContain('export function Textarea')
     expect(uiStub).not.toContain('type StubProps =')
     expect(uiStub).not.toContain('ElementProps<')
     expect(uiStub).not.toContain('Array<')
     expect(uiStub).not.toContain(': StubProps')
+  })
+
+  it('injects shared UI stubs when generated code uses Textarea without an import', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/FormPage.tsx',
+        content: [
+          'export default function FormPage() {',
+          '  return <main><Textarea placeholder="Bio" /></main>',
+          '}',
+        ].join('\n'),
+      },
+    ], 'Form page')
+
+    const source = result.files['/apps/design/src/generated/FormPage.tsx']
+
+    expect(source).toContain("Textarea } from '/src/telegraph-ui.tsx'")
+  })
+
+  it('normalizes Textarea imports from shared UI modules', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/FormPage.tsx',
+        content: [
+          "import { Textarea } from '@/packages/ui/components/ui/textarea'",
+          '',
+          'export default function FormPage() {',
+          '  return <main><Textarea placeholder="Bio" /></main>',
+          '}',
+        ].join('\n'),
+      },
+    ], 'Form page')
+
+    const source = result.files['/apps/design/src/generated/FormPage.tsx']
+
+    expect(source).toContain("Textarea } from '/src/telegraph-ui.tsx'")
+    expect(source).not.toContain('@/packages/ui/components/ui/textarea')
   })
 })
