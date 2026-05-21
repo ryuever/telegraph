@@ -36,6 +36,7 @@ export default defineConfig(({ command }) => ({
       path: 'path-browserify',
       'node:path': 'path-browserify',
       perf_hooks: resolve(__dirname, 'src/application/browser/sandpacker-node-stubs/perf-hooks.ts'),
+      picomatch: resolve(__dirname, 'src/application/browser/sandpacker-node-stubs/picomatch.ts'),
       process: 'process/browser',
       stream: 'stream-browserify',
       tty: 'tty-browserify',
