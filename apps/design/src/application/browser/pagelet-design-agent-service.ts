@@ -14,7 +14,7 @@ import {
   readRuntimeSettingsFromStorage,
 } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
-import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
+import { normalizeDesignRuntimeSettings } from './design-runtime-settings'
 import { getDesignPageletClient } from './getClient'
 import {
   projectAgentEventToDesign,
@@ -186,20 +186,14 @@ export class PageletDesignAgentService {
 }
 
 function readRuntimeSettings(): RuntimeSettings {
-  const hasSavedSettings = localStorage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
-    localStorage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
-  if (!hasSavedSettings) {
-    return {
-      ...readRuntimeSettingsFromStorage(localStorage),
-      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
-      taskCapabilityProfile: {
-        kind: 'design-build',
-        scopes: ['artifact:write', 'repo:read'],
-        artifactPolicy: 'preview',
-      },
-    }
-  }
-  return readRuntimeSettingsFromStorage(localStorage)
+  return normalizeDesignRuntimeSettings(readRuntimeSettingsFromStorage(localStorage), {
+    forceDesignProfile: !hasSavedRuntimeSettings(localStorage),
+  })
+}
+
+function hasSavedRuntimeSettings(storage: Pick<Storage, 'getItem'>): boolean {
+  return storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
+    storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
 }
 
 function isCancelledError(error: unknown): boolean {

@@ -157,6 +157,12 @@ describe('PageletDesignAgentService', () => {
       sessionId: 'session-1',
     })
 
+    expect(sendAgentMock.mock.calls[0]?.[0].settings).toEqual(expect.objectContaining({
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      orchestration: 'none',
+    }))
     expect(sendAgentMock.mock.calls[0]?.[0].settings.taskCapabilityProfile).toEqual({
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read'],

@@ -1,6 +1,7 @@
 import type { RuntimeEvent, RuntimeSettings } from '@/packages/agent-protocol'
 import { streamPiAiRuntimeEvents } from '@/packages/agent/runtime/streamPiAiRuntime'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
+import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 import type {
   DesignBuildChildProfileId,
   DesignBuildChildStage,
@@ -135,7 +136,9 @@ function toAgentRuntimeSettings(settings: RuntimeSettings | undefined): AgentRun
     modelId: settings.modelId,
     apiKey: settings.apiKey,
     baseUrl: settings.baseUrl,
-    backend: settings.backend as AgentRuntimeSettings['backend'],
+    backend: settings.backend === TELEGRAPH_DESIGN_BUILD_RUNTIME_ID
+      ? 'pi-ai'
+      : settings.backend as AgentRuntimeSettings['backend'],
     orchestration: settings.orchestration as AgentRuntimeSettings['orchestration'],
     orchestrationPattern: settings.orchestrationPattern as AgentRuntimeSettings['orchestrationPattern'],
     worktreeIsolation: settings.worktreeIsolation,

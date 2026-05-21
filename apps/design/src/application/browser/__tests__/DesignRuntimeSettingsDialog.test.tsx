@@ -42,6 +42,28 @@ describe('DesignRuntimeSettingsDialog', () => {
     }))
   })
 
+  it('normalizes saved chat backend settings to the design-build runtime', () => {
+    const settings = loadDesignRuntimeSettings({
+      getItem: key => key === AGENT_MODEL_SETTINGS_STORAGE_KEY
+        ? JSON.stringify({
+          provider: 'minimax-cn',
+          modelId: 'MiniMax-M2.7',
+          backend: 'pi-ai',
+          orchestration: 'telegraph-subagents',
+          taskCapabilityProfile: { kind: 'default' },
+        } satisfies RuntimeSettings)
+        : null,
+    })
+
+    expect(settings).toEqual(expect.objectContaining({
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      orchestration: 'none',
+      taskCapabilityProfile: { kind: 'default' },
+    }))
+  })
+
   it('saves a design-build run profile into runtime settings storage', () => {
     const storage = new Map<string, string>()
     const settings: RuntimeSettings = {
@@ -87,6 +109,8 @@ describe('DesignRuntimeSettingsDialog', () => {
     })
 
     const saved = JSON.parse(storage.get(AGENT_MODEL_SETTINGS_STORAGE_KEY) ?? '{}') as RuntimeSettings
+    expect(saved.backend).toBe(TELEGRAPH_DESIGN_BUILD_RUNTIME_ID)
+    expect(saved.orchestration).toBe('none')
     expect(saved.taskCapabilityProfile).toEqual({
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read'],
@@ -140,6 +164,7 @@ describe('DesignRuntimeSettingsDialog', () => {
     })
 
     const saved = JSON.parse(storage.get(AGENT_MODEL_SETTINGS_STORAGE_KEY) ?? '{}') as RuntimeSettings
+    expect(saved.backend).toBe(TELEGRAPH_DESIGN_BUILD_RUNTIME_ID)
     expect(saved.taskCapabilityProfile).toEqual({
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read', 'repo:write'],

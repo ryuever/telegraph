@@ -15,23 +15,35 @@ export type DesignRuntimeSettings = RuntimeSettings
 export function loadDesignRuntimeSettings(
   storage: Pick<Storage, 'getItem'> = globalThis.localStorage,
 ): DesignRuntimeSettings {
-  const hasSavedSettings = storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
-    storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
-  if (!hasSavedSettings) {
-    return {
-      ...readRuntimeSettingsFromStorage(storage),
-      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
-      taskCapabilityProfile: defaultDesignProfile('design-build'),
-    }
-  }
-  return readRuntimeSettingsFromStorage(storage)
+  return normalizeDesignRuntimeSettings(readRuntimeSettingsFromStorage(storage), {
+    forceDesignProfile: !hasSavedRuntimeSettings(storage),
+  })
 }
 
 export function saveDesignRuntimeSettings(
   settings: DesignRuntimeSettings,
   storage: Pick<Storage, 'setItem'> = globalThis.localStorage,
 ): void {
-  writeRuntimeSettingsToStorage(settings, storage)
+  writeRuntimeSettingsToStorage(normalizeDesignRuntimeSettings(settings), storage)
+}
+
+export function normalizeDesignRuntimeSettings(
+  settings: RuntimeSettings,
+  options: { forceDesignProfile?: boolean } = {},
+): DesignRuntimeSettings {
+  return {
+    ...settings,
+    backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+    orchestration: 'none',
+    taskCapabilityProfile: options.forceDesignProfile
+      ? defaultDesignProfile('design-build')
+      : settings.taskCapabilityProfile ?? defaultDesignProfile('design-build'),
+  }
+}
+
+function hasSavedRuntimeSettings(storage: Pick<Storage, 'getItem'>): boolean {
+  return storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
+    storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
 }
 
 export function defaultDesignProfile(kind: RuntimeTaskCapabilityProfile['kind']): RuntimeTaskCapabilityProfile {
