@@ -271,6 +271,7 @@ function toRuntimeInput(request: AgentRunRequest, signal?: AbortSignal): Runtime
     sessionId: request.sessionId,
     message: lastMessage?.content ?? '',
     settings: request.settings,
+    metadata: request.metadata,
     signal,
   }
 }

@@ -5,6 +5,8 @@ dist/
 *.log
 .env
 .env.local
+.telegraph/
+**/.telegraph/
 .electron-vite/
 out/
 .vitepress/cache/

@@ -2,6 +2,14 @@ import type { AgentSendOptions, AgentService } from './types'
 import {
   type ChatSendRequest,
   type ChatStreamEvent,
+  type ChatAgentRunEventRecordSnapshot,
+  type ChatAgentRunRecordSnapshot,
+  type ChatPermissionRequestSnapshot,
+  type ChatPermissionResolution,
+  type ChatRunTraceBundle,
+  type ChatRunTraceImportResult,
+  type ChatRuntimeCapabilityDescriptorSnapshot,
+  type ChatAgentRunStatus,
   type ChatSubagentRecordSnapshot,
 } from '@/apps/chat/application/common'
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
@@ -23,7 +31,7 @@ const PROBE_TIMEOUT_MS = 3000
  * probe `info()` with a per-attempt timeout and retry until the call
  * succeeds.
  */
-async function waitForChatPageletReady(signal?: AbortSignal): Promise<void> {
+export async function waitForChatPageletReady(signal?: AbortSignal): Promise<void> {
   const client = getChatPageletClient()
   await waitForPageletReady(() => client.info(), {
     attempts: READY_ATTEMPTS,
@@ -37,9 +45,12 @@ async function waitForChatPageletReady(signal?: AbortSignal): Promise<void> {
 export class PageletAgentService implements AgentService {
   async send({
     conversation,
+    parentRunId,
+    replay,
     onChunk,
     onToolCall,
     onSubagentUpdate,
+    onPermissionRequest,
     onStatus,
     signal,
     onLlmTrace,
@@ -77,6 +88,11 @@ export class PageletAgentService implements AgentService {
     const streamListener = (event: ChatStreamEvent) => {
       if (signal?.aborted) return
       if (event.runId !== runId) return
+
+      if (event.type === 'permission_pending' && event.permissionRequest) {
+        onPermissionRequest?.(event.permissionRequest)
+        return
+      }
 
       if (event.type === 'runtime_event' && event.event) {
         sawAgentEvent = true
@@ -148,6 +164,8 @@ export class PageletAgentService implements AgentService {
         settings,
         runId,
         sessionId: conversation.id,
+        parentRunId,
+        replay,
       }
 
       onStatus?.('running')
@@ -174,6 +192,71 @@ export class PageletAgentService implements AgentService {
     await waitForChatPageletReady(signal)
     throwIfAborted(signal)
     return getChatPageletClient().listSubagents()
+  }
+
+  async listRuns(
+    options: {
+      sessionId?: string
+      status?: ChatAgentRunStatus
+      limit?: number
+      offset?: number
+      signal?: AbortSignal
+    } = {},
+  ): Promise<ChatAgentRunRecordSnapshot[]> {
+    await waitForChatPageletReady(options.signal)
+    throwIfAborted(options.signal)
+    return getChatPageletClient().listRuns({
+      sessionId: options.sessionId,
+      status: options.status,
+      limit: options.limit,
+      offset: options.offset,
+    })
+  }
+
+  async getRun(runId: string, signal?: AbortSignal): Promise<ChatAgentRunRecordSnapshot | null> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().getRun(runId)
+  }
+
+  async listRunEvents(runId: string, signal?: AbortSignal): Promise<ChatAgentRunEventRecordSnapshot[]> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().listRunEvents(runId)
+  }
+
+  async listRuntimeCapabilities(signal?: AbortSignal): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().listRuntimeCapabilities()
+  }
+
+  async exportRunTraceBundle(runId: string, signal?: AbortSignal): Promise<ChatRunTraceBundle | null> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().exportRunTraceBundle(runId)
+  }
+
+  async importRunTraceBundle(bundle: ChatRunTraceBundle, signal?: AbortSignal): Promise<ChatRunTraceImportResult> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().importRunTraceBundle(bundle)
+  }
+
+  async listPendingPermissions(runId?: string, signal?: AbortSignal): Promise<ChatPermissionRequestSnapshot[]> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().listPendingPermissions(runId)
+  }
+
+  async resolvePermissionRequest(
+    requestId: string,
+    resolution: ChatPermissionResolution,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().resolvePermissionRequest(requestId, resolution)
   }
 
   async getSubagentResult(

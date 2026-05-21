@@ -9,11 +9,11 @@ import {
 import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
 
 describe('chat model settings', () => {
-  it('persists telegraph-orchestrator as an explicit backend choice', () => {
+  it('normalizes the internal orchestrator backend away from persisted chat settings', () => {
     installLocalStorage()
     const settings: ChatModelSettings = {
       ...DEFAULT_SETTINGS,
-      backend: 'telegraph-orchestrator',
+      backend: 'pi-ai',
       taskCapabilityProfile: {
         kind: 'shell-automation',
         commands: ['git', 'pnpm'],
@@ -24,10 +24,10 @@ describe('chat model settings', () => {
     saveSettings(settings)
 
     expect(loadSettings()).toMatchObject({
-      backend: 'telegraph-orchestrator',
+      backend: 'pi-ai',
     })
     expect(toRuntimeSettings(settings)).toMatchObject({
-      backend: 'telegraph-orchestrator',
+      backend: 'pi-ai',
       taskCapabilityProfile: {
         kind: 'shell-automation',
         commands: ['git', 'pnpm'],
@@ -41,7 +41,7 @@ describe('chat model settings', () => {
     globalThis.localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
-      backend: 'telegraph-orchestrator',
+      backend: 'pi-ai',
       taskCapabilityProfile: {
         kind: 'coding-edit',
         scopes: ['repo:read', 123, 'repo:write'],
@@ -52,7 +52,7 @@ describe('chat model settings', () => {
     expect(loadSettings()).toMatchObject({
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
-      backend: 'telegraph-orchestrator',
+      backend: 'pi-ai',
       apiKey: '',
       orchestration: 'none',
       orchestrationPattern: 'chain',

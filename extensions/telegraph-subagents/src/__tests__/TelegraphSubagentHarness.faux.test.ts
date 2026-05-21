@@ -21,13 +21,11 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
         { stopReason: 'toolUse' },
       ),
       fauxAssistantMessage('subagent plan accepted'),
-      fauxAssistantMessage('scout findings'),
-      fauxAssistantMessage('planner plan'),
       fauxAssistantMessage('worker implementation'),
       fauxAssistantMessage('reviewer final answer'),
       fauxAssistantMessage(
         fauxToolCall('get_subagent_result', {
-          childRunId: 'run-faux-subagents-chain-3-reviewer',
+          childRunId: 'run-faux-subagents-chain-1-reviewer',
           consume: true,
         }, { id: 'call-get-reviewer-result' }),
         { stopReason: 'toolUse' },
@@ -69,17 +67,24 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
           'run_completed',
         ]),
       )
-      expect(events.filter(event => event.type === 'child_run_completed')).toHaveLength(4)
+      expect(events.filter(event => event.type === 'child_run_completed')).toHaveLength(2)
+      expect(events.filter(event => event.type === 'child_run_started').map(event => event.label))
+        .toEqual(['worker', 'reviewer'])
       expect(events.at(-1)).toMatchObject({
         type: 'run_completed',
         runId: 'run-faux-subagents',
+        raw: {
+          route: {
+            kind: 'review',
+          },
+        },
       })
       expect(events
         .filter(event => event.type === 'assistant_delta' && event.runId === 'run-faux-subagents')
         .map(event => event.type === 'assistant_delta' ? event.text : '')
         .join(''))
         .toBe('reviewer final answer')
-      expect(faux.state.callCount).toBe(8)
+      expect(faux.state.callCount).toBe(6)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')
@@ -104,13 +109,11 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
         fauxToolCall('read', { path: 'package.json' }, { id: 'call-read-package' }),
         { stopReason: 'toolUse' },
       ),
-      fauxAssistantMessage('scout findings after read'),
-      fauxAssistantMessage('planner plan'),
-      fauxAssistantMessage('worker implementation'),
+      fauxAssistantMessage('worker findings after read'),
       fauxAssistantMessage('reviewer final answer'),
       fauxAssistantMessage(
         fauxToolCall('get_subagent_result', {
-          childRunId: 'run-faux-subagents-tools-chain-3-reviewer',
+          childRunId: 'run-faux-subagents-tools-chain-1-reviewer',
           consume: true,
         }, { id: 'call-get-reviewer-result' }),
         { stopReason: 'toolUse' },
@@ -145,13 +148,13 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
         expect.arrayContaining([
           expect.objectContaining({
             type: 'tool_call',
-            runId: 'run-faux-subagents-tools-chain-0-scout',
+            runId: 'run-faux-subagents-tools-chain-0-worker',
             callId: 'call-read-package',
             toolName: 'read',
           }),
           expect.objectContaining({
             type: 'tool_result',
-            runId: 'run-faux-subagents-tools-chain-0-scout',
+            runId: 'run-faux-subagents-tools-chain-0-worker',
             callId: 'call-read-package',
             toolName: 'read',
           }),
@@ -161,8 +164,8 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
           }),
         ]),
       )
-      expect(events.filter(event => event.type === 'model_request')).toHaveLength(9)
-      expect(faux.state.callCount).toBe(9)
+      expect(events.filter(event => event.type === 'model_request')).toHaveLength(7)
+      expect(faux.state.callCount).toBe(7)
     } finally {
       faux.unregister()
       vi.doUnmock('@/packages/agent/providers/index')

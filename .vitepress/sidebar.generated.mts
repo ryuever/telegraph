@@ -55,6 +55,10 @@ export const wikiSidebar = {
         {
           "text": "A-012 Telegraph Harness Extension 架构设计",
           "link": "/architecture/20260520-telegraph-harness-extension-architecture"
+        },
+        {
+          "text": "A-013 Telegraph Remote Agent OS 与外部控制架构",
+          "link": "/architecture/20260522-telegraph-remote-agent-os-architecture"
         }
       ]
     }
@@ -118,6 +122,10 @@ export const wikiSidebar = {
         {
           "text": "D-015 Agent Runtime 产品分层与 Telegraph Native Harness 对齐",
           "link": "/discussion/20260520-agent-runtime-product-layer-alignment"
+        },
+        {
+          "text": "D-016 Design Page 一句话生成页面的产品定位与 Agent 编排架构",
+          "link": "/discussion/20260521-design-page-agent-generation-product-architecture"
         }
       ]
     }
@@ -145,6 +153,14 @@ export const wikiSidebar = {
         {
           "text": "I-004 pi-subagents 触发不应由自然语言 parser 决定",
           "link": "/issue/20260519-pi-subagents-structured-plan-parsing"
+        },
+        {
+          "text": "I-005 Design Page Preview 与 Sandpacker 稳定化问题串复盘",
+          "link": "/issue/20260521-design-page-preview-sandpacker-stabilization"
+        },
+        {
+          "text": "I-006 DesignBuild Child 输出不应依赖自然语言 JSON 文本解析",
+          "link": "/issue/20260522-design-build-child-structured-output-contract"
         }
       ]
     }
@@ -187,6 +203,22 @@ export const wikiSidebar = {
         {
           "text": "P-006 Harness Capability 与 Extension 分层执行计划",
           "link": "/roadmap/20260518-harness-capability-extension-plan"
+        },
+        {
+          "text": "P-007 Agent Run Cockpit 可跟踪实施计划",
+          "link": "/roadmap/20260521-agent-run-cockpit-implementation-plan"
+        },
+        {
+          "text": "P-008 Design Page 一句话生成页面可执行实施计划",
+          "link": "/roadmap/20260521-design-page-agent-generation-implementation-plan"
+        },
+        {
+          "text": "P-009 Design Page Preview 与组件编辑器接入 Handoff",
+          "link": "/roadmap/20260521-design-page-preview-editor-handoff"
+        },
+        {
+          "text": "P-010 Remote Agent OS 能力象限与实施路线图",
+          "link": "/roadmap/20260522-remote-agent-os-implementation-roadmap"
         }
       ]
     }

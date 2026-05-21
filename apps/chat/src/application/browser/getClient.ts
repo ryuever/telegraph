@@ -8,8 +8,7 @@ import { client } from '@/apps/main/application/browser/rpc-clients';
  * Lazy accessor for the chat pagelet's RPC proxy.
  *
  * See `apps/connection/.../getClient.ts` for the full rationale.
- * Currently consumed only by the future `PageletAgentService` path
- * (chat presently runs against `MockAgentService` — see H10/D-008).
+ * Consumed by `PageletAgentService`; chat runs through the pagelet RPC path.
  */
 let cached: IChatPageletService | null = null;
 

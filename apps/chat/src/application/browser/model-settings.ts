@@ -160,7 +160,7 @@ export function toRuntimeSettings(
     modelId: settings.modelId,
     apiKey: settings.apiKey || env?.apiKey || '',
     baseUrl: settings.baseUrl ?? env?.baseUrl,
-    backend: settings.backend,
+    backend: normalizeBackend(settings.backend),
     orchestration: settings.orchestration,
     orchestrationPattern: settings.orchestrationPattern,
     worktreeIsolation: settings.worktreeIsolation,
@@ -241,8 +241,7 @@ function normalizeBackend(value: unknown): AgentBackendKind {
     value === 'pi-embedded' ||
     value === 'telegraph-subagents' ||
     value === 'langgraph' ||
-    value === 'vercel-ai' ||
-    value === 'telegraph-orchestrator'
+    value === 'vercel-ai'
   ) {
     return value
   }

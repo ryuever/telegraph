@@ -241,9 +241,22 @@ describe('TelegraphSubagentHarness', () => {
     })
 
     expect([...agents.keys()]).toEqual(
-      expect.arrayContaining(['scout', 'planner', 'worker', 'reviewer']),
+      expect.arrayContaining([
+        'scout',
+        'planner',
+        'worker',
+        'reviewer',
+        'design-product-planner',
+        'design-component-scout',
+        'design-worker',
+        'design-reviewer',
+      ]),
     )
     expect(agents.get('scout')?.sourcePath).toContain('extensions/telegraph-subagents/agents/scout.md')
+    expect(agents.get('design-component-scout')).toMatchObject({
+      description: 'Find reusable UI components, import paths, and usage constraints for a design-build run.',
+      tools: ['read', 'grep', 'glob'],
+    })
   })
 
   it('discovers custom agents by filename without requiring a name frontmatter field', async () => {
@@ -352,7 +365,7 @@ describe('TelegraphSubagentHarness', () => {
     }
   })
 
-  it('runs the default chain through fallback subagents and completes the parent run', async () => {
+  it('routes the default chain preference into a Team Router review handoff', async () => {
     mockRouterSelectionAndChildRuns({})
 
     const runtime = new TelegraphSubagentHarness()
@@ -367,20 +380,47 @@ describe('TelegraphSubagentHarness', () => {
       type: 'run_completed',
       runId: 'run-subagents-test',
       output: { mode: 'chain' },
+      raw: {
+        route: {
+          kind: 'review',
+        },
+      },
     })
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'step_started',
+          runId: 'run-subagents-test',
+          label: 'Team Router',
+          kind: 'router',
+        }),
+        expect.objectContaining({
+          type: 'step_completed',
+          runId: 'run-subagents-test',
+          stepId: 'run-subagents-test:team-router',
+          output: expect.objectContaining({
+            teamId: 'telegraph-default-team',
+            taskCount: 2,
+            decision: expect.objectContaining({
+              kind: 'review',
+            }),
+          }),
+        }),
+      ]),
+    )
     expect(events.filter(event => event.type === 'assistant_delta' && event.runId === 'run-subagents-test'))
       .toEqual([
         expect.objectContaining({
-          text: 'synthesized answer from run-subagents-test-chain-0-scout',
+          text: 'synthesized answer from run-subagents-test-chain-0-worker',
         }),
       ])
     expect(events.filter(event => event.type === 'child_run_started').map(event => event.label))
-      .toEqual(['scout', 'planner', 'worker', 'reviewer'])
-    expect(streamMock).toHaveBeenCalledTimes(6)
+      .toEqual(['worker', 'reviewer'])
+    expect(streamMock).toHaveBeenCalledTimes(4)
     expect(streamMock.mock.calls[0]?.[0].tools?.map(tool => tool.name)).toEqual(['subagent'])
     expect(streamMock.mock.calls[1]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
-    expect(streamMock.mock.calls[3]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
-    expect(streamMock.mock.calls[5]?.[0].tools?.map(tool => tool.name)).toEqual(['get_subagent_result'])
+    expect(streamMock.mock.calls[2]?.[0].tools?.map(tool => tool.name)).toEqual(['read', 'grep', 'glob'])
+    expect(streamMock.mock.calls[3]?.[0].tools?.map(tool => tool.name)).toEqual(['get_subagent_result'])
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -503,6 +543,20 @@ describe('TelegraphSubagentHarness', () => {
     })))
 
     expect(events.filter(event => event.type === 'child_run_started')).toHaveLength(0)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'step_completed',
+          runId: 'run-subagents-test',
+          output: expect.objectContaining({
+            taskCount: 0,
+            decision: expect.objectContaining({
+              kind: 'direct',
+            }),
+          }),
+        }),
+      ]),
+    )
     expect(events.filter(event => event.type === 'assistant_delta').map(event => event.text).join(''))
       .toBe('direct parent answer')
     expect(streamMock).toHaveBeenCalledTimes(1)

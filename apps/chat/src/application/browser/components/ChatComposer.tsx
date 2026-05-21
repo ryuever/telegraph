@@ -20,7 +20,7 @@ export const ChatComposer = React.memo(function ChatComposer({
   onSendMessage,
   onStop,
   isStreaming,
-  placeholder = 'Message the agent…  (⏎ to send, ⇧⏎ for newline)',
+  placeholder = 'Message the agent',
 }: ChatComposerProps) {
   const [text, setText] = useState(seedText)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -84,12 +84,12 @@ export const ChatComposer = React.memo(function ChatComposer({
   const canSend = text.trim().length > 0 && !isStreaming
 
   return (
-    <div className="border-t border-zinc-800/80 bg-zinc-950/80 px-4 pb-4 pt-3">
+    <div className="border-t border-border bg-card/70 px-4 pb-4 pt-3">
       <div className="mx-auto max-w-3xl">
         <div
           className={cn(
-            'group relative flex items-end gap-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 px-3 py-2.5 shadow-sm transition-colors',
-            'focus-within:border-zinc-600 focus-within:bg-zinc-900'
+            'group relative flex items-end gap-2 rounded-md border border-border bg-background px-3 py-2.5 shadow-sm transition-colors',
+            'focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/25'
           )}
         >
           <textarea
@@ -100,14 +100,14 @@ export const ChatComposer = React.memo(function ChatComposer({
             onPaste={handlePaste}
             placeholder={placeholder}
             rows={1}
-            className="min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500"
+            className="min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
           />
           {isStreaming ? (
             <button
               type="button"
               onClick={onStop}
               aria-label="Stop generating"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-700 text-zinc-100 shadow transition-colors hover:bg-zinc-600"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground shadow transition-colors hover:bg-secondary/80"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="5" y="5" width="14" height="14" rx="2" />
@@ -120,10 +120,10 @@ export const ChatComposer = React.memo(function ChatComposer({
               disabled={!canSend}
               aria-label="Send message"
               className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow transition-all',
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-md shadow transition-all',
                 canSend
-                  ? 'bg-zinc-100 text-zinc-900 hover:bg-white'
-                  : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'cursor-not-allowed bg-muted text-muted-foreground'
               )}
             >
               <svg
@@ -141,9 +141,6 @@ export const ChatComposer = React.memo(function ChatComposer({
             </button>
           )}
         </div>
-        <p className="mt-1.5 text-center text-[10.5px] text-zinc-600">
-          Chat via x-oasis RPC pagelet — connect a real agent service for live AI responses.
-        </p>
       </div>
     </div>
   )

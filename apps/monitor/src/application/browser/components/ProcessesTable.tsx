@@ -53,9 +53,9 @@ export function ProcessesTable({ processes, query }: ProcessesTableProps) {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/30">
+    <div className="overflow-hidden rounded-md border border-border bg-card">
       <table className="w-full text-[12px]">
-        <thead className="sticky top-0 z-10 border-b border-zinc-800/80 bg-zinc-900/80 backdrop-blur">
+        <thead className="sticky top-0 z-10 border-b border-border bg-card/95 backdrop-blur">
           <tr>
             <SortableHead
               label="Type"
@@ -100,7 +100,7 @@ export function ProcessesTable({ processes, query }: ProcessesTableProps) {
         <tbody>
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-10 text-center text-zinc-500">
+              <td colSpan={5} className="py-10 text-center text-muted-foreground">
                 No processes match.
               </td>
             </tr>
@@ -109,22 +109,22 @@ export function ProcessesTable({ processes, query }: ProcessesTableProps) {
             <tr
               key={p.pid}
               className={cn(
-                'border-b border-zinc-800/40 transition-colors hover:bg-zinc-800/40',
-                i % 2 === 1 && 'bg-zinc-900/20'
+                'border-b border-border transition-colors hover:bg-surface-soft',
+                i % 2 === 1 && 'bg-surface-soft/35'
               )}
             >
               <td className="px-3 py-1.5">
-                <span className="inline-flex rounded border border-zinc-700/80 bg-zinc-800/50 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                <span className="inline-flex rounded border border-border bg-surface-soft px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {p.type}
                 </span>
               </td>
               <td
-                className="max-w-[220px] truncate px-3 py-1.5 text-zinc-200"
+                className="max-w-[220px] truncate px-3 py-1.5 text-foreground"
                 title={p.name ?? ''}
               >
                 {p.name ?? '—'}
               </td>
-              <td className="px-3 py-1.5 text-right font-mono tabular-nums text-zinc-500">
+              <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
                 {p.pid}
               </td>
               <td
@@ -135,7 +135,7 @@ export function ProcessesTable({ processes, query }: ProcessesTableProps) {
               >
                 {p.cpu.toFixed(2)}
               </td>
-              <td className="px-3 py-1.5 text-right font-mono tabular-nums text-zinc-200">
+              <td className="px-3 py-1.5 text-right font-mono tabular-nums text-foreground">
                 {p.memory.toFixed(1)}
               </td>
             </tr>
@@ -168,8 +168,8 @@ function SortableHead({
         type="button"
         onClick={() => { onClick(sortKey); }}
         className={cn(
-          'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors',
-          isActive ? 'text-sky-300' : 'text-zinc-500 hover:text-zinc-300'
+          'inline-flex items-center gap-1 text-[10px] font-semibold uppercase transition-colors',
+          isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
         )}
       >
         <span>{label}</span>
@@ -209,5 +209,5 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 function cpuTextClass(v: number) {
   if (v >= 50) return 'text-rose-400';
   if (v >= 15) return 'text-amber-400';
-  return 'text-zinc-200';
+  return 'text-foreground';
 }

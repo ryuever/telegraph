@@ -216,9 +216,10 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
     <>
       <div
         style={{
-          background: `linear-gradient(135deg, ${page.color}dd 0%, ${page.color}99 100%)`,
+          backgroundColor: 'var(--card)',
+          borderBottom: '1px solid var(--border)',
           padding: '12px 24px',
-          color: '#fff',
+          color: 'var(--foreground)',
           display: 'flex',
           alignItems: 'center',
           gap: 16,
@@ -226,13 +227,13 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
         }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>
             {page.label}
             <span
               style={{
                 fontSize: 11,
                 fontWeight: 400,
-                color: 'rgba(255,255,255,0.7)',
+                color: 'var(--muted-foreground)',
                 marginLeft: 12,
               }}
             >
@@ -242,7 +243,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
           <div
             style={{
               fontSize: 11,
-              color: 'rgba(255,255,255,0.8)',
+              color: 'var(--muted-foreground)',
               marginTop: 1,
             }}
           >
@@ -255,8 +256,8 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
             alignItems: 'center',
             gap: 6,
             padding: '4px 12px',
-            borderRadius: 20,
-            backgroundColor: 'rgba(255,255,255,0.2)',
+            borderRadius: 8,
+            backgroundColor: 'var(--surface-soft)',
           }}
         >
           <span
@@ -268,7 +269,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
               display: 'inline-block',
             }}
           />
-          <span style={{ fontSize: 11, color: '#fff' }}>{state}</span>
+          <span style={{ fontSize: 11, color: 'var(--foreground)' }}>{state}</span>
         </div>
       </div>
 
@@ -283,9 +284,9 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
         <div
           style={{
             flex: 1,
-            backgroundColor: '#fff',
-            borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
             padding: 14,
           }}
         >
@@ -293,7 +294,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: '#94a3b8',
+              color: 'var(--muted-foreground)',
               textTransform: 'uppercase',
               marginBottom: 8,
             }}
@@ -320,18 +321,18 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
               style={{
                 marginTop: 8,
                 fontSize: 11,
-                color: '#94a3b8',
+                color: 'var(--muted-foreground)',
                 display: 'grid',
                 gridTemplateColumns: 'auto 1fr',
                 gap: '2px 8px',
               }}
             >
               <span>From:</span>
-              <span style={{ fontFamily: 'monospace', color: '#334155' }}>
+              <span style={{ fontFamily: 'monospace', color: 'var(--foreground)' }}>
                 {cs.fromId}
               </span>
               <span>To:</span>
-              <span style={{ fontFamily: 'monospace', color: '#334155' }}>
+              <span style={{ fontFamily: 'monospace', color: 'var(--foreground)' }}>
                 {cs.toId}
               </span>
             </div>
@@ -341,9 +342,9 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
         <div
           style={{
             flex: 1,
-            backgroundColor: '#fff',
-            borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
             padding: 14,
           }}
         >
@@ -351,7 +352,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: '#94a3b8',
+              color: 'var(--muted-foreground)',
               textTransform: 'uppercase',
               marginBottom: 8,
             }}
@@ -385,18 +386,18 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
               <div
                 key={s.l}
                 style={{
-                  backgroundColor: '#f8fafc',
-                  borderRadius: 4,
+                  backgroundColor: 'var(--surface-soft)',
+                  borderRadius: 6,
                   padding: '4px 6px',
                 }}
               >
-                <div style={{ fontSize: 9, color: '#94a3b8' }}>{s.l}</div>
+                <div style={{ fontSize: 9, color: 'var(--muted-foreground)' }}>{s.l}</div>
                 <div
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
                     fontFamily: 'monospace',
-                    color: '#334155',
+                    color: 'var(--foreground)',
                   }}
                 >
                   {s.v}
@@ -409,9 +410,9 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
         <div
           style={{
             flex: 0,
-            backgroundColor: '#fff',
-            borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
             padding: 14,
             display: 'flex',
             flexDirection: 'column',
@@ -422,7 +423,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: '#94a3b8',
+              color: 'var(--muted-foreground)',
               textTransform: 'uppercase',
               marginBottom: 2,
             }}
@@ -462,11 +463,11 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
         style={{
           display: 'flex',
           gap: 2,
-          backgroundColor: '#fff',
-          borderRadius: 10,
+          backgroundColor: 'var(--card)',
+          borderRadius: 8,
           padding: 4,
           margin: '0 16px',
-          border: '1px solid #e2e8f0',
+          border: '1px solid var(--border)',
           flexShrink: 0,
         }}
       >
@@ -480,7 +481,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
               fontWeight: activeTab === tab.id ? 600 : 400,
               backgroundColor:
                 activeTab === tab.id ? `${tab.color}15` : 'transparent',
-              color: activeTab === tab.id ? tab.color : '#64748b',
+              color: activeTab === tab.id ? tab.color : 'var(--muted-foreground)',
               transition: 'all 0.15s ease',
             }}
           >
@@ -509,9 +510,9 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
               <div
                 key={method.name}
                 style={{
-                  backgroundColor: '#fff',
-                  borderRadius: 10,
-                  border: '1px solid #e2e8f0',
+                  backgroundColor: 'var(--card)',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
                   padding: 16,
                 }}
               >
@@ -540,7 +541,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
                         fontFamily: 'monospace',
                         fontSize: 14,
                         fontWeight: 600,
-                        color: '#1e293b',
+                        color: 'var(--foreground)',
                       }}
                     >
                       {method.name}()
@@ -563,7 +564,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
                 <div
                   style={{
                     fontSize: 11,
-                    color: '#94a3b8',
+                    color: 'var(--muted-foreground)',
                     marginBottom: method.params ? 10 : 0,
                   }}
                 >
@@ -590,7 +591,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
                         <span
                           style={{
                             fontSize: 11,
-                            color: '#64748b',
+                            color: 'var(--muted-foreground)',
                             fontWeight: 500,
                           }}
                         >
@@ -616,10 +617,10 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
                             padding: '3px 8px',
                             fontSize: 12,
                             fontFamily: 'monospace',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: 4,
+                            border: '1px solid var(--border)',
+                            borderRadius: 6,
                             width: 140,
-                            backgroundColor: isReady ? '#fff' : '#f9fafb',
+                            backgroundColor: isReady ? 'var(--card)' : 'var(--muted)',
                           }}
                         />
                       </div>
@@ -660,7 +661,7 @@ function PageView({ page }: PageViewProps): React.JSX.Element {
                         : JSON.stringify(latest.value)}
                     </span>
                     <span
-                      style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}
+                      style={{ fontSize: 10, color: 'var(--muted-foreground)', flexShrink: 0 }}
                     >
                       {latest.latencyMs}ms
                     </span>

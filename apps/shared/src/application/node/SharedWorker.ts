@@ -36,6 +36,7 @@ export class SharedWorker implements ISharedWorker {
     language: 'zh-CN',
     timeout: '30000',
   };
+  private configListeners = new Set<(event: ConfigChangeEvent) => void>();
 
   boot(): void {
     const SELF_ID = 'shared';
@@ -52,28 +53,25 @@ export class SharedWorker implements ISharedWorker {
         )})`;
       },
       setConfig: (key: string, value: string): string => {
+        const oldValue = this.configStore[key] ?? 'undefined';
         this.configVersion++;
         this.configStore[key] = value;
+        const event: ConfigChangeEvent = {
+          key,
+          oldValue,
+          newValue: value,
+          configVersion: this.configVersion,
+          timestamp: Date.now(),
+        };
+        for (const listener of this.configListeners) {
+          listener(event);
+        }
         return `config[${key}] set to ${value} (v${String(this.configVersion)})`;
       },
       echo: (msg: string): string => `shared echo: ${msg}`,
       onConfigChange: (callback: (event: ConfigChangeEvent) => void) => {
-        const interval = setInterval(() => {
-          const keys = Object.keys(this.configStore);
-          const randomKey = keys[Math.floor(Math.random() * keys.length)];
-          const oldVal = this.configStore[randomKey];
-          const newVal = `${oldVal}-updated-${String(Date.now() % 1000)}`;
-          this.configStore[randomKey] = newVal;
-          this.configVersion++;
-          callback({
-            key: randomKey,
-            oldValue: oldVal,
-            newValue: newVal,
-            configVersion: this.configVersion,
-            timestamp: Date.now(),
-          });
-        }, 3000);
-        return () => { clearInterval(interval); };
+        this.configListeners.add(callback);
+        return () => { this.configListeners.delete(callback); };
       },
     };
 

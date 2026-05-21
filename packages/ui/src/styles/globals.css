@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./tokens.css";
+@source "../../../../node_modules/@sandpacker/style-editor/dist";
 
 @custom-variant dark (&:is(.dark *));

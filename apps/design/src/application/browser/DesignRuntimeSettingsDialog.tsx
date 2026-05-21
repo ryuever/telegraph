@@ -214,7 +214,7 @@ function Field({
   return (
     <label className="block">
       <div className="mb-1 flex items-baseline justify-between gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        <span className="text-[11px] font-medium uppercase text-muted-foreground">
           {label}
         </span>
         {hint && <span className="text-[10.5px] text-muted-foreground">{hint}</span>}

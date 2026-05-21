@@ -2,13 +2,19 @@ import type { RuntimeSettings } from '@/packages/agent-protocol'
 import type {
   DesignAgentSendRequest,
   DesignAgentStreamEvent,
+  DesignAgentRunRecordSnapshot,
   DesignArtifactPatchApplyResult,
   DesignArtifactPatchPreviewResult,
   DesignPatchFileOperation,
   DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common'
-import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
+import {
+  AGENT_MODEL_SETTINGS_STORAGE_KEY,
+  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
+  readRuntimeSettingsFromStorage,
+} from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
+import { normalizeDesignRuntimeSettings } from './design-runtime-settings'
 import { getDesignPageletClient } from './getClient'
 import {
   projectAgentEventToDesign,
@@ -115,6 +121,18 @@ export class PageletDesignAgentService {
     return getDesignPageletClient().listSubagents()
   }
 
+  async listAgentRuns(signal?: AbortSignal): Promise<DesignAgentRunRecordSnapshot[]> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().listAgentRuns()
+  }
+
+  async getAgentRun(runId: string, signal?: AbortSignal): Promise<DesignAgentRunRecordSnapshot | null> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().getAgentRun(runId)
+  }
+
   async getSubagentResult(
     childRunId: string,
     options: { consume?: boolean; signal?: AbortSignal } = {},
@@ -168,7 +186,14 @@ export class PageletDesignAgentService {
 }
 
 function readRuntimeSettings(): RuntimeSettings {
-  return readRuntimeSettingsFromStorage(localStorage)
+  return normalizeDesignRuntimeSettings(readRuntimeSettingsFromStorage(localStorage), {
+    forceDesignProfile: !hasSavedRuntimeSettings(localStorage),
+  })
+}
+
+function hasSavedRuntimeSettings(storage: Pick<Storage, 'getItem'>): boolean {
+  return storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
+    storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
 }
 
 function isCancelledError(error: unknown): boolean {

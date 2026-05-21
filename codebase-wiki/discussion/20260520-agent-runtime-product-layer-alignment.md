@@ -50,6 +50,9 @@ references:
   - id: A-012
     rel: extended-by
     file: ../architecture/20260520-telegraph-harness-extension-architecture.md
+  - id: D-016
+    rel: extended-by
+    file: ./20260521-design-page-agent-generation-product-architecture.md
 ---
 
 # Agent Runtime 产品分层与 Telegraph Native Harness 对齐

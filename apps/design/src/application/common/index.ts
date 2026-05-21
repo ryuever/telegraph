@@ -8,6 +8,8 @@ export interface IDesignPageletService {
   ping(now: number): Promise<{ pong: number; serverTime: number }>;
   sendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult>;
   cancelAgent(runId: string): Promise<boolean>;
+  listAgentRuns(): Promise<DesignAgentRunRecordSnapshot[]>;
+  getAgentRun(runId: string): Promise<DesignAgentRunRecordSnapshot | null>;
   listSubagents(): Promise<DesignSubagentRecordSnapshot[]>;
   getSubagentResult(childRunId: string, consume?: boolean): Promise<DesignSubagentRecordSnapshot | null>;
   cancelSubagent(childRunId: string): Promise<boolean>;
@@ -32,6 +34,24 @@ export interface DesignAgentSendResult {
   runId: string;
   status: 'completed' | 'failed';
   error?: string;
+}
+
+export interface DesignAgentRunRecordSnapshot {
+  runId: string;
+  sessionId?: string;
+  prompt: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startedAt: number;
+  updatedAt: number;
+  completedAt?: number;
+  error?: string;
+  events: DesignAgentRunEventSnapshot[];
+}
+
+export interface DesignAgentRunEventSnapshot {
+  type: AgentEvent['type'] | DesignAgentStreamEvent['type'];
+  ts: number;
+  label?: string;
 }
 
 export interface DesignSubagentRecordSnapshot {
@@ -63,6 +83,23 @@ export interface DesignPatchPreview {
     adds: number;
     updates: number;
     deletes: number;
+  };
+}
+
+export interface DesignSelectedComponentSnapshot {
+  id: string;
+  artifactId: string;
+  label: string;
+  source: 'patch-operation' | 'preview-dom' | 'preview-placeholder';
+  path?: string;
+  operationKind?: DesignPatchFileOperation['kind'];
+  elementTag?: string;
+  className?: string;
+  attributes?: Record<string, string>;
+  sourceLocation?: {
+    filePath: string;
+    line: number;
+    column: number;
   };
 }
 

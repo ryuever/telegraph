@@ -7,7 +7,7 @@ description: >
   并说明如何兼容 Pi、LangGraph、Vercel AI SDK、Mastra 与未来 agent framework。
 category: architecture
 created: 2026-05-05
-updated: 2026-05-20
+updated: 2026-05-22
 tags:
   - telegraph
   - agent-runtime
@@ -55,6 +55,10 @@ references:
   - id: A-012
     rel: extended-by
     file: ./20260520-telegraph-harness-extension-architecture.md
+  - id: A-013
+    rel: related-to
+    file: ./20260522-telegraph-remote-agent-os-architecture.md
+    note: A-013 将本文 Run / RuntimeEvent / Tool / Approval 抽象扩展到 Mobile、CLI、Slack、Telegram 与 Computer Use 入口。
 ---
 
 # Telegraph Agent Runtime 与 Extension Host 理论基础

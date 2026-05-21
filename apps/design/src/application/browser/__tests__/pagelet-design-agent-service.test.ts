@@ -9,6 +9,7 @@ import type {
 } from '@/apps/design/application/common'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
+import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let agentEventCallback: ((event: DesignAgentStreamEvent) => void) | null = null
@@ -16,6 +17,11 @@ const sendAgentMock = vi.fn(
   (_: DesignAgentSendRequest): Promise<DesignAgentSendResult> => new Promise<DesignAgentSendResult>(() => {}),
 )
 const cancelAgentMock = vi.fn(() => Promise.resolve(true))
+const listAgentRunsMock = vi.fn(() => Promise.resolve([]))
+const getAgentRunMock = vi.fn(() => Promise.resolve(null))
+const listSubagentsMock = vi.fn(() => Promise.resolve([]))
+const getSubagentResultMock = vi.fn(() => Promise.resolve(null))
+const cancelSubagentMock = vi.fn(() => Promise.resolve(false))
 const previewArtifactPatchMock = vi.fn(
   (_: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult> => Promise.resolve({
   runId: 'patch-run',
@@ -42,9 +48,11 @@ const client: IDesignPageletService = {
   ping: vi.fn((now: number) => Promise.resolve({ pong: now, serverTime: now })),
   sendAgent: sendAgentMock,
   cancelAgent: cancelAgentMock,
-  listSubagents: vi.fn(() => Promise.resolve([])),
-  getSubagentResult: vi.fn(() => Promise.resolve(null)),
-  cancelSubagent: vi.fn(() => Promise.resolve(false)),
+  listAgentRuns: listAgentRunsMock,
+  getAgentRun: getAgentRunMock,
+  listSubagents: listSubagentsMock,
+  getSubagentResult: getSubagentResultMock,
+  cancelSubagent: cancelSubagentMock,
   previewArtifactPatch: previewArtifactPatchMock,
   applyArtifactPatch: applyArtifactPatchMock,
   onAgentEvent: vi.fn((callback: (event: DesignAgentStreamEvent) => void) => {
@@ -149,11 +157,40 @@ describe('PageletDesignAgentService', () => {
       sessionId: 'session-1',
     })
 
+    expect(sendAgentMock.mock.calls[0]?.[0].settings).toEqual(expect.objectContaining({
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      orchestration: 'none',
+    }))
     expect(sendAgentMock.mock.calls[0]?.[0].settings.taskCapabilityProfile).toEqual({
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read'],
       artifactPolicy: 'preview',
     })
+  })
+
+  it('uses design-build runtime defaults when no model settings were saved', async () => {
+    sendAgentMock.mockImplementationOnce((request) => {
+      return Promise.resolve({ runId: request.runId, status: 'completed' })
+    })
+
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+
+    await service.send({
+      prompt: 'make a design',
+      sessionId: 'session-1',
+    })
+
+    expect(sendAgentMock.mock.calls[0]?.[0].settings).toEqual(expect.objectContaining({
+      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      taskCapabilityProfile: {
+        kind: 'design-build',
+        scopes: ['artifact:write', 'repo:read'],
+        artifactPolicy: 'preview',
+      },
+    }))
   })
 
   it('passes saved design settings into artifact patch preview and apply requests', async () => {
@@ -206,9 +243,20 @@ describe('PageletDesignAgentService', () => {
     await expect(service.getSubagentResult('child-1', { consume: true })).resolves.toBeNull()
     await expect(service.cancelSubagent('child-1')).resolves.toBe(false)
 
-    expect(client.listSubagents).toHaveBeenCalled()
-    expect(client.getSubagentResult).toHaveBeenCalledWith('child-1', true)
-    expect(client.cancelSubagent).toHaveBeenCalledWith('child-1')
+    expect(listSubagentsMock).toHaveBeenCalled()
+    expect(getSubagentResultMock).toHaveBeenCalledWith('child-1', true)
+    expect(cancelSubagentMock).toHaveBeenCalledWith('child-1')
+  })
+
+  it('forwards design run history calls through the pagelet service', async () => {
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+
+    await expect(service.listAgentRuns()).resolves.toEqual([])
+    await expect(service.getAgentRun('run-1')).resolves.toBeNull()
+
+    expect(listAgentRunsMock).toHaveBeenCalled()
+    expect(getAgentRunMock).toHaveBeenCalledWith('run-1')
   })
 })
 

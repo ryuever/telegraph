@@ -209,7 +209,8 @@ function SettingApp() {
       style={{
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        backgroundColor: '#f8fafc',
+        backgroundColor: 'var(--background)',
+        color: 'var(--foreground)',
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -217,9 +218,10 @@ function SettingApp() {
     >
       <div
         style={{
-          background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+          backgroundColor: 'var(--card)',
+          borderBottom: '1px solid var(--border)',
           padding: '16px 24px',
-          color: '#fff',
+          color: 'var(--foreground)',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
@@ -231,7 +233,7 @@ function SettingApp() {
           <div
             style={{
               fontSize: 11,
-              color: 'rgba(255,255,255,0.7)',
+              color: 'var(--muted-foreground)',
               marginTop: 2,
             }}
           >
@@ -245,8 +247,8 @@ function SettingApp() {
               alignItems: 'center',
               gap: 6,
               padding: '4px 12px',
-              borderRadius: 20,
-              backgroundColor: 'rgba(255,255,255,0.15)',
+              borderRadius: 8,
+              backgroundColor: 'var(--accent)',
             }}
           >
             <span
@@ -278,9 +280,9 @@ function SettingApp() {
           <div
             style={{
               flex: 1,
-              backgroundColor: '#fff',
-              borderRadius: 10,
-              border: '1px solid #e2e8f0',
+              backgroundColor: 'var(--card)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
               padding: 14,
             }}
           >
@@ -288,7 +290,7 @@ function SettingApp() {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#94a3b8',
+                color: 'var(--muted-foreground)',
                 textTransform: 'uppercase',
                 marginBottom: 8,
               }}
@@ -322,11 +324,11 @@ function SettingApp() {
                 }}
               >
                 <span>From:</span>
-                <span style={{ fontFamily: 'monospace', color: '#334155' }}>
+                <span style={{ fontFamily: 'monospace', color: 'var(--foreground)' }}>
                   {statusInfo.fromId}
                 </span>
                 <span>To:</span>
-                <span style={{ fontFamily: 'monospace', color: '#334155' }}>
+                <span style={{ fontFamily: 'monospace', color: 'var(--foreground)' }}>
                   {statusInfo.toId}
                 </span>
               </div>
@@ -336,9 +338,9 @@ function SettingApp() {
           <div
             style={{
               flex: 1,
-              backgroundColor: '#fff',
-              borderRadius: 10,
-              border: '1px solid #e2e8f0',
+              backgroundColor: 'var(--card)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
               padding: 14,
             }}
           >
@@ -346,7 +348,7 @@ function SettingApp() {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#94a3b8',
+                color: 'var(--muted-foreground)',
                 textTransform: 'uppercase',
                 marginBottom: 8,
               }}
@@ -383,18 +385,18 @@ function SettingApp() {
                 <div
                   key={s.l}
                   style={{
-                    backgroundColor: '#f8fafc',
+                    backgroundColor: 'var(--muted)',
                     borderRadius: 4,
                     padding: '4px 6px',
                   }}
                 >
-                  <div style={{ fontSize: 9, color: '#94a3b8' }}>{s.l}</div>
+                  <div style={{ fontSize: 9, color: 'var(--muted-foreground)' }}>{s.l}</div>
                   <div
                     style={{
                       fontSize: 13,
                       fontWeight: 600,
                       fontFamily: 'monospace',
-                      color: '#334155',
+                      color: 'var(--foreground)',
                     }}
                   >
                     {s.v}
@@ -407,9 +409,9 @@ function SettingApp() {
           <div
             style={{
               flex: 0,
-              backgroundColor: '#fff',
-              borderRadius: 10,
-              border: '1px solid #e2e8f0',
+              backgroundColor: 'var(--card)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
               padding: 14,
               display: 'flex',
               flexDirection: 'column',
@@ -420,7 +422,7 @@ function SettingApp() {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#94a3b8',
+                color: 'var(--muted-foreground)',
                 textTransform: 'uppercase',
                 marginBottom: 2,
               }}
@@ -480,9 +482,9 @@ function SettingApp() {
 
         <div
           style={{
-            backgroundColor: '#fff',
-            borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
             padding: 16,
           }}
         >
@@ -491,7 +493,7 @@ function SettingApp() {
               fontSize: 13,
               fontWeight: 600,
               marginBottom: 12,
-              color: '#1e293b',
+              color: 'var(--foreground)',
             }}
           >
             Shared Process (via Setting Pagelet)
@@ -520,9 +522,9 @@ function SettingApp() {
 
         <div
           style={{
-            backgroundColor: '#fff',
-            borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
             padding: 16,
           }}
         >
@@ -531,7 +533,7 @@ function SettingApp() {
               fontSize: 13,
               fontWeight: 600,
               marginBottom: 12,
-              color: '#1e293b',
+              color: 'var(--foreground)',
             }}
           >
             Daemon Process (via Setting Pagelet)
@@ -554,9 +556,9 @@ function SettingApp() {
 
         <div
           style={{
-            backgroundColor: '#fff',
-            borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
             padding: 16,
           }}
         >
@@ -565,7 +567,7 @@ function SettingApp() {
               fontSize: 13,
               fontWeight: 600,
               marginBottom: 12,
-              color: '#1e293b',
+              color: 'var(--foreground)',
             }}
           >
             Main Process (via Setting Pagelet)
@@ -588,7 +590,7 @@ function SettingApp() {
 
         <div
           style={{
-            backgroundColor: '#111827',
+            backgroundColor: '#0f172a',
             borderRadius: 8,
             padding: 12,
             flex: 1,
@@ -707,10 +709,10 @@ function ActionBtn({
         padding: '6px 14px',
         fontSize: 12,
         fontWeight: 600,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--border)',
         borderRadius: 6,
-        backgroundColor: loading ? '#f1f5f9' : disabled ? '#f9fafb' : '#fff',
-        color: loading ? '#94a3b8' : disabled ? '#d1d5db' : '#334155',
+        backgroundColor: loading ? 'var(--muted)' : disabled ? 'var(--muted)' : 'var(--card)',
+        color: loading ? 'var(--muted-foreground)' : disabled ? 'var(--muted-foreground)' : 'var(--foreground)',
         cursor: loading || disabled ? 'not-allowed' : 'pointer',
       }}
     >

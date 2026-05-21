@@ -29,7 +29,7 @@ export function createDesignArtifactViewModel(
       title,
       kind: artifact.kind,
       viewKind: 'patch',
-      code: JSON.stringify(output, null, 2),
+      code: formatPatchSource(operations),
       patchSummary: summarizeOperations(operations),
     }
   }
@@ -110,6 +110,15 @@ function summarizeOperations(operations: unknown[]): DesignArtifactViewModel['pa
     updates: operations.filter(operation => operationKind(operation) === 'update').length,
     deletes: operations.filter(operation => operationKind(operation) === 'delete').length,
   }
+}
+
+function formatPatchSource(operations: DesignPatchFileOperation[]): string {
+  return operations.map(operation => {
+    const header = `// ${operation.kind.toUpperCase()} ${operation.path}`
+    if (operation.kind === 'delete') return header
+    if (!operation.content) return `${header}\n// No source content provided.`
+    return `${header}\n${operation.content}`
+  }).join('\n\n')
 }
 
 function operationKind(value: unknown): string | undefined {

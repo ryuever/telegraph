@@ -10,10 +10,18 @@ import {
   getProviderOptions,
   getModelOptions,
 } from '../model-settings'
+import {
+  capabilitySupport,
+  listRuntimeCapabilityDescriptors,
+  type RuntimeCapabilityDescriptor,
+  type RuntimeCapabilitySupport,
+} from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
+import type { ChatRuntimeCapabilityDescriptorSnapshot } from '@/apps/chat/application/common'
 
 interface Props {
   open: boolean
   settings: ChatModelSettings
+  runtimeCapabilities?: ChatRuntimeCapabilityDescriptorSnapshot[]
   onClose: () => void
   onSave: (next: ChatModelSettings) => void
 }
@@ -26,7 +34,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'extensions', label: 'Extensions' },
 ]
 
-export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
+export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClose, onSave }: Props) {
   const [draft, setDraft] = useState<ChatModelSettings>(settings)
   const [envModels, setEnvModels] = useState<EnvModelConfig[]>([])
   const [connectionStatus, setConnectionStatus] = useState<Map<string, ModelConnectionStatus>>(
@@ -66,6 +74,16 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
   const provider = draft.provider
   const providerOptions = useMemo(() => getProviderOptions(), [])
   const modelOptions = useMemo(() => getModelOptions(provider), [provider])
+  const capabilityDescriptors = useMemo(
+    () => runtimeCapabilities && runtimeCapabilities.length > 0
+      ? runtimeCapabilities
+      : listRuntimeCapabilityDescriptors(),
+    [runtimeCapabilities]
+  )
+  const selectedRuntime = useMemo(
+    () => findEffectiveRuntimeDescriptor(capabilityDescriptors, draft),
+    [capabilityDescriptors, draft]
+  )
 
   const currentStatus = connectionStatus.get(`${provider}:${draft.modelId}`)
 
@@ -121,24 +139,24 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 px-4 backdrop-blur-sm"
       onMouseDown={e => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-md border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <h2 className="text-[13.5px] font-semibold tracking-tight text-zinc-100">Settings</h2>
+            <h2 className="text-[13.5px] font-semibold text-foreground">Settings</h2>
             {isTesting && (
-              <span className="animate-pulse text-[10px] text-zinc-500">testing...</span>
+              <span className="animate-pulse text-[10px] text-muted-foreground">testing...</span>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -146,22 +164,22 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
           </button>
         </div>
 
-        <div className="flex border-b border-zinc-800 px-5">
+        <div className="flex border-b border-border px-5">
           {TABS.map(tab => (
             <button
               key={tab.id}
               type="button"
               onClick={() => { setActiveTab(tab.id); }}
               className={cn(
-                'relative px-3 py-2 text-[11.5px] font-medium tracking-wide transition-colors',
+                'relative px-3 py-2 text-[11.5px] font-medium transition-colors',
                 activeTab === tab.id
-                  ? 'text-zinc-100'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               {tab.label}
               {activeTab === tab.id && (
-                <span className="absolute inset-x-0 -bottom-px h-px bg-zinc-100" />
+                <span className="absolute inset-x-0 -bottom-px h-px bg-primary" />
               )}
             </button>
           ))}
@@ -177,6 +195,8 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
               currentStatus={currentStatus}
               providerOptions={providerOptions}
               modelOptions={modelOptions}
+              runtimeCapabilities={capabilityDescriptors}
+              selectedRuntime={selectedRuntime}
               onSetProvider={setProvider}
               onSetModel={setModel}
               onSetBackend={setBackend}
@@ -187,6 +207,7 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
           {activeTab === 'orchestration' && (
             <OrchestrationTab
               draft={draft}
+              selectedRuntime={selectedRuntime}
               onSetOrchestration={setOrchestration}
               onSetOrchestrationPattern={setOrchestrationPattern}
               onSetWorktreeIsolation={setWorktreeIsolation}
@@ -195,34 +216,35 @@ export function ChatSettingsDialog({ open, settings, onClose, onSave }: Props) {
           {activeTab === 'extensions' && (
             <ExtensionsTab
               draft={draft}
+              selectedRuntime={selectedRuntime}
               onSetBlocklist={setExtensionBlocklistText}
               onSetTaskCapabilityProfile={setTaskCapabilityProfile}
             />
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-zinc-800 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <div className="flex items-center gap-2">
             {envModels.length > 0 ? (
-              <span className="text-[11px] text-zinc-500">
+              <span className="text-[11px] text-muted-foreground">
                 {envModels.length} model(s) from .env
               </span>
             ) : (
-              <span className="text-[11px] text-zinc-600">No .env config found</span>
+              <span className="text-[11px] text-muted-foreground">No .env config found</span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-[12.5px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              className="rounded-md px-3 py-1.5 text-[12.5px] text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={save}
-              className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12.5px] font-medium text-zinc-900 hover:bg-white"
+              className="rounded-md bg-primary px-3 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
             >
               Save
             </button>
@@ -241,6 +263,8 @@ function ModelTab({
   currentStatus,
   providerOptions,
   modelOptions,
+  runtimeCapabilities,
+  selectedRuntime,
   onSetProvider,
   onSetModel,
   onSetBackend,
@@ -254,6 +278,8 @@ function ModelTab({
   currentStatus: ModelConnectionStatus | undefined
   providerOptions: { id: string; label: string }[]
   modelOptions: { provider: string; id: string; label: string }[]
+  runtimeCapabilities: RuntimeCapabilityDescriptor[]
+  selectedRuntime?: RuntimeCapabilityDescriptor
   onSetProvider: (id: string) => void
   onSetModel: (id: string) => void
   onSetBackend: (backend: ChatModelSettings['backend']) => void
@@ -263,10 +289,10 @@ function ModelTab({
   return (
     <div className="space-y-4">
       {availableEnvModels.length > 0 && (
-        <div className="rounded-lg border border-green-900/30 bg-green-950/20 p-3">
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-green-500" />
-            <span className="text-[11px] font-medium text-green-400">
+            <span className="text-[11px] font-medium text-emerald-700">
               Available models (from .env)
             </span>
           </div>
@@ -285,14 +311,14 @@ function ModelTab({
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] transition-colors',
                     isSelected
-                      ? 'bg-green-600 text-white'
-                      : 'bg-green-900/30 text-green-300 hover:bg-green-900/50'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                   )}
                 >
                   <span
                     className={cn(
                       'h-1.5 w-1.5 rounded-full',
-                      status?.connected ? 'bg-green-400' : 'bg-zinc-500'
+                      status?.connected ? 'bg-green-400' : 'bg-muted-foreground'
                     )}
                   />
                   {model.label || `${model.provider} · ${model.modelId}`}
@@ -341,8 +367,8 @@ function ModelTab({
               className={cn(
                 'flex h-9 items-center gap-1.5 rounded-md px-3 text-[11px]',
                 currentStatus.connected
-                  ? 'bg-green-950/50 text-green-400'
-                  : 'bg-red-950/50 text-red-400'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-rose-100 text-rose-700'
               )}
             >
               <div
@@ -368,13 +394,22 @@ function ModelTab({
           onChange={e => { onSetBackend(e.target.value as ChatModelSettings['backend']); }}
           className={selectClass}
         >
-          <option value="pi-ai">pi-ai (default)</option>
-          <option value="pi-embedded">pi-embedded (tool loop)</option>
-          <option value="telegraph-orchestrator">telegraph-orchestrator (experimental)</option>
+          {runtimeCapabilities.map(runtime => (
+            <option key={runtime.id} value={runtime.id} disabled={!runtime.selectable}>
+              {runtime.label} ({runtime.maturity})
+            </option>
+          ))}
+          {!runtimeCapabilities.some(runtime => runtime.id === draft.backend) && (
+            <option value={draft.backend} disabled>
+              {draft.backend} (not available)
+            </option>
+          )}
           <option value="langgraph" disabled>langgraph (not validated)</option>
           <option value="vercel-ai" disabled>vercel-ai (not validated)</option>
         </select>
       </Field>
+
+      <RuntimeCapabilityMatrix descriptor={selectedRuntime} />
 
       <Field label="API Key" hint="Stored in localStorage (MVP)">
         <div className="flex items-center gap-2">
@@ -394,7 +429,7 @@ function ModelTab({
                 .then(text => { onSetApiKey(text.trim()); })
                 .catch(() => { /* clipboard read denied */ });
             }}
-            className="shrink-0 rounded-md border border-zinc-700 bg-zinc-800/80 px-2 py-1.5 text-[11px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100"
+            className="shrink-0 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent hover:text-foreground"
           >
             Paste
           </button>
@@ -418,15 +453,20 @@ function ModelTab({
 
 function OrchestrationTab({
   draft,
+  selectedRuntime,
   onSetOrchestration,
   onSetOrchestrationPattern,
   onSetWorktreeIsolation,
 }: {
   draft: ChatModelSettings
+  selectedRuntime?: RuntimeCapabilityDescriptor
   onSetOrchestration: (v: ChatModelSettings['orchestration']) => void
   onSetOrchestrationPattern: (v: ChatModelSettings['orchestrationPattern']) => void
   onSetWorktreeIsolation: (v: boolean) => void
 }) {
+  const childRunSupport = capabilitySupport(selectedRuntime, 'childRun')
+  const selectedRuntimeBlocksChildRuns = draft.orchestration !== 'telegraph-subagents' && childRunSupport === 'unsupported'
+
   return (
     <div className="space-y-4">
       <Field label="Orchestration mode">
@@ -438,13 +478,20 @@ function OrchestrationTab({
           className={selectClass}
         >
           <option value="none">none</option>
-          <option value="telegraph-subagents">Telegraph native subagents</option>
+          <option value="telegraph-subagents">Team Router v0</option>
         </select>
       </Field>
 
+      {selectedRuntimeBlocksChildRuns && (
+        <div className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          Current backend does not emit child runs. Select Team Router v0 to enable routed
+          child-agent execution.
+        </div>
+      )}
+
       {draft.orchestration === 'telegraph-subagents' && (
         <>
-          <Field label="Orchestration pattern">
+          <Field label="Router preference">
             <select
               value={draft.orchestrationPattern}
               onChange={e =>
@@ -454,24 +501,24 @@ function OrchestrationTab({
               }
               className={selectClass}
             >
-              <option value="chain">chain (scout → planner → worker → reviewer)</option>
-              <option value="parallel">parallel (scout/planner/worker/reviewer)</option>
+              <option value="chain">review handoff</option>
+              <option value="parallel">parallel specialists</option>
             </select>
           </Field>
 
-          <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <input
               type="checkbox"
               checked={draft.worktreeIsolation}
               onChange={e => { onSetWorktreeIsolation(e.target.checked); }}
-              className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
+              className="h-3.5 w-3.5 rounded border-border bg-background"
             />
             Enable worktree isolation hint (recommended for parallel code edits)
           </label>
 
-          <div className="text-[11px] text-zinc-500">
+          <div className="text-[11px] text-muted-foreground">
             Uses Telegraph native agent profiles from `~/.telegraph/agents` and project
-            `.telegraph/agents`. Pi extensions should run through Pi CLI external runtime.
+            `.telegraph/agents`. The router chooses direct, clarify, single, parallel, or review.
           </div>
         </>
       )}
@@ -481,14 +528,19 @@ function OrchestrationTab({
 
 function ExtensionsTab({
   draft,
+  selectedRuntime,
   onSetBlocklist,
   onSetTaskCapabilityProfile,
 }: {
   draft: ChatModelSettings
+  selectedRuntime?: RuntimeCapabilityDescriptor
   onSetBlocklist: (raw: string) => void
   onSetTaskCapabilityProfile: (profile: ChatModelSettings['taskCapabilityProfile']) => void
 }) {
   const profile = draft.taskCapabilityProfile
+  const supportsReadonly = capabilitySupport(selectedRuntime, 'filesystem') !== 'unsupported'
+  const supportsShell = capabilitySupport(selectedRuntime, 'shell') !== 'unsupported'
+  const supportsPatch = capabilitySupport(selectedRuntime, 'patch') !== 'unsupported'
   const setProfileKind = (kind: ChatModelSettings['taskCapabilityProfile']['kind']) => {
     if (kind === 'readonly-workspace') {
       onSetTaskCapabilityProfile({ kind, scopes: ['repo:read'] })
@@ -523,12 +575,19 @@ function ExtensionsTab({
           className={selectClass}
         >
           <option value="default">default (chat only)</option>
-          <option value="readonly-workspace">readonly workspace</option>
-          <option value="shell-automation">shell automation</option>
-          <option value="coding-edit">coding edit</option>
-          <option value="design-build">design build</option>
+          <option value="readonly-workspace" disabled={!supportsReadonly}>readonly workspace</option>
+          <option value="shell-automation" disabled={!supportsShell}>shell automation</option>
+          <option value="coding-edit" disabled={!supportsPatch}>coding edit</option>
+          <option value="design-build" disabled={!supportsReadonly}>design build</option>
         </select>
       </Field>
+
+      {profile.kind !== 'default' && (
+        <div className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          Risky capabilities remain gated by the permission broker. Renderer approval is Phase D;
+          unsupported profiles are disabled for the selected runtime.
+        </div>
+      )}
 
       {profile.kind === 'shell-automation' && (
         <Field label="Allowed shell commands" hint="Comma or newline separated executable names">
@@ -570,7 +629,7 @@ function ExtensionsTab({
       )}
 
       {profile.kind === 'coding-edit' && (
-        <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
           <input
             type="checkbox"
             checked={profile.patchPolicy === 'apply-after-confirm'}
@@ -580,14 +639,14 @@ function ExtensionsTab({
                 patchPolicy: e.target.checked ? 'apply-after-confirm' : 'preview',
               })
             }}
-            className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
+            className="h-3.5 w-3.5 rounded border-border bg-background"
           />
           Allow patch apply after confirmation
         </label>
       )}
 
       {profile.kind === 'design-build' && (
-        <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
           <input
             type="checkbox"
             checked={profile.artifactPolicy === 'apply-after-confirm'}
@@ -597,7 +656,7 @@ function ExtensionsTab({
                 artifactPolicy: e.target.checked ? 'apply-after-confirm' : 'preview',
               })
             }}
-            className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900"
+            className="h-3.5 w-3.5 rounded border-border bg-background"
           />
           Allow artifact apply after confirmation
         </label>
@@ -628,6 +687,85 @@ function splitList(raw: string): string[] {
     .filter(Boolean)
 }
 
+function RuntimeCapabilityMatrix({ descriptor }: { descriptor?: RuntimeCapabilityDescriptor }) {
+  if (!descriptor) {
+    return (
+      <div className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] text-muted-foreground">
+        Runtime capability descriptor is not available.
+      </div>
+    )
+  }
+
+  return (
+    <section className="rounded-md border border-border bg-background p-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-semibold text-foreground">{descriptor.label}</span>
+            <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] uppercase', maturityClass(descriptor.maturity))}>
+              {descriptor.maturity}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{descriptor.summary}</p>
+        </div>
+        <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[9.5px] uppercase text-muted-foreground">
+          {descriptor.productLayer}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {descriptor.capabilities.map(item => (
+          <div
+            key={item.key}
+            title={item.note}
+            className={cn(
+              'min-w-0 rounded-md border px-2 py-1',
+              supportClass(item.support)
+            )}
+          >
+            <div className="truncate text-[10.5px] font-medium">{item.label}</div>
+            <div className="text-[9.5px] uppercase opacity-80">{supportLabel(item.support)}</div>
+          </div>
+        ))}
+      </div>
+      {descriptor.limitations.length > 0 && (
+        <ul className="mt-2 space-y-1 text-[10.5px] leading-relaxed text-muted-foreground">
+          {descriptor.limitations.map(item => (
+            <li key={item}>- {item}</li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function findEffectiveRuntimeDescriptor(
+  descriptors: RuntimeCapabilityDescriptor[],
+  settings: ChatModelSettings,
+): RuntimeCapabilityDescriptor | undefined {
+  const runtimeId = settings.orchestration === 'telegraph-subagents'
+    ? 'telegraph-subagents'
+    : settings.backend
+  return descriptors.find(item => item.id === runtimeId)
+}
+
+function supportLabel(support: RuntimeCapabilitySupport): string {
+  if (support === 'supported') return 'yes'
+  if (support === 'partial') return 'partial'
+  return 'no'
+}
+
+function supportClass(support: RuntimeCapabilitySupport): string {
+  if (support === 'supported') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  if (support === 'partial') return 'border-amber-200 bg-amber-50 text-amber-700'
+  return 'border-border bg-muted text-muted-foreground'
+}
+
+function maturityClass(maturity: RuntimeCapabilityDescriptor['maturity']): string {
+  if (maturity === 'ready') return 'bg-emerald-100 text-emerald-700'
+  if (maturity === 'scaffold') return 'bg-amber-100 text-amber-700'
+  return 'bg-accent text-primary'
+}
+
 function Field({
   label,
   hint,
@@ -640,10 +778,10 @@ function Field({
   return (
     <label className="block">
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">
+        <span className="text-[11px] font-medium uppercase text-muted-foreground">
           {label}
         </span>
-        {hint && <span className="text-[10.5px] text-zinc-600">{hint}</span>}
+        {hint && <span className="text-[10.5px] text-muted-foreground">{hint}</span>}
       </div>
       {children}
     </label>
@@ -651,9 +789,9 @@ function Field({
 }
 
 const inputClass = cn(
-  'block w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5',
-  'text-[12.5px] text-zinc-100 outline-none transition-colors',
-  'placeholder:text-zinc-600 focus:border-zinc-600 focus:bg-zinc-900'
+  'block w-full rounded-md border border-border bg-background px-2.5 py-1.5',
+  'text-[12.5px] text-foreground outline-none transition-colors',
+  'placeholder:text-muted-foreground/70 focus:border-primary/45 focus:bg-card'
 )
 
 const selectClass = cn(inputClass, 'pr-8')

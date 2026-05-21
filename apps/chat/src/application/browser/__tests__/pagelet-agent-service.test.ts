@@ -16,6 +16,14 @@ const client: IChatPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   send: sendMock,
   cancel: cancelMock,
+  listRuns: vi.fn(() => Promise.resolve([])),
+  getRun: vi.fn(() => Promise.resolve(null)),
+  listRunEvents: vi.fn(() => Promise.resolve([])),
+  listRuntimeCapabilities: vi.fn(() => Promise.resolve([])),
+  exportRunTraceBundle: vi.fn(() => Promise.resolve(null)),
+  importRunTraceBundle: vi.fn(bundle => Promise.resolve({ status: 'imported' as const, record: bundle.run })),
+  listPendingPermissions: vi.fn(() => Promise.resolve([])),
+  resolvePermissionRequest: vi.fn(() => Promise.resolve(true)),
   listSubagents: vi.fn(() => Promise.resolve([])),
   getSubagentResult: vi.fn(() => Promise.resolve(null)),
   cancelSubagent: vi.fn(() => Promise.resolve(false)),
@@ -92,6 +100,48 @@ describe('PageletAgentService', () => {
     expect(unsubscribe).toHaveBeenCalled()
   })
 
+  it('forwards pending permission requests from the pagelet stream', async () => {
+    sendMock.mockImplementationOnce((request) => {
+      streamCallback?.({
+        type: 'permission_pending',
+        runId: request.runId,
+        sessionId: request.sessionId,
+        permissionRequest: {
+          id: 'perm-1',
+          runId: request.runId,
+          sessionId: request.sessionId,
+          permission: { type: 'filesystem', scope: 'workspace', access: 'write' },
+          context: {
+            runId: request.runId,
+            sessionId: request.sessionId,
+            pageletId: 'chat',
+            pageletKind: 'chat',
+          },
+          proposedDecision: {
+            granted: false,
+            source: 'profile',
+            reason: 'Filesystem workspace write requires user approval',
+            requiresUserDecision: true,
+          },
+          createdAt: 1,
+        },
+      })
+      return Promise.resolve({ runId: request.runId, status: 'completed' })
+    })
+
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const permissions: string[] = []
+    const service = new PageletAgentService()
+
+    await service.send({
+      conversation: conversationFixture(),
+      onChunk: vi.fn(),
+      onPermissionRequest: request => { permissions.push(request.id); },
+    })
+
+    expect(permissions).toEqual(['perm-1'])
+  })
+
   it('forwards subagent control calls through the pagelet service', async () => {
     const { PageletAgentService } = await import('../pagelet-agent-service')
     const service = new PageletAgentService()
@@ -103,6 +153,92 @@ describe('PageletAgentService', () => {
     expect(client.listSubagents).toHaveBeenCalled()
     expect(client.getSubagentResult).toHaveBeenCalledWith('child-1', true)
     expect(client.cancelSubagent).toHaveBeenCalledWith('child-1')
+  })
+
+  it('forwards persisted run console calls through the pagelet service', async () => {
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await expect(service.listRuns?.({ sessionId: 'session-1', limit: 10 })).resolves.toEqual([])
+    await expect(service.getRun?.('run-1')).resolves.toBeNull()
+    await expect(service.listRunEvents?.('run-1')).resolves.toEqual([])
+
+    expect(client.listRuns).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      status: undefined,
+      limit: 10,
+      offset: undefined,
+    })
+    expect(client.getRun).toHaveBeenCalledWith('run-1')
+    expect(client.listRunEvents).toHaveBeenCalledWith('run-1')
+  })
+
+  it('forwards replay metadata and trace bundle export through the pagelet service', async () => {
+    sendMock.mockResolvedValueOnce({ runId: 'run-replay', status: 'completed' })
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await service.send({
+      conversation: conversationFixture(),
+      parentRunId: 'run-source',
+      replay: {
+        mode: 'fork',
+        sourceRunId: 'run-source',
+        sourceEventSeq: 3,
+      },
+      onChunk: vi.fn(),
+    })
+    const bundle = {
+      schemaVersion: 1 as const,
+      exportedAt: 1,
+      run: {
+        runId: 'run-source',
+        sessionId: 'session-1',
+        status: 'completed' as const,
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        eventCount: 0,
+        createdAt: 1,
+      },
+      events: [],
+    }
+    await expect(service.exportRunTraceBundle?.('run-source')).resolves.toBeNull()
+    await expect(service.importRunTraceBundle?.(bundle)).resolves.toEqual({
+      status: 'imported',
+      record: bundle.run,
+    })
+
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({
+      parentRunId: 'run-source',
+      replay: {
+        mode: 'fork',
+        sourceRunId: 'run-source',
+        sourceEventSeq: 3,
+      },
+    }))
+    expect(client.exportRunTraceBundle).toHaveBeenCalledWith('run-source')
+    expect(client.importRunTraceBundle).toHaveBeenCalledWith(bundle)
+  })
+
+  it('forwards runtime capability matrix calls through the pagelet service', async () => {
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await expect(service.listRuntimeCapabilities?.()).resolves.toEqual([])
+
+    expect(client.listRuntimeCapabilities).toHaveBeenCalled()
+  })
+
+  it('forwards permission approval calls through the pagelet service', async () => {
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await expect(service.listPendingPermissions?.('run-1')).resolves.toEqual([])
+    await expect(service.resolvePermissionRequest?.('perm-1', { granted: true })).resolves.toBe(true)
+
+    expect(client.listPendingPermissions).toHaveBeenCalledWith('run-1')
+    expect(client.resolvePermissionRequest).toHaveBeenCalledWith('perm-1', { granted: true })
   })
 })
 
