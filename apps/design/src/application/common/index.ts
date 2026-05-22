@@ -57,6 +57,7 @@ export interface DesignAgentRunEventSnapshot {
 export interface DesignSubagentRecordSnapshot {
   id: string;
   parentRunId: string;
+  sessionId?: string;
   agent: string;
   label: string;
   description: string;
@@ -131,6 +132,7 @@ export interface DesignArtifactPatchApplyResult {
 export type DesignAgentStreamEvent =
   | { type: 'run_queued'; runId: string; sessionId?: string }
   | { type: 'agent_event'; runId: string; sessionId?: string; event: AgentEvent }
+  | { type: 'subagent_updated'; runId: string; sessionId?: string; subagent: DesignSubagentRecordSnapshot }
   | { type: 'run_failed'; runId: string; sessionId?: string; error: string };
 
 export interface IDesignApplication {

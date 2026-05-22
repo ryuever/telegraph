@@ -13,6 +13,11 @@ import {
   type DesignSelectedComponent,
 } from './DesignArtifactWorkbench'
 import { extractDesignPatchOperations } from './design-artifact-view'
+import {
+  reduceDesignSubagentItems,
+  type DesignSubagentViewItem,
+} from './design-subagent-projector'
+import { DesignSubagentPanel } from './DesignSubagentPanel'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
 export type DesignRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
@@ -82,6 +87,7 @@ export function DesignWorkspace({
   const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
   const [traceItems, setTraceItems] = useState<DesignTraceItem[]>([])
+  const [subagentItems, setSubagentItems] = useState<DesignSubagentViewItem[]>([])
 
   const appendAssistantText = (text: string, messageId?: string): void => {
     setMessages((prev) => {
@@ -141,6 +147,16 @@ export function DesignWorkspace({
       onAssistantText: text => { appendAssistantText(text, assistantMessageId) },
       onTraceEvent: event => {
         setTraceItems(prev => reduceTraceItems(prev, event))
+        if (event.type === 'agent_event') {
+          setSubagentItems(prev => reduceDesignSubagentItems(prev, event))
+        }
+      },
+      onSubagent: subagent => {
+        setSubagentItems(prev => reduceDesignSubagentItems(prev, {
+          type: 'subagent_updated',
+          runId: subagent.parentRunId,
+          subagent,
+        }))
       },
       onArtifact: artifact => {
         rememberAssistantArtifact(assistantMessageId, artifact)
@@ -168,6 +184,14 @@ export function DesignWorkspace({
     }
     activeControllers.current.clear()
     setStatus('cancelled')
+  }
+
+  const cancelSubagent = (childRunId: string): void => {
+    setSubagentItems(prev => prev.map(item => {
+      if (item.id !== childRunId) return item
+      return { ...item, status: 'stopped', cancellable: false }
+    }))
+    void agent.cancelSubagent(childRunId).catch(() => {})
   }
 
   useEffect(() => {
@@ -387,6 +411,7 @@ export function DesignWorkspace({
           </div>
         </div>
         <TraceTimeline items={traceItems} />
+        <DesignSubagentPanel items={subagentItems} onCancel={cancelSubagent} />
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
@@ -652,6 +677,7 @@ function traceItemFromEvent(
   if (event.type === 'run_failed') {
     return { id: `${event.runId}:terminal`, label: 'Run failed', status: 'failed', detail: event.error }
   }
+  if (event.type !== 'agent_event') return null
 
   const runtimeEvent = event.event
   switch (runtimeEvent.type) {

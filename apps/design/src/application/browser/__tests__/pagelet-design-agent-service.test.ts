@@ -134,6 +134,44 @@ describe('PageletDesignAgentService', () => {
     expect(unsubscribe).toHaveBeenCalled()
   })
 
+  it('forwards live subagent snapshots separately from trace events', async () => {
+    sendAgentMock.mockImplementationOnce((request) => {
+      agentEventCallback?.({
+        type: 'subagent_updated',
+        runId: request.runId,
+        sessionId: request.sessionId,
+        subagent: {
+          id: 'child-1',
+          parentRunId: request.runId,
+          sessionId: request.sessionId,
+          agent: 'worker',
+          label: 'Worker',
+          description: 'Does work',
+          task: 'Build the patch',
+          status: 'running',
+          toolUses: 0,
+          startedAt: 1,
+        },
+      })
+      return Promise.resolve({ runId: request.runId, status: 'completed' })
+    })
+
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const subagents: string[] = []
+    const traceTypes: string[] = []
+    const service = new PageletDesignAgentService()
+
+    await service.send({
+      prompt: 'make a card',
+      sessionId: 'session-1',
+      onSubagent: subagent => { subagents.push(`${subagent.id}:${subagent.status}`); },
+      onTraceEvent: event => { traceTypes.push(event.type); },
+    })
+
+    expect(subagents).toEqual(['child-1:running'])
+    expect(traceTypes).toEqual(['subagent_updated'])
+  })
+
   it('passes the saved design task capability profile into pagelet runs', async () => {
     globalThis.localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
       provider: 'minimax-cn',

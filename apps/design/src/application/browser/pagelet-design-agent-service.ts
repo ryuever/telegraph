@@ -34,6 +34,7 @@ export interface DesignAgentSendOptions {
   onStatus?: (status: DesignAgentRunStatus) => void
   onAssistantText?: (text: string) => void
   onArtifact?: (artifact: DesignProjectedArtifact) => void
+  onSubagent?: (subagent: DesignSubagentRecordSnapshot) => void
   onTraceEvent?: (event: DesignAgentStreamEvent) => void
 }
 
@@ -79,6 +80,11 @@ export class PageletDesignAgentService {
         if (options.signal?.aborted && (event.type !== 'agent_event' || event.event.type !== 'run_cancelled')) return
         if (event.runId !== runId) return
         options.onTraceEvent?.(event)
+
+        if (event.type === 'subagent_updated') {
+          options.onSubagent?.(event.subagent)
+          return
+        }
 
         if (event.type === 'agent_event') {
           projectAgentEventToDesign(event.event, {

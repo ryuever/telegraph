@@ -9,6 +9,8 @@ import {
 export interface SubagentManagerOptions {
   runner?: SubagentRunner
   maxConcurrent?: number
+  onCreate?: (record: SubagentRecord) => void
+  onUpdate?: (record: SubagentRecord) => void
   onStart?: (record: SubagentRecord) => void
   onComplete?: (record: SubagentRecord) => void
 }
@@ -28,6 +30,8 @@ export interface SpawnSubagentInput {
 export class SubagentManager {
   private readonly runner: SubagentRunner
   private readonly records = new Map<string, SubagentRecord>()
+  private readonly onCreate?: (record: SubagentRecord) => void
+  private readonly onUpdate?: (record: SubagentRecord) => void
   private readonly onStart?: (record: SubagentRecord) => void
   private readonly onComplete?: (record: SubagentRecord) => void
   private maxConcurrent: number
@@ -37,6 +41,8 @@ export class SubagentManager {
   constructor(options: SubagentManagerOptions = {}) {
     this.runner = options.runner ?? new StreamingSubagentRunner()
     this.maxConcurrent = options.maxConcurrent ?? 4
+    this.onCreate = options.onCreate
+    this.onUpdate = options.onUpdate
     this.onStart = options.onStart
     this.onComplete = options.onComplete
   }
@@ -60,6 +66,7 @@ export class SubagentManager {
     record.abortController.abort()
     record.status = 'stopped'
     record.completedAt = Date.now()
+    this.onUpdate?.(record)
     return true
   }
 
@@ -125,6 +132,7 @@ export class SubagentManager {
     const record: SubagentRecord = {
       id: input.childRunId,
       parentRunId: input.parentRunId,
+      sessionId: input.sessionId,
       agent: input.agent.name,
       label: input.label ?? input.agent.name,
       description: input.agent.description ?? input.agent.name,
@@ -137,6 +145,7 @@ export class SubagentManager {
       origin: input.agent.origin,
     }
     this.records.set(record.id, record)
+    this.onCreate?.(record)
     return record
   }
 

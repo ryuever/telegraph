@@ -15,6 +15,12 @@ export {
   type RuntimeRegistration,
 } from './AgentHarness'
 export {
+  AgentRunControl,
+  type AgentRunControlHandle,
+  type AgentRunControlStartInput,
+  type AgentRunControlSubscription,
+} from './AgentRunControl'
+export {
   PermissionBroker,
   type FilesystemAccess,
   type FilesystemPermissionPolicy,
