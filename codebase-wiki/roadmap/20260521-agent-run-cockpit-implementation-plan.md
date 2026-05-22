@@ -43,6 +43,9 @@ references:
   - id: P-010
     rel: related-to
     file: ./20260522-remote-agent-os-implementation-roadmap.md
+  - id: D-017
+    rel: related-to
+    file: ../discussion/20260522-durable-execution-agent-run-ledger.md
 ---
 
 # Agent Run Cockpit 可跟踪实施计划

@@ -51,6 +51,10 @@ references:
     rel: extended-by
     file: ./20260522-telegraph-remote-agent-os-architecture.md
     note: A-013 在本文 Pagelet / Shared / Main 边界上扩展 Mobile、CLI、Slack、Telegram、MCP 与 Computer Use 的远程控制目标架构。
+  - id: D-017
+    rel: related-to
+    file: ../discussion/20260522-durable-execution-agent-run-ledger.md
+    note: D-017 的 durable execution 落点受本文 Pagelet = Runtime/Extension Host 边界约束。
 ---
 
 # Telegraph 最终进程架构（Main · Shared · Daemon · Pagelet）

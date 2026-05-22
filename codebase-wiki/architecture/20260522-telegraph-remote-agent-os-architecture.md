@@ -4,8 +4,8 @@ title: Telegraph Remote Agent OS 与外部控制架构
 description: >
   将 Mobile、CLI、Slack、Telegram、Webhook、MCP 与 Computer Use 统一纳入
   Telegraph local-first agent host 的目标架构：外部入口只产生 RunIntent，
-  桌面端 Pagelet 承载 Runtime/Tool/Permission，Shared RunBroker 负责事件与审批，
-  Computer Use 作为分层执行兜底而不是架构中心。
+  桌面端 Pagelet 承载 Runtime/Tool/Permission 与 DurableRunLedger，Shared
+  RunBroker 负责入口路由、索引、订阅聚合与审批，Computer Use 作为分层执行兜底。
 category: architecture
 created: 2026-05-22
 updated: 2026-05-22
@@ -17,6 +17,8 @@ tags:
   - telegram
   - computer-use
   - run-broker
+  - run-ledger
+  - durable-execution
   - approval
 status: draft
 sources:
@@ -54,6 +56,10 @@ references:
   - id: P-010
     rel: derives
     file: ../roadmap/20260522-remote-agent-os-implementation-roadmap.md
+  - id: D-017
+    rel: related-to
+    file: ../discussion/20260522-durable-execution-agent-run-ledger.md
+    note: D-017 细化本文中 RunBroker / DurableRunLedger / DurableRunEngine 的 durable execution 分层。
 ---
 
 # Telegraph Remote Agent OS 与外部控制架构
@@ -136,11 +142,12 @@ Telegraph Desktop
   Main
     Process governance / native capability boundary
   Shared
-    RunBroker / EventLog / Policy / Identity / Settings
+    RunBroker / RunIndex / Approval / Policy / Identity / Settings
   Daemon
     Metrics / watchdog / diagnostics / audit shipping
   Pagelets
     chat / design / remote-control / cli-gateway / computer-use
+    DurableRunLedger / optional DurableRunEngine
         |
         v
 Agent Runtime + Harness Extension + Tool Registry
@@ -154,7 +161,8 @@ Execution Layer
 
 - 外部入口不成为 Main participant。
 - runtime、tool、extension、Computer Use broker 仍在 Pagelet 内。
-- Shared 持有全局 run/event/approval 状态，但不跑 runtime。
+- Shared 持有入口路由、run 索引、订阅聚合与 approval 状态，但不跑 runtime。
+- Pagelet 持有 durable run event ledger，是执行事实的 source of truth。
 - Main 只暴露受控系统能力，不直接执行 agent loop。
 - 所有 Telegraph 内部跨进程调用继续走 ConnectionOrchestrator + RPC。
 
@@ -195,16 +203,28 @@ Execution Layer
 - 真正进入拓扑的是 `pagelet:cli-gateway:1`。
 - CLI 与 Desktop UI 是同一个 run 的两个观察者。
 
-### 4.3 Shared RunBroker
+### 4.3 RunBroker / DurableRunLedger / DurableRunEngine 三层
 
-`RunBrokerService` 是所有入口的中枢。
+Remote Agent OS 需要把三个相近概念拆开，避免把控制面和执行语义混在一起：
+
+| 概念 | 归属 | 职责 | 不做什么 |
+|------|------|------|----------|
+| `RunBroker` | Shared | 入口路由、run 索引、订阅聚合、approval 状态、跨入口 attach | 不跑 runtime，不做每条 event 的强写入，不执行工具 |
+| `DurableRunLedger` | Pagelet | `createRun`、append-only event log、terminal flush、orphan recovery、历史 projection | 不做跨入口路由，不定义 checkpoint 语义 |
+| `DurableRunEngine` | Pagelet runtime adapter 内部 | checkpoint、resume、durable step、side-effect idempotency | 不替代 `RuntimeEvent`，不把 Restate/DBOS/LangGraph 类型泄漏到协议层 |
+
+关键原则：**Shared 负责“大家怎么找到 run”，Pagelet 负责“run 实际发生了什么”，DurableRunEngine 负责“run 能不能从中断点继续”。**
+
+### 4.4 Shared RunBroker
+
+`RunBrokerService` 是所有外部入口的控制面中枢。
 
 ```typescript
 export interface IRunBrokerService {
   createRunIntent(input: RunIntentInput): Promise<RunRecord>
   claimRunIntent(req: { appId: string; runId?: string }): Promise<RunClaim | null>
-  appendRuntimeEvent(req: { runId: string; event: RuntimeEvent }): Promise<EventCursor>
-  subscribeRunEvents(req: { runId: string; cursor?: string }): AsyncIterable<RuntimeEventEnvelope>
+  registerRunSummary(req: RunSummary): Promise<void>
+  subscribeRunProjection(req: { runId: string; cursor?: string }): AsyncIterable<RuntimeEventEnvelope>
   requestApproval(req: ApprovalRequest): Promise<ApprovalTicket>
   decideApproval(req: ApprovalDecision): Promise<void>
   listRuns(filter?: RunListFilter): Promise<RunRecord[]>
@@ -213,18 +233,62 @@ export interface IRunBrokerService {
 
 RunBroker 放 Shared 的理由：
 
-- 多个入口需要共享同一套 run 状态。
-- 多个 Pagelet 需要领取与更新 run。
+- 多个入口需要共享同一套 run 索引和状态摘要。
+- 多个 Pagelet 需要领取 run intent。
 - Desktop UI、CLI、Mobile、Slack 可以同时 attach。
-- 事件需要断线恢复、cursor、审计与 replay。
+- approval 需要跨入口投递和决策。
 
 RunBroker 不做的事情：
 
 - 不调用 `runtime.run()`。
+- 不作为 pagelet-local event ledger 的替代。
 - 不执行 Computer Use action。
 - 不直接控制桌面。
+- 不把 Shared 放进模型 token stream 或高频 trace 的关键路径。
 
-### 4.4 Main DesktopPrimitiveService
+### 4.5 Pagelet DurableRunLedger
+
+`DurableRunLedger` 是每个执行型 Pagelet 内的强 durable 写入点。
+
+```typescript
+export interface DurableRunLedger {
+  createRun(input: CreateRunInput): Promise<RunRecord>
+  appendEvent(runId: string, event: RuntimeEvent): Promise<EventCursor>
+  listRuns(filter?: RunListFilter): Promise<RunRecord[]>
+  listRunEvents(runId: string, cursor?: string): Promise<RuntimeEventEnvelope[]>
+  markRunningRunsRecovered(now?: number): Promise<RunRecord[]>
+}
+```
+
+落在 Pagelet 的理由：
+
+- runtime event 在 Pagelet 内生成，关键生命周期事件应就近落盘。
+- 高频 `assistant_delta` / `model_event` 不应跨进程同步写 Shared。
+- pagelet crash recovery 可以在 pagelet boot 时扫描 orphan run 并收敛状态。
+- 符合 A-008：Runtime / Extension Host 的边界在 Pagelet 内。
+
+写入策略：
+
+- `createRun` 必须在 `AgentHarness.run()` 前完成。
+- `run_started`、tool call/result、permission、child run、terminal event 属于关键事件。
+- token delta / raw model event 可以 compact / batch / rawRef。
+- terminal 返回前必须确保关键事件和最终状态已经落盘。
+
+### 4.6 Pagelet DurableRunEngine
+
+`DurableRunEngine` 是可选的高阶执行能力，只在 runtime 真正支持 checkpoint/resume 时启用。
+
+```typescript
+export interface DurableRunEngine {
+  run(input: DurableRunInput): AsyncIterable<RuntimeEvent>
+  resume(input: ResumeRunInput): AsyncIterable<RuntimeEvent>
+  getCheckpoints(runId: string): Promise<CheckpointRef[]>
+}
+```
+
+它可以封装 Restate、DBOS、LangGraph checkpointer 或自研 step journal，但这些内部概念不能替代 Telegraph 的 `RuntimeEvent`。
+
+### 4.7 Main DesktopPrimitiveService
 
 Main 只暴露必须由 Electron main 或 OS API 提供的能力：
 
@@ -488,10 +552,11 @@ Telegram/Slack/Mobile
   -> ChannelAdapter parses ExternalMessage
   -> Relay routes to online Desktop
   -> RemoteControlPagelet validates actor/device/profile
-  -> Shared RunBroker creates RunIntent
+  -> Shared RunBroker creates RunIntent and run index entry
   -> target Pagelet claims run
+  -> target Pagelet DurableRunLedger creates run and appends events
   -> Runtime emits RuntimeEvent
-  -> RunBroker persists events
+  -> RunBroker receives projections / summaries
   -> ChannelProjection sends replies
 ```
 
@@ -503,7 +568,8 @@ telegraph ask
   -> cli-gateway Pagelet
   -> RunBroker createRunIntent
   -> target Pagelet claim
-  -> CLI attach run event stream by cursor
+  -> target Pagelet DurableRunLedger append events
+  -> CLI attach run projection stream by cursor
 ```
 
 ### 9.3 Computer Use Action
@@ -526,7 +592,7 @@ PermissionBroker
   -> RunBroker requestApproval
   -> projection to Mobile/Slack/Telegram/CLI/Desktop
   -> first valid decision wins
-  -> decision appended to EventLog
+  -> decision appended to pagelet DurableRunLedger as permission event
   -> blocked tool resumes or fails
 ```
 

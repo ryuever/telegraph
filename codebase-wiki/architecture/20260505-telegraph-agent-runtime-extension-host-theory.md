@@ -59,6 +59,10 @@ references:
     rel: related-to
     file: ./20260522-telegraph-remote-agent-os-architecture.md
     note: A-013 将本文 Run / RuntimeEvent / Tool / Approval 抽象扩展到 Mobile、CLI、Slack、Telegram 与 Computer Use 入口。
+  - id: D-017
+    rel: extended-by
+    file: ../discussion/20260522-durable-execution-agent-run-ledger.md
+    note: D-017 将本文 Run / RuntimeEvent / Trace 原则扩展为 durable run ledger、recovery 与 resume 的分层设想。
 ---
 
 # Telegraph Agent Runtime 与 Extension Host 理论基础

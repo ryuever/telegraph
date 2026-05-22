@@ -7,7 +7,7 @@ description: >
   runtime adapter，而应沉淀为 Telegraph native subagent harness。
 category: discussion
 created: 2026-05-20
-updated: 2026-05-21
+updated: 2026-05-22
 tags:
   - agent-runtime
   - native-harness
@@ -53,6 +53,9 @@ references:
   - id: D-016
     rel: extended-by
     file: ./20260521-design-page-agent-generation-product-architecture.md
+  - id: D-017
+    rel: extended-by
+    file: ./20260522-durable-execution-agent-run-ledger.md
 ---
 
 # Agent Runtime 产品分层与 Telegraph Native Harness 对齐

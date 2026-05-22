@@ -126,6 +126,10 @@ export const wikiSidebar = {
         {
           "text": "D-016 Design Page 一句话生成页面的产品定位与 Agent 编排架构",
           "link": "/discussion/20260521-design-page-agent-generation-product-architecture"
+        },
+        {
+          "text": "D-017 Durable Execution 与 Agent Run Ledger 设想",
+          "link": "/discussion/20260522-durable-execution-agent-run-ledger"
         }
       ]
     }
