@@ -4,18 +4,18 @@ import type {
   DesignPatchOperation,
 } from './DesignBuildArtifacts'
 import type {
-  DesignBuildOrchestratorOutput,
+  DesignBuildInitialState,
   DesignBuildReview,
-} from './DesignBuildOrchestrator'
-import { DesignBuildRuntimeError } from './DesignBuildOrchestrator'
+} from './DesignBuildInitialState'
+import { DesignBuildRuntimeError } from './DesignBuildInitialState'
 
 export interface DesignBuildValidationResult {
   valid: boolean
   errors: string[]
-  repaired?: DesignBuildOrchestratorOutput
+  repaired?: DesignBuildInitialState
 }
 
-export function validateDesignBuildOutput(output: DesignBuildOrchestratorOutput): DesignBuildValidationResult {
+export function validateDesignBuildOutput(output: DesignBuildInitialState): DesignBuildValidationResult {
   const errors = [
     ...validateArtifact(output.artifact),
     ...validateReview(output.review),
@@ -25,7 +25,7 @@ export function validateDesignBuildOutput(output: DesignBuildOrchestratorOutput)
   const repairedArtifact = repairArtifact(output.artifact)
   if (!repairedArtifact) return { valid: false, errors }
 
-  const repaired: DesignBuildOrchestratorOutput = {
+  const repaired: DesignBuildInitialState = {
     ...output,
     artifact: repairedArtifact,
   }
@@ -38,7 +38,7 @@ export function validateDesignBuildOutput(output: DesignBuildOrchestratorOutput)
     : { valid: false, errors: [...errors, ...repairedErrors] }
 }
 
-export function assertValidDesignBuildOutput(output: DesignBuildOrchestratorOutput): DesignBuildOrchestratorOutput {
+export function assertValidDesignBuildOutput(output: DesignBuildInitialState): DesignBuildInitialState {
   const result = validateDesignBuildOutput(output)
   if (result.valid) return output
   if (result.repaired) return result.repaired
