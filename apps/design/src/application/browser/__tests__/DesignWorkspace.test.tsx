@@ -158,6 +158,8 @@ describe('DesignWorkspace', () => {
 
     expect(applyButton()?.textContent).toContain('预览 Patch')
     expect(container.textContent).toContain('已生成「Hero patch」预览。')
+    expect(container.textContent).toContain('Subagents')
+    expect(container.textContent).toContain('Design Component Scout')
     expect(container.textContent).not.toContain('正在生成...')
 
     await act(async () => {

@@ -193,6 +193,7 @@ export type SubagentStatus = 'queued' | 'running' | 'completed' | 'stopped' | 'e
 export interface SubagentRecord {
   id: string
   parentRunId: string
+  sessionId?: string
   agent: string
   label: string
   description: string

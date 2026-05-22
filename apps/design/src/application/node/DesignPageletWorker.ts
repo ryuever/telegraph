@@ -24,23 +24,17 @@ import {
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
-import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
-import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
 import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build';
 import { DesignBuildRuntime } from './design-build/DesignBuildRuntime';
-import { DesignRunStore } from './DesignRunStore';
+import { DesignHarnessRunController } from './DesignHarnessRunController';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');
 
-const activeAgentRuns = new Map<string, AbortController>();
-
 @injectable()
 export class DesignPageletWorker extends PageletWorker {
-  private agentListeners = new Set<(event: DesignAgentStreamEvent) => void>();
-  private readonly subagents = new SubagentManager();
-  private readonly runStore = new DesignRunStore();
+  private readonly runControl = new DesignHarnessRunController();
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -56,62 +50,35 @@ export class DesignPageletWorker extends PageletWorker {
         sendAgent: (request: DesignAgentSendRequest): Promise<DesignAgentSendResult> =>
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>
-          Promise.resolve(this.cancelAgentRun(runId)),
+          Promise.resolve(this.runControl.cancelRun(runId)),
         listAgentRuns: (): Promise<DesignAgentRunRecordSnapshot[]> =>
-          Promise.resolve(this.runStore.list()),
+          Promise.resolve(this.runControl.listRuns()),
         getAgentRun: (runId: string): Promise<DesignAgentRunRecordSnapshot | null> =>
-          Promise.resolve(this.runStore.get(runId)),
+          Promise.resolve(this.runControl.getRun(runId)),
         listSubagents: (): Promise<DesignSubagentRecordSnapshot[]> =>
-          Promise.resolve(this.subagents.listRecords().map(snapshotSubagentRecord)),
+          Promise.resolve(this.runControl.listSubagents()),
         getSubagentResult: (childRunId: string, consume?: boolean): Promise<DesignSubagentRecordSnapshot | null> =>
-          Promise.resolve(snapshotNullableSubagentRecord(this.subagents.getResult(childRunId, { consume: consume === true }))),
+          Promise.resolve(this.runControl.getSubagentResult(childRunId, consume === true)),
         cancelSubagent: (childRunId: string): Promise<boolean> =>
-          Promise.resolve(this.subagents.abort(childRunId)),
+          Promise.resolve(this.runControl.cancelSubagent(childRunId)),
         previewArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult> =>
           this.handlePreviewArtifactPatch(request),
         applyArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult> =>
           this.handleApplyArtifactPatch(request),
         onAgentEvent: (callback: (event: DesignAgentStreamEvent) => void): { unsubscribe: () => void } => {
-          this.agentListeners.add(callback);
-          return {
-            unsubscribe: () => {
-              this.agentListeners.delete(callback);
-            },
-          };
+          return this.runControl.subscribe(callback);
         },
       },
     });
   }
 
-  private emitAgentEvent(event: DesignAgentStreamEvent): void {
-    this.runStore.append(event);
-    for (const listener of this.agentListeners) {
-      try {
-        listener(event);
-      } catch {
-        this.agentListeners.delete(listener);
-      }
-    }
-  }
-
-  private cancelAgentRun(runId: string): boolean {
-    const ctrl = activeAgentRuns.get(runId);
-    if (!ctrl) return false;
-    ctrl.abort();
-    activeAgentRuns.delete(runId);
-    return true;
-  }
-
   private async handleSendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult> {
     const sessionId = request.sessionId ?? `design-${request.runId}`;
-    const abortController = new AbortController();
-    activeAgentRuns.set(request.runId, abortController);
-    this.runStore.start({
+    const run = this.runControl.startRun({
       runId: request.runId,
       sessionId,
       prompt: request.prompt,
     });
-    this.emitAgentEvent({ type: 'run_queued', runId: request.runId, sessionId });
 
     const agentRequest: AgentRunRequest = {
       runId: request.runId,
@@ -137,7 +104,7 @@ export class DesignPageletWorker extends PageletWorker {
         { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
         {
           id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-          create: () => new TelegraphSubagentHarness({ subagentManager: this.subagents }),
+          create: () => new TelegraphSubagentHarness({ subagentManager: this.runControl.subagents }),
         },
         { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
       ],
@@ -150,20 +117,20 @@ export class DesignPageletWorker extends PageletWorker {
         feedback: {
           notify: input => {
             if (!input.runId) return;
-            this.emitAgentEvent({ type: 'agent_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
+            this.runControl.emitAgentEvent({ type: 'agent_event', runId: input.runId, sessionId: input.sessionId, event: feedbackRuntimeLog(input) });
           },
         },
         emit: event => {
-          this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
+          this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
         },
       }),
     });
 
     try {
       let terminal: { status: 'completed' | 'failed'; error?: string } | undefined;
-      for await (const event of agentHarness.run(agentRequest, { signal: abortController.signal })) {
-        if (abortController.signal.aborted) break;
-        this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
+      for await (const event of agentHarness.run(agentRequest, { signal: run.signal })) {
+        if (run.signal.aborted) break;
+        this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId, event });
         if (event.type === 'run_completed') {
           terminal = { status: 'completed' };
         } else if (event.type === 'run_failed') {
@@ -173,27 +140,26 @@ export class DesignPageletWorker extends PageletWorker {
         }
       }
 
-      activeAgentRuns.delete(request.runId);
-      if (abortController.signal.aborted) {
-        this.emitAgentEvent({
+      this.runControl.finishRun(request.runId);
+      if (run.signal.aborted) {
+        this.runControl.emitAgentEvent({
           type: 'agent_event',
           runId: request.runId,
           sessionId,
           event: cancelledAgentEvent(request.runId),
         });
-        this.emitAgentEvent({ type: 'run_failed', runId: request.runId, sessionId, error: 'Cancelled' });
         return { runId: request.runId, status: 'failed', error: 'Cancelled' };
       }
       if (terminal?.status === 'failed') {
-        this.runStore.complete(request.runId, 'failed', terminal.error);
+        this.runControl.completeRun(request.runId, 'failed', terminal.error);
         return { runId: request.runId, status: 'failed', error: terminal.error };
       }
-      this.runStore.complete(request.runId, 'completed');
+      this.runControl.completeRun(request.runId, 'completed');
       return { runId: request.runId, status: 'completed' };
     } catch (error) {
-      activeAgentRuns.delete(request.runId);
+      this.runControl.finishRun(request.runId);
       const message = error instanceof Error ? error.message : String(error);
-      this.emitAgentEvent({ type: 'run_failed', runId: request.runId, sessionId, error: message });
+      this.runControl.emitAgentEvent({ type: 'run_failed', runId: request.runId, sessionId, error: message });
       return { runId: request.runId, status: 'failed', error: message };
     }
   }
@@ -255,14 +221,14 @@ export class DesignPageletWorker extends PageletWorker {
     const broker = new PermissionBroker({
       prompt: () => userConfirmed,
       emit: event => {
-        this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
+        this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
       },
     });
 
     return new PermissionedNodePatchCapability({
       broker,
       emit: event => {
-        this.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
+        this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
       },
       allowedRoots: [process.cwd()],
       context: {
@@ -288,28 +254,6 @@ export class DesignPageletWorker extends PageletWorker {
       },
     });
   }
-}
-
-function snapshotNullableSubagentRecord(record: SubagentRecord | undefined): DesignSubagentRecordSnapshot | null {
-  return record ? snapshotSubagentRecord(record) : null;
-}
-
-function snapshotSubagentRecord(record: SubagentRecord): DesignSubagentRecordSnapshot {
-  return {
-    id: record.id,
-    parentRunId: record.parentRunId,
-    agent: record.agent,
-    label: record.label,
-    description: record.description,
-    task: record.task,
-    status: record.status,
-    result: record.result,
-    error: record.error,
-    toolUses: record.toolUses,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
-    resultConsumed: record.resultConsumed,
-  };
 }
 
 function assertDesignPatchApplyAllowed(request: DesignArtifactPatchRequest): void {

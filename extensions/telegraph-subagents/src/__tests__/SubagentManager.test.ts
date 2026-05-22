@@ -82,6 +82,7 @@ describe('SubagentManager', () => {
       childRunId: 'parent-run-scout',
       agent,
       task: 'Find auth files',
+      sessionId: 'session-1',
       settings: settings(),
     }))
 
@@ -95,6 +96,7 @@ describe('SubagentManager', () => {
     expect(manager.getRecord('parent-run-scout')).toMatchObject({
       id: 'parent-run-scout',
       parentRunId: 'parent-run',
+      sessionId: 'session-1',
       agent: 'scout',
       status: 'completed',
       result: 'scout output',
@@ -154,6 +156,30 @@ describe('SubagentManager', () => {
     runner.releaseNext()
     await second
     expect(manager.getRecord('child-two')?.status).toBe('completed')
+  })
+
+  it('notifies lifecycle observers when child records are created, started, and completed', async () => {
+    const transitions: string[] = []
+    const manager = new SubagentManager({
+      runner: new FakeRunner(),
+      onCreate: record => { transitions.push(`${record.id}:${record.status}:create`); },
+      onStart: record => { transitions.push(`${record.id}:${record.status}:start`); },
+      onComplete: record => { transitions.push(`${record.id}:${record.status}:complete`); },
+    })
+
+    await collect(manager.spawnAndWait({
+      parentRunId: 'parent-run',
+      childRunId: 'parent-run-scout',
+      agent,
+      task: 'Find auth files',
+      settings: settings(),
+    }))
+
+    expect(transitions).toEqual([
+      'parent-run-scout:queued:create',
+      'parent-run-scout:running:start',
+      'parent-run-scout:completed:complete',
+    ])
   })
 })
 

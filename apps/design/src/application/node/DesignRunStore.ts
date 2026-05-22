@@ -99,6 +99,13 @@ function summarizeStreamEvent(event: DesignAgentStreamEvent): DesignAgentRunReco
       label: event.error,
     }
   }
+  if (event.type === 'subagent_updated') {
+    return {
+      type: 'subagent_updated',
+      ts: Date.now(),
+      label: `${event.subagent.label}: ${event.subagent.status}`,
+    }
+  }
   return {
     type: event.event.type,
     ts: event.event.ts,
