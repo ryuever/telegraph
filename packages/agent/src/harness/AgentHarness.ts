@@ -144,7 +144,7 @@ class DefaultAgentHarness implements AgentHarness {
 
     const runtimeId = selectRuntimeId(preparedRequest.settings, this.defaultRuntimeId)
     const runtime = this.registry.create(runtimeId, preparedRequest)
-    const input = toRuntimeInput(preparedRequest, options.signal)
+    const input = toRuntimeInput(preparedRequest, this.capabilities, options.signal)
     let sawTerminal = false
     let lastEvent: AgentEvent | undefined
 
@@ -262,9 +262,10 @@ function normalizeHookError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
 }
 
-function toRuntimeInput(request: AgentRunRequest, signal?: AbortSignal): RuntimeInput {
+function toRuntimeInput(request: AgentRunRequest, capabilities: CapabilityHost, signal?: AbortSignal): RuntimeInput {
   const lastUserMessage = [...request.messages].reverse().find(message => message.role === 'user')
   const lastMessage = lastUserMessage ?? request.messages.at(-1)
+  const tools = capabilities.listToolCapabilities()
 
   return {
     runId: request.runId,
@@ -272,6 +273,10 @@ function toRuntimeInput(request: AgentRunRequest, signal?: AbortSignal): Runtime
     message: lastMessage?.content ?? '',
     settings: request.settings,
     metadata: request.metadata,
+    tools: tools.map(tool => ({
+      definition: tool.definition,
+      execute: input => tool.execute(input),
+    })),
     signal,
   }
 }

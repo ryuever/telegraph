@@ -21,8 +21,10 @@ const baseRequest: AgentRunRequest = {
 class FakeRuntime implements RuntimeExecutor {
   readonly id = 'fake'
   readonly label = 'Fake Runtime'
+  lastInput?: RuntimeInput
 
   async *run(input: RuntimeInput): AsyncIterable<AgentEvent> {
+    this.lastInput = input
     await Promise.resolve()
     yield {
       type: 'run_started',
@@ -142,6 +144,37 @@ describe('AgentHarness', () => {
     expect(events.find(event => event.type === 'assistant_delta')).toMatchObject({
       text: 'from capability',
     })
+  })
+
+  it('passes registered tool capabilities into runtime input', async () => {
+    const runtime = new FakeRuntime()
+    const capability: AgentCapability = ({ host }) => {
+      host.registerTool({
+        definition: {
+          name: 'test.echo',
+          description: 'Echo test input',
+          inputSchema: {
+            type: 'object',
+          },
+        },
+        execute: input => Promise.resolve({ input }),
+      })
+    }
+    const harness = createAgentHarness({
+      runtimes: [{ id: 'fake', create: () => runtime }],
+      capabilities: [capability],
+    })
+
+    await collect(harness.run(baseRequest))
+
+    expect(runtime.lastInput?.tools).toHaveLength(1)
+    expect(runtime.lastInput?.tools?.[0]?.definition.name).toBe('test.echo')
+    await expect(runtime.lastInput?.tools?.[0]?.execute({ ok: true }, {
+      runId: baseRequest.runId,
+      sessionId: baseRequest.sessionId,
+      callId: 'call-test',
+      toolName: 'test.echo',
+    })).resolves.toEqual({ input: { ok: true } })
   })
 
   it('turns input hook blocks into terminal run_failed events', async () => {

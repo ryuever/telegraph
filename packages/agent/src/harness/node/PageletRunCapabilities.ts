@@ -1,4 +1,9 @@
 import { resolve } from 'node:path'
+import {
+  ComputerUseBroker,
+  FileObservationArtifactStore,
+  MacOsScreenCaptureObservationProvider,
+} from '@/packages/computer-use'
 import type {
   AgentEvent,
   RuntimeSettings,
@@ -24,6 +29,8 @@ import {
   PermissionedNodePatchCapability,
   PermissionedNodeProcessCapability,
 } from './NodeIntegrationCapabilities'
+import { ComputerUseActionTool } from './ComputerUseActionCapability'
+import { ComputerUseObservationTool } from './ComputerUseObservationCapability'
 
 export interface PageletRunCapabilityOptions {
   runId: string
@@ -36,6 +43,7 @@ export interface PageletRunCapabilityOptions {
   prompt?: PermissionPromptHandler
   workspaceRoot?: string
   allowedEnvKeys?: string[]
+  computerUseBroker?: ComputerUseBroker
 }
 
 export function createPageletRunCapabilities(options: PageletRunCapabilityOptions): AgentCapability[] {
@@ -72,6 +80,25 @@ export function createPageletRunCapabilities(options: PageletRunCapabilityOption
         allowedRoots: [workspaceRoot],
       })
     : undefined
+  const computerUseScopes = taskProfile.kind === 'computer-observe' || taskProfile.kind === 'computer-act'
+    ? taskProfile.scopes
+    : undefined
+  const computerUseBroker = options.computerUseBroker ?? createDefaultComputerUseBroker()
+  const computerObserveTool = shouldAttachComputerObserve(taskProfile)
+    ? new ComputerUseObservationTool({
+        runId: options.runId,
+        broker: computerUseBroker,
+        allowedScopes: computerUseScopes,
+      })
+    : undefined
+  const computerActTool = shouldAttachComputerAct(taskProfile)
+    ? new ComputerUseActionTool({
+        runId: options.runId,
+        broker: computerUseBroker,
+        allowedScopes: computerUseScopes,
+        allowedActions: taskProfile.kind === 'computer-act' ? taskProfile.actions : undefined,
+      })
+    : undefined
 
   const capabilities = codingCapabilities({
     feedback: options.feedback,
@@ -79,6 +106,16 @@ export function createPageletRunCapabilities(options: PageletRunCapabilityOption
     filesystem: filesystemCapability,
     patch: patchCapability,
   })
+  if (computerObserveTool) {
+    capabilities.push(({ host }) => {
+      host.registerTool(computerObserveTool)
+    })
+  }
+  if (computerActTool) {
+    capabilities.push(({ host }) => {
+      host.registerTool(computerActTool)
+    })
+  }
 
   return capabilities
 }
@@ -114,6 +151,14 @@ function shouldAttachPatch(profile: RuntimeTaskCapabilityProfile): boolean {
   return profile.kind === 'coding-edit' || profile.kind === 'design-build'
 }
 
+function shouldAttachComputerObserve(profile: RuntimeTaskCapabilityProfile): boolean {
+  return profile.kind === 'computer-observe' || profile.kind === 'computer-act'
+}
+
+function shouldAttachComputerAct(profile: RuntimeTaskCapabilityProfile): boolean {
+  return profile.kind === 'computer-act'
+}
+
 function allowedCapabilitiesForProfile(
   profile: TaskCapabilityProfile,
 ): Array<'filesystem' | 'shell' | 'network'> {
@@ -125,6 +170,9 @@ function allowedCapabilitiesForProfile(
     case 'coding-edit':
     case 'design-build':
       return ['filesystem']
+    case 'computer-observe':
+    case 'computer-act':
+      return []
     default:
       return []
   }
@@ -161,4 +209,11 @@ function workspacePolicyForProfile(profile: TaskCapabilityProfile): WorkspacePer
   }
 
   return {}
+}
+
+function createDefaultComputerUseBroker(): ComputerUseBroker {
+  return new ComputerUseBroker(
+    new MacOsScreenCaptureObservationProvider(),
+    new FileObservationArtifactStore(),
+  )
 }

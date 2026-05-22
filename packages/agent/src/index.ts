@@ -218,6 +218,47 @@ export {
   isTelegraphSubagentsSelector,
 } from '@/packages/agent/extensions/harness/constants'
 export {
+  InMemoryDurableStepLedger,
+  FileDurableStepLedger,
+  LedgerBackedDurableRunEngine,
+  createDurableStepContext,
+  durableIdempotencyKey,
+  type DurableIdempotencyInput,
+  type DurableRunEngine,
+  type DurableRunEngineOptions,
+  type DurableStepDefinition,
+  type DurableStepExecutionContext,
+  type DurableStepExecutionResult,
+  type DurableStepKind,
+  type DurableStepLedger,
+  type DurableStepRecord,
+  type DurableStepStatus,
+} from '@/packages/agent/durable'
+export {
+  POLICY_PACK_SCHEMA_VERSION,
+  assertPolicyPackValid,
+  createPolicyPack,
+  resolvePolicyProfile,
+  type PolicyPack,
+  type PolicyProfile,
+} from '@/packages/agent/policy'
+export {
+  CAPABILITY_MARKETPLACE_SCHEMA_VERSION,
+  InMemoryCapabilityMarketplace,
+  assertCapabilityMarketplaceListingValid,
+  createCapabilityMarketplaceListing,
+  marketplaceToolKey,
+  validateCapabilityMarketplaceListing,
+  type CapabilityMarketplaceListing,
+  type MarketplaceApprovalMode,
+  type MarketplaceApprovalPolicy,
+  type MarketplaceCatalogEntry,
+  type MarketplaceListingSource,
+  type MarketplaceToolDefinition as CapabilityMarketplaceToolDefinition,
+  type MarketplaceToolRisk,
+  type ResolvedMarketplaceTool,
+} from '@/packages/agent/marketplace'
+export {
   ActivationHost,
   CapabilityBroker,
   ContributionRegistry,

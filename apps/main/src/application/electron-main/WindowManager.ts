@@ -4,6 +4,7 @@ import { join } from 'path';
 
 import type { IWindowManager } from '@/apps/main/application/common';
 import { WindowManagerId } from '@/apps/main/application/common';
+import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common';
 
 export type { IWindowManager };
 export { WindowManagerId };
@@ -13,7 +14,7 @@ export class WindowManager implements IWindowManager {
   private mainWindow: BrowserWindow | null = null;
   private settingWindow: BrowserWindow | null = null;
   private settingWindowCallbacks: ((win: BrowserWindow) => void)[] = [];
-  private switchPageCallback: ((pageId: string) => void) | null = null;
+  private switchPageCallback: ((pageId: string, payload?: MainSwitchPagePayload) => void) | null = null;
 
   openMainWindow(): BrowserWindow {
     this.mainWindow = new BrowserWindow({
@@ -57,8 +58,18 @@ export class WindowManager implements IWindowManager {
     this.settingWindowCallbacks.push(callback);
   }
 
-  setSwitchPageCallback(callback: (pageId: string) => void): void {
+  setSwitchPageCallback(callback: (pageId: string, payload?: MainSwitchPagePayload) => void): void {
     this.switchPageCallback = callback;
+  }
+
+  switchPage(pageId: string, payload?: MainSwitchPagePayload): boolean {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+      this.mainWindow.focus();
+    }
+    if (!this.switchPageCallback) return false;
+    this.switchPageCallback(pageId, payload);
+    return true;
   }
 
   openSettingWindow(): BrowserWindow | null {
@@ -127,19 +138,31 @@ export class WindowManager implements IWindowManager {
           {
             label: 'Connection',
             click: () => {
-              this.switchPageCallback?.('connection');
+              this.switchPage('connection');
             },
           },
           {
             label: 'Monitor',
             click: () => {
-              this.switchPageCallback?.('monitor');
+              this.switchPage('monitor');
             },
           },
           {
             label: 'Design',
             click: () => {
-              this.switchPageCallback?.('design');
+              this.switchPage('design');
+            },
+          },
+          {
+            label: 'Runs',
+            click: () => {
+              this.switchPage('run-console');
+            },
+          },
+          {
+            label: 'Chat',
+            click: () => {
+              this.switchPage('chat');
             },
           },
           { type: 'separator' },

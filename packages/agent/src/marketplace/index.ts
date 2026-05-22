@@ -1,0 +1,16 @@
+export {
+  CAPABILITY_MARKETPLACE_SCHEMA_VERSION,
+  InMemoryCapabilityMarketplace,
+  assertCapabilityMarketplaceListingValid,
+  createCapabilityMarketplaceListing,
+  marketplaceToolKey,
+  validateCapabilityMarketplaceListing,
+  type CapabilityMarketplaceListing,
+  type MarketplaceApprovalMode,
+  type MarketplaceApprovalPolicy,
+  type MarketplaceCatalogEntry,
+  type MarketplaceListingSource,
+  type MarketplaceToolDefinition,
+  type MarketplaceToolRisk,
+  type ResolvedMarketplaceTool,
+} from '@/packages/agent/marketplace/CapabilityMarketplace'

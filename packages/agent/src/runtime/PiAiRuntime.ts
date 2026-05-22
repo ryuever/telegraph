@@ -1,7 +1,13 @@
-import { streamPiAiRuntimeEvents, TELEGRAPH_PI_AI_PRODUCER_VERSION } from '@/packages/agent/runtime/streamPiAiRuntime'
+import {
+  streamPiAiRuntimeEvents,
+  TELEGRAPH_PI_AI_PRODUCER_VERSION,
+  type PiAiToolExecutionContext,
+} from '@/packages/agent/runtime/streamPiAiRuntime'
 import type { RuntimeEvent } from '@/packages/agent-protocol'
+import type { TSchema } from '@mariozechner/pi-ai'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { BaseAgentRuntime, type RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
+import type { RuntimeExecutableTool } from '@/packages/agent/runtime/AgentRuntime'
 
 /**
  * Pi-AI runtime executor.
@@ -45,6 +51,7 @@ export class PiAiRuntime extends BaseAgentRuntime {
         settings: settings as any, // TODO: type alignment between RuntimeSettings and AgentRuntimeSettings
         message,
         signal,
+        tools: input.tools?.map(toPiAiExecutableTool),
       })) {
         yield ev
 
@@ -68,5 +75,15 @@ export class PiAiRuntime extends BaseAgentRuntime {
         ts: this.now(),
       } as RuntimeEvent
     }
+  }
+}
+
+function toPiAiExecutableTool(tool: RuntimeExecutableTool) {
+  return {
+    name: tool.definition.name,
+    description: tool.definition.description,
+    parameters: tool.definition.inputSchema as TSchema,
+    execute: (toolInput: Record<string, unknown>, context: PiAiToolExecutionContext) =>
+      tool.execute(toolInput, context),
   }
 }

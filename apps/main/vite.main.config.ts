@@ -5,8 +5,13 @@ const nodeBuiltins = [
   'assert', 'buffer', 'child_process', 'cluster', 'crypto', 'dgram', 'dns',
   'domain', 'events', 'fs', 'http', 'https', 'net', 'os', 'path', 'process',
   'querystring', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
-  'tty', 'url', 'util', 'v8', 'vm', 'zlib',
+  'tty', 'url', 'util', 'v8', 'vm', 'zlib', 'async_hooks', 'module',
 ];
+
+const isExternal = (id: string) =>
+  id === 'electron' ||
+  id.startsWith('node:') ||
+  nodeBuiltins.some(builtin => id === builtin || id.startsWith(`${builtin}/`));
 
 export default defineConfig({
   resolve: {
@@ -24,6 +29,13 @@ export default defineConfig({
       '@/apps/setting': resolve(__dirname, '../setting/src'),
       '@/apps/design': resolve(__dirname, '../design/src'),
       '@/apps/chat': resolve(__dirname, '../chat/src'),
+      '@/apps/cli-gateway': resolve(__dirname, '../cli-gateway/src'),
+      '@/apps/remote-control': resolve(__dirname, '../remote-control/src'),
+      '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
+      '@/packages/run-protocol': resolve(__dirname, '../../packages/run-protocol/src/index.ts'),
+      '@/packages/remote-protocol': resolve(__dirname, '../../packages/remote-protocol/src/index.ts'),
+      '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),
+      '@/packages/computer-use-protocol': resolve(__dirname, '../../packages/computer-use-protocol/src/index.ts'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
     },
   },
@@ -33,7 +45,7 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: [...nodeBuiltins, ...nodeBuiltins.map(m => `node:${m}`), 'electron'],
+      external: isExternal,
       output: {
         entryFileNames: 'index.js',
       },

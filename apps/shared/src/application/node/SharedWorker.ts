@@ -8,7 +8,7 @@ import { serviceHost } from '@x-oasis/async-call-rpc';
 import { SHARED_SERVICE_PATH } from '@/apps/shared/application/common';
 import { createLogger } from '@/packages/services/log/node/logger';
 import { RunBrokerStore } from './RunBrokerStore';
-import { RunBrokerSocketGateway } from './RunBrokerSocketGateway';
+import { FileRunBrokerStateRepository } from './RunBrokerStateRepository';
 
 const logger = createLogger('shared');
 
@@ -32,8 +32,7 @@ export const SharedWorkerId = createId('SharedWorker');
 
 @injectable()
 export class SharedWorker implements ISharedWorker {
-  private readonly runBroker = new RunBrokerStore();
-  private readonly runBrokerGateway = new RunBrokerSocketGateway(this.runBroker);
+  private readonly runBroker = new RunBrokerStore(500, new FileRunBrokerStateRepository());
   private configVersion = 0;
   private configStore: Record<string, string> = {
     theme: 'dark',
@@ -84,10 +83,18 @@ export class SharedWorker implements ISharedWorker {
       registerRunProjection: this.runBroker.registerRunProjection.bind(this.runBroker),
       listRunProjections: this.runBroker.listRunProjections.bind(this.runBroker),
       getRunProjection: this.runBroker.getRunProjection.bind(this.runBroker),
+      listRunProjectionChanges: this.runBroker.listRunProjectionChanges.bind(this.runBroker),
       subscribeRunProjections: this.runBroker.subscribeRunProjections.bind(this.runBroker),
       requestApproval: this.runBroker.requestApproval.bind(this.runBroker),
       decideApproval: this.runBroker.decideApproval.bind(this.runBroker),
       listApprovals: this.runBroker.listApprovals.bind(this.runBroker),
+      listApprovalChanges: this.runBroker.listApprovalChanges.bind(this.runBroker),
+      subscribeApprovals: this.runBroker.subscribeApprovals.bind(this.runBroker),
+      requestRunControlCommand: this.runBroker.requestRunControlCommand.bind(this.runBroker),
+      markRunControlCommandApplied: this.runBroker.markRunControlCommandApplied.bind(this.runBroker),
+      listRunControlCommands: this.runBroker.listRunControlCommands.bind(this.runBroker),
+      listRunControlChanges: this.runBroker.listRunControlChanges.bind(this.runBroker),
+      subscribeRunControlCommands: this.runBroker.subscribeRunControlCommands.bind(this.runBroker),
     };
 
     const proxy = createParticipantProxy({
@@ -110,16 +117,6 @@ export class SharedWorker implements ISharedWorker {
         }
       },
     });
-
-    void this.runBrokerGateway.start()
-      .then(path => {
-        logger.info(`[shared-worker] run broker gateway listening on ${path}`);
-      })
-      .catch((error: unknown) => {
-        logger.warn(`[shared-worker] run broker gateway failed to start: ${
-          error instanceof Error ? error.message : String(error)
-        }`);
-      });
 
     logger.info('[shared-worker] initialized, waiting for pagelet connections');
   }

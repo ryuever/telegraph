@@ -19,6 +19,10 @@ import type { IDesignApplication } from '@/apps/design/application/common';
 import { DesignApplicationId } from '@/apps/design/application/common';
 import type { IChatApplication } from '@/apps/chat/application/common';
 import { ChatApplicationId } from '@/apps/chat/application/common';
+import type { ICliGatewayApplication } from '@/apps/cli-gateway/application/common';
+import { CliGatewayApplicationId } from '@/apps/cli-gateway/application/common';
+import type { IRemoteControlApplication } from '@/apps/remote-control/application/common';
+import { RemoteControlApplicationId } from '@/apps/remote-control/application/common';
 import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { MAIN_RPC_SERVICE_PATH, MAIN_WINDOW_SERVICE_PATH } from '@/packages/services/pagelet-host/common';
@@ -33,6 +37,10 @@ import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { LogServiceId } from '@/packages/services/log/common/LogService';
 import type { ILogger } from '@/packages/services/log/common/types';
+import {
+  ComputerUseArtifactProtocolId,
+  type IComputerUseArtifactProtocol,
+} from '@/apps/main/application/electron-main/ComputerUseArtifactProtocol';
 
 export interface IAppApplication {
   start(): Promise<void>;
@@ -57,6 +65,10 @@ export class AppApplication implements IAppApplication {
     private readonly designApp: IDesignApplication,
     @inject(ChatApplicationId)
     private readonly chatApp: IChatApplication,
+    @inject(CliGatewayApplicationId)
+    private readonly cliGatewayApp: ICliGatewayApplication,
+    @inject(RemoteControlApplicationId)
+    private readonly remoteControlApp: IRemoteControlApplication,
     @inject(AppOrchestratorId)
     private readonly appOrchestrator: IAppOrchestrator,
     @inject(MainMetricsServiceId)
@@ -67,12 +79,16 @@ export class AppApplication implements IAppApplication {
     private readonly sharedProcess: ISharedProcess,
     @inject(PageletProcessId)
     private readonly pageletProcess: IPageletProcess,
+    @inject(ComputerUseArtifactProtocolId)
+    private readonly computerUseArtifactProtocol: IComputerUseArtifactProtocol,
     @inject(LogServiceId)
     private readonly logger: ILogger
   ) {}
 
   async start(): Promise<void> {
     this.logger.info('[AppApplication] start()');
+
+    this.computerUseArtifactProtocol.start();
 
     this.windowManager.openMainWindow();
 
@@ -95,6 +111,18 @@ export class AppApplication implements IAppApplication {
       mainPing(msg: string): string {
         mainCallCount++;
         return `pong from main (#${String(mainCallCount)}): ${msg}`;
+      },
+      openRun: (runId: string, options?: { pageletId?: string }) => {
+        const pageId = 'run-console';
+        return {
+          runId,
+          pageletId: options?.pageletId,
+          pageId,
+          focused: this.windowManager.switchPage(pageId, {
+            runId,
+            pageletId: options?.pageletId,
+          }),
+        };
       },
     });
 
@@ -151,6 +179,8 @@ export class AppApplication implements IAppApplication {
 
     await this.monitorApp.start();
     await this.settingApp.start();
+    await this.cliGatewayApp.start();
+    await this.remoteControlApp.start();
     await this.designApp.start();
     await this.chatApp.start();
 

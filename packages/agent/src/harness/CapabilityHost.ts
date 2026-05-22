@@ -137,6 +137,10 @@ export class CapabilityHost {
     return [...this.tools.values()].map(tool => tool.definition)
   }
 
+  listToolCapabilities(): ToolCapability[] {
+    return [...this.tools.values()]
+  }
+
   registerCustom(key: string, capability: unknown): void {
     this.custom.set(key, capability)
   }

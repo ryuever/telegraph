@@ -109,6 +109,7 @@ export interface ListAgentRunsOptions {
 export interface AgentRunRepository {
   createRun(input: CreateAgentRunInput): Promise<AgentRunRecord>
   appendEvent(runId: string, event: AgentEvent): Promise<AgentRunEventRecord>
+  appendEvents(runId: string, events: AgentEvent[]): Promise<AgentRunEventRecord[]>
   updateRun(runId: string, patch: Partial<AgentRunRecord>): Promise<AgentRunRecord>
   getRun(runId: string): Promise<AgentRunRecord | null>
   listRuns(options?: ListAgentRunsOptions): Promise<AgentRunRecord[]>
@@ -157,18 +158,34 @@ export class FileAgentRunRepository implements AgentRunRepository {
   }
 
   async appendEvent(runId: string, event: AgentEvent): Promise<AgentRunEventRecord> {
+    const [record] = await this.appendEvents(runId, [event])
+    if (!record) throw new Error(`No event was appended for run "${runId}"`)
+    return record
+  }
+
+  async appendEvents(runId: string, events: AgentEvent[]): Promise<AgentRunEventRecord[]> {
+    if (events.length === 0) return []
     return this.enqueueRunWrite(runId, async () => {
-      const record = await this.requireRun(runId)
-      const eventRecord: AgentRunEventRecord = {
-        runId,
-        sessionId: record.sessionId,
-        seq: record.eventCount + 1,
-        event,
-        ts: eventTs(event),
+      let record = await this.requireRun(runId)
+      const eventRecords: AgentRunEventRecord[] = []
+      for (const event of events) {
+        const eventRecord: AgentRunEventRecord = {
+          runId,
+          sessionId: record.sessionId,
+          seq: record.eventCount + 1,
+          event,
+          ts: eventTs(event),
+        }
+        eventRecords.push(eventRecord)
+        record = applyRunPatch(record, patchForEvent(record, event))
       }
-      await appendFile(this.eventsPath(runId), `${JSON.stringify(eventRecord)}\n`, 'utf8')
-      await this.writeRunRecord(runId, applyRunPatch(record, patchForEvent(record, event)))
-      return eventRecord
+      await appendFile(
+        this.eventsPath(runId),
+        `${eventRecords.map(eventRecord => JSON.stringify(eventRecord)).join('\n')}\n`,
+        'utf8',
+      )
+      await this.writeRunRecord(runId, record)
+      return eventRecords
     })
   }
 
@@ -367,6 +384,11 @@ function patchForEvent(record: AgentRunRecord, event: AgentEvent): Partial<Agent
         failureReason: 'cancelled',
         failureMessage: event.reason,
       }
+    case 'tool_result':
+      return {
+        ...base,
+        artifactRefs: mergeArtifactRefs(record.artifactRefs, event.output),
+      }
     default:
       return base
   }
@@ -382,11 +404,39 @@ function failureReasonForErrorCode(code: string): AgentRunFailureReason {
 }
 
 function mergeArtifactRefs(current: string[], output: unknown): string[] {
-  if (!output || typeof output !== 'object') return current
-  const refs = (output as { artifactRefs?: unknown }).artifactRefs
-  if (!Array.isArray(refs)) return current
-  const strings = refs.filter((value): value is string => typeof value === 'string')
-  return [...new Set([...current, ...strings])]
+  const refs = extractArtifactRefs(output)
+  if (refs.length === 0) return current
+  return [...new Set([...current, ...refs])]
+}
+
+function extractArtifactRefs(value: unknown): string[] {
+  if (!value || typeof value !== 'object') return []
+  const refs: string[] = []
+  const record = value as Record<string, unknown>
+
+  if (Array.isArray(record.artifactRefs)) {
+    refs.push(...record.artifactRefs.filter((item): item is string => typeof item === 'string'))
+  }
+
+  if (isArtifactRef(record.artifactRef)) {
+    refs.push(record.artifactRef.uri)
+  }
+
+  if (Array.isArray(record.observations)) {
+    for (const observation of record.observations) {
+      if (!observation || typeof observation !== 'object') continue
+      const artifactRef = (observation as Record<string, unknown>).artifactRef
+      if (isArtifactRef(artifactRef)) refs.push(artifactRef.uri)
+    }
+  }
+
+  return refs
+}
+
+function isArtifactRef(value: unknown): value is { uri: string } {
+  return Boolean(value) &&
+    typeof value === 'object' &&
+    typeof (value as { uri?: unknown }).uri === 'string'
 }
 
 function eventTs(event: AgentEvent): number {

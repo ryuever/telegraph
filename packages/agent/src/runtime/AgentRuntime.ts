@@ -1,4 +1,17 @@
-import type { RuntimeEvent, RuntimeSettings } from '@/packages/agent-protocol'
+import type { RuntimeEvent, RuntimeSettings, ToolDefinition } from '@/packages/agent-protocol'
+
+export interface RuntimeToolExecutionContext {
+  runId: string
+  sessionId?: string
+  callId: string
+  toolName: string
+  signal?: AbortSignal
+}
+
+export interface RuntimeExecutableTool {
+  definition: ToolDefinition
+  execute(input: unknown, context: RuntimeToolExecutionContext): Promise<unknown>
+}
 
 /**
  * Runtime input for executing an agent run.
@@ -10,6 +23,7 @@ export interface RuntimeInput {
   message: string
   settings: RuntimeSettings
   metadata?: Record<string, unknown>
+  tools?: RuntimeExecutableTool[]
   signal?: AbortSignal
 }
 

@@ -3,12 +3,13 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '@/apps/main/application/browser/App'
 import type { PageConfig } from '@/apps/main/application/common/cp-config'
+import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
 
 const rpcMock = vi.hoisted(() => ({
-  switchPage: undefined as ((pageId: string) => void) | undefined,
+  switchPage: undefined as ((pageId: string, payload?: MainSwitchPagePayload) => void) | undefined,
   openSettingWindow: vi.fn(),
 }))
 
@@ -28,7 +29,7 @@ const localStorageMock = vi.hoisted(() => {
 
 vi.mock('@/apps/main/application/browser/rpc-clients', () => ({
   mainWindowClient: {
-    onSwitchPage: vi.fn((callback: (pageId: string) => void) => {
+    onSwitchPage: vi.fn((callback: (pageId: string, payload?: MainSwitchPagePayload) => void) => {
       rpcMock.switchPage = callback
     }),
     openSettingWindow: rpcMock.openSettingWindow,
@@ -36,8 +37,17 @@ vi.mock('@/apps/main/application/browser/rpc-clients', () => ({
 }))
 
 vi.mock('@/apps/main/application/browser/PageletHost', () => ({
-  PageletHost: ({ activePage }: { activePage: PageConfig }) => (
-    <div data-testid="active-page">{activePage.id}</div>
+  PageletHost: ({
+    activePage,
+    runConsoleFocus,
+  }: {
+    activePage: PageConfig
+    runConsoleFocus?: MainSwitchPagePayload
+  }) => (
+    <>
+      <div data-testid="active-page">{activePage.id}</div>
+      <div data-testid="focused-run">{runConsoleFocus?.runId ?? ''}</div>
+    </>
   ),
 }))
 
@@ -99,6 +109,29 @@ describe('App page navigation', () => {
     expect(localStorageMock.getItem('telegraph.activePageId')).toBe('chat')
   })
 
+  it('persists run console page selection', () => {
+    const app = renderApp()
+    const runsButton = Array.from(app.querySelectorAll('button'))
+      .find((button) => button.textContent.includes('Runs'))
+
+    expect(runsButton).toBeDefined()
+
+    act(() => {
+      runsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(app.querySelector('[data-testid="active-page"]')?.textContent).toBe('run-console')
+    expect(localStorageMock.getItem('telegraph.activePageId')).toBe('run-console')
+  })
+
+  it('restores the run console after a renderer remount', () => {
+    localStorageMock.setItem('telegraph.activePageId', 'run-console')
+
+    const app = renderApp()
+
+    expect(app.querySelector('[data-testid="active-page"]')?.textContent).toBe('run-console')
+  })
+
   it('persists page switches requested by the main window service', () => {
     const app = renderApp()
 
@@ -108,5 +141,16 @@ describe('App page navigation', () => {
 
     expect(app.querySelector('[data-testid="active-page"]')?.textContent).toBe('connection')
     expect(localStorageMock.getItem('telegraph.activePageId')).toBe('connection')
+  })
+
+  it('passes open-run focus payloads into the run console', () => {
+    const app = renderApp()
+
+    act(() => {
+      rpcMock.switchPage?.('run-console', { runId: 'run-open', pageletId: 'design' })
+    })
+
+    expect(app.querySelector('[data-testid="active-page"]')?.textContent).toBe('run-console')
+    expect(app.querySelector('[data-testid="focused-run"]')?.textContent).toBe('run-open')
   })
 })

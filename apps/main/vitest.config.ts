@@ -14,6 +14,8 @@ export default defineConfig({
       '@/apps/setting': resolve(__dirname, '../setting/src'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src'),
+      '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),
+      '@/packages/computer-use-protocol': resolve(__dirname, '../../packages/computer-use-protocol/src'),
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
       '@/packages/services/main-metrics': resolve(__dirname, '../../packages/services/src/main-metrics/src'),
       '@/packages/services/log': resolve(__dirname, '../../packages/services/src/log/src'),

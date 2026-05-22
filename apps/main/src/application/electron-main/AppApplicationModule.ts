@@ -51,9 +51,21 @@ import {
 } from '@/apps/chat/application/electron-main/ChatApplication';
 import { ChatApplicationId } from '@/apps/chat/application/common';
 import {
+  CliGatewayApplication,
+} from '@/apps/cli-gateway/application/electron-main/CliGatewayApplication';
+import { CliGatewayApplicationId } from '@/apps/cli-gateway/application/common';
+import {
+  RemoteControlApplication,
+} from '@/apps/remote-control/application/electron-main/RemoteControlApplication';
+import { RemoteControlApplicationId } from '@/apps/remote-control/application/common';
+import {
   AppApplication,
   AppApplicationId,
 } from '@/apps/main/application/electron-main/AppApplication';
+import {
+  ComputerUseArtifactProtocol,
+  ComputerUseArtifactProtocolId,
+} from '@/apps/main/application/electron-main/ComputerUseArtifactProtocol';
 import {
   MainMetricsService,
   MainMetricsServiceId,
@@ -88,6 +100,9 @@ export default new Registry((bind) => {
   bind(SettingApplicationId).to(SettingApplication);
   bind(DesignApplicationId).to(DesignApplication);
   bind(ChatApplicationId).to(ChatApplication);
+  bind(CliGatewayApplicationId).to(CliGatewayApplication);
+  bind(RemoteControlApplicationId).to(RemoteControlApplication);
+  bind(ComputerUseArtifactProtocolId).to(ComputerUseArtifactProtocol);
 
   bind(AppApplicationId).to(AppApplication);
 });

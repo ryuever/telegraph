@@ -5,8 +5,13 @@ const nodeBuiltins = [
   'assert', 'buffer', 'child_process', 'cluster', 'crypto', 'dgram', 'dns',
   'domain', 'events', 'fs', 'http', 'https', 'net', 'os', 'path', 'process',
   'querystring', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
-  'tty', 'url', 'util', 'v8', 'vm', 'zlib',
+  'tty', 'url', 'util', 'v8', 'vm', 'zlib', 'async_hooks', 'module',
 ];
+
+const isExternal = (id: string) =>
+  id === 'electron' ||
+  id.startsWith('node:') ||
+  nodeBuiltins.some(builtin => id === builtin || id.startsWith(`${builtin}/`));
 
 export default defineConfig({
   resolve: {
@@ -21,6 +26,8 @@ export default defineConfig({
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/orchestrator-core': resolve(__dirname, '../../packages/orchestrator-core/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
+      '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),
+      '@/packages/computer-use-protocol': resolve(__dirname, '../../packages/computer-use-protocol/src/index.ts'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
       '@/extensions/telegraph-subagents': resolve(__dirname, '../../extensions/telegraph-subagents'),
     },
@@ -32,7 +39,7 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: [...nodeBuiltins, ...nodeBuiltins.map(m => `node:${m}`), 'electron'],
+      external: isExternal,
       output: {
         entryFileNames: 'design-worker.js',
       },

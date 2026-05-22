@@ -97,6 +97,39 @@ importers:
         specifier: ^4.4.1
         version: 4.5.7(@types/react@18.3.28)(react@18.3.1)
 
+  apps/cli: {}
+
+  apps/cli-gateway:
+    dependencies:
+      '@telegraph/agent-protocol':
+        specifier: workspace:*
+        version: link:../../packages/agent-protocol
+      '@telegraph/remote-protocol':
+        specifier: workspace:*
+        version: link:../../packages/remote-protocol
+      '@telegraph/run-protocol':
+        specifier: workspace:*
+        version: link:../../packages/run-protocol
+      '@telegraph/services':
+        specifier: workspace:*
+        version: link:../../packages/services
+      '@telegraph/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@x-oasis/async-call-rpc':
+        specifier: ^0.17.0
+        version: 0.17.0
+      '@x-oasis/async-call-rpc-electron':
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
+      '@x-oasis/di':
+        specifier: ^0.13.2
+        version: 0.13.2
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
   apps/connection:
     dependencies:
       '@telegraph/daemon':
@@ -390,6 +423,37 @@ importers:
         specifier: ^5.3.0
         version: 5.9.3
 
+  apps/remote-control:
+    dependencies:
+      '@telegraph/agent-protocol':
+        specifier: workspace:*
+        version: link:../../packages/agent-protocol
+      '@telegraph/remote-protocol':
+        specifier: workspace:*
+        version: link:../../packages/remote-protocol
+      '@telegraph/run-protocol':
+        specifier: workspace:*
+        version: link:../../packages/run-protocol
+      '@telegraph/services':
+        specifier: workspace:*
+        version: link:../../packages/services
+      '@telegraph/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@x-oasis/async-call-rpc':
+        specifier: ^0.17.0
+        version: 0.17.0
+      '@x-oasis/async-call-rpc-electron':
+        specifier: ^0.14.0
+        version: 0.14.0(electron@41.5.1)
+      '@x-oasis/di':
+        specifier: ^0.13.2
+        version: 0.13.2
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
   apps/setting:
     dependencies:
       '@telegraph/daemon':
@@ -423,6 +487,12 @@ importers:
       '@telegraph/main':
         specifier: workspace:*
         version: link:../main
+      '@telegraph/remote-protocol':
+        specifier: workspace:*
+        version: link:../../packages/remote-protocol
+      '@telegraph/run-protocol':
+        specifier: workspace:*
+        version: link:../../packages/run-protocol
       '@telegraph/services':
         specifier: workspace:*
         version: link:../../packages/services
@@ -466,6 +536,12 @@ importers:
       '@telegraph/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
+      '@telegraph/computer-use':
+        specifier: workspace:*
+        version: link:../computer-use
+      '@telegraph/computer-use-protocol':
+        specifier: workspace:*
+        version: link:../computer-use-protocol
       '@telegraph/orchestrator-core':
         specifier: workspace:*
         version: link:../orchestrator-core
@@ -480,7 +556,68 @@ importers:
         specifier: ^5.3.0
         version: 5.9.3
 
+  packages/channel-adapter-sdk:
+    dependencies:
+      '@telegraph/remote-protocol':
+        specifier: workspace:*
+        version: link:../remote-protocol
+      '@telegraph/run-protocol':
+        specifier: workspace:*
+        version: link:../run-protocol
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/computer-use:
+    dependencies:
+      '@telegraph/computer-use-protocol':
+        specifier: workspace:*
+        version: link:../computer-use-protocol
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/computer-use-protocol:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
   packages/orchestrator-core:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/relay-protocol:
+    dependencies:
+      '@telegraph/remote-protocol':
+        specifier: workspace:*
+        version: link:../remote-protocol
+      '@telegraph/run-protocol':
+        specifier: workspace:*
+        version: link:../run-protocol
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/remote-protocol:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/run-protocol:
+    dependencies:
+      '@telegraph/agent-protocol':
+        specifier: workspace:*
+        version: link:../agent-protocol
+      '@telegraph/remote-protocol':
+        specifier: workspace:*
+        version: link:../remote-protocol
     devDependencies:
       typescript:
         specifier: ^5.3.0

@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "lib": ["ES2022"],
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/packages/computer-use": ["./src/index.ts"],
+      "@/packages/computer-use/*": ["./src/*"],
+      "@/packages/computer-use-protocol": ["../computer-use-protocol/src/index.ts"],
+      "@/packages/computer-use-protocol/*": ["../computer-use-protocol/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

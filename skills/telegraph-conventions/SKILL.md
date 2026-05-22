@@ -39,10 +39,14 @@ The same applies to cross-package imports — always use the alias, never `../..
 
 - Look up the right alias in `AGENTS.md` → "Path aliases" before writing the import.
 - The aliases (all use `@/` prefix, `@` = monorepo root, `src/` is elided):
-  - `@/apps/<app>/*` → `apps/<app>/src/*` (e.g. `@/apps/main/…`, `@/apps/design/…`)
+  - `@/apps/<app>/*` → `apps/<app>/src/*` (e.g. `@/apps/main/…`, `@/apps/design/…`, `@/apps/cli-gateway/…`, `@/apps/remote-control/…`)
   - `@/packages/ui/*` → `packages/ui/src/*` (renderer view layer)
   - `@/packages/stores` → `packages/stores/src/index.ts` (barrel import)
   - `@/packages/agent-protocol` → `packages/agent-protocol/src/index.ts` (barrel import)
+  - `@/packages/run-protocol` → `packages/run-protocol/src/index.ts` (barrel import)
+  - `@/packages/remote-protocol` → `packages/remote-protocol/src/index.ts` (barrel import)
+  - `@/packages/computer-use-protocol` → `packages/computer-use-protocol/src/index.ts` (barrel import)
+  - `@/packages/computer-use` → `packages/computer-use/src/index.ts` (barrel import)
   - `@/packages/agent/*` → `packages/agent/src/*`
   - `@/packages/services/pagelet-host/*` → `packages/services/src/pagelet-host/src/*`
   - `@/packages/services/main-metrics/*` → `packages/services/src/main-metrics/src/*`

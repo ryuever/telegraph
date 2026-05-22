@@ -2,6 +2,7 @@ import { app } from 'electron';
 import { Container } from '@x-oasis/di';
 
 import registry from '@/apps/main/application/electron-main/AppApplicationModule';
+import { registerTelegraphProtocolScheme } from '@/apps/main/application/electron-main/ComputerUseArtifactProtocol';
 import {
   AppApplicationId,
   IAppApplication,
@@ -11,6 +12,8 @@ import type { ILogger } from '@/packages/services/log/common/types';
 
 const container = new Container();
 container.load(registry);
+
+registerTelegraphProtocolScheme();
 
 app
   .whenReady()

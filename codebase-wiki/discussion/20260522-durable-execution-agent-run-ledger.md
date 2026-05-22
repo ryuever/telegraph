@@ -124,7 +124,7 @@ Renderer
 
 - `createRun` 应在 runtime 启动前完成。
 - 生命周期事件、tool call/result、permission、child run、terminal event 应作为关键事件写入 ledger。
-- 高频 `assistant_delta` / `model_event` 可批量写入，必要时做 rawRef 或 compact event，避免每个 token 都阻塞模型流。
+- 高频 `assistant_delta` / `model_event` 可批量写入，必要时做 rawRef 或 compact event，避免每个 token 都阻塞模型流。2026-05-22 实施补充：`FileAgentRunRepository.appendEvents` 已提供 batch primitive，可一次追加多条事件并只更新一次 run record；chat/design pagelet 已接入 `BufferedAgentRunEventWriter`，高频事件 batch，连续 assistant delta compact，关键 lifecycle/tool/permission/terminal event 触发 flush。
 - terminal 返回前应确保关键事件和最终状态已经落盘。
 
 换句话说：**trace 可以降级，run ledger 不能丢关键生命周期事实**。
@@ -230,7 +230,7 @@ Inngest、Trigger.dev、Hatchet 都有 durable workflow 能力，但它们更像
 
 - [x] 从 persisted `AgentEvent` 投影 Design workspace status、assistant text、subagent snapshots、artifact refs。
 - [x] live stream 与 persisted events 使用同一 projector，避免 UI 逻辑分叉。
-- 高频 delta 支持 compact / batch 写入。
+- [x] 高频 delta 支持 compact / batch 写入。
 
 验收：
 

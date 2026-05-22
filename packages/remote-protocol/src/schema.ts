@@ -1,0 +1,1 @@
+export const REMOTE_PROTOCOL_SCHEMA_VERSION = 1;

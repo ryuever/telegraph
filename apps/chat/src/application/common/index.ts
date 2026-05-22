@@ -61,6 +61,7 @@ export interface ChatSendRequest {
   settings: AgentRuntimeSettings
   runId: string
   sessionId: string
+  sourceIntentId?: string
   parentRunId?: string
   replay?: AgentRunReplaySource
 }

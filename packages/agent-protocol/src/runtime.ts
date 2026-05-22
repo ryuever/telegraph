@@ -21,6 +21,8 @@ export interface RuntimeSettings {
 export type RuntimeTaskCapabilityProfile =
   | { kind: 'default' }
   | { kind: 'readonly-workspace'; scopes: string[] }
+  | { kind: 'computer-observe'; scopes?: string[] }
+  | { kind: 'computer-act'; scopes?: string[]; actions?: string[] }
   | { kind: 'shell-automation'; commands?: string[]; cwdPolicy: 'workspace' | 'restricted' }
   | { kind: 'coding-edit'; scopes: string[]; patchPolicy: 'preview' | 'apply-after-confirm' }
   | { kind: 'design-build'; scopes: string[]; artifactPolicy: 'preview' | 'apply-after-confirm' }

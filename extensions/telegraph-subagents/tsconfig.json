@@ -14,6 +14,10 @@
       "@/packages/agent/*": ["../../packages/agent/src/*"],
       "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
+      "@/packages/computer-use": ["../../packages/computer-use/src/index.ts"],
+      "@/packages/computer-use/*": ["../../packages/computer-use/src/*"],
+      "@/packages/computer-use-protocol": ["../../packages/computer-use-protocol/src/index.ts"],
+      "@/packages/computer-use-protocol/*": ["../../packages/computer-use-protocol/src/*"],
       "@/packages/orchestrator-core": ["../../packages/orchestrator-core/src/index.ts"],
       "@/packages/orchestrator-core/*": ["../../packages/orchestrator-core/src/*"]
     }

@@ -4,11 +4,13 @@ import PageView from '@/apps/connection/application/browser/PageView'
 import MonitorPage from '@/apps/monitor/application/browser/MonitorPage'
 import { DesignPanel } from '@/apps/design/application/browser/DesignPanel'
 import ChatPage from '@/apps/chat/application/browser/ChatPage'
+import { RunConsolePanel } from '@/apps/main/application/browser/RunConsolePanel'
 import {
   ALL_PAGES,
   CONNECTION_PAGE,
   type PageConfig,
 } from '@/apps/main/application/common/cp-config'
+import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common'
 import { PageletActivityProvider, type PageletId } from './pagelet-activity'
 
 type PageRenderer = () => React.ReactNode
@@ -18,12 +20,15 @@ const PAGE_RENDERERS: Record<PageletId, PageRenderer> = {
   monitor: () => <MonitorPage />,
   design: () => <DesignPanel />,
   chat: () => <ChatPage />,
+  'run-console': () => <RunConsolePanel />,
 }
 
 export function PageletHost({
   activePage,
+  runConsoleFocus,
 }: {
   activePage: PageConfig
+  runConsoleFocus?: MainSwitchPagePayload
 }): React.JSX.Element {
   const [visitedPageIds, setVisitedPageIds] = useState<Set<PageletId>>(
     () => new Set([activePage.id])
@@ -75,7 +80,9 @@ export function PageletHost({
                 overflow: 'hidden',
               }}
             >
-              {PAGE_RENDERERS[page.id]()}
+              {page.id === 'run-console'
+                ? <RunConsolePanel focus={runConsoleFocus} />
+                : PAGE_RENDERERS[page.id]()}
             </section>
           </PageletActivityProvider>
         )

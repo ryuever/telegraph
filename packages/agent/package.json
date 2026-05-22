@@ -25,6 +25,8 @@
   "dependencies": {
     "@mariozechner/pi-ai": "^0.72.1",
     "@telegraph/agent-protocol": "workspace:*",
+    "@telegraph/computer-use": "workspace:*",
+    "@telegraph/computer-use-protocol": "workspace:*",
     "@telegraph/orchestrator-core": "workspace:*"
   },
   "devDependencies": {

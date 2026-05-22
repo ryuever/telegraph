@@ -1,11 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import { RunBrokerStore } from '../RunBrokerStore';
+import { FileRunBrokerStateRepository } from '../RunBrokerStateRepository';
 
 const desktopActor = {
   actorId: 'desktop:user',
   kind: 'desktop' as const,
   displayName: 'Desktop User',
 };
+
+const cleanupDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of cleanupDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 describe('RunBrokerStore', () => {
   it('creates and claims run intents once', () => {
@@ -71,6 +83,10 @@ describe('RunBrokerStore', () => {
       pageletId: 'design',
       status: 'completed',
       artifactCount: 1,
+      artifactRefs: [{
+        artifactId: 'dashboard.png',
+        uri: 'telegraph://computer-use-artifacts/run-1/dashboard.png',
+      }],
       activeArtifactTitle: 'Dashboard',
       updatedAt: 250,
     });
@@ -84,6 +100,10 @@ describe('RunBrokerStore', () => {
       cursor: 2,
       eventCount: 2,
       artifactCount: 1,
+      artifactRefs: [{
+        artifactId: 'dashboard.png',
+        uri: 'telegraph://computer-use-artifacts/run-1/dashboard.png',
+      }],
       activeArtifactTitle: 'Dashboard',
     });
     expect(events).toEqual([
@@ -100,8 +120,43 @@ describe('RunBrokerStore', () => {
     expect(events).toHaveLength(2);
   });
 
+  it('keeps cursor-addressable projection changes for reconnect replay', () => {
+    const store = new RunBrokerStore();
+
+    store.registerRunProjection({
+      runId: 'run-1',
+      pageletId: 'design',
+      status: 'queued',
+      updatedAt: 100,
+    });
+    store.registerRunProjection({
+      runId: 'run-1',
+      pageletId: 'design',
+      status: 'running',
+      updatedAt: 110,
+    });
+    store.registerRunProjection({
+      runId: 'run-1',
+      pageletId: 'design',
+      status: 'completed',
+      updatedAt: 120,
+    });
+
+    expect(store.listRunProjectionChanges({
+      runId: 'run-1',
+      afterCursor: 1,
+    }).map(event => `${String(event.cursor)}:${event.projection.status}`)).toEqual([
+      '2:running',
+      '3:completed',
+    ]);
+  });
+
   it('tracks approval requests and decisions', () => {
     const store = new RunBrokerStore();
+    const events: string[] = [];
+    const subscription = store.subscribeApprovals(event => {
+      events.push(`${String(event.cursor)}:${event.approvalId}:${event.approval.status}`);
+    });
     const approval = store.requestApproval({
       approvalId: 'approval-1',
       runId: 'run-1',
@@ -133,5 +188,163 @@ describe('RunBrokerStore', () => {
       decidedAt: 320,
     });
     expect(store.listApprovals({ runId: 'run-1', status: 'approved' })).toHaveLength(1);
+    expect(store.listApprovalChanges({ runId: 'run-1', afterCursor: 1 })).toEqual([
+      expect.objectContaining({
+        approvalId: 'approval-1',
+        cursor: 2,
+        approval: expect.objectContaining({ status: 'approved' }),
+      }),
+    ]);
+    expect(events).toEqual([
+      '1:approval-1:pending',
+      '2:approval-1:approved',
+    ]);
+
+    subscription.unsubscribe();
+    store.requestApproval({
+      approvalId: 'approval-2',
+      runId: 'run-1',
+      source: desktopActor,
+      kind: 'tool',
+      title: 'No notification after unsubscribe',
+      now: 330,
+    });
+    expect(events).toHaveLength(2);
+  });
+
+  it('tracks run control commands and rejects terminal runs', () => {
+    const store = new RunBrokerStore();
+    const events: string[] = [];
+    const subscription = store.subscribeRunControlCommands(event => {
+      events.push(`${String(event.cursor)}:${event.commandId}:${event.command.status}`);
+    });
+
+    store.registerRunProjection({
+      runId: 'run-control',
+      pageletId: 'design',
+      status: 'running',
+      updatedAt: 500,
+    });
+    const command = store.requestRunControlCommand({
+      commandId: 'runctl-1',
+      runId: 'run-control',
+      kind: 'pause',
+      requestedBy: desktopActor,
+      reason: 'telegram /pause',
+      now: 510,
+    });
+    const applied = store.markRunControlCommandApplied('runctl-1', 520);
+
+    store.registerRunProjection({
+      runId: 'run-done',
+      pageletId: 'design',
+      status: 'completed',
+      updatedAt: 530,
+    });
+    const rejected = store.requestRunControlCommand({
+      commandId: 'runctl-2',
+      runId: 'run-done',
+      kind: 'cancel',
+      requestedBy: desktopActor,
+      now: 540,
+    });
+
+    expect(command).toMatchObject({
+      status: 'accepted',
+      kind: 'pause',
+      reason: 'telegram /pause',
+    });
+    expect(applied).toMatchObject({
+      status: 'applied',
+      appliedAt: 520,
+    });
+    expect(rejected).toMatchObject({
+      status: 'rejected',
+      rejectionReason: 'run is already completed',
+    });
+    expect(store.listRunControlCommands({ runId: 'run-control' })).toEqual([
+      expect.objectContaining({
+        commandId: 'runctl-1',
+        status: 'applied',
+      }),
+    ]);
+    expect(store.listRunControlChanges({ afterCursor: 1 })).toEqual([
+      expect.objectContaining({ commandId: 'runctl-1', cursor: 2 }),
+      expect.objectContaining({ commandId: 'runctl-2', cursor: 3 }),
+    ]);
+    expect(events).toEqual([
+      '1:runctl-1:accepted',
+      '2:runctl-1:applied',
+      '3:runctl-2:rejected',
+    ]);
+
+    subscription.unsubscribe();
+  });
+
+  it('hydrates persisted control-plane state from a snapshot repository', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'telegraph-run-broker-state-'));
+    cleanupDirs.push(dir);
+    const repository = new FileRunBrokerStateRepository(join(dir, 'state.json'));
+    const store = new RunBrokerStore(500, repository);
+
+    store.createRunIntent({
+      intentId: 'intent-persisted',
+      source: desktopActor,
+      targetPagelet: 'design',
+      prompt: 'persist this intent',
+      now: 400,
+    });
+    store.registerRunProjection({
+      runId: 'run-persisted',
+      pageletId: 'design',
+      status: 'running',
+      updatedAt: 410,
+    });
+    store.requestApproval({
+      approvalId: 'approval-persisted',
+      runId: 'run-persisted',
+      source: desktopActor,
+      kind: 'tool',
+      title: 'Persist approval',
+      now: 420,
+    });
+    store.requestRunControlCommand({
+      commandId: 'runctl-persisted',
+      runId: 'run-persisted',
+      kind: 'pause',
+      requestedBy: desktopActor,
+      now: 430,
+    });
+
+    const restored = new RunBrokerStore(500, repository);
+
+    expect(restored.getRunIntent('intent-persisted')).toMatchObject({
+      prompt: 'persist this intent',
+      status: 'queued',
+    });
+    expect(restored.getRunProjection('run-persisted')).toMatchObject({
+      status: 'running',
+      cursor: 1,
+    });
+    expect(restored.listRunProjectionChanges({ runId: 'run-persisted' })).toHaveLength(1);
+    expect(restored.listApprovals({ runId: 'run-persisted' })).toHaveLength(1);
+    expect(restored.listApprovalChanges({ runId: 'run-persisted' })).toEqual([
+      expect.objectContaining({
+        approvalId: 'approval-persisted',
+        cursor: 1,
+      }),
+    ]);
+    expect(restored.listRunControlCommands({ runId: 'run-persisted' })).toEqual([
+      expect.objectContaining({
+        commandId: 'runctl-persisted',
+        status: 'accepted',
+      }),
+    ]);
+    expect(restored.listRunControlChanges({ runId: 'run-persisted' })).toEqual([
+      expect.objectContaining({
+        commandId: 'runctl-persisted',
+        cursor: 1,
+      }),
+    ]);
   });
 });

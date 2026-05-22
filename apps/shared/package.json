@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@telegraph/main": "workspace:*",
+    "@telegraph/remote-protocol": "workspace:*",
+    "@telegraph/run-protocol": "workspace:*",
     "@telegraph/services": "workspace:*",
     "@x-oasis/async-call-rpc": "^0.17.0",
     "@x-oasis/async-call-rpc-electron": "^0.14.0",

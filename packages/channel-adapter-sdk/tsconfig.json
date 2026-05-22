@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "lib": ["ES2022"],
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "@/packages/channel-adapter-sdk": ["./src/index.ts"],
+      "@/packages/channel-adapter-sdk/*": ["./src/*"],
+      "@/packages/remote-protocol": ["../remote-protocol/src/index.ts"],
+      "@/packages/remote-protocol/*": ["../remote-protocol/src/*"],
+      "@/packages/run-protocol": ["../run-protocol/src/index.ts"],
+      "@/packages/run-protocol/*": ["../run-protocol/src/*"],
+      "@/packages/agent-protocol": ["../agent-protocol/src/index.ts"],
+      "@/packages/agent-protocol/*": ["../agent-protocol/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

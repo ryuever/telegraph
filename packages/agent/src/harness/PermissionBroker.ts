@@ -466,7 +466,7 @@ function profileAllowsNetwork(userIntent?: PermissionUserIntent): boolean {
 }
 
 function profileHasScope(profile: TaskCapabilityProfile, scope: string): boolean {
-  return 'scopes' in profile && profile.scopes.includes(scope)
+  return 'scopes' in profile && Array.isArray(profile.scopes) && profile.scopes.includes(scope)
 }
 
 function userIntentAllows(userIntent: PermissionUserIntent | undefined, capability: PermissionCapability): boolean {

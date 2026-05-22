@@ -25,13 +25,30 @@ export const ORCHESTRATOR_SERVICE_PATH = 'orchestrator';
 
 export const MAIN_RPC_SERVICE_PATH = 'main-rpc';
 
+export interface MainOpenRunOptions {
+  pageletId?: string;
+}
+
+export interface MainOpenRunResult {
+  runId: string;
+  pageletId?: string;
+  pageId: string;
+  focused: boolean;
+}
+
+export interface MainSwitchPagePayload {
+  runId?: string;
+  pageletId?: string;
+}
+
 export interface IMainRpcService {
   mainPing(msg: string): Promise<string>;
+  openRun(runId: string, options?: MainOpenRunOptions): Promise<MainOpenRunResult>;
 }
 
 export const MAIN_WINDOW_SERVICE_PATH = 'main-window';
 
 export interface IMainWindowService {
   openSettingWindow(): Promise<void>;
-  onSwitchPage(callback: (pageId: string) => void): void;
+  onSwitchPage(callback: (pageId: string, payload?: MainSwitchPagePayload) => void): void;
 }

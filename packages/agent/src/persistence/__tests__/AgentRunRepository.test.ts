@@ -104,6 +104,85 @@ describe('FileAgentRunRepository', () => {
     }
   })
 
+  it('batch appends ordered events and writes the terminal run state once', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'telegraph-runs-'))
+    try {
+      const repo = new FileAgentRunRepository(dir)
+      await repo.createRun({
+        runId: 'run-batch',
+        sessionId: 'session-batch',
+        runtimeId: 'pi-ai',
+        now: 100,
+      })
+
+      const appended = await repo.appendEvents('run-batch', [
+        runStarted('run-batch', 110),
+        assistantDelta('run-batch', 'a', 120),
+        assistantDelta('run-batch', 'b', 121),
+        runCompleted('run-batch', 130),
+      ])
+
+      expect(appended.map(event => event.seq)).toEqual([1, 2, 3, 4])
+      expect(appended.map(event => event.ts)).toEqual([110, 120, 121, 130])
+      expect(await repo.appendEvents('run-batch', [])).toEqual([])
+
+      const record = await repo.getRun('run-batch')
+      expect(record).toMatchObject({
+        status: 'completed',
+        eventCount: 4,
+        startedAt: 110,
+        completedAt: 130,
+        lastEventAt: 130,
+      })
+      expect((await repo.listRunEvents('run-batch')).map(event => event.event.type)).toEqual([
+        'run_started',
+        'assistant_delta',
+        'assistant_delta',
+        'run_completed',
+      ])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('indexes observation artifact refs from tool results', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'telegraph-runs-'))
+    try {
+      const repo = new FileAgentRunRepository(dir)
+      await repo.createRun({
+        runId: 'run-observation-artifacts',
+        sessionId: 'session-observation-artifacts',
+        runtimeId: 'pi-ai',
+        now: 100,
+      })
+
+      await repo.appendEvent('run-observation-artifacts', {
+        type: 'tool_result',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        origin: { framework: 'telegraph', runtimeId: 'test-runtime' },
+        runId: 'run-observation-artifacts',
+        callId: 'call-observe',
+        toolName: 'computer.observe',
+        output: {
+          observations: [{
+            kind: 'screenshot',
+            artifactRef: {
+              uri: 'telegraph://computer-use-artifacts/run-observation-artifacts/shot.png',
+              mediaType: 'image/png',
+            },
+          }],
+        },
+        ts: 120,
+      })
+
+      expect((await repo.getRun('run-observation-artifacts'))?.artifactRefs).toEqual([
+        'telegraph://computer-use-artifacts/run-observation-artifacts/shot.png',
+      ])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('imports an exported run bundle without overwriting existing runs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'telegraph-runs-'))
     try {

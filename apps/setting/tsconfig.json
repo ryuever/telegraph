@@ -21,6 +21,14 @@
       "@/apps/shared/*": ["../shared/src/*"],
       "@/apps/daemon/*": ["../daemon/src/*"],
       "@/apps/main/*": ["../main/src/*"],
+      "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
+      "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
+      "@/packages/run-protocol": ["../../packages/run-protocol/src/index.ts"],
+      "@/packages/run-protocol/*": ["../../packages/run-protocol/src/*"],
+      "@/packages/remote-protocol": ["../../packages/remote-protocol/src/index.ts"],
+      "@/packages/remote-protocol/*": ["../../packages/remote-protocol/src/*"],
+      "@/packages/computer-use-protocol": ["../../packages/computer-use-protocol/src/index.ts"],
+      "@/packages/computer-use-protocol/*": ["../../packages/computer-use-protocol/src/*"],
       "@/packages/ui/*": ["../../packages/ui/src/*"]
     }
   },

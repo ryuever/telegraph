@@ -113,8 +113,22 @@ When creating a new project skill, add it under `skills/` and update `skills/REA
 │   │   ├── tsconfig.json                          # paths: @/apps/design/*, @/packages/{ui,services/pagelet-host,services/main-metrics}/*; include limited
 │   │   └── package.json                           # x-oasis + react devDeps; typecheck/lint/test only (built by telegraph's forge config)
 │   │
+│   ├── cli-gateway/                               # headless pagelet — local CLI/MCP socket gateway to RunBroker via Shared RPC
+│   │   ├── src/application/common/                # CLI_GATEWAY_PARTICIPANT_ID + DI contract
+│   │   ├── src/application/electron-main/         # spawns cli-gateway-worker.js via PageletProcess
+│   │   └── src/application/node/                  # CliGatewayWorker hosts local socket gateway, no renderer surface
+│   │
+│   ├── remote-control/                            # headless pagelet — ExternalMessage intake, device bindings, RunIntent bridge
+│   │   ├── src/application/common/                # REMOTE_CONTROL_PARTICIPANT_ID + pagelet service contract
+│   │   ├── src/application/electron-main/         # spawns remote-control-worker.js via PageletProcess
+│   │   └── src/application/node/                  # RemoteControlWorker validates remote messages and creates RunIntents
+│   │
 ├── packages/
 │   ├── agent-protocol/                            # @/packages/agent-protocol — AgentEvent / RuntimeEvent / run / tool / extension protocol types
+│   ├── run-protocol/                              # @/packages/run-protocol — RunIntent / RunRecord / approval / cursor control-plane types
+│   ├── remote-protocol/                           # @/packages/remote-protocol — ExternalMessage / RemoteActor / ChannelReply / DeviceBinding types
+│   ├── computer-use-protocol/                     # @/packages/computer-use-protocol — ComputerTarget / Observation / ComputerAction / ActionResult types
+│   ├── computer-use/                              # @/packages/computer-use — read-only observation broker + artifact-backed capture providers
 │   ├── agent/                                     # @/packages/agent — harness, runtime adapters, tool/trace implementation kit
 │   └── ui/                                        # @/packages/ui — shared UI component library (React + Tailwind, shadcn-based, no Electron imports)
 │
@@ -148,6 +162,14 @@ This makes imports self-documenting — you can always locate a module by its im
 | `@/packages/stores/*`                 | `packages/stores/src/*`                           | `import type { X } from '@/packages/stores/types'`                 |
 | `@/packages/agent-protocol`           | `packages/agent-protocol/src/index.ts`            | `import type { AgentEvent } from '@/packages/agent-protocol'`     |
 | `@/packages/agent-protocol/*`         | `packages/agent-protocol/src/*`                   | `import { X } from '@/packages/agent-protocol/events'`            |
+| `@/packages/run-protocol`             | `packages/run-protocol/src/index.ts`              | `import type { RunIntent } from '@/packages/run-protocol'`        |
+| `@/packages/run-protocol/*`           | `packages/run-protocol/src/*`                     | `import type { EventCursor } from '@/packages/run-protocol/cursor'` |
+| `@/packages/remote-protocol`          | `packages/remote-protocol/src/index.ts`           | `import type { RemoteActor } from '@/packages/remote-protocol'`   |
+| `@/packages/remote-protocol/*`        | `packages/remote-protocol/src/*`                  | `import type { ExternalMessage } from '@/packages/remote-protocol/external-message'` |
+| `@/packages/computer-use-protocol`    | `packages/computer-use-protocol/src/index.ts`     | `import type { Observation } from '@/packages/computer-use-protocol'` |
+| `@/packages/computer-use-protocol/*`  | `packages/computer-use-protocol/src/*`            | `import type { ComputerAction } from '@/packages/computer-use-protocol/action'` |
+| `@/packages/computer-use`             | `packages/computer-use/src/index.ts`              | `import { ComputerUseBroker } from '@/packages/computer-use'`        |
+| `@/packages/computer-use/*`           | `packages/computer-use/src/*`                     | `import { FileObservationArtifactStore } from '@/packages/computer-use/artifact-store'` |
 | `@/packages/agent/*`                  | `packages/agent/src/*`                            | `import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime'` |
 | `@/packages/services/pagelet-host/*`  | `packages/services/src/pagelet-host/src/*`        | `import { PageletWorker } from '@/packages/services/pagelet-host/node/PageletWorker'` |
 | `@/packages/services/main-metrics/*`  | `packages/services/src/main-metrics/src/*`        | `import { X } from '@/packages/services/main-metrics/common'`      |
@@ -165,25 +187,35 @@ This makes imports self-documenting — you can always locate a module by its im
 4. **Bare imports** (no sub-path) for packages with a barrel `index.ts`:
    - `@/packages/stores` → `packages/stores/src/index.ts`
    - `@/packages/agent-protocol` → `packages/agent-protocol/src/index.ts`
+   - `@/packages/run-protocol` → `packages/run-protocol/src/index.ts`
+   - `@/packages/remote-protocol` → `packages/remote-protocol/src/index.ts`
+   - `@/packages/computer-use-protocol` → `packages/computer-use-protocol/src/index.ts`
+   - `@/packages/computer-use` → `packages/computer-use/src/index.ts`
 5. **Never introduce a new alias prefix** (no `@foo/`, `@bar/`, etc.). `@/` is the sole alias.
 
 ### Where each alias is configured
 
 | File                                              | Aliases declared                                                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------|
-| `apps/main/tsconfig.json`                         | `@/apps/{main,design,connection,daemon,shared,monitor,setting,chat}/*`, `@/packages/{ui,stores,agent-protocol,agent,services/pagelet-host,services/main-metrics,services/process}/*` |
-| `apps/design/tsconfig.json`                       | `@/apps/design/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
-| `apps/shared/tsconfig.json`                       | `@/apps/shared/*` (self), `@/apps/main/*`, `@/packages/services/{pagelet-host,main-metrics}/*` |
+| `apps/main/tsconfig.json`                         | `@/apps/{main,design,connection,daemon,shared,monitor,setting,chat,cli-gateway,remote-control}/*`, `@/packages/{ui,stores,agent-protocol,run-protocol,remote-protocol,computer-use-protocol,computer-use,agent,services/pagelet-host,services/main-metrics,services/process}/*` |
+| `apps/design/tsconfig.json`                       | `@/apps/design/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,agent-protocol,run-protocol,remote-protocol,computer-use-protocol,computer-use,services/pagelet-host,services/main-metrics}/*` |
+| `apps/shared/tsconfig.json`                       | `@/apps/shared/*` (self), `@/apps/main/*`, `@/packages/{agent-protocol,run-protocol,remote-protocol,computer-use-protocol,services/pagelet-host,services/main-metrics}/*` |
 | `apps/daemon/tsconfig.json`                       | `@/apps/daemon/*` (self), `@/apps/main/*`, `@/packages/services/{pagelet-host,main-metrics,process}/*` |
-| `apps/setting/tsconfig.json`                      | `@/apps/setting/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
+| `apps/setting/tsconfig.json`                      | `@/apps/setting/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,agent-protocol,run-protocol,remote-protocol,computer-use-protocol,services/pagelet-host,services/main-metrics}/*` |
 | `apps/monitor/tsconfig.json`                      | `@/apps/monitor/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,services/pagelet-host,services/main-metrics}/*` |
-| `apps/connection/tsconfig.json`                   | `@/apps/connection/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,services/{pagelet-host,main-metrics,process}}/*` |
-| `apps/chat/tsconfig.json`                         | `@/apps/chat/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,stores,agent-protocol,agent,services/pagelet-host,services/main-metrics}/*` |
+| `apps/connection/tsconfig.json`                   | `@/apps/connection/*` (self), `@/apps/{main,daemon,shared}/*`, `@/packages/{ui,agent-protocol,run-protocol,remote-protocol,computer-use-protocol,computer-use,agent,services/{pagelet-host,main-metrics,process}}/*` |
+| `apps/chat/tsconfig.json`                         | `@/apps/chat/*` (self), `@/apps/{main,daemon}/*`, `@/packages/{ui,stores,agent-protocol,run-protocol,remote-protocol,computer-use-protocol,computer-use,agent,services/pagelet-host,services/main-metrics}/*` |
+| `apps/cli-gateway/tsconfig.json`                  | `@/apps/cli-gateway/*` (self), `@/apps/shared/*`, `@/packages/{agent-protocol,run-protocol,remote-protocol,computer-use-protocol,services/pagelet-host,services/main-metrics}/*` |
+| `apps/remote-control/tsconfig.json`               | `@/apps/remote-control/*` (self), `@/apps/shared/*`, `@/packages/{agent-protocol,run-protocol,remote-protocol,services/pagelet-host,services/main-metrics}/*` |
 | `packages/ui/tsconfig.json`                       | `@/packages/ui/*` (self) |
 | `packages/services/tsconfig.json`                 | `@/packages/services/*` (self + sub-services), `@/apps/{main,daemon}/*` |
-| `packages/agent/tsconfig.json`                    | `@/packages/agent/*` (self), `@/packages/agent-protocol/*` |
+| `packages/agent/tsconfig.json`                    | `@/packages/agent/*` (self), `@/packages/{agent-protocol,computer-use-protocol,computer-use}/*` |
 | `packages/stores/tsconfig.json`                   | `@/packages/stores/*` (self) |
 | `packages/agent-protocol/tsconfig.json`           | `@/packages/agent-protocol/*` (self) |
+| `packages/run-protocol/tsconfig.json`             | `@/packages/run-protocol/*` (self), `@/packages/{agent-protocol,remote-protocol}/*` |
+| `packages/remote-protocol/tsconfig.json`          | `@/packages/remote-protocol/*` (self) |
+| `packages/computer-use-protocol/tsconfig.json`    | `@/packages/computer-use-protocol/*` (self) |
+| `packages/computer-use/tsconfig.json`             | `@/packages/computer-use/*` (self), `@/packages/computer-use-protocol/*` |
 | `apps/main/vite.*.config.ts`                      | Mirror tsconfig aliases as `resolve.alias` entries (key = `@/apps/X`, value = `resolve(__dirname, '<rel-path-to-src>')`) |
 
 ## Running and building

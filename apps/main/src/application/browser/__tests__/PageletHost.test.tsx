@@ -1,7 +1,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CHAT_PAGE, DESIGN_PAGE } from '@/apps/main/application/common/cp-config'
+import { CHAT_PAGE, DESIGN_PAGE, RUN_CONSOLE_PAGE } from '@/apps/main/application/common/cp-config'
 import { PageletHost } from '@/apps/main/application/browser/PageletHost'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -21,6 +21,10 @@ vi.mock('@/apps/design/application/browser/DesignPanel', () => ({
 
 vi.mock('@/apps/chat/application/browser/ChatPage', () => ({
   default: () => <div data-testid="page-chat">Chat slot</div>,
+}))
+
+vi.mock('@/apps/main/application/browser/RunConsolePanel', () => ({
+  RunConsolePanel: () => <div data-testid="page-run-console">Run Console slot</div>,
 }))
 
 describe('PageletHost', () => {
@@ -61,5 +65,29 @@ describe('PageletHost', () => {
     expect(chatSlot).not.toBeNull()
     expect(designSlot?.closest('section')?.hidden).toBe(true)
     expect(chatSlot?.closest('section')?.hidden).toBe(false)
+  })
+
+  it('mounts the run console as a keep-alive page', () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    act(() => {
+      root?.render(<PageletHost activePage={DESIGN_PAGE} />)
+    })
+
+    expect(container.querySelector('[data-testid="page-run-console"]')).toBeNull()
+
+    act(() => {
+      root?.render(<PageletHost activePage={RUN_CONSOLE_PAGE} />)
+    })
+
+    const designSlot = container.querySelector('[data-testid="page-design"]')
+    const runConsoleSlot = container.querySelector('[data-testid="page-run-console"]')
+
+    expect(designSlot).not.toBeNull()
+    expect(runConsoleSlot).not.toBeNull()
+    expect(designSlot?.closest('section')?.hidden).toBe(true)
+    expect(runConsoleSlot?.closest('section')?.hidden).toBe(false)
   })
 })

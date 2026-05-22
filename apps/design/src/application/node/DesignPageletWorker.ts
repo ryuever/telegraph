@@ -28,11 +28,19 @@ import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
 import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
-import type { RuntimeSettings } from '@/packages/agent-protocol';
+import type { PermissionRequest, RuntimeSettings } from '@/packages/agent-protocol';
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build';
+import { BufferedAgentRunEventWriter } from '@/packages/agent/persistence/BufferedAgentRunEventWriter';
 import { FileAgentRunRepository } from '@/packages/agent/persistence/AgentRunRepository';
 import type { AgentRunEventRecord, AgentRunRecord } from '@/packages/agent/persistence/AgentRunRepository';
-import type { ISharedService, RunIntentRecord, RunProjectionStatus } from '@/apps/shared/application/common';
+import type {
+  ApprovalRequestChangeEvent,
+  ISharedService,
+  RunControlCommandChangeEvent,
+  RunIntentRecord,
+  RunProjectionStatus,
+} from '@/apps/shared/application/common';
+import type { RemoteArtifactRef } from '@/packages/remote-protocol';
 import { DesignBuildRuntime } from './design-build/DesignBuildRuntime';
 import { DesignHarnessRunController } from './DesignHarnessRunController';
 import { designRunSnapshotFromLedger } from './DesignRunStore';
@@ -43,8 +51,21 @@ export const DesignPageletWorkerId = createId('DesignPageletWorker');
 export class DesignPageletWorker extends PageletWorker<ISharedService> {
   private readonly runControl = new DesignHarnessRunController();
   private readonly runs = new FileAgentRunRepository(join(process.cwd(), '.telegraph', 'design-runs'));
+  private readonly runEvents = new BufferedAgentRunEventWriter(this.runs, {
+    onFlush: async (_runId, records) => {
+      const last = records[records.length - 1];
+      const record = await this.runs.getRun(last.runId);
+      if (record) await this.publishRunProjection(record, last);
+    },
+  });
   private readonly recoveredRunsReady = this.runs.markRunningRunsRecovered().catch(() => []);
+  private readonly sourceIntentIds = new Map<string, string>();
   private intentPollTimer: ReturnType<typeof setInterval> | null = null;
+  private recoveredRunProjectionPublishStarted = false;
+  private approvalSubscription: { unsubscribe(): void } | null = null;
+  private runControlSubscription: { unsubscribe(): void } | null = null;
+  private readonly ledgeredApprovalChangeKeys = new Set<string>();
+  private readonly ledgeredRunControlKeys = new Set<string>();
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -63,6 +84,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
           Promise.resolve(this.runControl.cancelRun(runId)),
         listAgentRuns: async (): Promise<DesignAgentRunRecordSnapshot[]> => {
           await this.recoveredRunsReady;
+          await this.runEvents.flushAll();
           const records = await this.runs.listRuns();
           return Promise.all(records.map(async record =>
             designRunSnapshotFromLedger(record, await this.runs.listRunEvents(record.runId)),
@@ -70,12 +92,14 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
         },
         getAgentRun: async (runId: string): Promise<DesignAgentRunRecordSnapshot | null> => {
           await this.recoveredRunsReady;
+          await this.runEvents.flushRun(runId);
           const record = await this.runs.getRun(runId);
           if (!record) return null;
           return designRunSnapshotFromLedger(record, await this.runs.listRunEvents(runId));
         },
         listAgentRunEvents: async (runId: string): Promise<DesignAgentRunEventRecordSnapshot[]> => {
           await this.recoveredRunsReady;
+          await this.runEvents.flushRun(runId);
           return this.runs.listRunEvents(runId);
         },
         listSubagents: (): Promise<DesignSubagentRecordSnapshot[]> =>
@@ -96,6 +120,9 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
   }
 
   protected override onSharedClientReady(): void {
+    void this.publishRecoveredRunProjections();
+    this.subscribeApprovalLedgerBridge();
+    this.subscribeRunControlBridge();
     if (this.intentPollTimer) return;
     void this.consumeQueuedRunIntents();
     this.intentPollTimer = setInterval(() => {
@@ -107,6 +134,10 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
   private async handleSendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult> {
     const sessionId = request.sessionId ?? `design-${request.runId}`;
     await this.recoveredRunsReady;
+    const sourceIntentId = sourceIntentIdFromContext(request.context);
+    if (sourceIntentId) {
+      this.sourceIntentIds.set(request.runId, sourceIntentId);
+    }
 
     const createdRun = await this.runs.createRun({
       runId: request.runId,
@@ -222,9 +253,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
 
   private async persistRunEvent(runId: string, event: AgentEvent): Promise<void> {
     try {
-      const eventRecord = await this.runs.appendEvent(runId, event);
-      const record = await this.runs.getRun(runId);
-      if (record) void this.publishRunProjection(record, eventRecord);
+      await this.runEvents.append(runId, event);
     } catch {
       // Ledger persistence must not break live agent streaming.
     }
@@ -232,6 +261,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
 
   private async publishRunProjection(record: AgentRunRecord, event?: AgentRunEventRecord): Promise<void> {
     try {
+      const artifactRefs = remoteArtifactRefs(record.artifactRefs, await this.runs.listRunEvents(record.runId));
       await this.shared.registerRunProjection({
         runId: record.runId,
         sessionId: record.sessionId,
@@ -241,7 +271,11 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
         promptPreview: record.inputPreview,
         cursor: event?.seq ?? record.eventCount,
         eventCount: record.eventCount,
+        artifactCount: record.artifactRefs.length,
+        artifactRefs,
+        activeArtifactTitle: artifactRefs.at(-1)?.title ?? record.artifactRefs.at(-1),
         error: record.failureMessage,
+        sourceIntentId: this.sourceIntentIds.get(record.runId),
         updatedAt: record.lastEventAt ?? record.completedAt ?? record.startedAt ?? record.createdAt,
         metadata: {
           runtimeId: record.runtimeId,
@@ -251,6 +285,75 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     } catch {
       // RunBroker projection is a control-plane cache; the pagelet ledger remains authoritative.
     }
+  }
+
+  private async publishRecoveredRunProjections(): Promise<void> {
+    if (this.recoveredRunProjectionPublishStarted) return;
+    this.recoveredRunProjectionPublishStarted = true;
+    try {
+      const recoveredRuns = await this.recoveredRunsReady;
+      for (const record of recoveredRuns) {
+        await this.publishRunProjection(record);
+      }
+    } catch {
+      // Projection recovery is best-effort; pagelet-local ledger remains authoritative.
+    }
+  }
+
+  private subscribeApprovalLedgerBridge(): void {
+    if (this.approvalSubscription) return;
+    try {
+      this.approvalSubscription = this.shared.subscribeApprovals(event => {
+        void this.persistApprovalChangeEvent(event);
+      });
+    } catch {
+      this.approvalSubscription = null;
+    }
+  }
+
+  private async persistApprovalChangeEvent(event: ApprovalRequestChangeEvent): Promise<void> {
+    if (event.approval.status === 'pending') return;
+    const key = `${event.approvalId}:${String(event.cursor)}`;
+    if (this.ledgeredApprovalChangeKeys.has(key)) return;
+    this.ledgeredApprovalChangeKeys.add(key);
+
+    const run = await this.runs.getRun(event.runId);
+    if (!run) return;
+    await this.persistRunEvent(event.runId, approvalChangeRuntimeEvent(event));
+    await this.runEvents.flushRun(event.runId);
+  }
+
+  private subscribeRunControlBridge(): void {
+    if (this.runControlSubscription) return;
+    try {
+      this.runControlSubscription = this.shared.subscribeRunControlCommands(event => {
+        void this.handleRunControlCommand(event);
+      });
+    } catch {
+      this.runControlSubscription = null;
+    }
+  }
+
+  private async handleRunControlCommand(event: RunControlCommandChangeEvent): Promise<void> {
+    if (event.command.status !== 'accepted') return;
+    const key = `${event.commandId}:${String(event.cursor)}`;
+    if (this.ledgeredRunControlKeys.has(key)) return;
+    this.ledgeredRunControlKeys.add(key);
+
+    const run = await this.runs.getRun(event.runId);
+    if (!run) return;
+
+    await this.persistRunEvent(event.runId, runControlRuntimeLogEvent(event));
+    await this.runEvents.flushRun(event.runId);
+
+    if (event.command.kind === 'pause') {
+      await this.persistRunEvent(event.runId, runControlUnsupportedPauseEvent(event));
+      await this.runEvents.flushRun(event.runId);
+      return;
+    }
+
+    if (!this.runControl.cancelRun(event.runId)) return;
+    await this.shared.markRunControlCommandApplied(event.commandId);
   }
 
   private async consumeQueuedRunIntents(): Promise<void> {
@@ -346,18 +449,18 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     userConfirmed: boolean,
   ): PermissionedNodePatchCapability {
     const taskProfile = request.settings.taskCapabilityProfile ?? { kind: 'default' as const };
+    const emitPatchEvent = (event: AgentEvent): void => {
+      void this.persistRunEvent(request.runId, event);
+      this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
+    };
     const broker = new PermissionBroker({
       prompt: () => userConfirmed,
-      emit: event => {
-        this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
-      },
+      emit: emitPatchEvent,
     });
 
     return new PermissionedNodePatchCapability({
       broker,
-      emit: event => {
-        this.runControl.emitAgentEvent({ type: 'agent_event', runId: request.runId, sessionId: request.sessionId, event });
-      },
+      emit: emitPatchEvent,
       allowedRoots: [process.cwd()],
       context: {
         runId: request.runId,
@@ -443,8 +546,207 @@ function runProjectionStatus(record: AgentRunRecord): RunProjectionStatus {
   return record.status;
 }
 
+function remoteArtifactRefs(uris: string[], events: AgentRunEventRecord[] = []): RemoteArtifactRef[] {
+  const refs = new Map<string, RemoteArtifactRef>();
+  for (const event of events) {
+    for (const ref of extractRemoteArtifactRefs(event.event)) {
+      refs.set(ref.uri, mergeRemoteArtifactRef(refs.get(ref.uri), ref));
+    }
+  }
+  for (const uri of uris) {
+    refs.set(uri, mergeRemoteArtifactRef(refs.get(uri), fallbackRemoteArtifactRef(uri)));
+  }
+  return uris
+    .map(uri => refs.get(uri) ?? fallbackRemoteArtifactRef(uri))
+    .concat(Array.from(refs.values()).filter(ref => !uris.includes(ref.uri)));
+}
+
+function extractRemoteArtifactRefs(value: unknown): RemoteArtifactRef[] {
+  if (!value || typeof value !== 'object') return [];
+  const refs: RemoteArtifactRef[] = [];
+  const record = value as Record<string, unknown>;
+  collectRemoteArtifactRefsFromRecord(record, refs);
+  if (isRecord(record.output)) collectRemoteArtifactRefsFromRecord(record.output, refs);
+  return refs;
+}
+
+function collectRemoteArtifactRefsFromRecord(record: Record<string, unknown>, refs: RemoteArtifactRef[]): void {
+  if (Array.isArray(record.artifactRefs)) {
+    for (const item of record.artifactRefs) {
+      const ref = toRemoteArtifactRef(item);
+      if (ref) refs.push(ref);
+    }
+  }
+
+  const artifactRef = toRemoteArtifactRef(record.artifactRef);
+  if (artifactRef) refs.push(artifactRef);
+
+  if (!Array.isArray(record.observations)) return;
+  for (const observation of record.observations) {
+    if (!isRecord(observation)) continue;
+    const ref = toRemoteArtifactRef(observation.artifactRef);
+    if (ref) refs.push(ref);
+  }
+}
+
+function toRemoteArtifactRef(value: unknown): RemoteArtifactRef | null {
+  if (typeof value === 'string') return fallbackRemoteArtifactRef(value);
+  if (!isRecord(value) || typeof value.uri !== 'string') return null;
+  return {
+    artifactId: typeof value.artifactId === 'string' ? value.artifactId : artifactIdFromUri(value.uri),
+    uri: value.uri,
+    mediaType: typeof value.mediaType === 'string' ? value.mediaType : undefined,
+    title: typeof value.title === 'string' ? value.title : value.uri.split('/').pop(),
+    sizeBytes: typeof value.sizeBytes === 'number' ? value.sizeBytes : undefined,
+    sha256: typeof value.sha256 === 'string' ? value.sha256 : undefined,
+  };
+}
+
+function fallbackRemoteArtifactRef(uri: string): RemoteArtifactRef {
+  return {
+    artifactId: artifactIdFromUri(uri),
+    uri,
+    title: uri.split('/').pop(),
+  };
+}
+
+function mergeRemoteArtifactRef(current: RemoteArtifactRef | undefined, next: RemoteArtifactRef): RemoteArtifactRef {
+  return {
+    ...next,
+    ...current,
+    mediaType: current?.mediaType ?? next.mediaType,
+    title: current?.title ?? next.title,
+    sizeBytes: current?.sizeBytes ?? next.sizeBytes,
+    sha256: current?.sha256 ?? next.sha256,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function approvalChangeRuntimeEvent(event: ApprovalRequestChangeEvent): AgentEvent {
+  const permission = permissionFromApproval(event.approval.proposedAction);
+  if (permission) {
+    return {
+      type: 'permission_resolved',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      producerVersion: 'telegraph-run-broker-approval@0.0.0',
+      origin: { framework: 'telegraph', runtimeId: 'run-broker-approval' },
+      runId: event.runId,
+      permission,
+      granted: event.approval.status === 'approved',
+      raw: event.approval,
+      ts: event.approval.decidedAt ?? event.approval.updatedAt,
+    };
+  }
+
+  return {
+    type: 'runtime_log',
+    schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+    producerVersion: 'telegraph-run-broker-approval@0.0.0',
+    origin: { framework: 'telegraph', runtimeId: 'run-broker-approval' },
+    runId: event.runId,
+    level: event.approval.status === 'approved' ? 'info' : 'warn',
+    message: `Approval ${event.approval.status}: ${event.approval.title}`,
+    raw: event.approval,
+    ts: event.approval.decidedAt ?? event.approval.updatedAt,
+  };
+}
+
+function runControlRuntimeLogEvent(event: RunControlCommandChangeEvent): AgentEvent {
+  return {
+    type: 'runtime_log',
+    schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+    producerVersion: 'telegraph-run-broker-control@0.0.0',
+    origin: { framework: 'telegraph', runtimeId: 'run-broker-control' },
+    runId: event.runId,
+    level: 'warn',
+    message: `Remote run control requested: ${event.command.kind}`,
+    raw: event.command,
+    ts: event.command.updatedAt,
+  };
+}
+
+function runControlUnsupportedPauseEvent(event: RunControlCommandChangeEvent): AgentEvent {
+  return {
+    type: 'runtime_log',
+    schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+    producerVersion: 'telegraph-run-broker-control@0.0.0',
+    origin: { framework: 'telegraph', runtimeId: 'run-broker-control' },
+    runId: event.runId,
+    level: 'warn',
+    message: 'Remote pause requested, but this runtime has no checkpoint pause capability yet.',
+    raw: event.command,
+    ts: Date.now(),
+  };
+}
+
+function permissionFromApproval(proposedAction: Record<string, unknown> | undefined): PermissionRequest | null {
+  const permission = proposedAction?.permission;
+  if (!isRecord(permission)) return null;
+  if (permission.type === 'filesystem' &&
+    isFilesystemScope(permission.scope) &&
+    isFilesystemAccess(permission.access)) {
+    return {
+      type: 'filesystem',
+      scope: permission.scope,
+      access: permission.access,
+    };
+  }
+  if (permission.type === 'process') {
+    return {
+      type: 'process',
+      commands: Array.isArray(permission.commands)
+        ? permission.commands.filter((item): item is string => typeof item === 'string')
+        : undefined,
+    };
+  }
+  if (permission.type === 'network') {
+    return {
+      type: 'network',
+      hosts: Array.isArray(permission.hosts)
+        ? permission.hosts.filter((item): item is string => typeof item === 'string')
+        : undefined,
+    };
+  }
+  if (permission.type === 'shell' && isShellRisk(permission.risk)) {
+    return { type: 'shell', risk: permission.risk };
+  }
+  if (permission.type === 'secrets') {
+    return {
+      type: 'secrets',
+      keys: Array.isArray(permission.keys)
+        ? permission.keys.filter((item): item is string => typeof item === 'string')
+        : undefined,
+    };
+  }
+  return null;
+}
+
+function isFilesystemScope(value: unknown): value is Extract<PermissionRequest, { type: 'filesystem' }>['scope'] {
+  return value === 'workspace' || value === 'user-selected' || value === 'home' || value === 'any';
+}
+
+function isFilesystemAccess(value: unknown): value is Extract<PermissionRequest, { type: 'filesystem' }>['access'] {
+  return value === 'read' || value === 'write' || value === 'readwrite';
+}
+
+function isShellRisk(value: unknown): value is Extract<PermissionRequest, { type: 'shell' }>['risk'] {
+  return value === 'low' || value === 'medium' || value === 'high';
+}
+
+function artifactIdFromUri(uri: string): string {
+  const segment = uri.split('/').filter(Boolean).pop();
+  return segment || uri;
+}
+
 function intentRunId(intent: RunIntentRecord): string {
   return intent.runId ?? `design-${intent.intentId}`;
+}
+
+function sourceIntentIdFromContext(context: Record<string, unknown> | undefined): string | undefined {
+  return typeof context?.sourceIntentId === 'string' ? context.sourceIntentId : undefined;
 }
 
 function settingsFromIntent(intent: RunIntentRecord): RuntimeSettings {

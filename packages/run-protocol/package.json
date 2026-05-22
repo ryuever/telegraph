@@ -1,0 +1,24 @@
+{
+  "name": "@telegraph/run-protocol",
+  "version": "0.0.0",
+  "description": "Telegraph run control-plane protocol for intents, records, events, cursors, and approvals.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/agent-protocol": "workspace:*",
+    "@telegraph/remote-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

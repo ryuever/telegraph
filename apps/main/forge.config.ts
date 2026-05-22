@@ -33,6 +33,14 @@ const config: ForgeConfig = {
           config: 'vite.shared.config.ts',
         },
         {
+          entry: '../cli-gateway/src/application/node/main.ts',
+          config: 'vite.cli-gateway.config.ts',
+        },
+        {
+          entry: '../remote-control/src/application/node/main.ts',
+          config: 'vite.remote-control.config.ts',
+        },
+        {
           entry: '../daemon/src/application/node/main.ts',
           config: 'vite.daemon.config.ts',
         },

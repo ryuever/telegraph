@@ -213,6 +213,8 @@ export default defineConfig(({ command }) => ({
       '@/packages/stores': resolve(__dirname, '../../packages/stores/src/index.ts'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
+      '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),
+      '@/packages/computer-use-protocol': resolve(__dirname, '../../packages/computer-use-protocol/src/index.ts'),
       '@/packages/ui/useOrchestratorDashboard': resolve(__dirname, '../../packages/ui/src/hooks/useOrchestratorDashboard.ts'),
       '@/packages/ui': resolve(__dirname, '../../packages/ui/src'),
     },

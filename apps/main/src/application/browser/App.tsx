@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
-import { Activity, Cable, MessageCircle, Palette, Settings, Sparkles } from 'lucide-react';
+import { Activity, Cable, ListTree, MessageCircle, Palette, Settings, Sparkles } from 'lucide-react';
 import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
 import { PageletHost } from '@/apps/main/application/browser/PageletHost';
 import { cn } from '@/packages/ui/lib/utils';
+import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common';
 
 import {
   DESIGN_PAGE,
@@ -16,6 +17,7 @@ export type { PageConfig };
 const PAGE_ICONS: Record<PageConfig['id'], typeof Palette> = {
   design: Palette,
   chat: MessageCircle,
+  'run-console': ListTree,
   monitor: Activity,
   connection: Cable,
 };
@@ -23,6 +25,7 @@ const PAGE_ICONS: Record<PageConfig['id'], typeof Palette> = {
 const PAGE_ACCENTS: Record<PageConfig['id'], string> = {
   design: 'bg-accent-lilac text-white',
   chat: 'bg-accent-coral text-white',
+  'run-console': 'bg-teal-700 text-white',
   monitor: 'bg-accent-mint text-slate-900',
   connection: 'bg-primary text-primary-foreground',
 };
@@ -52,14 +55,18 @@ function persistActivePage(page: PageConfig): void {
 
 function App(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageConfig>(loadInitialPage);
+  const [runConsoleFocus, setRunConsoleFocus] = useState<MainSwitchPagePayload | undefined>();
   const selectPage = useCallback((page: PageConfig) => {
     setActivePage(page);
     persistActivePage(page);
   }, []);
 
   useEffect(() => {
-    mainWindowClient.onSwitchPage((pageId: string) => {
+    mainWindowClient.onSwitchPage((pageId: string, payload?: MainSwitchPagePayload) => {
       const page = findPageById(pageId);
+      if (pageId === 'run-console' && payload?.runId) {
+        setRunConsoleFocus(payload);
+      }
       if (page) selectPage(page);
     });
   }, [selectPage]);
@@ -132,7 +139,7 @@ function App(): React.JSX.Element {
       </aside>
 
       <main className="flex min-h-0 min-w-0 flex-1 bg-background">
-        <PageletHost activePage={activePage} />
+        <PageletHost activePage={activePage} runConsoleFocus={runConsoleFocus} />
       </main>
     </div>
   );
