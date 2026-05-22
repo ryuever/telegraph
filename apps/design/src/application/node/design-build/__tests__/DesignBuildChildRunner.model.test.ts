@@ -157,6 +157,46 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
     })
   })
 
+  it('includes the resolved subagent profile prompt in the child system prompt', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield submitToolCall({
+        review: {
+          verdict: 'pass',
+          checks: [{ id: 'profile-review', passed: true, summary: 'profile prompt used' }],
+        },
+      })
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:reviewer',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.reviewer,
+      stage: 'review',
+      label: 'Design Reviewer',
+      input: { review: { verdict: 'pass', checks: [] } },
+      profile: {
+        id: DESIGN_BUILD_CHILD_PROFILES.reviewer,
+        title: 'Design Reviewer',
+        description: 'Review design artifacts.',
+        systemPrompt: 'Review the artifact for visual quality and patch safety.',
+      },
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })
+
+    const request = streamPiAiRuntimeEvents.mock.calls[0][0]
+    expect(request.systemPrompt).toContain('Subagent profile: Design Reviewer')
+    expect(request.systemPrompt).toContain('Review the artifact for visual quality and patch safety.')
+    expect(request.systemPrompt).toContain('submit_design_child_output')
+  })
+
   it('fails invalid stage output instead of accepting a malformed contract', async () => {
     streamPiAiRuntimeEvents.mockImplementation(async function* () {
       await Promise.resolve()
@@ -232,12 +272,9 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
 
     expect(streamPiAiRuntimeEvents).toHaveBeenCalledTimes(2)
     const retryRequest = streamPiAiRuntimeEvents.mock.calls[1][0]
-    expect(JSON.parse(retryRequest.message) as { previousContractError?: { message?: string } })
-      .toEqual(expect.objectContaining({
-        previousContractError: expect.objectContaining({
-          message: 'code-artifact output contains an invalid artifact.',
-        }),
-      }))
+    const retryPayload = JSON.parse(retryRequest.message) as { previousContractError?: { message?: unknown } }
+    expect(retryPayload.previousContractError?.message)
+      .toBe('code-artifact output contains an invalid artifact.')
   })
 })
 

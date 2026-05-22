@@ -6,6 +6,7 @@ import {
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 import type {
+  DesignBuildChildProfile,
   DesignBuildChildProfileId,
   DesignBuildChildStage,
 } from './DesignBuildChildContracts'
@@ -23,6 +24,8 @@ export interface DesignBuildChildRunRequest {
   metadata?: Record<string, unknown>
   signal?: AbortSignal
   attempt?: number
+  profile?: DesignBuildChildProfile
+  emitEvent?: (event: RuntimeEvent) => void
 }
 
 export interface DesignBuildChildRunResult {
@@ -91,6 +94,7 @@ async function runModelChildAttempt(
     tools: [submitTool],
     maxToolIterations: 1,
   })) {
+    request.emitEvent?.(event)
     if (event.type === 'tool_call' && event.toolName === SUBMIT_DESIGN_CHILD_OUTPUT_TOOL_NAME) {
       return validateStageOutput(extractSubmittedOutput(event.input), request.stage)
     }
@@ -107,13 +111,23 @@ async function runModelChildAttempt(
 function createChildSystemPrompt(request: DesignBuildChildRunRequest): string {
   return [
     'You are a Telegraph design page generation child agent.',
+    formatProfilePrompt(request.profile),
     `You must call the ${SUBMIT_DESIGN_CHILD_OUTPUT_TOOL_NAME} tool exactly once. Do not answer with text.`,
     'Put the final stage result in the tool argument field named "output".',
     'If you cannot improve the provided input, submit an output object with the same shape as the input.',
     'Use the provided input as the source of truth. Keep imports using "@/..." monorepo-root aliases when source code appears.',
     `Stage output contract: ${stageContractDescription(request.stage)}`,
     stageInstruction(request),
-  ].join('\n')
+  ].filter(Boolean).join('\n')
+}
+
+function formatProfilePrompt(profile: DesignBuildChildProfile | undefined): string {
+  if (!profile?.systemPrompt.trim()) return ''
+  return [
+    `Subagent profile: ${profile.title ?? profile.id}`,
+    profile.description ? `Profile description: ${profile.description}` : undefined,
+    profile.systemPrompt.trim(),
+  ].filter(Boolean).join('\n')
 }
 
 function stageInstruction(request: DesignBuildChildRunRequest): string {
@@ -192,8 +206,8 @@ function createSubmitDesignChildOutputTool(stage: DesignBuildChildStage): PiAiEx
       },
       required: ['output'],
       additionalProperties: false,
-    } as PiAiExecutableTool['parameters'],
-    execute: async input => ({ accepted: Boolean(input.output) }),
+    },
+    execute: input => Promise.resolve({ accepted: Boolean(input.output) }),
   }
 }
 
@@ -265,10 +279,6 @@ function assertReviewOutput(output: Record<string, unknown>, message: string): v
       throw new ModelChildOutputContractError(message)
     }
   }
-}
-
-function assertRecordField(value: Record<string, unknown>, key: string, message: string): void {
-  if (!isRecord(value[key])) throw new ModelChildOutputContractError(message)
 }
 
 function assertStringField(value: Record<string, unknown>, key: string, message: string): void {

@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@/apps/design': resolve(__dirname, 'src'),
+      '@/extensions/telegraph-subagents': resolve(__dirname, '../../extensions/telegraph-subagents'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src'),
       '@/packages/services/pagelet-host': resolve(__dirname, '../../packages/services/src/pagelet-host/src'),
