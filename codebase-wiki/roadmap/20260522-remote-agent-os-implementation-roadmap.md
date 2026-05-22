@@ -154,11 +154,13 @@ No-Go：
 
 目标：先让 chat/design 的 run 事实可持久化、可恢复查看、可 projection。
 
+状态：Design pagelet ledger projection MVP 已于 2026-05-22 落地；DesignView 已可从 persisted event replay projector 水合历史 session。Phase 1 尚需继续补齐 batch/compact 策略与跨 pagelet projector 收敛。
+
 交付：
 
 - Pagelet-local `DurableRunLedger`，可复用现有 `AgentRunRepository`。
 - chat pagelet：`createRun`、`appendEvent`、terminal flush、orphan recovery。
-- design pagelet：将 `DesignRunStore` 从纯内存投影改为 ledger projection。
+- [x] design pagelet：将 `DesignRunStore` 从纯内存投影改为 ledger projection，并补充 `listAgentRunEvents`。
 - 高频 delta compact / batch 写入策略。
 - `markRunningRunsRecovered` 在 pagelet boot 时执行。
 
@@ -179,17 +181,19 @@ No-Go：
 
 目标：Shared 只做控制面和聚合，不进入 pagelet runtime 的高频写入路径。
 
+状态：2026-05-22 已在 Shared 落地 in-memory `RunBrokerStore`，覆盖 run intent、run projection subscription 与 approval request/decision；Design pagelet 已将 ledger summary projection bridge 到 Shared RunBroker。
+
 交付：
 
-- Shared `RunBrokerService`：
+- [x] Shared `RunBrokerService`：
   - `createRunIntent`
   - `claimRunIntent`
-  - `registerRunSummary`
+  - `registerRunProjection`
   - `subscribeRunProjection`
   - `requestApproval`
   - `decideApproval`
-- Pagelet -> RunBroker 的 summary/projection bridge。
-- Approval 状态统一存储和投递。
+- [x] Pagelet -> RunBroker 的 summary/projection bridge：Design pagelet 已接入。
+- [x] Approval 状态统一存储和投递：Shared 内存态已接入；持久化与外部入口投递待后续阶段补齐。
 
 验收：
 
@@ -206,25 +210,31 @@ No-Go：
 
 目标：本机 CLI 能发起、观察、审批和恢复 event stream。
 
+状态：2026-05-22 已落地 Shared-hosted local socket gateway 与 `@telegraph/cli` 薄入口，可通过 JSON line protocol 访问 RunBroker 的 intents、projections 与 approvals；root 已提供 `pnpm cli -- ...` 入口；`telegraph ask` 会创建 design intent，Design pagelet 已可 claim queued design intent 并执行；`telegraph attach <runId>` 已支持订阅 projection 变化。event-log attach、MCP server 与 headless pagelet 尚未实现。
+
 交付：
 
 - `cli-gateway` headless Pagelet。
-- local socket / named pipe transport。
-- CLI 命令：
+- [x] local socket / named pipe transport。
+- [x] CLI 命令：
 
 ```bash
+telegraph intent create --pagelet design "..."
 telegraph ask "..."
+telegraph runs
+telegraph projection get <runId>
 telegraph attach <runId>
 telegraph approve <approvalId>
 telegraph deny <approvalId>
-telegraph runs
-telegraph open <runId>
 ```
+
+- `telegraph open <runId>`
+- MCP gateway server。
 
 验收：
 
-- CLI 发起的 run 可在 Desktop UI 打开。
-- Desktop UI 发起的 run 可由 CLI attach。
+- [x] CLI 发起的 design intent 可由 Design pagelet claim 并执行。
+- [x] Desktop UI 发起的 run 可由 CLI attach projection。
 - CLI 断线后可用 cursor 恢复事件流。
 - approval 决策走 RunBroker，并同步进入 pagelet ledger 的 permission event。
 

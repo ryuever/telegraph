@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
+import type { AgentEvent } from '@/packages/agent-protocol'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
@@ -41,10 +42,20 @@ type Message =
     runStatus?: DesignRunStatus
   }
 
+export interface DesignWorkspaceInitialState {
+  messages: Message[]
+  status: DesignRunStatus
+  artifacts: DesignProjectedArtifact[]
+  activeArtifactId?: string | null
+  traceEvents?: AgentEvent[]
+  subagentItems?: DesignSubagentViewItem[]
+}
+
 interface DesignWorkspaceProps {
   initialPrompt: string
   sessionId?: string
   sessionTitle?: string
+  initialState?: DesignWorkspaceInitialState
   onOpenSettings?: () => void
   onReturnToEntry?: () => void
   onSessionUpdate?: (sessionId: string, summary: DesignWorkspaceSummary) => void
@@ -63,6 +74,7 @@ export function DesignWorkspace({
   initialPrompt,
   sessionId: providedSessionId,
   sessionTitle,
+  initialState,
   onOpenSettings,
   onReturnToEntry,
   onSessionUpdate,
@@ -71,23 +83,24 @@ export function DesignWorkspace({
   const initialUserMessageId = useMemo(() => globalThis.crypto.randomUUID(), [])
   const initialAssistantMessageId = useMemo(() => globalThis.crypto.randomUUID(), [])
   const agent = useMemo(() => new PageletDesignAgentService(), [])
-  const initialRunStarted = useRef(false)
+  const initialRunStarted = useRef(Boolean(initialState))
   const activeControllers = useRef<Map<string, AbortController>>(new Map())
   const assistantArtifactTitles = useRef<Map<string, string>>(new Map())
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(() => initialState?.messages ?? [
     { id: initialUserMessageId, role: 'user', content: initialPrompt },
     { id: initialAssistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
   ])
   const [input, setInput] = useState('')
-  const [status, setStatus] = useState<DesignRunStatus>('running')
-  const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>([])
-  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
+  const [status, setStatus] = useState<DesignRunStatus>(() => initialState?.status ?? 'running')
+  const [artifacts, setArtifacts] = useState<DesignProjectedArtifact[]>(() => initialState?.artifacts ?? [])
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(() => initialState?.activeArtifactId ?? null)
   const [artifactMode, setArtifactMode] = useState<'preview' | 'code' | 'inspect'>('preview')
   const [selectedComponent, setSelectedComponent] = useState<DesignSelectedComponent | null>(null)
   const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
-  const [traceItems, setTraceItems] = useState<DesignTraceItem[]>([])
-  const [subagentItems, setSubagentItems] = useState<DesignSubagentViewItem[]>([])
+  const [traceItems, setTraceItems] = useState<DesignTraceItem[]>(() =>
+    initialTraceItemsFromEvents(initialState?.traceEvents ?? [], sessionId))
+  const [subagentItems, setSubagentItems] = useState<DesignSubagentViewItem[]>(() => initialState?.subagentItems ?? [])
 
   const appendAssistantText = (text: string, messageId?: string): void => {
     setMessages((prev) => {
@@ -667,6 +680,15 @@ function reduceTraceItems(prev: DesignTraceItem[], event: DesignAgentStreamEvent
   return next.slice(-80)
 }
 
+function initialTraceItemsFromEvents(events: AgentEvent[], fallbackRunId: string): DesignTraceItem[] {
+  return events.reduce<DesignTraceItem[]>((items, event) =>
+    reduceTraceItems(items, {
+      type: 'agent_event',
+      runId: eventRunId(event) ?? fallbackRunId,
+      event,
+    }), [])
+}
+
 function traceItemFromEvent(
   event: DesignAgentStreamEvent,
   prev: DesignTraceItem[],
@@ -791,6 +813,12 @@ function truncateTraceDetail(value: string | undefined): string | undefined {
 
 function isCancelledError(error: unknown): boolean {
   return error instanceof Error && error.message === 'Cancelled'
+}
+
+function eventRunId(event: AgentEvent): string | undefined {
+  if ('runId' in event && typeof event.runId === 'string') return event.runId
+  if ('parentRunId' in event && typeof event.parentRunId === 'string') return event.parentRunId
+  return undefined
 }
 
 function summarizeSelectedComponent(

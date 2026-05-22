@@ -7,6 +7,8 @@ import { serviceHost } from '@x-oasis/async-call-rpc';
 
 import { SHARED_SERVICE_PATH } from '@/apps/shared/application/common';
 import { createLogger } from '@/packages/services/log/node/logger';
+import { RunBrokerStore } from './RunBrokerStore';
+import { RunBrokerSocketGateway } from './RunBrokerSocketGateway';
 
 const logger = createLogger('shared');
 
@@ -30,6 +32,8 @@ export const SharedWorkerId = createId('SharedWorker');
 
 @injectable()
 export class SharedWorker implements ISharedWorker {
+  private readonly runBroker = new RunBrokerStore();
+  private readonly runBrokerGateway = new RunBrokerSocketGateway(this.runBroker);
   private configVersion = 0;
   private configStore: Record<string, string> = {
     theme: 'dark',
@@ -73,6 +77,17 @@ export class SharedWorker implements ISharedWorker {
         this.configListeners.add(callback);
         return () => { this.configListeners.delete(callback); };
       },
+      createRunIntent: this.runBroker.createRunIntent.bind(this.runBroker),
+      claimRunIntent: this.runBroker.claimRunIntent.bind(this.runBroker),
+      listRunIntents: this.runBroker.listRunIntents.bind(this.runBroker),
+      getRunIntent: this.runBroker.getRunIntent.bind(this.runBroker),
+      registerRunProjection: this.runBroker.registerRunProjection.bind(this.runBroker),
+      listRunProjections: this.runBroker.listRunProjections.bind(this.runBroker),
+      getRunProjection: this.runBroker.getRunProjection.bind(this.runBroker),
+      subscribeRunProjections: this.runBroker.subscribeRunProjections.bind(this.runBroker),
+      requestApproval: this.runBroker.requestApproval.bind(this.runBroker),
+      decideApproval: this.runBroker.decideApproval.bind(this.runBroker),
+      listApprovals: this.runBroker.listApprovals.bind(this.runBroker),
     };
 
     const proxy = createParticipantProxy({
@@ -95,6 +110,16 @@ export class SharedWorker implements ISharedWorker {
         }
       },
     });
+
+    void this.runBrokerGateway.start()
+      .then(path => {
+        logger.info(`[shared-worker] run broker gateway listening on ${path}`);
+      })
+      .catch((error: unknown) => {
+        logger.warn(`[shared-worker] run broker gateway failed to start: ${
+          error instanceof Error ? error.message : String(error)
+        }`);
+      });
 
     logger.info('[shared-worker] initialized, waiting for pagelet connections');
   }

@@ -116,6 +116,8 @@ Renderer
 
 这个位置符合 A-008：Runtime / Extension Host 的承载边界在 Pagelet 内，renderer 只消费 pagelet 暴露的业务 service，main 不 import runtime implementation，daemon 不掌握 agent 业务状态。
 
+2026-05-22 实施补充：Design pagelet 已将 ledger summary projection 发布到 Shared `RunBrokerStore`。该 bridge 只发布 run summary / cursor / status，不复制完整 event log；pagelet-local ledger 仍是权威 source of truth。
+
 ### 3.1 强 durable 与非阻塞 trace 分层
 
 `traceSink` 保持非阻塞是正确的，因为 trace 不应拖慢模型流。Durable run ledger 需要单独建模：
@@ -208,11 +210,13 @@ Inngest、Trigger.dev、Hatchet 都有 durable workflow 能力，但它们更像
 
 ### Phase A：Run Ledger 接入 Design Pagelet
 
-- 在 design pagelet 启动时创建 `FileAgentRunRepository`。
-- `handleSendAgent` 启动前 `createRun`。
-- `for await (event of agentHarness.run(...))` 中追加 `appendEvent`。
-- `listAgentRuns` / `getAgentRun` 改为 repository projection，`DesignRunStore` 保留 live cache。
-- pagelet boot 时调用 `markRunningRunsRecovered`。
+状态：2026-05-22 已在 `DesignPageletWorker` 与 `DesignRunStore` projection 中落地 MVP。
+
+- [x] 在 design pagelet 启动时创建 `FileAgentRunRepository`。
+- [x] `handleSendAgent` 启动前 `createRun`。
+- [x] `for await (event of agentHarness.run(...))` 中追加 `appendEvent`。
+- [x] `listAgentRuns` / `getAgentRun` / `listAgentRunEvents` 改为 repository projection，`DesignRunStore` 保留 live cache。
+- [x] pagelet boot 时调用 `markRunningRunsRecovered`。
 
 验收：
 
@@ -222,13 +226,15 @@ Inngest、Trigger.dev、Hatchet 都有 durable workflow 能力，但它们更像
 
 ### Phase B：Durable Event Projection
 
-- 从 persisted `AgentEvent` 投影 Design Run Console、subagent snapshots、artifact refs。
-- live stream 与 persisted events 使用同一 projector，避免 UI 逻辑分叉。
+状态：2026-05-22 已补齐 Design browser 侧 persisted event replay projector，并接入 DesignView 历史 session hydration。
+
+- [x] 从 persisted `AgentEvent` 投影 Design workspace status、assistant text、subagent snapshots、artifact refs。
+- [x] live stream 与 persisted events 使用同一 projector，避免 UI 逻辑分叉。
 - 高频 delta 支持 compact / batch 写入。
 
 验收：
 
-- Run Console 能从历史 event log 还原 timeline。
+- DesignView 能从历史 event log 还原 session sidebar 与 workspace 初始状态。
 - child run / tool call / artifact patch 可定位到对应 runId / callId。
 
 ### Phase C：Durable Engine Spike

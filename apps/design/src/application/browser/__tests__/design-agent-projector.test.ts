@@ -2,7 +2,10 @@ import type { AgentEvent } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { describe, expect, it } from 'vitest'
 import type { DesignProjectedArtifact } from '../design-agent-projector'
-import { projectAgentEventToDesign } from '../design-agent-projector'
+import {
+  projectAgentEventToDesign,
+  projectDesignAgentRunEventRecords,
+} from '../design-agent-projector'
 
 function collect(events: AgentEvent[]) {
   const statuses: string[] = []
@@ -127,5 +130,127 @@ describe('projectAgentEventToDesign', () => {
     ])
 
     expect(result.statuses).toEqual(['cancelled'])
+  })
+
+  it('replays persisted ledger records into the same design projection', () => {
+    const projection = projectDesignAgentRunEventRecords([
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 3,
+        ts: 3,
+        event: {
+          type: 'run_completed',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          output: {
+            artifactId: 'artifact-1',
+            artifactKind: 'component',
+            title: 'Updated button',
+          },
+          ts: 3,
+        },
+      },
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 1,
+        ts: 1,
+        event: {
+          type: 'run_started',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          ts: 1,
+        },
+      },
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 2,
+        ts: 2,
+        event: {
+          type: 'assistant_delta',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          requestId: 'request-1',
+          text: 'Done',
+          ts: 2,
+        },
+      },
+    ])
+
+    expect(projection.status).toBe('completed')
+    expect(projection.assistantText).toBe('Done')
+    expect(projection.traceEvents.map(event => event.type)).toEqual([
+      'run_started',
+      'assistant_delta',
+      'run_completed',
+    ])
+    expect(projection.artifacts.map(artifact => ({
+      id: artifact.id,
+      kind: artifact.kind,
+      title: artifact.title,
+    }))).toEqual([
+      {
+        id: 'artifact-1',
+        kind: 'component',
+        title: 'Updated button',
+      },
+    ])
+  })
+
+  it('replays persisted child run events into subagent projection', () => {
+    const projection = projectDesignAgentRunEventRecords([
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 1,
+        ts: 1,
+        event: {
+          type: 'child_run_started',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          parentRunId: 'design-run',
+          childRunId: 'child-1',
+          label: 'Critique',
+          raw: {
+            profileId: 'reviewer',
+            profile: {
+              title: 'Reviewer',
+              description: 'Reviews generated UI',
+            },
+          },
+          ts: 1,
+        },
+      },
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 2,
+        ts: 2,
+        event: {
+          type: 'child_run_completed',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          parentRunId: 'design-run',
+          childRunId: 'child-1',
+          output: {
+            summary: 'Looks good',
+          },
+          ts: 2,
+        },
+      },
+    ])
+
+    expect(projection.subagents).toEqual([
+      expect.objectContaining({
+        id: 'child-1',
+        parentRunId: 'design-run',
+        label: 'Critique',
+        agent: 'Reviewer',
+        profileId: 'reviewer',
+        status: 'completed',
+        result: 'Looks good',
+        completedAt: 2,
+      }),
+    ])
   })
 })

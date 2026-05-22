@@ -1,5 +1,6 @@
 import { createId } from '@x-oasis/di';
 import type { AgentEvent, RuntimeSettings } from '@/packages/agent-protocol';
+import type { AgentRunEventRecord } from '@/packages/agent/persistence/AgentRunRepository';
 
 export const DESIGN_PAGELET_SERVICE_PATH = 'design-pagelet-api';
 
@@ -10,6 +11,7 @@ export interface IDesignPageletService {
   cancelAgent(runId: string): Promise<boolean>;
   listAgentRuns(): Promise<DesignAgentRunRecordSnapshot[]>;
   getAgentRun(runId: string): Promise<DesignAgentRunRecordSnapshot | null>;
+  listAgentRunEvents(runId: string): Promise<DesignAgentRunEventRecordSnapshot[]>;
   listSubagents(): Promise<DesignSubagentRecordSnapshot[]>;
   getSubagentResult(childRunId: string, consume?: boolean): Promise<DesignSubagentRecordSnapshot | null>;
   cancelSubagent(childRunId: string): Promise<boolean>;
@@ -32,7 +34,7 @@ export interface DesignAgentSendRequest {
 
 export interface DesignAgentSendResult {
   runId: string;
-  status: 'completed' | 'failed';
+  status: 'completed' | 'failed' | 'cancelled';
   error?: string;
 }
 
@@ -53,6 +55,8 @@ export interface DesignAgentRunEventSnapshot {
   ts: number;
   label?: string;
 }
+
+export type DesignAgentRunEventRecordSnapshot = AgentRunEventRecord;
 
 export interface DesignSubagentRecordSnapshot {
   id: string;

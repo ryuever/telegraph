@@ -1,0 +1,13 @@
+{
+  "name": "@telegraph/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "telegraph": "./bin/telegraph-cli.mjs"
+  },
+  "scripts": {
+    "smoke": "node ./bin/telegraph-cli.mjs help",
+    "test": "vitest run --passWithNoTests"
+  }
+}

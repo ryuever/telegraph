@@ -8,15 +8,29 @@ const workspaceLifecycle = vi.hoisted(() => ({
   unmounts: 0,
 }))
 
+const serviceMocks = vi.hoisted(() => ({
+  listAgentRuns: vi.fn(),
+  getAgentRunProjection: vi.fn(),
+}))
+
+vi.mock('../pagelet-design-agent-service', () => ({
+  PageletDesignAgentService: class {
+    listAgentRuns = serviceMocks.listAgentRuns
+    getAgentRunProjection = serviceMocks.getAgentRunProjection
+  },
+}))
+
 vi.mock('../DesignWorkspace', () => ({
   DesignWorkspace: ({
     initialPrompt,
     sessionId,
+    initialState,
     onReturnToEntry,
     onSessionUpdate,
   }: {
     initialPrompt: string
     sessionId?: string
+    initialState?: { messages: Array<{ content: string }> }
     onReturnToEntry?: () => void
     onSessionUpdate?: (sessionId: string, summary: { status: 'running' | 'completed' | 'failed' | 'cancelled'; artifactCount: number }) => void
   }) => {
@@ -35,6 +49,7 @@ vi.mock('../DesignWorkspace', () => ({
     return (
       <div data-testid="workspace">
         <div>Workspace: {initialPrompt}</div>
+        {initialState && <div>Restored: {initialState.messages.map(message => message.content).join(' / ')}</div>}
         <div>Edits {initialPrompt}: {edits}</div>
         {onReturnToEntry && (
           <button type="button" aria-label="Back to design entry" onClick={onReturnToEntry}>
@@ -59,6 +74,14 @@ describe('DesignView', () => {
   beforeEach(() => {
     workspaceLifecycle.mounts = 0
     workspaceLifecycle.unmounts = 0
+    vi.clearAllMocks()
+    serviceMocks.listAgentRuns.mockResolvedValue([])
+    serviceMocks.getAgentRunProjection.mockResolvedValue({
+      assistantText: '',
+      artifacts: [],
+      subagents: [],
+      traceEvents: [],
+    })
   })
 
   afterEach(() => {
@@ -169,6 +192,56 @@ describe('DesignView', () => {
     expect(activeWorkspaceText(container)).toContain('Edits make a profile page: 1')
     expect(workspaceLifecycle.mounts).toBe(2)
     expect(workspaceLifecycle.unmounts).toBe(0)
+  })
+
+  it('hydrates historical design sessions from the durable run ledger', async () => {
+    serviceMocks.listAgentRuns.mockResolvedValueOnce([
+      {
+        runId: 'run-history',
+        sessionId: 'session-history',
+        prompt: 'restore this design',
+        status: 'completed',
+        startedAt: 100,
+        updatedAt: 200,
+        completedAt: 200,
+        events: [],
+      },
+    ])
+    serviceMocks.getAgentRunProjection.mockResolvedValueOnce({
+      status: 'completed',
+      assistantText: 'Restored assistant text',
+      artifacts: [
+        {
+          id: 'artifact-history',
+          kind: 'component',
+          title: 'History component',
+          sourceEventType: 'run_completed',
+          output: {},
+        },
+      ],
+      subagents: [],
+      traceEvents: [],
+    })
+
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignView />)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('restore this design')
+
+    await act(async () => {
+      findButtonByLabelText(container, 'restore this design')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(activeWorkspaceText(container)).toContain('Restored: restore this design / Restored assistant text')
+    expect(serviceMocks.getAgentRunProjection).toHaveBeenCalledWith('run-history', expect.any(AbortSignal))
   })
 })
 

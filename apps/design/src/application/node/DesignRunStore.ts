@@ -3,6 +3,10 @@ import type {
   DesignAgentStreamEvent,
 } from '@/apps/design/application/common'
 import type { AgentEvent } from '@/packages/agent-protocol'
+import type {
+  AgentRunEventRecord,
+  AgentRunRecord,
+} from '@/packages/agent/persistence/AgentRunRepository'
 
 export class DesignRunStore {
   private readonly records = new Map<string, DesignAgentRunRecordSnapshot>()
@@ -85,6 +89,34 @@ export class DesignRunStore {
   }
 }
 
+export function designRunSnapshotFromLedger(
+  record: AgentRunRecord,
+  events: AgentRunEventRecord[],
+): DesignAgentRunRecordSnapshot {
+  const startedAt = record.startedAt ?? record.createdAt
+  const updatedAt = record.lastEventAt ?? record.completedAt ?? startedAt
+  const summaries = events
+    .sort((a, b) => a.seq - b.seq)
+    .map(event => summarizeAgentEvent(event.event))
+
+  return {
+    runId: record.runId,
+    sessionId: record.sessionId,
+    prompt: record.input?.message ?? record.inputPreview ?? '',
+    status: designStatusFromLedger(record.status),
+    startedAt,
+    updatedAt,
+    completedAt: record.completedAt,
+    error: record.failureMessage,
+    events: summaries.length > 0
+      ? summaries
+      : [{
+          type: 'run_queued',
+          ts: record.createdAt,
+        }],
+  }
+}
+
 function summarizeStreamEvent(event: DesignAgentStreamEvent): DesignAgentRunRecordSnapshot['events'][number] {
   if (event.type === 'run_queued') {
     return {
@@ -107,9 +139,29 @@ function summarizeStreamEvent(event: DesignAgentStreamEvent): DesignAgentRunReco
     }
   }
   return {
-    type: event.event.type,
-    ts: event.event.ts,
-    label: labelFromAgentEvent(event.event),
+    ...summarizeAgentEvent(event.event),
+  }
+}
+
+function summarizeAgentEvent(event: AgentEvent): DesignAgentRunRecordSnapshot['events'][number] {
+  return {
+    type: event.type,
+    ts: event.ts,
+    label: labelFromAgentEvent(event),
+  }
+}
+
+function designStatusFromLedger(status: AgentRunRecord['status']): DesignAgentRunRecordSnapshot['status'] {
+  switch (status) {
+    case 'completed':
+      return 'completed'
+    case 'failed':
+      return 'failed'
+    case 'cancelled':
+      return 'cancelled'
+    case 'queued':
+    case 'running':
+      return 'running'
   }
 }
 

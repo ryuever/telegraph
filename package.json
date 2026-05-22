@@ -10,6 +10,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests",
     "start": "pnpm --filter @telegraph/main start",
+    "cli": "pnpm --filter @telegraph/cli exec telegraph",
     "package": "pnpm --filter telegraph package",
     "make": "pnpm --filter telegraph make",
     "docs:wiki:dev": "vitepress dev",

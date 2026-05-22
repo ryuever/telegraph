@@ -1,4 +1,9 @@
 import type { AgentEvent } from '@/packages/agent-protocol'
+import type { DesignAgentRunEventRecordSnapshot } from '@/apps/design/application/common'
+import {
+  reduceDesignSubagentItems,
+  type DesignSubagentViewItem,
+} from './design-subagent-projector'
 
 export type DesignAgentRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
 
@@ -15,6 +20,15 @@ export interface DesignAgentProjectionHandlers {
   onAssistantText?: (text: string, event: AgentEvent) => void
   onArtifact?: (artifact: DesignProjectedArtifact, event: AgentEvent) => void
   onTraceEvent?: (event: AgentEvent) => void
+}
+
+export interface DesignAgentRunProjection {
+  status?: DesignAgentRunStatus
+  assistantText: string
+  artifacts: DesignProjectedArtifact[]
+  subagents: DesignSubagentViewItem[]
+  traceEvents: AgentEvent[]
+  updatedAt?: number
 }
 
 export function projectAgentEventToDesign(event: AgentEvent, handlers: DesignAgentProjectionHandlers): void {
@@ -58,6 +72,56 @@ export function projectAgentEventToDesign(event: AgentEvent, handlers: DesignAge
   }
 }
 
+export function projectDesignAgentRunEventRecords(
+  records: DesignAgentRunEventRecordSnapshot[],
+): DesignAgentRunProjection {
+  return projectDesignAgentEvents(records
+    .slice()
+    .sort((a, b) => a.seq - b.seq)
+    .map(record => record.event))
+}
+
+export function projectDesignAgentEvents(events: AgentEvent[]): DesignAgentRunProjection {
+  const projection: DesignAgentRunProjection = {
+    assistantText: '',
+    artifacts: [],
+    subagents: [],
+    traceEvents: [],
+  }
+
+  for (const event of events) {
+    projectAgentEventToDesign(event, {
+      onStatus: status => {
+        projection.status = status
+        projection.updatedAt = event.ts
+      },
+      onAssistantText: text => {
+        projection.assistantText = `${projection.assistantText}${text}`
+        projection.updatedAt = event.ts
+      },
+      onArtifact: artifact => {
+        projection.artifacts = [
+          ...projection.artifacts.filter(item => item.id !== artifact.id),
+          artifact,
+        ]
+        projection.updatedAt = event.ts
+      },
+      onTraceEvent: traceEvent => {
+        projection.traceEvents.push(traceEvent)
+        projection.updatedAt = traceEvent.ts
+      },
+    })
+
+    projection.subagents = reduceDesignSubagentItems(projection.subagents, {
+      type: 'agent_event',
+      runId: eventRunId(event) ?? '',
+      event,
+    })
+  }
+
+  return projection
+}
+
 function emitArtifact(output: unknown, event: AgentEvent, handlers: DesignAgentProjectionHandlers): void {
   const artifact = projectArtifact(output, event.type)
   if (artifact) handlers.onArtifact?.(artifact, event)
@@ -94,4 +158,10 @@ function stringField(record: Record<string, unknown>, key: string): string | und
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function eventRunId(event: AgentEvent): string | undefined {
+  if ('runId' in event && typeof event.runId === 'string') return event.runId
+  if ('parentRunId' in event && typeof event.parentRunId === 'string') return event.parentRunId
+  return undefined
 }

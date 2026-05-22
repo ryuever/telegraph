@@ -2,6 +2,7 @@ import type { RuntimeSettings } from '@/packages/agent-protocol'
 import type {
   DesignAgentSendRequest,
   DesignAgentStreamEvent,
+  DesignAgentRunEventRecordSnapshot,
   DesignAgentRunRecordSnapshot,
   DesignArtifactPatchApplyResult,
   DesignArtifactPatchPreviewResult,
@@ -18,6 +19,8 @@ import { normalizeDesignRuntimeSettings } from './design-runtime-settings'
 import { getDesignPageletClient } from './getClient'
 import {
   projectAgentEventToDesign,
+  projectDesignAgentRunEventRecords,
+  type DesignAgentRunProjection,
   type DesignAgentRunStatus,
   type DesignProjectedArtifact,
 } from './design-agent-projector'
@@ -110,7 +113,7 @@ export class PageletDesignAgentService {
 
       try {
         const result = await Promise.race([client.sendAgent(request), abortPromise])
-        options.onStatus?.(result.status === 'completed' ? 'completed' : 'failed')
+        options.onStatus?.(result.status)
       } finally {
         removeAbortListener()
         subscription.unsubscribe()
@@ -137,6 +140,17 @@ export class PageletDesignAgentService {
     await waitForDesignPageletReady(signal)
     throwIfAborted(signal)
     return getDesignPageletClient().getAgentRun(runId)
+  }
+
+  async listAgentRunEvents(runId: string, signal?: AbortSignal): Promise<DesignAgentRunEventRecordSnapshot[]> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().listAgentRunEvents(runId)
+  }
+
+  async getAgentRunProjection(runId: string, signal?: AbortSignal): Promise<DesignAgentRunProjection> {
+    const events = await this.listAgentRunEvents(runId, signal)
+    return projectDesignAgentRunEventRecords(events)
   }
 
   async getSubagentResult(

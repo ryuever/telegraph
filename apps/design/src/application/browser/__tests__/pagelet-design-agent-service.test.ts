@@ -4,6 +4,7 @@ import type {
   DesignArtifactPatchApplyResult,
   DesignArtifactPatchPreviewResult,
   DesignArtifactPatchRequest,
+  DesignAgentRunEventRecordSnapshot,
   DesignAgentStreamEvent,
   IDesignPageletService,
 } from '@/apps/design/application/common'
@@ -19,6 +20,7 @@ const sendAgentMock = vi.fn(
 const cancelAgentMock = vi.fn(() => Promise.resolve(true))
 const listAgentRunsMock = vi.fn(() => Promise.resolve([]))
 const getAgentRunMock = vi.fn(() => Promise.resolve(null))
+const listAgentRunEventsMock = vi.fn((): Promise<DesignAgentRunEventRecordSnapshot[]> => Promise.resolve([]))
 const listSubagentsMock = vi.fn(() => Promise.resolve([]))
 const getSubagentResultMock = vi.fn(() => Promise.resolve(null))
 const cancelSubagentMock = vi.fn(() => Promise.resolve(false))
@@ -50,6 +52,7 @@ const client: IDesignPageletService = {
   cancelAgent: cancelAgentMock,
   listAgentRuns: listAgentRunsMock,
   getAgentRun: getAgentRunMock,
+  listAgentRunEvents: listAgentRunEventsMock,
   listSubagents: listSubagentsMock,
   getSubagentResult: getSubagentResultMock,
   cancelSubagent: cancelSubagentMock,
@@ -132,6 +135,23 @@ describe('PageletDesignAgentService', () => {
     expect(text).toEqual(['preview'])
     expect(statuses).toContain('completed')
     expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('preserves cancelled pagelet results as cancelled status', async () => {
+    sendAgentMock.mockImplementationOnce((request) =>
+      Promise.resolve({ runId: request.runId, status: 'cancelled', error: 'Cancelled' }))
+
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const statuses: string[] = []
+    const service = new PageletDesignAgentService()
+
+    await service.send({
+      prompt: 'make a card',
+      sessionId: 'session-1',
+      onStatus: status => { statuses.push(status); },
+    })
+
+    expect(statuses).toContain('cancelled')
   })
 
   it('forwards live subagent snapshots separately from trace events', async () => {
@@ -289,12 +309,35 @@ describe('PageletDesignAgentService', () => {
   it('forwards design run history calls through the pagelet service', async () => {
     const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
     const service = new PageletDesignAgentService()
+    listAgentRunEventsMock.mockResolvedValueOnce([
+      {
+        runId: 'run-1',
+        sessionId: 'session-1',
+        seq: 1,
+        ts: 1,
+        event: {
+          type: 'assistant_delta',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'run-1',
+          requestId: 'request-1',
+          text: 'Hi',
+          ts: 1,
+        },
+      },
+    ])
 
     await expect(service.listAgentRuns()).resolves.toEqual([])
     await expect(service.getAgentRun('run-1')).resolves.toBeNull()
+    await expect(service.getAgentRunProjection('run-1')).resolves.toMatchObject({
+      assistantText: 'Hi',
+      traceEvents: [
+        expect.objectContaining({ type: 'assistant_delta' }),
+      ],
+    })
 
     expect(listAgentRunsMock).toHaveBeenCalled()
     expect(getAgentRunMock).toHaveBeenCalledWith('run-1')
+    expect(listAgentRunEventsMock).toHaveBeenCalledWith('run-1')
   })
 })
 
