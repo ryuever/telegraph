@@ -10,6 +10,7 @@ import type {
   ListApprovalChangesOptions,
   ListApprovalRequestsOptions,
   ListRunControlCommandsOptions,
+  ListRunIntentsOptions,
   ListRunProjectionChangesOptions,
   ListRunProjectionsOptions,
   CreateRunControlCommandInput,
@@ -71,6 +72,10 @@ import {
   createSlackOAuthCallbackHandlerFromEnv,
   type SlackOAuthCallbackHandler,
 } from './SlackOAuthCallbackHandler'
+import {
+  createRemoteControlHttpGatewayFromEnv,
+  type RemoteControlHttpGateway,
+} from './RemoteControlHttpGateway'
 import { createLogger } from '@/packages/services/log/node/logger'
 
 export const RemoteControlWorkerId = createId('RemoteControlWorker')
@@ -97,6 +102,8 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
   private telegramBotApiAdapter: TelegramBotApiAdapter | null = null
   private readonly relayGateway = new RemoteControlSocketGateway(this)
   private relayGatewayStart: Promise<void> | null = null
+  private readonly httpGateway: RemoteControlHttpGateway | null = createRemoteControlHttpGatewayFromEnv(this)
+  private httpGatewayStart: Promise<void> | null = null
   private projectionSubscription: EventSubscription | null = null
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
@@ -105,6 +112,7 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
 
   protected override onSharedClientReady(): void {
     void this.startRelayGateway()
+    void this.startHttpGateway()
     this.startTelegramBotApiAdapter()
     this.subscribeProjectionReplies()
   }
@@ -148,6 +156,8 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
           callback: (event: RunControlCommandChangeEvent) => void,
           options?: ListRunControlCommandsOptions,
         ): RemoteControlEventSubscription => this.subscribeRunControlCommands(callback, options),
+        listRunIntents: (options?: ListRunIntentsOptions): Promise<RunIntentRecord[]> =>
+          this.listRunIntents(options),
         listRunProjections: (options?: ListRunProjectionsOptions): Promise<RunProjectionRecord[]> =>
           this.listRunProjections(options),
         getRunProjection: (runId: string): Promise<RunProjectionRecord | null> =>
@@ -320,6 +330,10 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
         subscription.unsubscribe()
       },
     }
+  }
+
+  listRunIntents(options: ListRunIntentsOptions = {}): Promise<RunIntentRecord[]> {
+    return this.shared.listRunIntents(options)
   }
 
   listRunProjections(options: ListRunProjectionsOptions = {}): Promise<RunProjectionRecord[]> {
@@ -524,6 +538,22 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
         }`)
       })
     return this.relayGatewayStart
+  }
+
+  private async startHttpGateway(): Promise<void> {
+    if (!this.httpGateway) return
+    if (this.httpGatewayStart) return this.httpGatewayStart
+    this.httpGatewayStart = this.httpGateway.start()
+      .then(address => {
+        logger.info(`[remote-control] HTTP gateway listening on http://${address.host}:${String(address.port)}${address.path}`)
+      })
+      .catch((error: unknown) => {
+        this.httpGatewayStart = null
+        logger.warn(`[remote-control] HTTP gateway failed to start: ${
+          error instanceof Error ? error.message : String(error)
+        }`)
+      })
+    return this.httpGatewayStart
   }
 
   private startTelegramBotApiAdapter(): void {

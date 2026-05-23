@@ -1,5 +1,6 @@
 import type {
   ListChannelRepliesOptions,
+  CreateDeviceBindingInput,
   RemoteControlSubmissionResult,
   RemoteControlSubmitOptions,
   SlackDeviceBinding,
@@ -14,7 +15,9 @@ import type {
   ApprovalRequestRecord,
   DecideApprovalInput,
   ListApprovalRequestsOptions,
+  ListRunIntentsOptions,
   ListRunProjectionsOptions,
+  RunIntentRecord,
   RunProjectionRecord,
 } from '@/packages/run-protocol'
 import {
@@ -68,8 +71,30 @@ export class MobileRemoteControlClient {
     return this.transport.request('listDeviceBindings')
   }
 
+  createDeviceBinding(input: CreateDeviceBindingInput): Promise<DeviceBinding> {
+    return this.transport.request('createDeviceBinding', input)
+  }
+
+  async ensureDeviceBinding(input: CreateDeviceBindingInput): Promise<DeviceBinding> {
+    const bindings = await this.listDevices()
+    const now = Date.now()
+    const active = bindings.find(binding =>
+      binding.deviceId === input.deviceId &&
+      binding.actor.actorId === input.actor.actorId &&
+      binding.actor.kind === input.actor.kind &&
+      binding.status === 'active' &&
+      (binding.expiresAt === undefined || binding.expiresAt > now),
+    )
+    if (active) return active
+    return this.createDeviceBinding(input)
+  }
+
   listRuns(options: ListRunProjectionsOptions = { limit: 50 }): Promise<RunProjectionRecord[]> {
     return this.transport.request('listRunProjections', options)
+  }
+
+  listRunIntents(options: ListRunIntentsOptions = { limit: 50 }): Promise<RunIntentRecord[]> {
+    return this.transport.request('listRunIntents', options)
   }
 
   listApprovals(options: ListApprovalRequestsOptions = { status: 'pending', limit: 50 }): Promise<ApprovalRequestRecord[]> {
@@ -121,9 +146,10 @@ export class MobileRemoteControlClient {
     connection?: MobileConnectionState
     selectedRunId?: string
   } = {}): Promise<MobileDashboardModel> {
-    const [devices, runs, approvals, replies] = await Promise.all([
+    const [devices, runs, intents, approvals, replies] = await Promise.all([
       this.listDevices(),
       this.listRuns(),
+      this.listRunIntents(),
       this.listApprovals(),
       this.listReplies(),
     ])
@@ -131,6 +157,7 @@ export class MobileRemoteControlClient {
       connection: input.connection ?? 'live',
       devices,
       runs,
+      intents,
       approvals,
       replies,
       selectedRunId: input.selectedRunId,

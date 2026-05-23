@@ -56,6 +56,21 @@ export const useSessionsStore = create<SessionsStore>((set) => {
       return id
     },
 
+    upsertSession: (id: string, title: string) =>
+      set((state) => {
+        const now = Date.now()
+        const existing = state.sessions.find(session => session.id === id)
+        const sessions = existing
+          ? state.sessions.map(session => session.id === id ? { ...session, title, updatedAt: now } : session)
+          : [{ id, title, createdAt: now, updatedAt: now }, ...state.sessions]
+        const result: SessionsState = {
+          sessions,
+          activeSessionId: state.activeSessionId ?? id,
+        }
+        persistSessions(result)
+        return result
+      }),
+
     deleteSession: (id: string) =>
       set((state) => {
         removeSessionStore(id)

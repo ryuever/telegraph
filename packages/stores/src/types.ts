@@ -65,6 +65,7 @@ export interface SessionsState {
 
 export interface SessionsActions {
   createSession: () => string
+  upsertSession: (id: string, title: string) => void
   deleteSession: (id: string) => void
   setActiveSession: (id: string) => void
   renameSession: (id: string, title: string) => void

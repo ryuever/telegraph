@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type React from 'react'
 import {
   ActivityIndicator,
   Image,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { REMOTE_PROTOCOL_SCHEMA_VERSION, type RemoteActorSnapshot } from '@/packages/remote-protocol'
-import type { MobileDashboardModel, MobileRunItem } from './application/MobileDashboardViewModel'
+import type { MobileConnectionState, MobileDashboardModel, MobileRunItem } from './application/MobileDashboardViewModel'
 import type { MobileSlackGovernanceModel } from './application/MobileSlackGovernanceViewModel'
 import {
   HttpMobileRemoteControlTransport,
@@ -20,6 +21,7 @@ import {
 
 export interface TelegraphMobileAppProps {
   relayEndpoint?: string
+  relayToken?: string
   initialDashboard?: MobileDashboardModel
   actor?: RemoteActorSnapshot
 }
@@ -28,40 +30,66 @@ type MobileTab = 'runs' | 'approvals' | 'devices' | 'artifacts' | 'slack'
 
 const DEFAULT_ACTOR: RemoteActorSnapshot = {
   actorId: 'mobile:self',
-  kind: 'system',
+  kind: 'mobile',
   displayName: 'Telegraph Mobile',
 }
 
-export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element {
+const DEFAULT_DEVICE_ID = 'telegraph-mobile-dev'
+const MOBILE_CHAT_SETTINGS = {
+  backend: 'telegraph-orchestrator',
+}
+
+export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.Element {
+  const actor = props.actor ?? DEFAULT_ACTOR
   const [tab, setTab] = useState<MobileTab>('runs')
   const [prompt, setPrompt] = useState('')
   const [oauthCode, setOauthCode] = useState('')
+  const [relayEndpoint, setRelayEndpoint] = useState(props.relayEndpoint ?? '')
+  const [relayToken, setRelayToken] = useState(props.relayToken ?? '')
+  const [deviceId, setDeviceId] = useState(actor.deviceId ?? DEFAULT_DEVICE_ID)
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
     props.initialDashboard?.selectedRun?.runId,
   )
   const [dashboard, setDashboard] = useState<MobileDashboardModel | undefined>(props.initialDashboard)
+  const [connection, setConnection] = useState<MobileConnectionState>(
+    props.initialDashboard?.connection ?? (relayEndpoint ? 'connecting' : 'offline'),
+  )
   const [slack, setSlack] = useState<MobileSlackGovernanceModel | undefined>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const client = useMemo(() => props.relayEndpoint
-    ? new MobileRemoteControlClient(new HttpMobileRemoteControlTransport({ endpoint: props.relayEndpoint }))
-    : null, [props.relayEndpoint])
-  const actor = props.actor ?? DEFAULT_ACTOR
-
+  const client = useMemo(() => relayEndpoint.trim()
+    ? new MobileRemoteControlClient(new HttpMobileRemoteControlTransport({
+      endpoint: relayEndpoint.trim(),
+      headers: relayToken.trim() ? { authorization: `Bearer ${relayToken.trim()}` } : undefined,
+    }))
+    : null, [relayEndpoint, relayToken])
   useEffect(() => {
-    if (!client) return undefined
+    if (!client) {
+      setConnection('offline')
+      return undefined
+    }
+    setConnection('connecting')
     const subscription = client.watchDashboard({
       selectedRunId: () => selectedRunId,
-      onUpdate: setDashboard,
-      onError: watchError => setError(watchError.message),
+      onUpdate: model => {
+        setDashboard(model)
+        setConnection('live')
+      },
+      onError: watchError => {
+        setError(watchError.message)
+        setConnection('offline')
+      },
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [client, selectedRunId])
 
   const refresh = async (): Promise<void> => {
     if (!client) return
     setBusy(true)
     setError(undefined)
+    setConnection('connecting')
     try {
       const [nextDashboard, nextSlack] = await Promise.all([
         client.loadDashboard({ selectedRunId }),
@@ -69,8 +97,10 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
       ])
       setDashboard(nextDashboard)
       setSlack(nextSlack)
+      setConnection('live')
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError))
+      setConnection('offline')
     } finally {
       setBusy(false)
     }
@@ -96,17 +126,30 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
     setBusy(true)
     setError(undefined)
     try {
-      await client.submitMessage({
-        messageId: `mobile-${Date.now().toString(36)}`,
-        actor,
-        channel: {
-          kind: 'mobile',
-          channelId: 'mobile',
-        },
-        text: prompt.trim(),
-        receivedAt: Date.now(),
-        schemaVersion: REMOTE_PROTOCOL_SCHEMA_VERSION,
+      const boundDeviceId = deviceId.trim() || DEFAULT_DEVICE_ID
+      const boundActor: RemoteActorSnapshot = {
+        ...actor,
+        deviceId: boundDeviceId,
+      }
+      await client.ensureDeviceBinding({
+        deviceId: boundDeviceId,
+        actor: boundActor,
+        label: 'Telegraph Mobile',
       })
+      await client.submitMessage(
+        {
+          messageId: `mobile-${Date.now().toString(36)}`,
+          actor: boundActor,
+          channel: {
+            kind: 'mobile',
+            channelId: 'mobile',
+          },
+          text: prompt.trim(),
+          receivedAt: Date.now(),
+          schemaVersion: REMOTE_PROTOCOL_SCHEMA_VERSION,
+        },
+        { requireDeviceBinding: true, targetPagelet: 'chat', settings: MOBILE_CHAT_SETTINGS },
+      )
       setPrompt('')
       setDashboard(await client.loadDashboard())
     } catch (submitError) {
@@ -135,11 +178,26 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Telegraph</Text>
-          <Text style={styles.subtitle}>{connectionLabel(dashboard?.connection ?? 'offline')}</Text>
+          <Text style={styles.subtitle}>{connectionLabel(connection)}</Text>
         </View>
-        <Pressable style={styles.iconButton} disabled={!client || busy} onPress={() => void refresh()}>
+        <Pressable style={styles.iconButton} disabled={!client || busy} onPress={() => { void refresh(); }}>
           <Text style={styles.iconButtonText}>{busy ? '...' : '↻'}</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.connectionPanel}>
+        <TextInput
+          value={relayEndpoint}
+          placeholder="Remote endpoint"
+          style={styles.compactInput}
+          onChangeText={setRelayEndpoint}
+        />
+        <TextInput
+          value={relayToken}
+          placeholder="Token"
+          style={styles.compactInput}
+          onChangeText={setRelayToken}
+        />
       </View>
 
       <View style={styles.composer}>
@@ -150,13 +208,24 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
           style={styles.input}
           onChangeText={setPrompt}
         />
-        <Pressable style={styles.primaryButton} disabled={!client || busy || !prompt.trim()} onPress={() => void submit()}>
+        <Pressable style={styles.primaryButton} disabled={!client || busy || !prompt.trim()} onPress={() => { void submit(); }}>
           <Text style={styles.primaryButtonText}>Send</Text>
         </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!dashboard ? <EmptyState relayConfigured={Boolean(client)} busy={busy} /> : (
+      {!dashboard ? (
+        <EmptyState
+          relayConfigured={Boolean(client)}
+          busy={busy}
+          endpoint={relayEndpoint}
+          token={relayToken}
+          onEndpointChange={setRelayEndpoint}
+          onTokenChange={setRelayToken}
+          deviceId={deviceId}
+          onDeviceIdChange={setDeviceId}
+        />
+      ) : (
         <>
           <Summary model={dashboard} />
           <Tabs current={tab} onChange={setTab} />
@@ -167,7 +236,9 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
                   key={run.runId}
                   run={run}
                   selected={run.runId === selectedRunId}
-                  onSelect={() => setSelectedRunId(run.runId)}
+                  onSelect={() => {
+                    setSelectedRunId(run.runId)
+                  }}
                 />
               ))
             ) : null}
@@ -178,10 +249,10 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
                 {approval.body ? <Text style={styles.body}>{approval.body}</Text> : null}
                 {approval.pending ? (
                   <View style={styles.rowActions}>
-                    <Pressable style={styles.secondaryButton} onPress={() => void decide(approval.approvalId, false)}>
+                    <Pressable style={styles.secondaryButton} onPress={() => { void decide(approval.approvalId, false); }}>
                       <Text style={styles.secondaryButtonText}>Deny</Text>
                     </Pressable>
-                    <Pressable style={styles.primaryButton} onPress={() => void decide(approval.approvalId, true)}>
+                    <Pressable style={styles.primaryButton} onPress={() => { void decide(approval.approvalId, true); }}>
                       <Text style={styles.primaryButtonText}>Approve</Text>
                     </Pressable>
                   </View>
@@ -211,7 +282,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
                 model={slack}
                 oauthCode={oauthCode}
                 onOAuthCodeChange={setOauthCode}
-                onSubmitOAuth={() => void submitSlackOAuth()}
+                onSubmitOAuth={() => { void submitSlackOAuth(); }}
               />
             ) : null}
           </ScrollView>
@@ -223,7 +294,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): JSX.Element 
 
 export default TelegraphMobileApp
 
-function Summary({ model }: { model: MobileDashboardModel }): JSX.Element {
+function Summary({ model }: { model: MobileDashboardModel }): React.JSX.Element {
   return (
     <View style={styles.summary}>
       <Metric label="Runs" value={model.summary.runningRuns} />
@@ -234,7 +305,7 @@ function Summary({ model }: { model: MobileDashboardModel }): JSX.Element {
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }): JSX.Element {
+function Metric({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricValue}>{String(value)}</Text>
@@ -243,7 +314,7 @@ function Metric({ label, value }: { label: string; value: number }): JSX.Element
   )
 }
 
-function Tabs(props: { current: MobileTab; onChange: (tab: MobileTab) => void }): JSX.Element {
+function Tabs(props: { current: MobileTab; onChange: (tab: MobileTab) => void }): React.JSX.Element {
   const tabs: MobileTab[] = ['runs', 'approvals', 'devices', 'artifacts', 'slack']
   return (
     <View style={styles.tabs}>
@@ -251,7 +322,9 @@ function Tabs(props: { current: MobileTab; onChange: (tab: MobileTab) => void })
         <Pressable
           key={tab}
           style={[styles.tab, props.current === tab ? styles.tabActive : styles.tabIdle]}
-          onPress={() => props.onChange(tab)}
+          onPress={() => {
+            props.onChange(tab)
+          }}
         >
           <Text style={props.current === tab ? styles.tabTextActive : styles.tabText}>{tab}</Text>
         </Pressable>
@@ -265,7 +338,7 @@ function SlackGovernancePanel(props: {
   oauthCode: string
   onOAuthCodeChange: (value: string) => void
   onSubmitOAuth: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const model = props.model
   return (
     <View>
@@ -330,7 +403,7 @@ function RunRow(props: {
   run: MobileRunItem
   selected: boolean
   onSelect: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <Pressable style={[styles.item, props.selected ? styles.selectedItem : styles.unselectedItem]} onPress={props.onSelect}>
       <View style={styles.itemHeader}>
@@ -343,16 +416,57 @@ function RunRow(props: {
   )
 }
 
-function EmptyState({ relayConfigured, busy }: { relayConfigured: boolean; busy: boolean }): JSX.Element {
+function EmptyState({
+  relayConfigured,
+  busy,
+  endpoint,
+  token,
+  onEndpointChange,
+  onTokenChange,
+  deviceId,
+  onDeviceIdChange,
+}: {
+  relayConfigured: boolean
+  busy: boolean
+  endpoint: string
+  token: string
+  onEndpointChange: (value: string) => void
+  onTokenChange: (value: string) => void
+  deviceId: string
+  onDeviceIdChange: (value: string) => void
+}): React.JSX.Element {
   return (
     <View style={styles.empty}>
       {busy ? <ActivityIndicator /> : null}
       <Text style={styles.emptyTitle}>{relayConfigured ? 'No mobile state loaded' : 'Relay endpoint required'}</Text>
       <Text style={styles.body}>
         {relayConfigured
-          ? 'Refresh to load devices, runs, approvals, and artifact previews.'
+          ? `Trying ${endpoint.trim()}`
           : 'Pass relayEndpoint to connect this mobile control surface.'}
       </Text>
+      <View style={styles.emptyConnectionForm}>
+        <Text style={styles.formLabel}>Remote endpoint</Text>
+        <TextInput
+          value={endpoint}
+          placeholder="http://192.168.2.57:8799/rpc"
+          style={styles.formInput}
+          onChangeText={onEndpointChange}
+        />
+        <Text style={styles.formLabel}>Token</Text>
+        <TextInput
+          value={token}
+          placeholder="dev"
+          style={styles.formInput}
+          onChangeText={onTokenChange}
+        />
+        <Text style={styles.formLabel}>Device ID</Text>
+        <TextInput
+          value={deviceId}
+          placeholder={DEFAULT_DEVICE_ID}
+          style={styles.formInput}
+          onChangeText={onDeviceIdChange}
+        />
+      </View>
     </View>
   )
 }
@@ -377,8 +491,10 @@ const styles = StyleSheet.create({
   subtitle: { color: '#546065', fontSize: 13, marginTop: 2 },
   iconButton: { alignItems: 'center', backgroundColor: '#172126', borderRadius: 8, height: 40, justifyContent: 'center', width: 40 },
   iconButtonText: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
+  connectionPanel: { backgroundColor: '#ffffff', borderColor: '#cbd5d8', borderRadius: 8, borderWidth: 1, gap: 8, marginBottom: 10, padding: 10 },
   composer: { backgroundColor: '#ffffff', borderColor: '#cbd5d8', borderRadius: 8, borderWidth: 1, gap: 10, padding: 10 },
   input: { color: '#172126', minHeight: 54, padding: 0 },
+  compactInput: { color: '#172126', minHeight: 34, padding: 0 },
   primaryButton: { alignItems: 'center', backgroundColor: '#176b5b', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
   primaryButtonText: { color: '#ffffff', fontWeight: '700' },
   secondaryButton: { alignItems: 'center', borderColor: '#b9afa0', borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
@@ -409,5 +525,8 @@ const styles = StyleSheet.create({
   muted: { color: '#758086', fontSize: 12, fontWeight: '700' },
   preview: { borderRadius: 8, height: 180, marginTop: 10 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
+  emptyConnectionForm: { alignSelf: 'stretch', gap: 8, marginTop: 18 },
   emptyTitle: { color: '#172126', fontSize: 18, fontWeight: '800', marginBottom: 8 },
+  formInput: { backgroundColor: '#ffffff', borderColor: '#9aa7ad', borderRadius: 8, borderWidth: 1, color: '#172126', minHeight: 42, paddingHorizontal: 10 },
+  formLabel: { alignSelf: 'stretch', color: '#394348', fontSize: 12, fontWeight: '800', marginTop: 4 },
 })

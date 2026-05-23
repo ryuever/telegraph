@@ -47,6 +47,19 @@ describe('RemoteControlMessageRouter', () => {
     })
   })
 
+  it('forwards remote runtime settings through run intent metadata', () => {
+    expect(createRunIntentInputFromExternalMessage(externalMessage, {
+      targetPagelet: 'chat',
+      settings: {
+        backend: 'telegraph-orchestrator',
+      },
+    }).metadata).toMatchObject({
+      settings: {
+        backend: 'telegraph-orchestrator',
+      },
+    })
+  })
+
   it('builds queued channel replies from claimed intent state', () => {
     const intent: RunIntentRecord = {
       intentId: 'intent-1',

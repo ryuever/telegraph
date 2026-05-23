@@ -58,7 +58,7 @@ describe('streamPiAiRuntimeEvents tool loop', () => {
         settings: {
           provider: 'telegraph-faux-tool-loop',
           modelId: 'tool-loop-test-model',
-          apiKey: '',
+          apiKey: 'test-key',
         },
         tools: [readTool],
       }))
@@ -118,5 +118,19 @@ describe('streamPiAiRuntimeEvents tool loop', () => {
       vi.doUnmock('@/packages/agent/providers/index')
       vi.resetModules()
     }
+  })
+
+  it('fails clearly when model settings are incomplete', async () => {
+    const { streamPiAiRuntimeEvents } = await import('../streamPiAiRuntime')
+
+    await expect(collect(streamPiAiRuntimeEvents({
+      runId: 'run-missing-settings',
+      message: 'hello',
+      settings: {
+        provider: 'telegraph',
+        modelId: 'pi-embedded',
+        apiKey: '',
+      },
+    }))).rejects.toThrow('Chat model settings are required')
   })
 })

@@ -11,5 +11,6 @@ dist/
 out/
 .vitepress/cache/
 .vitepress/dist/
+apps/mobile/.expo/
 apps/telegraph/resources/pi-runtime/bin/pi
 apps/telegraph/resources/pi-runtime/bin/pi.exe

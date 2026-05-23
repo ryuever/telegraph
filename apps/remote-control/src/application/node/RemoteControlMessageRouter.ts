@@ -9,20 +9,22 @@ export function createRunIntentInputFromExternalMessage(
 ): CreateRunIntentInput {
   const prompt = externalPrompt(message)
   if (!prompt) throw new Error('External message has no text or command')
+  const metadata: Record<string, unknown> = {
+    externalMessageId: message.messageId,
+    channelKind: message.channel.kind,
+    channelId: message.channel.channelId,
+    threadId: message.channel.threadId,
+    artifactRefs: message.artifactRefs ?? [],
+    rawRef: message.rawRef,
+  }
+  if (options.settings) metadata.settings = options.settings
 
   return {
     source: message.actor,
     targetPagelet: options.targetPagelet ?? 'design',
     prompt,
     sessionId: options.sessionId,
-    metadata: {
-      externalMessageId: message.messageId,
-      channelKind: message.channel.kind,
-      channelId: message.channel.channelId,
-      threadId: message.channel.threadId,
-      artifactRefs: message.artifactRefs ?? [],
-      rawRef: message.rawRef,
-    },
+    metadata,
   }
 }
 

@@ -17,6 +17,10 @@ export default defineConfig({
       '@/apps/main': resolve(__dirname, 'src'),
       '@/packages/services/main-metrics': resolve(__dirname, '../../packages/services/src/main-metrics/src'),
       '@/packages/services/log': resolve(__dirname, '../../packages/services/src/log/src'),
+      '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src'),
+      '@/packages/run-protocol': resolve(__dirname, '../../packages/run-protocol/src'),
+      '@/packages/remote-protocol': resolve(__dirname, '../../packages/remote-protocol/src'),
+      '@/packages/computer-use-protocol': resolve(__dirname, '../../packages/computer-use-protocol/src'),
     },
   },
   build: {

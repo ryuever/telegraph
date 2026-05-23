@@ -10,6 +10,8 @@ import type {
   ChatRunTraceImportResult,
   ChatRuntimeCapabilityDescriptorSnapshot,
   ChatSubagentRecordSnapshot,
+  ChatStreamEvent,
+  EventSubscription,
 } from '@/apps/chat/application/common'
 import type { AgentRunReplaySource } from '@/packages/agent/persistence/AgentRunRepository'
 
@@ -43,6 +45,7 @@ export interface AgentService {
   importRunTraceBundle?(bundle: ChatRunTraceBundle, signal?: AbortSignal): Promise<ChatRunTraceImportResult>
   listPendingPermissions?(runId?: string, signal?: AbortSignal): Promise<ChatPermissionRequestSnapshot[]>
   resolvePermissionRequest?(requestId: string, resolution: ChatPermissionResolution, signal?: AbortSignal): Promise<boolean>
+  subscribeToStreamEvents?(callback: (event: ChatStreamEvent) => void, signal?: AbortSignal): Promise<EventSubscription>
   listSubagents(signal?: AbortSignal): Promise<ChatSubagentRecordSnapshot[]>
   getSubagentResult(childRunId: string, options?: { consume?: boolean; signal?: AbortSignal }): Promise<ChatSubagentRecordSnapshot | null>
   cancelSubagent(childRunId: string, signal?: AbortSignal): Promise<boolean>

@@ -184,6 +184,24 @@ describe('RemoteControlSocketGateway', () => {
     })
   })
 
+  it('proxies run intents for remote adapters', async () => {
+    const response = await handleRemoteControlGatewayRequest(createFakeService(), {
+      id: 'intents-1',
+      method: 'listRunIntents',
+      params: { targetPagelet: 'chat' },
+    })
+
+    expect(response).toMatchObject({
+      id: 'intents-1',
+      ok: true,
+      result: [{
+        intentId: 'intent-remote',
+        targetPagelet: 'chat',
+        prompt: 'build from telegram',
+      }],
+    })
+  })
+
 
   it('proxies run projection queries for remote adapters', async () => {
     const service = createFakeService()
@@ -708,6 +726,16 @@ function createFakeService(): RemoteControlGatewayService & { submissions: Exter
       },
     }],
     subscribeRunControlCommands: () => ({ unsubscribe: () => undefined }),
+    listRunIntents: () => [{
+      intentId: 'intent-remote',
+      source: externalMessage().actor,
+      targetPagelet: 'chat',
+      prompt: 'build from telegram',
+      status: 'claimed' as const,
+      runId: 'run-remote',
+      createdAt: 10,
+      updatedAt: 15,
+    }],
     listRunProjections: () => [{
       runId: 'run-remote',
       pageletId: 'design',

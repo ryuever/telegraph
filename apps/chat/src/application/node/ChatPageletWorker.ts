@@ -245,7 +245,13 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
     });
     void this.publishRunProjection(createdRun);
 
-    this.emitStreamEvent({ type: 'run_queued', runId });
+    this.emitStreamEvent({
+      type: 'run_queued',
+      runId,
+      sessionId,
+      sourceIntentId: req.sourceIntentId,
+      message,
+    });
 
     try {
       if (req.replay) {

@@ -14,6 +14,7 @@ import type {
   ListApprovalChangesOptions,
   ListApprovalRequestsOptions,
   ListRunControlCommandsOptions,
+  ListRunIntentsOptions,
   ListRunProjectionChangesOptions,
   ListRunProjectionsOptions,
   CreateRunControlCommandInput,
@@ -31,6 +32,20 @@ export interface RemoteControlSubmitOptions {
   targetPagelet?: string
   sessionId?: string
   requireDeviceBinding?: boolean
+  settings?: RemoteControlRuntimeSettingsInput
+}
+
+export interface RemoteControlRuntimeSettingsInput {
+  provider?: string
+  modelId?: string
+  apiKey?: string
+  baseUrl?: string
+  backend?: string
+  orchestration?: string
+  orchestrationPattern?: string
+  worktreeIsolation?: boolean
+  extensionBlocklist?: string[]
+  taskCapabilityProfile?: unknown
 }
 
 export interface RemoteControlSubmissionResult {
@@ -267,6 +282,7 @@ export interface IRemoteControlPageletService {
     callback: (event: RunControlCommandChangeEvent) => void,
     options?: ListRunControlCommandsOptions,
   ): Promise<EventSubscription>
+  listRunIntents(options?: ListRunIntentsOptions): Promise<RunIntentRecord[]>
   listRunProjections(options?: ListRunProjectionsOptions): Promise<RunProjectionRecord[]>
   getRunProjection(runId: string): Promise<RunProjectionRecord | null>
   listRunProjectionChanges(options?: ListRunProjectionChangesOptions): Promise<RunProjectionChangeEvent[]>

@@ -14,8 +14,11 @@ import {
   type LlmTraceRow,
 } from '../llm-trace-store'
 import { useChat } from '../use-chat'
-import { useSessionsStore } from '@/packages/stores'
+import { getSessionStore, useSessionsStore } from '@/packages/stores'
 import { PageletAgentService } from '../pagelet-agent-service'
+import { createChatAgentEventProjectionState, projectAgentEventToChat } from '../agent-event-projector'
+import { upsertToolCall } from '../chat-tool-calls'
+import { upsertSubagentUpdate } from '../chat-subagents'
 import {
   loadSettings,
   saveSettings,
@@ -30,6 +33,7 @@ import type {
   ChatPermissionRequestSnapshot,
   ChatRunTraceBundle,
   ChatRuntimeCapabilityDescriptorSnapshot,
+  ChatStreamEvent,
 } from '@/apps/chat/application/common'
 import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
 import type { AgentRunReplayMode } from '@/packages/agent/persistence/AgentRunRepository'
@@ -194,6 +198,245 @@ export function ChatPanel({ agent }: Props) {
     onLlmTrace: appendLlmTrace,
     onPermissionRequest: rememberPermissionRequest,
   })
+
+  useEffect(() => {
+    if (!agentService.subscribeToStreamEvents) return undefined
+    const controller = new AbortController()
+    let subscription: { unsubscribe(): void } | undefined
+    const remoteRuns = new Map<string, {
+      sessionId: string
+      assistantMessageId: string
+      projectionState: ReturnType<typeof createChatAgentEventProjectionState>
+    }>()
+
+    const ensureRemoteRun = (event: ChatStreamEvent) => {
+      if (!event.sourceIntentId || !event.sessionId || !event.message) return undefined
+      const existing = remoteRuns.get(event.runId)
+      if (existing) return existing
+
+      const title = deriveRemoteTitle(event.message)
+      useSessionsStore.getState().upsertSession(event.sessionId, title)
+      const store = getSessionStore(event.sessionId, title)
+      const userMessageId = `remote:${event.runId}:user`
+      const assistantMessageId = `remote:${event.runId}:assistant`
+      const messages = store.getState().messages
+
+      if (!messages.some(message => message.id === userMessageId)) {
+        store.addMessage({
+          id: userMessageId,
+          role: 'user',
+          content: event.message,
+          createdAt: Date.now(),
+          status: 'done',
+        })
+      }
+      if (!messages.some(message => message.id === assistantMessageId)) {
+        store.addMessage({
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          status: 'streaming',
+        })
+      }
+      store.setStreaming(true)
+
+      const remoteRun = {
+        sessionId: event.sessionId,
+        assistantMessageId,
+        projectionState: createChatAgentEventProjectionState(),
+      }
+      remoteRuns.set(event.runId, remoteRun)
+      return remoteRun
+    }
+
+    const updateAssistant = (
+      run: { sessionId: string; assistantMessageId: string },
+      updater: Parameters<ReturnType<typeof getSessionStore>['updateMessage']>[1],
+    ) => {
+      getSessionStore(run.sessionId).updateMessage(run.assistantMessageId, updater)
+    }
+
+    void agentService.subscribeToStreamEvents(event => {
+      if (event.type === 'run_queued') {
+        ensureRemoteRun(event)
+        return
+      }
+
+      const remoteRun = remoteRuns.get(event.runId)
+      if (!remoteRun) return
+      const store = getSessionStore(remoteRun.sessionId)
+
+      if (event.type === 'permission_pending' && event.permissionRequest) {
+        rememberPermissionRequest(event.permissionRequest)
+        return
+      }
+
+      if (event.type === 'runtime_event' && event.event) {
+        projectAgentEventToChat(event.event, {
+          sessionId: remoteRun.sessionId,
+          runId: event.runId,
+          projectionState: remoteRun.projectionState,
+          onChunk: delta => {
+            updateAssistant(remoteRun, message => ({
+              ...message,
+              content: message.content + delta,
+              status: message.status === 'pending' ? 'streaming' : message.status,
+            }))
+          },
+          onToolCall: call => {
+            updateAssistant(remoteRun, message => ({
+              ...message,
+              toolCalls: upsertToolCall(message.toolCalls ?? [], call),
+            }))
+          },
+          onSubagentUpdate: update => {
+            updateAssistant(remoteRun, message => ({
+              ...message,
+              subagentGroups: upsertSubagentUpdate(message.subagentGroups ?? [], update),
+            }))
+          },
+          onStatus: status => {
+            updateAssistant(remoteRun, message => ({
+              ...message,
+              status: status === 'failed' ? 'error' : status === 'completed' ? 'done' : 'streaming',
+            }))
+            if (status === 'completed' || status === 'failed') store.setStreaming(false)
+          },
+          onLlmTrace: appendLlmTrace,
+        })
+        if (event.event.type === 'run_failed') {
+          const errorMessage = event.event.error.message
+          updateAssistant(remoteRun, message => ({
+            ...message,
+            status: 'error',
+            errorMessage,
+          }))
+        }
+        return
+      }
+
+      if (event.type === 'text_delta' && event.text) {
+        updateAssistant(remoteRun, message => ({
+          ...message,
+          content: message.content + event.text,
+          status: 'streaming',
+        }))
+      } else if (event.type === 'run_completed' || event.type === 'done') {
+        updateAssistant(remoteRun, message => ({ ...message, status: 'done' }))
+        store.setStreaming(false)
+      } else if (event.type === 'run_failed' || event.type === 'error') {
+        updateAssistant(remoteRun, message => ({ ...message, status: 'error', errorMessage: event.error }))
+        store.setStreaming(false)
+      }
+    }, controller.signal)
+      .then(nextSubscription => {
+        subscription = nextSubscription
+      })
+      .catch(() => {
+        // Remote chat mirroring is best-effort; direct local chat and run ledger remain authoritative.
+      })
+
+    return () => {
+      controller.abort()
+      subscription?.unsubscribe()
+    }
+  }, [agentService, appendLlmTrace, rememberPermissionRequest])
+
+  useEffect(() => {
+    if (!agentService.listRuns || !agentService.listRunEvents) return undefined
+    const controller = new AbortController()
+
+    const hydrateRemoteRuns = async () => {
+      const runs = await agentService.listRuns?.({ limit: 80, signal: controller.signal })
+      if (!runs || controller.signal.aborted) return
+
+      for (const run of runs.filter(isRemoteChatRun)) {
+        if (controller.signal.aborted) return
+        const message = run.input?.message ?? run.inputPreview
+        if (!message) continue
+
+        const title = deriveRemoteTitle(message)
+        useSessionsStore.getState().upsertSession(run.sessionId, title)
+        const store = getSessionStore(run.sessionId, title)
+        const userMessageId = `remote:${run.runId}:user`
+        const assistantMessageId = `remote:${run.runId}:assistant`
+        const currentMessages = store.getState().messages
+        const existingAssistant = currentMessages.find(item => item.id === assistantMessageId)
+
+        if (!currentMessages.some(item => item.id === userMessageId)) {
+          store.addMessage({
+            id: userMessageId,
+            role: 'user',
+            content: message,
+            createdAt: run.createdAt,
+            status: 'done',
+          })
+        }
+        if (!existingAssistant) {
+          store.addMessage({
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            createdAt: run.startedAt ?? run.createdAt,
+            status: run.status === 'failed' ? 'error' : run.status === 'completed' ? 'done' : 'streaming',
+            errorMessage: run.failureMessage,
+          })
+        }
+
+        if (existingAssistant?.content || existingAssistant?.toolCalls?.length || existingAssistant?.subagentGroups?.length) {
+          continue
+        }
+
+        const events = await agentService.listRunEvents?.(run.runId, controller.signal)
+        if (!events || controller.signal.aborted) return
+        const projectionState = createChatAgentEventProjectionState()
+        const updateAssistant = (
+          updater: Parameters<ReturnType<typeof getSessionStore>['updateMessage']>[1],
+        ) => {
+          getSessionStore(run.sessionId).updateMessage(assistantMessageId, updater)
+        }
+
+        for (const record of events) {
+          projectAgentEventToChat(record.event, {
+            sessionId: run.sessionId,
+            runId: run.runId,
+            projectionState,
+            onChunk: delta => {
+              updateAssistant(item => ({ ...item, content: item.content + delta }))
+            },
+            onToolCall: call => {
+              updateAssistant(item => ({ ...item, toolCalls: upsertToolCall(item.toolCalls ?? [], call) }))
+            },
+            onSubagentUpdate: update => {
+              updateAssistant(item => ({
+                ...item,
+                subagentGroups: upsertSubagentUpdate(item.subagentGroups ?? [], update),
+              }))
+            },
+            onStatus: status => {
+              updateAssistant(item => ({
+                ...item,
+                status: status === 'failed' ? 'error' : status === 'completed' ? 'done' : 'streaming',
+              }))
+            },
+          })
+          if (record.event.type === 'run_failed') {
+            const errorMessage = record.event.error.message
+            updateAssistant(item => ({ ...item, status: 'error', errorMessage }))
+          }
+        }
+      }
+    }
+
+    void hydrateRemoteRuns().catch(() => {
+      // Backfill is best-effort; live stream mirroring handles new remote runs.
+    })
+
+    return () => {
+      controller.abort()
+    }
+  }, [agentService])
 
   const displayedTraceRows = useMemo(
     () =>
@@ -451,6 +694,16 @@ function replaySettingsDiff(run: ChatAgentRunRecordSnapshot, settings: ChatModel
   return checks
     .filter(([, before, after]) => (before ?? '-') !== (after ?? '-'))
     .map(([label, before, after]) => `${label}: ${before ?? '-'} -> ${after ?? '-'}`)
+}
+
+function deriveRemoteTitle(text: string): string {
+  const trimmed = text.replace(/\s+/g, ' ').trim()
+  if (!trimmed) return 'Remote chat'
+  return trimmed.length > 40 ? `${trimmed.slice(0, 40)}...` : trimmed
+}
+
+function isRemoteChatRun(run: ChatAgentRunRecordSnapshot): boolean {
+  return run.runId.startsWith('chat-intent_') || run.sessionId.startsWith('chat-intent_')
 }
 
 function runEventsToTraceRows(events: ChatAgentRunEventRecordSnapshot[]): LlmTraceRow[] {

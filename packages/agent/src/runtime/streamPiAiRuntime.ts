@@ -43,7 +43,14 @@ export async function* streamPiAiRuntimeEvents(opts: {
   const producerVersion = TELEGRAPH_PI_AI_PRODUCER_VERSION
   const requestIdPrefix = `req-${runId.slice(0, 12)}`
 
+  if (!settings.provider || !settings.modelId || !settings.apiKey) {
+    throw new Error('Chat model settings are required: provider, modelId, and apiKey must be configured.')
+  }
+
   const model = resolveModel(settings)
+  if (!model) {
+    throw new Error(`Unsupported chat model settings: provider="${settings.provider}", modelId="${settings.modelId}".`)
+  }
   const tools = opts.tools ?? []
   const toolsByName = new Map(tools.map(tool => [tool.name, tool]))
   const context: Context = {

@@ -45,6 +45,8 @@ export interface ChatStreamEvent {
   type: 'run_queued' | 'run_started' | 'text_delta' | 'run_completed' | 'run_failed' | 'done' | 'error' | 'llm_trace' | 'runtime_event' | 'permission_pending'
   runId: string
   sessionId?: string
+  sourceIntentId?: string
+  message?: string
   text?: string
   error?: string
   trace?: LlmTracePayload

@@ -123,6 +123,61 @@ describe('projectAgentEventToChat', () => {
     expect(project(cancelled).statuses).toEqual(['failed'])
   })
 
+  it('uses terminal output as assistant text when a runtime has no deltas', () => {
+    const state = createChatAgentEventProjectionState()
+    const chunks: string[] = []
+    const statuses: string[] = []
+
+    projectAgentEventToChat({
+      type: 'run_completed',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-1',
+      output: { reply: 'orchestrator-core received: hello' },
+      ts: 1,
+    }, {
+      sessionId: 'session-1',
+      runId: 'run-1',
+      onChunk: text => { chunks.push(text); },
+      onStatus: status => { statuses.push(status); },
+      projectionState: state,
+    })
+
+    expect(chunks).toEqual(['orchestrator-core received: hello'])
+    expect(statuses).toEqual(['completed'])
+  })
+
+  it('does not duplicate terminal output after assistant deltas', () => {
+    const state = createChatAgentEventProjectionState()
+    const chunks: string[] = []
+
+    for (const event of [
+      {
+        type: 'assistant_delta',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1',
+        requestId: 'request-1',
+        text: 'hello',
+        ts: 1,
+      },
+      {
+        type: 'run_completed',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1',
+        output: { reply: 'hello' },
+        ts: 2,
+      },
+    ] satisfies AgentEvent[]) {
+      projectAgentEventToChat(event, {
+        sessionId: 'session-1',
+        runId: 'run-1',
+        onChunk: text => { chunks.push(text); },
+        projectionState: state,
+      })
+    }
+
+    expect(chunks).toEqual(['hello'])
+  })
+
   it('keeps child-run text and status out of the main chat projection', () => {
     const childDelta: AgentEvent = {
       type: 'assistant_delta',

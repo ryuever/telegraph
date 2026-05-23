@@ -10,11 +10,13 @@ import type {
   ListApprovalChangesOptions,
   ListApprovalRequestsOptions,
   ListRunControlCommandsOptions,
+  ListRunIntentsOptions,
   ListRunProjectionChangesOptions,
   ListRunProjectionsOptions,
   CreateRunControlCommandInput,
   RunControlCommandChangeEvent,
   RunControlCommandRecord,
+  RunIntentRecord,
   RunProjectionChangeEvent,
   RunProjectionRecord,
 } from '@/packages/run-protocol'
@@ -74,6 +76,7 @@ export interface RemoteControlGatewayService {
     callback: (event: RunControlCommandChangeEvent) => void,
     options?: ListRunControlCommandsOptions,
   ): MaybePromise<{ unsubscribe(): void }>
+  listRunIntents(options?: ListRunIntentsOptions): MaybePromise<RunIntentRecord[]>
   listRunProjections(options?: ListRunProjectionsOptions): MaybePromise<RunProjectionRecord[]>
   getRunProjection(runId: string): MaybePromise<RunProjectionRecord | null>
   listRunProjectionChanges(options?: ListRunProjectionChangesOptions): MaybePromise<RunProjectionChangeEvent[]>
@@ -118,6 +121,7 @@ export type RemoteControlGatewayMethod =
   | 'listRunControlCommands'
   | 'listRunControlChanges'
   | 'subscribeRunControlCommands'
+  | 'listRunIntents'
   | 'listRunProjections'
   | 'getRunProjection'
   | 'listRunProjectionChanges'
@@ -471,6 +475,8 @@ async function dispatchRemoteControlGatewayRequest(
       return service.listRunControlChanges(assertOptionalObject(request.params))
     case 'subscribeRunControlCommands':
       throw new Error('subscribeRunControlCommands requires a socket connection')
+    case 'listRunIntents':
+      return service.listRunIntents(assertOptionalObject(request.params))
     case 'listRunProjections':
       return service.listRunProjections(assertOptionalObject(request.params))
     case 'getRunProjection': {

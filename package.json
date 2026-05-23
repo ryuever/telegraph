@@ -10,6 +10,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests",
     "start": "pnpm --filter @telegraph/main start",
+    "start:mobile-gateway": "TELEGRAPH_REMOTE_CONTROL_HTTP_HOST=0.0.0.0 TELEGRAPH_REMOTE_CONTROL_HTTP_PORT=8799 TELEGRAPH_REMOTE_CONTROL_HTTP_TOKEN=dev pnpm --filter @telegraph/main start",
     "cli": "pnpm --filter @telegraph/cli exec telegraph",
     "package": "pnpm --filter telegraph package",
     "make": "pnpm --filter telegraph make",
@@ -31,11 +32,19 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-tailwindcss": "^3.17.5",
     "happy-dom": "^20.9.0",
+    "string-width": "4.2.3",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.18.0",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wrap-ansi": "7.0.0"
   },
-  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
+  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8",
+  "pnpm": {
+    "overrides": {
+      "ansi-styles@6.2.3": "4.3.0",
+      "string-width@5.1.2": "4.2.3"
+    }
+  }
 }

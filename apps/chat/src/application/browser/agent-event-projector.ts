@@ -5,6 +5,7 @@ export interface ChatAgentEventProjectionState {
   childRunParents: Map<string, string>
   childRunNames: Map<string, string>
   childRunText: Map<string, string>
+  runsWithAssistantText: Set<string>
 }
 
 export interface ChatAgentEventProjectionHandlers {
@@ -23,6 +24,7 @@ export function createChatAgentEventProjectionState(): ChatAgentEventProjectionS
     childRunParents: new Map<string, string>(),
     childRunNames: new Map<string, string>(),
     childRunText: new Map<string, string>(),
+    runsWithAssistantText: new Set<string>(),
   }
 }
 
@@ -48,7 +50,10 @@ export function projectAgentEventToChat(event: AgentEvent, handlers: ChatAgentEv
 
     case 'assistant_delta':
       handlers.onStatus?.('running')
-      if (event.text) handlers.onChunk(event.text)
+      if (event.text) {
+        handlers.projectionState?.runsWithAssistantText.add(handlers.runId)
+        handlers.onChunk(event.text)
+      }
       return
 
     case 'tool_call':
@@ -79,6 +84,13 @@ export function projectAgentEventToChat(event: AgentEvent, handlers: ChatAgentEv
       return
 
     case 'run_completed':
+      if (!handlers.projectionState?.runsWithAssistantText.has(handlers.runId)) {
+        const outputText = assistantTextFromOutput(event.output)
+        if (outputText) {
+          handlers.projectionState?.runsWithAssistantText.add(handlers.runId)
+          handlers.onChunk(outputText)
+        }
+      }
       handlers.onStatus?.('completed')
       return
 
@@ -233,6 +245,18 @@ function readNumberField(value: unknown, key: string): number | undefined {
   if (!isRecord(value)) return undefined
   const candidate = value[key]
   return typeof candidate === 'number' ? candidate : undefined
+}
+
+function assistantTextFromOutput(output: unknown): string | undefined {
+  if (typeof output === 'string') return output
+  if (!isRecord(output)) return undefined
+  const direct = readStringField(output, 'text') ?? readStringField(output, 'reply') ?? readStringField(output, 'content')
+  if (direct) return direct
+  const message = output.message
+  if (isRecord(message)) {
+    return readStringField(message, 'content') ?? readStringField(message, 'text')
+  }
+  return undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

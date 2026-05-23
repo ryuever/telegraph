@@ -84,4 +84,72 @@ describe('MobileDashboardViewModel', () => {
       expect.objectContaining({ artifactId: 'artifact-log', previewKind: 'link' }),
     ]))
   })
+
+  it('shows queued run intents when projections are not available yet', () => {
+    const model = createMobileDashboardModel({
+      connection: 'live',
+      devices: [],
+      runs: [],
+      intents: [{
+        intentId: 'intent-1',
+        source: { actorId: 'mobile:user', kind: 'mobile', displayName: 'Phone' },
+        targetPagelet: 'chat',
+        prompt: 'hello from mobile',
+        status: 'claimed',
+        claimedBy: 'pagelet:chat:1',
+        runId: 'chat-intent-1',
+        createdAt: 10,
+        updatedAt: 20,
+        claimedAt: 20,
+      }],
+      approvals: [],
+      replies: [],
+    })
+
+    expect(model.runs).toEqual([
+      expect.objectContaining({
+        runId: 'chat-intent-1',
+        title: 'hello from mobile',
+        status: 'queued',
+        statusTone: 'active',
+      }),
+    ])
+    expect(model.selectedRun).toMatchObject({ runId: 'chat-intent-1' })
+  })
+
+  it('prefers projections over matching run intents', () => {
+    const model = createMobileDashboardModel({
+      connection: 'live',
+      devices: [],
+      runs: [{
+        runId: 'chat-intent-1',
+        pageletId: 'chat',
+        status: 'completed',
+        title: 'projected run',
+        cursor: 2,
+        eventCount: 2,
+        createdAt: 10,
+        updatedAt: 30,
+      }],
+      intents: [{
+        intentId: 'intent-1',
+        source: { actorId: 'mobile:user', kind: 'mobile', displayName: 'Phone' },
+        targetPagelet: 'chat',
+        prompt: 'hello from mobile',
+        status: 'claimed',
+        runId: 'chat-intent-1',
+        createdAt: 10,
+        updatedAt: 20,
+      }],
+      approvals: [],
+      replies: [],
+    })
+
+    expect(model.runs).toHaveLength(1)
+    expect(model.runs[0]).toMatchObject({
+      runId: 'chat-intent-1',
+      title: 'projected run',
+      status: 'completed',
+    })
+  })
 })

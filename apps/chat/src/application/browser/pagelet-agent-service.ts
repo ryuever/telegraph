@@ -259,6 +259,15 @@ export class PageletAgentService implements AgentService {
     return getChatPageletClient().resolvePermissionRequest(requestId, resolution)
   }
 
+  async subscribeToStreamEvents(
+    callback: (event: ChatStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<import('@/apps/chat/application/common').EventSubscription> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().onStreamEvent(callback)
+  }
+
   async getSubagentResult(
     childRunId: string,
     options: { consume?: boolean; signal?: AbortSignal } = {},

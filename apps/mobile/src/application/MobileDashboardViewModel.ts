@@ -1,5 +1,5 @@
 import type { DeviceBinding, ChannelReply, RemoteArtifactRef } from '@/packages/remote-protocol'
-import type { ApprovalRequestRecord, RunProjectionRecord, RunProjectionStatus } from '@/packages/run-protocol'
+import type { ApprovalRequestRecord, RunIntentRecord, RunProjectionRecord, RunProjectionStatus } from '@/packages/run-protocol'
 
 export type MobileConnectionState = 'offline' | 'connecting' | 'live'
 
@@ -7,6 +7,7 @@ export interface MobileDashboardSnapshot {
   connection: MobileConnectionState
   devices: DeviceBinding[]
   runs: RunProjectionRecord[]
+  intents?: RunIntentRecord[]
   approvals: ApprovalRequestRecord[]
   replies: ChannelReply[]
   selectedRunId?: string
@@ -65,8 +66,9 @@ export interface MobileDashboardModel {
 }
 
 export function createMobileDashboardModel(snapshot: MobileDashboardSnapshot): MobileDashboardModel {
-  const selectedRunId = snapshot.selectedRunId ?? latestRunId(snapshot.runs)
-  const runs = snapshot.runs
+  const sourceRuns = mergeProjectedAndIntentRuns(snapshot.runs, snapshot.intents ?? [])
+  const selectedRunId = snapshot.selectedRunId ?? latestRunId(sourceRuns)
+  const runs = sourceRuns
     .slice()
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .map(runItem)
@@ -94,7 +96,7 @@ export function createMobileDashboardModel(snapshot: MobileDashboardSnapshot): M
     runs,
     approvals,
     artifacts,
-    latestReply: relevantReplies.slice().sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0],
+    latestReply: relevantReplies.slice().sort((a, b) => b.createdAt - a.createdAt)[0],
     selectedRun,
   }
 }
@@ -163,6 +165,41 @@ function statusTone(status: RunProjectionStatus): MobileRunItem['statusTone'] {
 
 function latestRunId(runs: RunProjectionRecord[]): string | undefined {
   return runs.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0]?.runId
+}
+
+function mergeProjectedAndIntentRuns(
+  projections: RunProjectionRecord[],
+  intents: RunIntentRecord[],
+): RunProjectionRecord[] {
+  const projectedRunIds = new Set(projections.map(run => run.runId))
+  const projectedIntentIds = new Set(projections.map(run => run.sourceIntentId).filter(Boolean))
+  const intentRuns = intents
+    .filter(intent => !projectedIntentIds.has(intent.intentId))
+    .filter(intent => !intent.runId || !projectedRunIds.has(intent.runId))
+    .map(runProjectionFromIntent)
+  return projections.concat(intentRuns)
+}
+
+function runProjectionFromIntent(intent: RunIntentRecord): RunProjectionRecord {
+  return {
+    runId: intent.runId ?? `intent:${intent.intentId}`,
+    sessionId: intent.sessionId,
+    pageletId: intent.targetPagelet,
+    status: runProjectionStatusFromIntent(intent),
+    title: intent.prompt,
+    promptPreview: intent.prompt,
+    cursor: 0,
+    eventCount: 0,
+    sourceIntentId: intent.intentId,
+    metadata: intent.metadata,
+    createdAt: intent.createdAt,
+    updatedAt: intent.updatedAt,
+  }
+}
+
+function runProjectionStatusFromIntent(intent: RunIntentRecord): RunProjectionStatus {
+  if (intent.status === 'cancelled' || intent.status === 'expired') return 'cancelled'
+  return 'queued'
 }
 
 function isImageArtifact(ref: RemoteArtifactRef): boolean {
