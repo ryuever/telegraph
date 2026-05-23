@@ -28,8 +28,9 @@ export class WindowManager implements IWindowManager {
       },
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      void this.mainWindow.loadURL('http://localhost:5173');
+    const devServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL;
+    if (devServerUrl) {
+      void this.mainWindow.loadURL(devServerUrl);
     } else {
       void this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
@@ -90,8 +91,9 @@ export class WindowManager implements IWindowManager {
       },
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      void this.settingWindow.loadURL('http://localhost:5173/setting.html');
+    const devServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL;
+    if (devServerUrl) {
+      void this.settingWindow.loadURL(`${devServerUrl}/setting.html`);
     } else {
       void this.settingWindow.loadFile(join(__dirname, '../renderer/setting.html'));
     }
