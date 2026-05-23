@@ -25,10 +25,23 @@ import {
   REMOTE_CONTROL_PAGELET_SERVICE_PATH,
   type AckChannelReplyInput,
   type CreateDeviceBindingInput,
+  type CreateSlackAppInstallationInput,
+  type CreateSlackDeviceBindingInput,
+  type CreateSlackUserBindingInput,
+  type CreateSlackWorkspaceBindingInput,
   type EventSubscription as RemoteControlEventSubscription,
   type ListChannelRepliesOptions,
   type RemoteControlSubmissionResult,
   type RemoteControlSubmitOptions,
+  type SlackAppInstallation,
+  type SlackDeviceBinding,
+  type SlackLifecycleEvent,
+  type SlackLifecycleRevokeResult,
+  type SlackOAuthCallbackInput,
+  type SlackOAuthCallbackResult,
+  type SlackTeamAuditEvent,
+  type SlackUserBinding,
+  type SlackWorkspaceBinding,
 } from '@/apps/remote-control/application/common'
 import {
   createRunIntentInputFromExternalMessage,
@@ -50,6 +63,14 @@ import {
   type SlackInteractionPayload,
   type SlackSlashCommandPayload,
 } from './SlackCommandRouter'
+import {
+  FileSlackTeamGovernanceRepository,
+  SlackTeamGovernance,
+} from './SlackTeamGovernance'
+import {
+  createSlackOAuthCallbackHandlerFromEnv,
+  type SlackOAuthCallbackHandler,
+} from './SlackOAuthCallbackHandler'
 import { createLogger } from '@/packages/services/log/node/logger'
 
 export const RemoteControlWorkerId = createId('RemoteControlWorker')
@@ -61,14 +82,18 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
   private readonly replyListeners = new Set<(reply: ChannelReply) => void>()
   private readonly deviceBindingRepository = new RemoteControlDeviceBindingRepository()
   private readonly replyDeliveryRepository = new RemoteControlReplyDeliveryRepository()
+  private readonly slackGovernanceRepository = new FileSlackTeamGovernanceRepository()
   private readonly ingressPolicy = new RemoteControlIngressPolicy()
   private readonly deviceBindingsReady = this.hydrateDeviceBindings()
   private readonly replyOutbox = new RemoteControlReplyOutbox()
   private readonly replyDeliveryReady = this.hydrateReplyDelivery()
+  private readonly slackGovernance = SlackTeamGovernance.empty()
+  private readonly slackGovernanceReady = this.hydrateSlackGovernance()
+  private slackOAuthCallbackHandler: SlackOAuthCallbackHandler | null = null
   private readonly telegramRouter = new TelegramCommandRouter(this, {
     allowedGroupChatIds: parseTelegramAllowedGroupChatIds(process.env.TELEGRAPH_TELEGRAM_ALLOWED_GROUPS),
   })
-  private readonly slackRouter = new SlackCommandRouter(this)
+  private readonly slackRouter = new SlackCommandRouter(this, { governance: this.slackGovernance })
   private telegramBotApiAdapter: TelegramBotApiAdapter | null = null
   private readonly relayGateway = new RemoteControlSocketGateway(this)
   private relayGatewayStart: Promise<void> | null = null
@@ -146,6 +171,33 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
           this.createDeviceBinding(input),
         revokeDeviceBinding: (bindingId: string): Promise<DeviceBinding | null> =>
           this.revokeDeviceBinding(bindingId),
+        listSlackWorkspaceBindings: (): Promise<SlackWorkspaceBinding[]> => this.listSlackWorkspaceBindings(),
+        createSlackWorkspaceBinding: (
+          input: CreateSlackWorkspaceBindingInput,
+        ): Promise<SlackWorkspaceBinding> => this.createSlackWorkspaceBinding(input),
+        revokeSlackWorkspaceBinding: (workspaceId: string): Promise<SlackWorkspaceBinding | null> =>
+          this.revokeSlackWorkspaceBinding(workspaceId),
+        listSlackAppInstallations: (): Promise<SlackAppInstallation[]> => this.listSlackAppInstallations(),
+        createSlackAppInstallation: (
+          input: CreateSlackAppInstallationInput,
+        ): Promise<SlackAppInstallation> => this.createSlackAppInstallation(input),
+        revokeSlackAppInstallation: (installationId: string): Promise<SlackAppInstallation | null> =>
+          this.revokeSlackAppInstallation(installationId),
+        listSlackUserBindings: (): Promise<SlackUserBinding[]> => this.listSlackUserBindings(),
+        createSlackUserBinding: (input: CreateSlackUserBindingInput): Promise<SlackUserBinding> =>
+          this.createSlackUserBinding(input),
+        revokeSlackUserBinding: (workspaceId: string, userId: string): Promise<SlackUserBinding | null> =>
+          this.revokeSlackUserBinding(workspaceId, userId),
+        listSlackDeviceBindings: (): Promise<SlackDeviceBinding[]> => this.listSlackDeviceBindings(),
+        createSlackDeviceBinding: (input: CreateSlackDeviceBindingInput): Promise<SlackDeviceBinding> =>
+          this.createSlackDeviceBinding(input),
+        revokeSlackDeviceBinding: (bindingId: string): Promise<SlackDeviceBinding | null> =>
+          this.revokeSlackDeviceBinding(bindingId),
+        handleSlackOAuthCallback: (input: SlackOAuthCallbackInput): Promise<SlackOAuthCallbackResult> =>
+          this.handleSlackOAuthCallback(input),
+        listSlackTeamAuditEvents: (): Promise<SlackTeamAuditEvent[]> => this.listSlackTeamAuditEvents(),
+        handleSlackLifecycleEvent: (event: SlackLifecycleEvent): Promise<SlackLifecycleRevokeResult> =>
+          this.handleSlackLifecycleEvent(event),
       },
     })
   }
@@ -300,16 +352,25 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
     return this.telegramRouter.handleUpdate(update)
   }
 
-  handleSlackSlashCommand(payload: SlackSlashCommandPayload): Promise<ChannelReply> {
-    return this.slackRouter.handleSlashCommand(payload)
+  async handleSlackSlashCommand(payload: SlackSlashCommandPayload): Promise<ChannelReply> {
+    await this.slackGovernanceReady
+    const reply = await this.slackRouter.handleSlashCommand(payload)
+    await this.persistSlackGovernance()
+    return reply
   }
 
-  handleSlackEventCallback(payload: SlackEventCallbackPayload): Promise<ChannelReply[]> {
-    return this.slackRouter.handleEventCallback(payload)
+  async handleSlackEventCallback(payload: SlackEventCallbackPayload): Promise<ChannelReply[]> {
+    await this.slackGovernanceReady
+    const replies = await this.slackRouter.handleEventCallback(payload)
+    await this.persistSlackGovernance()
+    return replies
   }
 
-  handleSlackInteraction(payload: SlackInteractionPayload): Promise<ChannelReply[]> {
-    return this.slackRouter.handleInteraction(payload)
+  async handleSlackInteraction(payload: SlackInteractionPayload): Promise<ChannelReply[]> {
+    await this.slackGovernanceReady
+    const replies = await this.slackRouter.handleInteraction(payload)
+    await this.persistSlackGovernance()
+    return replies
   }
 
   async listDeviceBindings(): Promise<DeviceBinding[]> {
@@ -349,6 +410,105 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
     this.deviceBindings.set(bindingId, next)
     await this.persistDeviceBindings()
     return next
+  }
+
+  async listSlackWorkspaceBindings(): Promise<SlackWorkspaceBinding[]> {
+    await this.slackGovernanceReady
+    return this.slackGovernance.listWorkspaceBindings()
+  }
+
+  async createSlackWorkspaceBinding(input: CreateSlackWorkspaceBindingInput): Promise<SlackWorkspaceBinding> {
+    await this.slackGovernanceReady
+    const binding = this.slackGovernance.upsertWorkspaceBinding(input)
+    await this.persistSlackGovernance()
+    return binding
+  }
+
+  async revokeSlackWorkspaceBinding(workspaceId: string): Promise<SlackWorkspaceBinding | null> {
+    await this.slackGovernanceReady
+    const binding = this.slackGovernance.revokeWorkspaceBinding(workspaceId)
+    await this.persistSlackGovernance()
+    return binding
+  }
+
+  async listSlackAppInstallations(): Promise<SlackAppInstallation[]> {
+    await this.slackGovernanceReady
+    return this.slackGovernance.listAppInstallations()
+  }
+
+  async createSlackAppInstallation(input: CreateSlackAppInstallationInput): Promise<SlackAppInstallation> {
+    await this.slackGovernanceReady
+    const installation = this.slackGovernance.createAppInstallation(input)
+    await this.persistSlackGovernance()
+    return installation
+  }
+
+  async revokeSlackAppInstallation(installationId: string): Promise<SlackAppInstallation | null> {
+    await this.slackGovernanceReady
+    const installation = this.slackGovernance.revokeAppInstallation(installationId)
+    await this.persistSlackGovernance()
+    return installation
+  }
+
+  async listSlackUserBindings(): Promise<SlackUserBinding[]> {
+    await this.slackGovernanceReady
+    return this.slackGovernance.listUserBindings()
+  }
+
+  async createSlackUserBinding(input: CreateSlackUserBindingInput): Promise<SlackUserBinding> {
+    await this.slackGovernanceReady
+    const binding = this.slackGovernance.upsertUserBinding(input)
+    await this.persistSlackGovernance()
+    return binding
+  }
+
+  async revokeSlackUserBinding(workspaceId: string, userId: string): Promise<SlackUserBinding | null> {
+    await this.slackGovernanceReady
+    const binding = this.slackGovernance.revokeUserBinding(workspaceId, userId)
+    await this.persistSlackGovernance()
+    return binding
+  }
+
+  async listSlackDeviceBindings(): Promise<SlackDeviceBinding[]> {
+    await this.slackGovernanceReady
+    return this.slackGovernance.listDeviceBindings()
+  }
+
+  async createSlackDeviceBinding(input: CreateSlackDeviceBindingInput): Promise<SlackDeviceBinding> {
+    await this.slackGovernanceReady
+    const binding = this.slackGovernance.upsertDeviceBinding(input)
+    await this.persistSlackGovernance()
+    return binding
+  }
+
+  async revokeSlackDeviceBinding(bindingId: string): Promise<SlackDeviceBinding | null> {
+    await this.slackGovernanceReady
+    const binding = this.slackGovernance.revokeDeviceBinding(bindingId)
+    await this.persistSlackGovernance()
+    return binding
+  }
+
+  async handleSlackOAuthCallback(input: SlackOAuthCallbackInput): Promise<SlackOAuthCallbackResult> {
+    await this.slackGovernanceReady
+    const handler = this.getSlackOAuthCallbackHandler()
+    if (!handler) {
+      throw new Error('Slack OAuth callback requires TELEGRAPH_SLACK_CLIENT_ID and TELEGRAPH_SLACK_CLIENT_SECRET.')
+    }
+    const result = await handler.handle(input)
+    await this.persistSlackGovernance()
+    return result
+  }
+
+  async listSlackTeamAuditEvents(): Promise<SlackTeamAuditEvent[]> {
+    await this.slackGovernanceReady
+    return this.slackGovernance.listAuditEvents()
+  }
+
+  async handleSlackLifecycleEvent(event: SlackLifecycleEvent): Promise<SlackLifecycleRevokeResult> {
+    await this.slackGovernanceReady
+    const result = this.slackGovernance.applyLifecycleEvent(event)
+    await this.persistSlackGovernance()
+    return result
   }
 
   private async startRelayGateway(): Promise<void> {
@@ -446,12 +606,25 @@ export class RemoteControlWorker extends PageletWorker<ISharedService> {
     this.replyOutbox.hydrateDelivery(await this.replyDeliveryRepository.load())
   }
 
+  private async hydrateSlackGovernance(): Promise<void> {
+    this.slackGovernance.replaceSnapshot(await this.slackGovernanceRepository.load())
+  }
+
+  private getSlackOAuthCallbackHandler(): SlackOAuthCallbackHandler | null {
+    this.slackOAuthCallbackHandler ??= createSlackOAuthCallbackHandlerFromEnv(this.slackGovernance)
+    return this.slackOAuthCallbackHandler
+  }
+
   private async persistDeviceBindings(): Promise<void> {
     await this.deviceBindingRepository.save(Array.from(this.deviceBindings.values()))
   }
 
   private async persistReplyDelivery(): Promise<void> {
     await this.replyDeliveryRepository.save(this.replyOutbox.listDeliveryRecords())
+  }
+
+  private async persistSlackGovernance(): Promise<void> {
+    await this.slackGovernanceRepository.save(this.slackGovernance.snapshot())
   }
 
   private emitChannelReply(reply: ChannelReply): void {

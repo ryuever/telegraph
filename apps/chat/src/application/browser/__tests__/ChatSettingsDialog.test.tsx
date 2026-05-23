@@ -10,9 +10,10 @@ let root: Root | undefined
 let host: HTMLDivElement | undefined
 
 afterEach(() => {
-  if (root) {
+  const currentRoot = root
+  if (currentRoot) {
     act(() => {
-      root?.unmount()
+      currentRoot.unmount()
     })
   }
   root = undefined
@@ -33,7 +34,7 @@ describe('ChatSettingsDialog capability settings', () => {
     }, onSave)
 
     clickTab('Extensions')
-    const textarea = getControl<HTMLTextAreaElement>('Allowed shell commands')
+    const textarea = getControl('Allowed shell commands') as HTMLTextAreaElement
     expect(textarea.value).toBe('git')
 
     change(textarea, 'git\npnpm, node')
@@ -79,9 +80,10 @@ describe('ChatSettingsDialog capability settings', () => {
 function renderDialog(settings: ChatModelSettings, onSave: (next: ChatModelSettings) => void): void {
   host = document.createElement('div')
   document.body.appendChild(host)
-  root = createRoot(host)
+  const currentRoot = createRoot(host)
+  root = currentRoot
   act(() => {
-    root?.render(
+    currentRoot.render(
       <ChatSettingsDialog
         open
         settings={settings}
@@ -102,26 +104,26 @@ function clickButton(label: string): void {
 
 function getButton(label: string): HTMLButtonElement {
   const buttons = Array.from(document.querySelectorAll('button'))
-  const button = buttons.find(candidate => candidate.textContent?.trim() === label)
+  const button = buttons.find(candidate => candidate.textContent.trim() === label)
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button "${label}" not found`)
   }
   return button
 }
 
-function getControl<T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(label: string): T {
+function getControl(label: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
   const labels = Array.from(document.querySelectorAll('label'))
-  const labelEl = labels.find(candidate => candidate.textContent?.includes(label))
+  const labelEl = labels.find(candidate => candidate.textContent.includes(label))
   const control = labelEl?.querySelector('input, textarea, select')
   if (!control) {
     throw new Error(`Control "${label}" not found`)
   }
-  return control as T
+  return control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 function getCheckbox(label: string): HTMLInputElement {
   const labels = Array.from(document.querySelectorAll('label'))
-  const labelEl = labels.find(candidate => candidate.textContent?.includes(label))
+  const labelEl = labels.find(candidate => candidate.textContent.includes(label))
   const input = labelEl?.querySelector('input[type="checkbox"]')
   if (!(input instanceof HTMLInputElement)) {
     throw new Error(`Checkbox "${label}" not found`)

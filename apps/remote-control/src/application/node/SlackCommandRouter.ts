@@ -2,6 +2,8 @@ import type { ChannelReply, ExternalMessage, RemoteActorSnapshot } from '@/packa
 import { REMOTE_PROTOCOL_SCHEMA_VERSION } from '@/packages/remote-protocol'
 import type { ApprovalRequestRecord, ListRunProjectionsOptions, RunProjectionRecord } from '@/packages/run-protocol'
 import type { RemoteControlSubmissionResult, RemoteControlSubmitOptions } from '@/apps/remote-control/application/common'
+import type { SlackGovernanceAction } from '@/apps/remote-control/application/common'
+import type { SlackTeamGovernance } from './SlackTeamGovernance'
 
 export interface SlackUserSnapshot {
   id: string
@@ -63,20 +65,27 @@ export interface SlackCommandRouterService {
 
 export interface SlackCommandRouterOptions {
   defaultTargetPagelet?: string
+  governance?: SlackTeamGovernance
 }
 
 export class SlackCommandRouter {
   private readonly defaultTargetPagelet: string
+  private readonly governance?: SlackTeamGovernance
 
   constructor(
     private readonly service: SlackCommandRouterService,
     options: SlackCommandRouterOptions = {},
   ) {
     this.defaultTargetPagelet = options.defaultTargetPagelet ?? 'design'
+    this.governance = options.governance
   }
 
   async handleSlashCommand(payload: SlackSlashCommandPayload): Promise<ChannelReply> {
     const command = parseSlackCommand(payload.text ?? '')
+    const action = slackActionForCommand(command.name)
+    const authorization = this.authorizeSlashCommand(payload, action)
+    if (authorization) return authorization
+
     if (command.name === 'runs') return this.listRuns(payload)
     if (command.name === 'approve' || command.name === 'deny') {
       return this.decideApproval(payload, command.name === 'approve', command.args)
@@ -90,6 +99,7 @@ export class SlackCommandRouter {
       externalMessageFromSlackSlashCommand(payload, prompt),
       { targetPagelet: this.defaultTargetPagelet },
     )
+    this.recordSlashAudit(payload, 'ask', 'accepted', { policyProfileId: this.policyProfileForSlash(payload, 'ask') })
     return result.reply
   }
 
@@ -97,10 +107,14 @@ export class SlackCommandRouter {
     if (payload.event.type !== 'app_mention') return []
     const text = stripBotMention(payload.event.text ?? '')
     if (!text) return []
+    const authorization = this.authorizeEventCallback(payload, 'ask')
+    if (authorization) return [authorization]
+
     const result = await this.service.submitExternalMessage(
       externalMessageFromSlackEventCallback(payload, text),
       { targetPagelet: this.defaultTargetPagelet },
     )
+    this.recordEventAudit(payload, 'ask', 'accepted', { policyProfileId: this.policyProfileForEvent(payload, 'ask') })
     return [result.reply]
   }
 
@@ -114,6 +128,10 @@ export class SlackCommandRouter {
         : undefined
     if (granted === undefined) return []
 
+    const governanceAction = granted ? 'block_approve' : 'block_deny'
+    const authorization = this.authorizeInteraction(payload, governanceAction, action.value)
+    if (authorization) return [authorization]
+
     const decision = await this.service.decideApproval(action.value, {
       granted,
       decidedBy: actorFromSlackInteraction(payload),
@@ -122,8 +140,16 @@ export class SlackCommandRouter {
     const channelId = payload.channel?.id ? slackChannelId(payload.channel.id) : 'slack:unknown'
     const threadId = payload.message?.thread_ts ?? payload.message?.ts
     if (!decision) {
+      this.recordInteractionAudit(payload, governanceAction, 'rejected', {
+        approvalId: action.value,
+        reason: `Approval not found: ${action.value}`,
+      })
       return [slackReplyFromChannel(channelId, threadId, `Approval not found: ${action.value}`, 'failed')]
     }
+    this.recordInteractionAudit(payload, governanceAction, 'accepted', {
+      approvalId: action.value,
+      policyProfileId: this.policyProfileForInteraction(payload, governanceAction),
+    })
     return [slackReplyFromChannel(channelId, threadId, `Approval ${decision.status}: ${action.value}`, 'sent')]
   }
 
@@ -132,6 +158,7 @@ export class SlackCommandRouter {
     const text = runs.length === 0
       ? 'No runs found.'
       : runs.map(run => `${run.runId} ${run.status} cursor=${String(run.cursor)}`).join('\n')
+    this.recordSlashAudit(payload, 'runs', 'accepted', { policyProfileId: this.policyProfileForSlash(payload, 'runs') })
     return slackReply(payload, text, 'sent')
   }
 
@@ -149,8 +176,175 @@ export class SlackCommandRouter {
       decidedBy: actorFromSlackSlashCommand(payload),
       reason: reasonParts.join(' ') || undefined,
     })
-    if (!decision) return slackReply(payload, `Approval not found: ${approvalId}`, 'failed')
+    if (!decision) {
+      this.recordSlashAudit(payload, granted ? 'approve' : 'deny', 'rejected', {
+        approvalId,
+        reason: `Approval not found: ${approvalId}`,
+      })
+      return slackReply(payload, `Approval not found: ${approvalId}`, 'failed')
+    }
+    this.recordSlashAudit(payload, granted ? 'approve' : 'deny', 'accepted', {
+      approvalId,
+      policyProfileId: this.policyProfileForSlash(payload, granted ? 'approve' : 'deny'),
+    })
     return slackReply(payload, `Approval ${decision.status}: ${approvalId}`, 'sent')
+  }
+
+  private authorizeSlashCommand(
+    payload: SlackSlashCommandPayload,
+    action: SlackGovernanceAction,
+  ): ChannelReply | null {
+    if (!this.governance) return null
+    const decision = this.governance.authorize({
+      workspaceId: payload.team_id,
+      actorId: `slack:${payload.user_id}`,
+      userId: payload.user_id,
+      channelId: slackChannelId(payload.channel_id),
+      action,
+    })
+    if (decision.allowed) return null
+    this.recordSlashAudit(payload, action, 'rejected', { reason: decision.reason })
+    return slackReply(payload, decision.reason ?? 'Slack command is not allowed.', 'failed')
+  }
+
+  private authorizeEventCallback(
+    payload: SlackEventCallbackPayload,
+    action: SlackGovernanceAction,
+  ): ChannelReply | null {
+    if (!this.governance) return null
+    const decision = this.governance.authorize({
+      workspaceId: payload.team_id,
+      actorId: payload.event.user ? `slack:${payload.event.user}` : 'slack:unknown',
+      userId: payload.event.user,
+      channelId: slackChannelId(payload.event.channel),
+      threadId: payload.event.thread_ts ?? payload.event.ts,
+      action,
+    })
+    if (decision.allowed) return null
+    this.recordEventAudit(payload, action, 'rejected', { reason: decision.reason })
+    return slackReplyFromChannel(
+      slackChannelId(payload.event.channel),
+      payload.event.thread_ts ?? payload.event.ts,
+      decision.reason ?? 'Slack event is not allowed.',
+      'failed',
+    )
+  }
+
+  private authorizeInteraction(
+    payload: SlackInteractionPayload,
+    action: SlackGovernanceAction,
+    approvalId: string,
+  ): ChannelReply | null {
+    if (!this.governance) return null
+    const channelId = payload.channel?.id ? slackChannelId(payload.channel.id) : 'slack:unknown'
+    const threadId = payload.message?.thread_ts ?? payload.message?.ts
+    const decision = this.governance.authorize({
+      workspaceId: payload.team?.id ?? payload.user.team_id,
+      actorId: `slack:${payload.user.id}`,
+      userId: payload.user.id,
+      channelId,
+      threadId,
+      action,
+    })
+    if (decision.allowed) return null
+    this.recordInteractionAudit(payload, action, 'rejected', { approvalId, reason: decision.reason })
+    return slackReplyFromChannel(channelId, threadId, decision.reason ?? 'Slack interaction is not allowed.', 'failed')
+  }
+
+  private policyProfileForSlash(
+    payload: SlackSlashCommandPayload,
+    action: SlackGovernanceAction,
+  ): string | undefined {
+    return this.governance?.authorize({
+      workspaceId: payload.team_id,
+      actorId: `slack:${payload.user_id}`,
+      userId: payload.user_id,
+      channelId: slackChannelId(payload.channel_id),
+      action,
+    }).policyProfileId
+  }
+
+  private policyProfileForEvent(
+    payload: SlackEventCallbackPayload,
+    action: SlackGovernanceAction,
+  ): string | undefined {
+    return this.governance?.authorize({
+      workspaceId: payload.team_id,
+      actorId: payload.event.user ? `slack:${payload.event.user}` : 'slack:unknown',
+      userId: payload.event.user,
+      channelId: slackChannelId(payload.event.channel),
+      threadId: payload.event.thread_ts ?? payload.event.ts,
+      action,
+    }).policyProfileId
+  }
+
+  private policyProfileForInteraction(
+    payload: SlackInteractionPayload,
+    action: SlackGovernanceAction,
+  ): string | undefined {
+    return this.governance?.authorize({
+      workspaceId: payload.team?.id ?? payload.user.team_id,
+      actorId: `slack:${payload.user.id}`,
+      userId: payload.user.id,
+      channelId: payload.channel?.id ? slackChannelId(payload.channel.id) : undefined,
+      threadId: payload.message?.thread_ts ?? payload.message?.ts,
+      action,
+    }).policyProfileId
+  }
+
+  private recordSlashAudit(
+    payload: SlackSlashCommandPayload,
+    action: SlackGovernanceAction,
+    status: 'accepted' | 'rejected',
+    extra: { approvalId?: string; policyProfileId?: string; reason?: string } = {},
+  ): void {
+    this.governance?.recordAuditEvent({
+      action,
+      status,
+      workspaceId: payload.team_id,
+      actorId: `slack:${payload.user_id}`,
+      channelId: slackChannelId(payload.channel_id),
+      approvalId: extra.approvalId,
+      policyProfileId: extra.policyProfileId,
+      reason: extra.reason,
+    })
+  }
+
+  private recordEventAudit(
+    payload: SlackEventCallbackPayload,
+    action: SlackGovernanceAction,
+    status: 'accepted' | 'rejected',
+    extra: { policyProfileId?: string; reason?: string } = {},
+  ): void {
+    this.governance?.recordAuditEvent({
+      action,
+      status,
+      workspaceId: payload.team_id,
+      actorId: payload.event.user ? `slack:${payload.event.user}` : 'slack:unknown',
+      channelId: slackChannelId(payload.event.channel),
+      threadId: payload.event.thread_ts ?? payload.event.ts,
+      policyProfileId: extra.policyProfileId,
+      reason: extra.reason,
+    })
+  }
+
+  private recordInteractionAudit(
+    payload: SlackInteractionPayload,
+    action: SlackGovernanceAction,
+    status: 'accepted' | 'rejected',
+    extra: { approvalId?: string; policyProfileId?: string; reason?: string } = {},
+  ): void {
+    this.governance?.recordAuditEvent({
+      action,
+      status,
+      workspaceId: payload.team?.id ?? payload.user.team_id,
+      actorId: `slack:${payload.user.id}`,
+      channelId: payload.channel?.id ? slackChannelId(payload.channel.id) : undefined,
+      threadId: payload.message?.thread_ts ?? payload.message?.ts,
+      approvalId: extra.approvalId,
+      policyProfileId: extra.policyProfileId,
+      reason: extra.reason,
+    })
   }
 }
 
@@ -254,6 +448,13 @@ function parseSlackCommand(text: string): { name: string; args: string } {
     return { name: normalized, args: rest.join(' ').trim() }
   }
   return { name: 'ask', args: trimmed }
+}
+
+function slackActionForCommand(command: string): SlackGovernanceAction {
+  if (command === 'runs') return 'runs'
+  if (command === 'approve') return 'approve'
+  if (command === 'deny') return 'deny'
+  return 'ask'
 }
 
 function stripBotMention(text: string): string {

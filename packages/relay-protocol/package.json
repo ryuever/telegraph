@@ -5,6 +5,9 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
+  "bin": {
+    "telegraph-self-host-relay": "./bin/telegraph-self-host-relay.mjs"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts"

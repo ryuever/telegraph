@@ -34,7 +34,7 @@ export interface RelayParticipant {
 export interface RelayBoundaryPolicy {
   deploymentMode: RelayDeploymentMode;
   localOnlySecrets: boolean;
-  storesDesktopExecutionCapability: false;
+  storesDesktopExecutionCapability: boolean;
   allowedPayloadKinds: RelayPayload['kind'][];
 }
 
@@ -133,7 +133,7 @@ export class InMemorySelfHostRelay implements SelfHostRelay {
 }
 
 export function assertRoutingOnlyRelayPolicy(policy: RelayBoundaryPolicy): void {
-  if (policy.storesDesktopExecutionCapability !== false) {
+  if (policy.storesDesktopExecutionCapability) {
     throw new Error('Relay must not store desktop execution capability.');
   }
   const forbidden = policy.allowedPayloadKinds.filter(kind => ![
@@ -166,3 +166,14 @@ function pruneUndefined<T extends Record<string, unknown>>(value: T): T {
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as T;
 }
+
+export {
+  RELAY_PACKAGE_SCHEMA_VERSION,
+  assertEnterpriseSelfHostRelayPackageManifest,
+  createEnterpriseSelfHostRelayPackageManifest,
+  type EnterpriseSelfHostRelayPackageManifest,
+  type RelayRequiredEnvironmentVariable,
+  type RelayRetentionPolicy,
+  type RelayRuntimeEntrypoint,
+  type RelayRuntimeEntrypointKind,
+} from './packaging.js';

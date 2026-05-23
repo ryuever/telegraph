@@ -71,6 +71,19 @@ export {
   type OrchestratorCoreRunnerOptions,
 } from '@/packages/agent/runtime/OrchestratorCoreRunner'
 export {
+  InMemoryOrchestratorCheckpointController,
+  ORCHESTRATOR_CHECKPOINT_METADATA_KEY,
+  createOrchestratorCheckpointMetadata,
+  readOrchestratorCheckpointMetadata,
+  type InMemoryOrchestratorCheckpointControllerOptions,
+  type OrchestratorCheckpointControl,
+  type OrchestratorCheckpointController,
+  type OrchestratorCheckpointMetadata,
+  type OrchestratorCheckpointResumeMetadata,
+  type OrchestratorPauseInterruptPayload,
+  type OrchestratorPauseRequest,
+} from '@/packages/agent/runtime/OrchestratorCheckpointController'
+export {
   VercelAiRuntime,
   TELEGRAPH_VERCEL_AI_PRODUCER_VERSION,
   createVercelAiRuntime,
@@ -218,11 +231,20 @@ export {
   isTelegraphSubagentsSelector,
 } from '@/packages/agent/extensions/harness/constants'
 export {
+  DesignBuildDurableSpike,
   InMemoryDurableStepLedger,
   FileDurableStepLedger,
   LedgerBackedDurableRunEngine,
+  RestateDurableRunEngine,
   createDurableStepContext,
   durableIdempotencyKey,
+  type DesignBuildDurableSpikeArtifact,
+  type DesignBuildDurableSpikeExecutors,
+  type DesignBuildDurableSpikeInput,
+  type DesignBuildDurableSpikeOutput,
+  type DesignBuildDurableSpikePatch,
+  type DesignBuildDurableSpikePlan,
+  type DesignBuildDurableStepId,
   type DurableIdempotencyInput,
   type DurableRunEngine,
   type DurableRunEngineOptions,
@@ -233,14 +255,19 @@ export {
   type DurableStepLedger,
   type DurableStepRecord,
   type DurableStepStatus,
+  type RestateDurableContext,
+  type RestateDurableRunEngineOptions,
 } from '@/packages/agent/durable'
 export {
   POLICY_PACK_SCHEMA_VERSION,
+  REMOTE_AGENT_OS_POLICY_PACK_ID,
   assertPolicyPackValid,
   createPolicyPack,
+  createRemoteAgentOsPolicyPack,
   resolvePolicyProfile,
   type PolicyPack,
   type PolicyProfile,
+  type RemotePolicyChannelKind,
 } from '@/packages/agent/policy'
 export {
   CAPABILITY_MARKETPLACE_SCHEMA_VERSION,

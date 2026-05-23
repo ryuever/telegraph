@@ -7,6 +7,7 @@ import {
   externalMessageFromSlackSlashCommand,
   type SlackCommandRouterService,
 } from '../SlackCommandRouter'
+import { SlackTeamGovernance } from '../SlackTeamGovernance'
 
 describe('SlackCommandRouter', () => {
   it('maps slash ask commands into ExternalMessage submissions', async () => {
@@ -17,19 +18,18 @@ describe('SlackCommandRouter', () => {
       status: 'queued',
       channelId: 'slack:C123',
     })
-    expect(service.submissions).toEqual([
-      expect.objectContaining({
-        actor: expect.objectContaining({
-          actorId: 'slack:U123',
-          workspaceId: 'T123',
-        }),
-        channel: {
-          kind: 'slack',
-          channelId: 'slack:C123',
-        },
-        text: 'build the admin screen',
-      }),
-    ])
+    expect(service.submissions).toHaveLength(1)
+    expect(service.submissions[0]).toMatchObject({
+      channel: {
+        kind: 'slack',
+        channelId: 'slack:C123',
+      },
+      text: 'build the admin screen',
+    })
+    expect(service.submissions[0]?.actor).toMatchObject({
+      actorId: 'slack:U123',
+      workspaceId: 'T123',
+    })
   })
 
   it('maps app mentions into threaded ExternalMessage submissions', async () => {
@@ -107,6 +107,115 @@ describe('SlackCommandRouter', () => {
       actorId: 'slack:U123',
       reason: 'Slack action telegraph_deny',
     }])
+  })
+
+  it('rejects revoked Slack workspace commands before creating a run', async () => {
+    const service = createService()
+    const governance = new SlackTeamGovernance({
+      workspaces: [{
+        workspaceId: 'T123',
+        status: 'revoked',
+        createdAt: 10,
+        updatedAt: 20,
+        revokedAt: 20,
+      }],
+    })
+    const reply = await new SlackCommandRouter(service, { governance })
+      .handleSlashCommand(slashPayload('ask build from revoked workspace'))
+
+    expect(reply).toMatchObject({
+      status: 'failed',
+      text: 'Slack workspace "T123" is revoked.',
+    })
+    expect(service.submissions).toEqual([])
+    expect(governance.listAuditEvents()).toEqual([
+      expect.objectContaining({
+        action: 'ask',
+        status: 'rejected',
+        workspaceId: 'T123',
+        actorId: 'slack:U123',
+        channelId: 'slack:C123',
+        reason: 'Slack workspace "T123" is revoked.',
+      }),
+    ])
+  })
+
+  it('records accepted Slack run and approval audit events with policy profile', async () => {
+    const service = createService()
+    const governance = new SlackTeamGovernance({
+      workspaces: [{
+        workspaceId: 'T123',
+        status: 'active',
+        policyProfileId: 'remote-agent-os/team-readonly',
+        createdAt: 10,
+        updatedAt: 10,
+      }],
+      users: [{
+        workspaceId: 'T123',
+        userId: 'U123',
+        actorId: 'slack:U123',
+        status: 'active',
+        role: 'operator',
+        policyProfileId: 'remote-agent-os/team-operator',
+        createdAt: 10,
+        updatedAt: 10,
+      }],
+    })
+    const router = new SlackCommandRouter(service, { governance })
+
+    await router.handleSlashCommand(slashPayload('ask audit this'))
+    await router.handleSlashCommand(slashPayload('approve approval-1 looks good'))
+
+    expect(governance.listAuditEvents()).toEqual([
+      expect.objectContaining({
+        action: 'ask',
+        status: 'accepted',
+        policyProfileId: 'remote-agent-os/team-operator',
+      }),
+      expect.objectContaining({
+        action: 'approve',
+        status: 'accepted',
+        approvalId: 'approval-1',
+        policyProfileId: 'remote-agent-os/team-operator',
+      }),
+    ])
+  })
+
+  it('requires operator or admin role for Slack approval decisions', async () => {
+    const service = createService()
+    const governance = new SlackTeamGovernance({
+      workspaces: [{
+        workspaceId: 'T123',
+        status: 'active',
+        createdAt: 10,
+        updatedAt: 10,
+      }],
+      users: [{
+        workspaceId: 'T123',
+        userId: 'U123',
+        actorId: 'slack:U123',
+        status: 'active',
+        role: 'member',
+        createdAt: 10,
+        updatedAt: 10,
+      }],
+    })
+    const reply = await new SlackCommandRouter(service, { governance })
+      .handleSlashCommand(slashPayload('deny approval-1 no'))
+
+    expect(reply).toMatchObject({
+      status: 'failed',
+      text: 'Slack user "U123" requires operator or admin role for approval decisions.',
+    })
+    expect(service.decisions).toEqual([])
+    expect(governance.listAuditEvents()).toEqual([
+      expect.objectContaining({
+        action: 'deny',
+        status: 'rejected',
+        approvalId: undefined,
+        reason: 'Slack user "U123" requires operator or admin role for approval decisions.',
+      }),
+    ])
   })
 
   it('converts Slack payloads into stable ExternalMessage envelopes', () => {

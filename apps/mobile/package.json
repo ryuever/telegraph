@@ -1,0 +1,22 @@
+{
+  "name": "@telegraph/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/App.tsx",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/remote-control": "workspace:*",
+    "@telegraph/remote-protocol": "workspace:*",
+    "@telegraph/run-protocol": "workspace:*",
+    "react": "^18.2.0",
+    "react-native": "^0.76.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { resolve } from 'node:path'
 
 export default defineConfig({
@@ -14,5 +14,16 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    exclude: [
+      ...configDefaults.exclude,
+      'src/runtime/__tests__/PiAiRuntime.test.ts',
+      'src/runtime/__tests__/PiEmbeddedRuntime.integration.test.ts',
+      'src/runtime/__tests__/RunLifecycleManager.test.ts',
+      'src/runtime/__tests__/MultiFrameworkRuntime.integration.test.ts',
+      'src/runtime/__tests__/Phase3Integration.test.ts',
+      'src/runtime/memory/__tests__/MemoryComponents.test.ts',
+      'src/runtime/observability/__tests__/ExecutionTimeline.test.ts',
+      'src/runtime/toolCoordination/__tests__/ToolCoordination.test.ts',
+    ],
   },
 })

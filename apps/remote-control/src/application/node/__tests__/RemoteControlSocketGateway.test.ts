@@ -284,6 +284,155 @@ describe('RemoteControlSocketGateway', () => {
     })
   })
 
+  it('dispatches Slack governance binding management for adapter processes', async () => {
+    const service = createFakeService()
+    const gateway = new RemoteControlSocketGateway(service, '/tmp/unused.sock')
+
+    await expect(gateway.handleRequest({
+      id: 'slack-workspace-bind',
+      method: 'createSlackWorkspaceBinding',
+      params: {
+        workspaceId: 'T123',
+        teamDomain: 'example',
+        policyProfileId: 'remote-agent-os/team-readonly',
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        workspaceId: 'T123',
+        teamDomain: 'example',
+        status: 'active',
+      },
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-user-bind',
+      method: 'createSlackUserBinding',
+      params: {
+        workspaceId: 'T123',
+        userId: 'U123',
+        role: 'operator',
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        workspaceId: 'T123',
+        userId: 'U123',
+        actorId: 'slack:U123',
+        status: 'active',
+        role: 'operator',
+      },
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-device-bind',
+      method: 'createSlackDeviceBinding',
+      params: {
+        workspaceId: 'T123',
+        userId: 'U123',
+        deviceId: 'iphone-1',
+        label: 'iPhone',
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        bindingId: 'slack-device-T123-U123-iphone-1',
+        workspaceId: 'T123',
+        userId: 'U123',
+        deviceId: 'iphone-1',
+        actorId: 'slack:U123',
+        status: 'active',
+      },
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-app-install',
+      method: 'createSlackAppInstallation',
+      params: {
+        workspaceId: 'T123',
+        appId: 'A123',
+        botTokenRef: 'secret://slack/T123/bot',
+        scopes: ['commands'],
+        installedByUserId: 'U123',
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        installationId: 'slack-install-T123',
+        workspaceId: 'T123',
+        appId: 'A123',
+        botTokenRef: 'secret://slack/T123/bot',
+        scopes: ['commands'],
+        status: 'active',
+        installedByUserId: 'U123',
+      },
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-oauth-callback',
+      method: 'handleSlackOAuthCallback',
+      params: {
+        code: 'oauth-code',
+        redirectUri: 'https://telegraph.local/slack/callback',
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        installation: {
+          workspaceId: 'T123',
+          status: 'active',
+        },
+      },
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-audit',
+      method: 'listSlackTeamAuditEvents',
+    })).resolves.toMatchObject({
+      ok: true,
+      result: [],
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-app-revoke',
+      method: 'revokeSlackAppInstallation',
+      params: {
+        installationId: 'slack-install-T123',
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        installationId: 'slack-install-T123',
+        status: 'revoked',
+      },
+    })
+
+    await expect(gateway.handleRequest({
+      id: 'slack-lifecycle',
+      method: 'handleSlackLifecycleEvent',
+      params: {
+        event: {
+          kind: 'user_left_workspace',
+          workspaceId: 'T123',
+          userIds: ['U123'],
+        },
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      result: {
+        kind: 'user_left_workspace',
+        workspaceId: 'T123',
+        revokedUsers: [{
+          workspaceId: 'T123',
+          userId: 'U123',
+          status: 'revoked',
+        }],
+        revokedDevices: [],
+      },
+    })
+  })
+
+
 
 
 
@@ -622,6 +771,131 @@ function createFakeService(): RemoteControlGatewayService & { submissions: Exter
       updatedAt: 10,
     }),
     revokeDeviceBinding: () => null,
+    listSlackWorkspaceBindings: () => [],
+    createSlackWorkspaceBinding: input => ({
+      workspaceId: input.workspaceId,
+      teamDomain: input.teamDomain,
+      status: 'active' as const,
+      policyProfileId: input.policyProfileId,
+      createdAt: 10,
+      updatedAt: 10,
+    }),
+    revokeSlackWorkspaceBinding: workspaceId => ({
+      workspaceId,
+      status: 'revoked' as const,
+      createdAt: 10,
+      updatedAt: 20,
+      revokedAt: 20,
+    }),
+    listSlackAppInstallations: () => [],
+    createSlackAppInstallation: input => ({
+      installationId: input.installationId ?? `slack-install-${input.workspaceId}`,
+      workspaceId: input.workspaceId,
+      teamDomain: input.teamDomain,
+      appId: input.appId,
+      botUserId: input.botUserId,
+      botTokenRef: input.botTokenRef,
+      userTokenRef: input.userTokenRef,
+      scopes: input.scopes ?? [],
+      status: 'active' as const,
+      installedByUserId: input.installedByUserId,
+      policyProfileId: input.policyProfileId,
+      createdAt: 10,
+      updatedAt: 10,
+    }),
+    revokeSlackAppInstallation: installationId => ({
+      installationId,
+      workspaceId: 'T123',
+      scopes: ['commands'],
+      status: 'revoked' as const,
+      createdAt: 10,
+      updatedAt: 20,
+      revokedAt: 20,
+    }),
+    listSlackUserBindings: () => [],
+    createSlackUserBinding: input => ({
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      actorId: input.actorId ?? `slack:${input.userId}`,
+      status: 'active' as const,
+      role: input.role ?? 'member' as const,
+      policyProfileId: input.policyProfileId,
+      createdAt: 10,
+      updatedAt: 10,
+    }),
+    revokeSlackUserBinding: (workspaceId, userId) => ({
+      workspaceId,
+      userId,
+      actorId: `slack:${userId}`,
+      status: 'revoked' as const,
+      role: 'member' as const,
+      createdAt: 10,
+      updatedAt: 20,
+      revokedAt: 20,
+    }),
+    listSlackDeviceBindings: () => [],
+    createSlackDeviceBinding: input => ({
+      bindingId: input.bindingId ?? `slack-device-${input.workspaceId}-${input.userId}-${input.deviceId}`,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      deviceId: input.deviceId,
+      actorId: input.actorId ?? `slack:${input.userId}`,
+      label: input.label,
+      status: 'active' as const,
+      createdAt: 10,
+      updatedAt: 10,
+      expiresAt: input.expiresAt,
+    }),
+    revokeSlackDeviceBinding: bindingId => ({
+      bindingId,
+      workspaceId: 'T123',
+      userId: 'U123',
+      deviceId: 'iphone-1',
+      actorId: 'slack:U123',
+      status: 'revoked' as const,
+      createdAt: 10,
+      updatedAt: 20,
+      revokedAt: 20,
+    }),
+    handleSlackOAuthCallback: input => ({
+      installation: {
+        installationId: 'slack-install-T123',
+        workspaceId: 'T123',
+        scopes: ['commands'],
+        status: 'active' as const,
+        createdAt: 10,
+        updatedAt: 10,
+      },
+      tokenRefs: {
+        botTokenRef: input.code ? 'secret://slack/T123/bot' : undefined,
+      },
+    }),
+    listSlackTeamAuditEvents: () => [],
+    handleSlackLifecycleEvent: event => ({
+      kind: event.kind,
+      workspaceId: event.workspaceId,
+      revokedWorkspace: null,
+      revokedUsers: (event.userIds ?? []).map(userId => ({
+        workspaceId: event.workspaceId,
+        userId,
+        actorId: `slack:${userId}`,
+        status: 'revoked' as const,
+        role: 'member' as const,
+        createdAt: 10,
+        updatedAt: 20,
+        revokedAt: 20,
+      })),
+      revokedDevices: [],
+      auditEvent: {
+        auditId: 'slack-audit-1',
+        ts: 20,
+        action: event.kind,
+        status: 'accepted' as const,
+        workspaceId: event.workspaceId,
+        actorId: event.actorId ?? 'slack:lifecycle',
+        reason: event.reason,
+      },
+    }),
   }
 }
 

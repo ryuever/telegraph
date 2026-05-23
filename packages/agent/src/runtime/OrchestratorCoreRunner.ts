@@ -5,10 +5,17 @@ import {
   type TelegraphOrchestratorSignal,
 } from './TelegraphOrchestratorRuntime'
 import {
+  readOrchestratorCheckpointMetadata,
+  type OrchestratorCheckpointControl,
+  type OrchestratorCheckpointController,
+} from './OrchestratorCheckpointController'
+import {
   Annotation,
   type Command,
+  Command as GraphCommand,
   type CompiledStateGraph,
   END,
+  interrupt,
   isGraphInterrupt,
   START,
   StateGraph,
@@ -23,6 +30,7 @@ export interface OrchestratorCoreRunnerOptions<S = Record<string, unknown>, U = 
   graph: CompiledStateGraph<S, U> | (() => CompiledStateGraph<S, U>)
   input?: (input: RuntimeInput) => Partial<S> | Command
   invokeOptions?: (input: RuntimeInput) => InvokeOptions | undefined
+  checkpointController?: OrchestratorCheckpointController
   now?: () => number
 }
 
@@ -31,28 +39,31 @@ implements TelegraphOrchestratorRunner {
   private readonly graph: CompiledStateGraph<S, U> | (() => CompiledStateGraph<S, U>)
   private readonly inputMapper?: (input: RuntimeInput) => Partial<S> | Command
   private readonly optionsMapper?: (input: RuntimeInput) => InvokeOptions | undefined
+  private readonly checkpointController?: OrchestratorCheckpointController
   private readonly now: () => number
 
   constructor(options: OrchestratorCoreRunnerOptions<S, U>) {
     this.graph = options.graph
     this.inputMapper = options.input
     this.optionsMapper = options.invokeOptions
+    this.checkpointController = options.checkpointController
     this.now = options.now ?? Date.now
   }
 
   async *run(input: RuntimeInput): AsyncIterable<TelegraphOrchestratorSignal> {
     const graph = typeof this.graph === 'function' ? this.graph() : this.graph
     const queue = new SignalQueue()
-    const restore = instrumentGraph(graph, queue, this.now)
-    const invokeOptions = {
-      ...this.optionsMapper?.(input),
-      signal: input.signal,
-    }
+    const checkpoint = this.checkpointControl(input)
+    const restore = instrumentGraph(graph, queue, this.now, input, this.checkpointController)
+    const invokeOptions = mergeInvokeOptions(this.optionsMapper?.(input), checkpoint, input.signal)
+    const graphInput = checkpoint?.resume
+      ? new GraphCommand({ resume: checkpoint.resume.value })
+      : (this.inputMapper?.(input) ?? defaultGraphInput(input)) as Partial<S> | Command
 
     void (async () => {
       try {
         const output = await graph.invoke(
-          (this.inputMapper?.(input) ?? defaultGraphInput(input)) as Partial<S> | Command,
+          graphInput,
           invokeOptions,
         )
         await emitLatestCheckpoint(graph, invokeOptions, queue, this.now)
@@ -86,6 +97,27 @@ implements TelegraphOrchestratorRunner {
     })()
 
     yield* queue
+  }
+
+  private checkpointControl(input: RuntimeInput): OrchestratorCheckpointControl | undefined {
+    return this.checkpointController?.checkpoint(input) ?? readOrchestratorCheckpointMetadata(input.metadata)
+  }
+}
+
+function mergeInvokeOptions(
+  base: InvokeOptions | undefined,
+  checkpoint: OrchestratorCheckpointControl | undefined,
+  signal: AbortSignal | undefined,
+): InvokeOptions {
+  return {
+    ...base,
+    signal,
+    configurable: {
+      ...base?.configurable,
+      ...(checkpoint?.threadId ? { thread_id: checkpoint.threadId } : {}),
+      ...(checkpoint?.checkpointNamespace ? { checkpoint_ns: checkpoint.checkpointNamespace } : {}),
+      ...(checkpoint?.checkpointId ? { checkpoint_id: checkpoint.checkpointId } : {}),
+    },
   }
 }
 
@@ -152,6 +184,8 @@ function instrumentGraph<S, U>(
   graph: CompiledStateGraph<S, U>,
   queue: SignalQueue,
   now: () => number,
+  input: RuntimeInput,
+  checkpointController: OrchestratorCheckpointController | undefined,
 ): () => void {
   const originals: Array<[string, NodeAction<S, U> | undefined]> = []
 
@@ -169,6 +203,11 @@ function instrumentGraph<S, U>(
         raw: { taskId: config?.taskId, triggers: node.triggers },
         ts: now(),
       })
+
+      const pause = checkpointController?.consumePause?.(input, nodeId)
+      if (pause) {
+        interrupt(pause)
+      }
 
       const output = await original(state, config)
       const targets = inferTargets(nodeId, node, output, graph.nodes)

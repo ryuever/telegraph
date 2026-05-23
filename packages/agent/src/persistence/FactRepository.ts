@@ -310,18 +310,18 @@ export class FactRepository {
     expiredFacts: number
   } {
     const facts = Array.from(this.facts.values())
-    const now = Date.now()
-
     const expiredCount = facts.filter((f) => this.isExpired(f)).length
-    const activeCount = facts.length - expiredCount
-    const avgConfidence = activeCount > 0 ? facts.reduce((sum, f) => sum + f.confidence, 0) / activeCount : 0
+    const activeFacts = facts.filter((f) => !this.isExpired(f))
+    const avgConfidence = activeFacts.length > 0
+      ? activeFacts.reduce((sum, f) => sum + f.confidence, 0) / activeFacts.length
+      : 0
 
     return {
       totalFacts: facts.length,
       userCount: this.userFacts.size,
       sessionCount: this.sessionFacts.size,
       avgConfidence,
-      highConfidenceFacts: facts.filter((f) => f.confidence >= 0.8).length,
+      highConfidenceFacts: activeFacts.filter((f) => f.confidence >= 0.7).length,
       expiredFacts: expiredCount,
     }
   }
@@ -356,8 +356,8 @@ export class FactRepository {
       return 1
     }
 
-    const words1 = new Set(text1.toLowerCase().split(/\s+/))
-    const words2 = new Set(text2.toLowerCase().split(/\s+/))
+    const words1 = new Set(tokenizeFactText(text1))
+    const words2 = new Set(tokenizeFactText(text2))
 
     const intersection = new Set([...words1].filter((w) => words2.has(w)))
     const union = new Set([...words1, ...words2])
@@ -366,8 +366,9 @@ export class FactRepository {
       return 0
     }
 
-    // Jaccard similarity
-    return intersection.size / union.size
+    const jaccard = intersection.size / union.size
+    const overlap = intersection.size / Math.min(words1.size, words2.size)
+    return Math.max(jaccard, overlap)
   }
 
   /**
@@ -389,4 +390,13 @@ export class FactRepository {
     this.sessionFacts.clear()
     this.validationHistory.clear()
   }
+}
+
+function tokenizeFactText(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.length > 3 && token.endsWith('s') ? token.slice(0, -1) : token)
 }

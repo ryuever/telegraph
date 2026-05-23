@@ -492,6 +492,335 @@ describe('telegraph CLI', () => {
     await remote.close()
   })
 
+  it('manages Slack workspace and user bindings through remote-control socket', async () => {
+    const remote = await startFakeBroker((request) => ({
+      id: request.id,
+      ok: true,
+      result: request.method === 'createSlackWorkspaceBinding'
+        ? {
+            workspaceId: request.params.workspaceId,
+            teamDomain: request.params.teamDomain,
+            status: 'active',
+            policyProfileId: request.params.policyProfileId,
+          }
+        : {
+            workspaceId: request.params.workspaceId,
+            userId: request.params.userId,
+            actorId: request.params.actorId ?? `slack:${request.params.userId}`,
+            status: 'active',
+            role: request.params.role,
+            policyProfileId: request.params.policyProfileId,
+          },
+    }))
+
+    const workspaceResult = await runCli([
+      'remote',
+      'slack',
+      'workspace',
+      'bind',
+      '--workspace',
+      'T123',
+      '--domain',
+      'example',
+      '--policy',
+      'remote-agent-os/team-readonly',
+    ], undefined, process.cwd(), remote.socketPath)
+    const userResult = await runCli([
+      'remote',
+      'slack',
+      'user',
+      'bind',
+      '--workspace',
+      'T123',
+      '--user',
+      'U123',
+      '--role',
+      'operator',
+      '--policy',
+      'remote-agent-os/team-operator',
+    ], undefined, process.cwd(), remote.socketPath)
+
+    expect(workspaceResult.code).toBe(0)
+    expect(JSON.parse(workspaceResult.stdout)).toMatchObject({
+      workspaceId: 'T123',
+      teamDomain: 'example',
+      status: 'active',
+      policyProfileId: 'remote-agent-os/team-readonly',
+    })
+    expect(userResult.code).toBe(0)
+    expect(JSON.parse(userResult.stdout)).toMatchObject({
+      workspaceId: 'T123',
+      userId: 'U123',
+      actorId: 'slack:U123',
+      status: 'active',
+      role: 'operator',
+      policyProfileId: 'remote-agent-os/team-operator',
+    })
+    expect(remote.requests.map(request => request.method)).toEqual([
+      'createSlackWorkspaceBinding',
+      'createSlackUserBinding',
+    ])
+    expect(remote.requests[1]).toMatchObject({
+      params: {
+        workspaceId: 'T123',
+        userId: 'U123',
+        role: 'operator',
+      },
+    })
+
+    await remote.close()
+  })
+
+  it('manages Slack device bindings through remote-control socket', async () => {
+    const remote = await startFakeBroker((request) => ({
+      id: request.id,
+      ok: true,
+      result: request.method === 'createSlackDeviceBinding'
+        ? {
+            bindingId: `slack-device-${request.params.workspaceId}-${request.params.userId}-${request.params.deviceId}`,
+            workspaceId: request.params.workspaceId,
+            userId: request.params.userId,
+            deviceId: request.params.deviceId,
+            actorId: request.params.actorId ?? `slack:${request.params.userId}`,
+            label: request.params.label,
+            status: 'active',
+          }
+        : { bindingId: request.params.bindingId, status: 'revoked' },
+    }))
+
+    const bindResult = await runCli([
+      'remote',
+      'slack',
+      'device',
+      'bind',
+      '--workspace',
+      'T123',
+      '--user',
+      'U123',
+      '--device',
+      'iphone-1',
+      '--label',
+      'iPhone',
+    ], undefined, process.cwd(), remote.socketPath)
+    const revokeResult = await runCli([
+      'remote',
+      'slack',
+      'device',
+      'revoke',
+      'slack-device-T123-U123-iphone-1',
+    ], undefined, process.cwd(), remote.socketPath)
+
+    expect(bindResult.code).toBe(0)
+    expect(JSON.parse(bindResult.stdout)).toMatchObject({
+      bindingId: 'slack-device-T123-U123-iphone-1',
+      status: 'active',
+      label: 'iPhone',
+    })
+    expect(revokeResult.code).toBe(0)
+    expect(JSON.parse(revokeResult.stdout)).toMatchObject({
+      bindingId: 'slack-device-T123-U123-iphone-1',
+      status: 'revoked',
+    })
+    expect(remote.requests.map(request => request.method)).toEqual([
+      'createSlackDeviceBinding',
+      'revokeSlackDeviceBinding',
+    ])
+
+    await remote.close()
+  })
+
+  it('sends Slack lifecycle revoke events through remote-control socket', async () => {
+    const remote = await startFakeBroker((request) => ({
+      id: request.id,
+      ok: true,
+      result: {
+        kind: request.params.event.kind,
+        workspaceId: request.params.event.workspaceId,
+        revokedWorkspace: null,
+        revokedUsers: request.params.event.userIds.map(userId => ({
+          workspaceId: request.params.event.workspaceId,
+          userId,
+          status: 'revoked',
+        })),
+        auditEvent: {
+          action: request.params.event.kind,
+          status: 'accepted',
+        },
+      },
+    }))
+
+    const result = await runCli([
+      'remote',
+      'slack',
+      'lifecycle',
+      'tokens-revoked',
+      '--workspace',
+      'T123',
+      '--users',
+      'U123,U456',
+      '--actor',
+      'slack:admin',
+      '--reason',
+      'rotation',
+    ], undefined, process.cwd(), remote.socketPath)
+
+    expect(result.code).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      kind: 'tokens_revoked',
+      workspaceId: 'T123',
+      revokedUsers: [
+        { workspaceId: 'T123', userId: 'U123', status: 'revoked' },
+        { workspaceId: 'T123', userId: 'U456', status: 'revoked' },
+      ],
+    })
+    expect(remote.requests).toEqual([
+      expect.objectContaining({
+        method: 'handleSlackLifecycleEvent',
+        params: {
+          event: {
+            kind: 'tokens_revoked',
+            workspaceId: 'T123',
+            userIds: ['U123', 'U456'],
+            actorId: 'slack:admin',
+            reason: 'rotation',
+          },
+        },
+      }),
+    ])
+
+    await remote.close()
+  })
+
+  it('records Slack app install metadata through remote-control socket', async () => {
+    const remote = await startFakeBroker((request) => ({
+      id: request.id,
+      ok: true,
+      result: {
+        installationId: request.params.installationId ?? `slack-install-${request.params.workspaceId}`,
+        workspaceId: request.params.workspaceId,
+        teamDomain: request.params.teamDomain,
+        appId: request.params.appId,
+        botUserId: request.params.botUserId,
+        botTokenRef: request.params.botTokenRef,
+        scopes: request.params.scopes,
+        status: 'active',
+        installedByUserId: request.params.installedByUserId,
+        policyProfileId: request.params.policyProfileId,
+      },
+    }))
+
+    const result = await runCli([
+      'remote',
+      'slack',
+      'app',
+      'install',
+      '--workspace',
+      'T123',
+      '--domain',
+      'example',
+      '--app',
+      'A123',
+      '--bot-user',
+      'Ubot',
+      '--bot-token-ref',
+      'secret://slack/T123/bot',
+      '--scope',
+      'commands,chat:write',
+      '--installer',
+      'Uadmin',
+      '--policy',
+      'remote-agent-os/team-operator',
+    ], undefined, process.cwd(), remote.socketPath)
+
+    expect(result.code).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      installationId: 'slack-install-T123',
+      workspaceId: 'T123',
+      teamDomain: 'example',
+      appId: 'A123',
+      botUserId: 'Ubot',
+      botTokenRef: 'secret://slack/T123/bot',
+      scopes: ['commands', 'chat:write'],
+      status: 'active',
+      installedByUserId: 'Uadmin',
+      policyProfileId: 'remote-agent-os/team-operator',
+    })
+    expect(remote.requests).toEqual([
+      expect.objectContaining({
+        method: 'createSlackAppInstallation',
+        params: {
+          workspaceId: 'T123',
+          teamDomain: 'example',
+          appId: 'A123',
+          botUserId: 'Ubot',
+          botTokenRef: 'secret://slack/T123/bot',
+          scopes: ['commands', 'chat:write'],
+          installedByUserId: 'Uadmin',
+          policyProfileId: 'remote-agent-os/team-operator',
+        },
+      }),
+    ])
+
+    await remote.close()
+  })
+
+  it('submits Slack OAuth callback codes through remote-control socket', async () => {
+    const remote = await startFakeBroker((request) => ({
+      id: request.id,
+      ok: true,
+      result: {
+        installation: {
+          installationId: 'slack-install-T123',
+          workspaceId: 'T123',
+          scopes: ['commands'],
+          status: 'active',
+          policyProfileId: request.params.policyProfileId,
+        },
+        tokenRefs: {
+          botTokenRef: 'secret://slack/T123/bot',
+        },
+      },
+    }))
+
+    const result = await runCli([
+      'remote',
+      'slack',
+      'oauth',
+      'callback',
+      '--code',
+      'oauth-code',
+      '--redirect-uri',
+      'https://telegraph.local/slack/callback',
+      '--policy',
+      'remote-agent-os/team-operator',
+    ], undefined, process.cwd(), remote.socketPath)
+
+    expect(result.code).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      installation: {
+        installationId: 'slack-install-T123',
+        workspaceId: 'T123',
+        status: 'active',
+        policyProfileId: 'remote-agent-os/team-operator',
+      },
+      tokenRefs: {
+        botTokenRef: 'secret://slack/T123/bot',
+      },
+    })
+    expect(remote.requests).toEqual([
+      expect.objectContaining({
+        method: 'handleSlackOAuthCallback',
+        params: {
+          code: 'oauth-code',
+          redirectUri: 'https://telegraph.local/slack/callback',
+          policyProfileId: 'remote-agent-os/team-operator',
+        },
+      }),
+    ])
+
+    await remote.close()
+  })
+
   it('lists runs through remote-control socket', async () => {
     const remote = await startFakeBroker((request) => ({
       id: request.id,

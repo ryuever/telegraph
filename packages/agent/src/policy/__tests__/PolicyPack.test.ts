@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   POLICY_PACK_SCHEMA_VERSION,
+  REMOTE_AGENT_OS_POLICY_PACK_ID,
   assertPolicyPackValid,
   createPolicyPack,
+  createRemoteAgentOsPolicyPack,
   resolvePolicyProfile,
 } from '@/packages/agent/policy'
 
@@ -32,28 +34,86 @@ describe('PolicyPack', () => {
   })
 
   it('rejects unsupported versions and duplicate profile ids', () => {
-    expect(() => assertPolicyPackValid({
-      schemaVersion: 999 as typeof POLICY_PACK_SCHEMA_VERSION,
-      packId: 'bad',
-      title: 'Bad',
-      profiles: [],
-    })).toThrow('Unsupported policy pack schema version')
+    expect(() => {
+      assertPolicyPackValid({
+        schemaVersion: 999,
+        packId: 'bad',
+        title: 'Bad',
+        profiles: [],
+      })
+    }).toThrow('Unsupported policy pack schema version')
 
-    expect(() => assertPolicyPackValid(createPolicyPack({
-      packId: 'dupe',
-      title: 'Dupe',
-      profiles: [
-        {
-          profileId: 'operator',
-          title: 'Operator',
-          taskCapabilityProfile: { kind: 'default' },
+    expect(() => {
+      assertPolicyPackValid(createPolicyPack({
+        packId: 'dupe',
+        title: 'Dupe',
+        profiles: [
+          {
+            profileId: 'operator',
+            title: 'Operator',
+            taskCapabilityProfile: { kind: 'default' },
+          },
+          {
+            profileId: 'operator',
+            title: 'Operator duplicate',
+            taskCapabilityProfile: { kind: 'default' },
+          },
+        ],
+      }))
+    }).toThrow('Duplicate policy profile id: operator')
+  })
+
+  it('provides Remote Agent OS personal and team baseline profiles', () => {
+    const pack = createRemoteAgentOsPolicyPack()
+
+    assertPolicyPackValid(pack)
+    expect(pack.packId).toBe(REMOTE_AGENT_OS_POLICY_PACK_ID)
+    expect(pack.profiles.map(profile => profile.profileId)).toEqual([
+      'personal',
+      'team-readonly',
+      'team-operator',
+      'admin-approved',
+    ])
+
+    expect(resolvePolicyProfile([pack], 'remote-agent-os/team-readonly')).toMatchObject({
+      taskCapabilityProfile: {
+        kind: 'readonly-workspace',
+        scopes: ['workspace:read', 'repo:read'],
+      },
+      remote: {
+        requireDeviceBinding: true,
+        allowedChannelKinds: ['slack', 'webhook', 'mobile'],
+      },
+    })
+
+    expect(resolvePolicyProfile([pack], 'team-operator')).toMatchObject({
+      taskCapabilityProfile: {
+        kind: 'computer-act',
+        actions: ['click', 'type', 'hotkey', 'scroll', 'wait'],
+      },
+      computerUse: {
+        actionPolicy: {
+          requireApproval: true,
+          maxActionsPerRun: 10,
+          captureBeforeAfter: true,
         },
-        {
-          profileId: 'operator',
-          title: 'Operator duplicate',
-          taskCapabilityProfile: { kind: 'default' },
+      },
+    })
+
+    expect(resolvePolicyProfile([pack], 'admin-approved')).toMatchObject({
+      taskCapabilityProfile: {
+        kind: 'coding-edit',
+        patchPolicy: 'apply-after-confirm',
+      },
+      workspacePolicy: {
+        shell: {
+          maxRisk: 'high',
         },
-      ],
-    }))).toThrow('Duplicate policy profile id: operator')
+      },
+      remote: {
+        requireDeviceBinding: true,
+        allowedChannelKinds: ['slack', 'mobile', 'cli', 'mcp'],
+      },
+    })
   })
 })

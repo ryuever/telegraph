@@ -119,22 +119,21 @@ export function evaluateDomainNetworkPolicy(
 
 export function validateExecutionTargetDefinition(definition: ExecutionTargetDefinition): string[] {
   const errors: string[] = [];
-  if (!definition.target?.targetId) errors.push('target.targetId is required');
-  if (!definition.target?.kind) errors.push('target.kind is required');
+  if (!definition.target.targetId) errors.push('target.targetId is required');
   if (!['user-desktop', 'ephemeral-isolated', 'managed-vm'].includes(definition.trustLevel)) {
-    errors.push(`invalid trustLevel: ${String(definition.trustLevel)}`);
+    errors.push(`invalid trustLevel: ${definition.trustLevel}`);
   }
   if (!['offline', 'allowlist', 'restricted', 'open'].includes(definition.networkPolicy.mode)) {
-    errors.push(`invalid network policy mode: ${String(definition.networkPolicy.mode)}`);
+    errors.push(`invalid network policy mode: ${definition.networkPolicy.mode}`);
   }
   if (!['none', 'bookmarks-only', 'selected-cookies', 'managed-profile'].includes(definition.profileSync.mode)) {
-    errors.push(`invalid profile sync mode: ${String(definition.profileSync.mode)}`);
+    errors.push(`invalid profile sync mode: ${definition.profileSync.mode}`);
   }
   if (
     definition.profileSync.homeMount &&
     !['none', 'selected-paths-readonly', 'selected-paths-readwrite'].includes(definition.profileSync.homeMount)
   ) {
-    errors.push(`invalid home mount policy: ${String(definition.profileSync.homeMount)}`);
+    errors.push(`invalid home mount policy: ${definition.profileSync.homeMount}`);
   }
   return errors;
 }

@@ -140,7 +140,7 @@ export const RUNTIME_CAPABILITY_DESCRIPTORS: RuntimeCapabilityDescriptor[] = [
       capability('rawTrace', 'supported', 'Emits node, edge, checkpoint, interrupt, and raw graph data.'),
       capability('toolApproval', 'unsupported'),
       capability('childRun', 'partial', 'Graph nodes are observable; child agent runs are not first-class yet.'),
-      capability('resume', 'partial', 'Interrupt/checkpoint signals exist; UI resume is not wired.'),
+      capability('resume', 'supported', 'Checkpointed interrupt resume and controller-driven pause are supported for checkpointer-backed graphs.'),
       capability('mcp', 'unsupported'),
       capability('skills', 'unsupported'),
       capability('filesystem', 'unsupported'),
@@ -150,7 +150,7 @@ export const RUNTIME_CAPABILITY_DESCRIPTORS: RuntimeCapabilityDescriptor[] = [
     limitations: [
       'Internal graph diagnostics runtime; not exposed as a production chat backend.',
       'No graph builder or runtime selection UI beyond backend selection.',
-      'Interrupt resume is not connected to renderer actions.',
+      'Generic chat/design runtimes still reject pause unless a checkpoint controller-backed graph runtime is mounted.',
     ],
   },
 ]

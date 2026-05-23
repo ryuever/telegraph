@@ -48,9 +48,9 @@ describe('channel adapter SDK', () => {
   it('types adapters against the remote control host surface only', async () => {
     const calls: string[] = []
     const host: ChannelAdapterHost = {
-      submitExternalMessage: async () => {
+      submitExternalMessage: () => {
         calls.push('submit')
-        return {
+        return Promise.resolve({
           intent: {
             intentId: 'intent-1',
             source: { actorId: 'telegram:ada', kind: 'telegram' },
@@ -68,18 +68,18 @@ describe('channel adapter SDK', () => {
             updatedAt: 10,
             schemaVersion: 1,
           },
-        }
+        })
       },
-      listChannelReplies: async () => [],
-      ackChannelReply: async () => null,
-      listRunProjections: async () => [],
-      getRunProjection: async () => null,
-      listRunProjectionChanges: async () => [],
-      listApprovals: async () => [],
-      listApprovalChanges: async () => [],
-      decideApproval: async () => null,
-      listDeviceBindings: async () => [],
-      createDeviceBinding: async input => ({
+      listChannelReplies: () => Promise.resolve([]),
+      ackChannelReply: () => Promise.resolve(null),
+      listRunProjections: () => Promise.resolve([]),
+      getRunProjection: () => Promise.resolve(null),
+      listRunProjectionChanges: () => Promise.resolve([]),
+      listApprovals: () => Promise.resolve([]),
+      listApprovalChanges: () => Promise.resolve([]),
+      decideApproval: () => Promise.resolve(null),
+      listDeviceBindings: () => Promise.resolve([]),
+      createDeviceBinding: input => Promise.resolve({
         bindingId: input.bindingId ?? 'binding-1',
         deviceId: input.deviceId,
         actor: input.actor,
@@ -87,7 +87,7 @@ describe('channel adapter SDK', () => {
         createdAt: 10,
         updatedAt: 10,
       }),
-      revokeDeviceBinding: async () => null,
+      revokeDeviceBinding: () => Promise.resolve(null),
     }
     const adapter: ChannelAdapterRuntime = {
       manifest: createChannelAdapterManifest({

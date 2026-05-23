@@ -7,7 +7,7 @@ description: >
   技术象限、分阶段实施路径、验收标准和风险控制。
 category: roadmap
 created: 2026-05-22
-updated: 2026-05-22
+updated: 2026-05-23
 tags:
   - remote-control
   - roadmap
@@ -321,7 +321,7 @@ No-Go：
 
 目标：开放 click/type/hotkey/scroll，但必须有 policy、approval、lock 和审计。
 
-状态：2026-05-22 已落地 `ComputerUseBroker.act()` 安全地基：动作默认要求 `approvalId`，未授权直接返回 `permission_denied`；真实动作只会通过注入的 `ComputerActionProvider` 执行，默认 provider 不启用真实桌面操作；broker 已具备单 action lock，重叠 action 会返回 `locked`。2026-05-23 补齐了 broker-level action budget、global stop gate、before/after screenshot observation refs、provider/observation 异常归一的 `ActionResult`、按 target/app/window/browser tab 拉高 approval 要求的策略基线，以及 broker-level 坐标/过期 observation ref 校验：normalized 坐标必须在 0..1，pixel 坐标必须声明 viewport bounds 且落在边界内，action 引用的 observation 超过 `maxObservationAgeMs` 会返回 `stale_ref`。这仍只是受控 action 的协议与安全门骨架，尚未接入 agent runtime tool、approval broker 与真实 click/type provider。
+状态：2026-05-22 已落地 `ComputerUseBroker.act()` 安全地基：动作默认要求 `approvalId`，未授权直接返回 `permission_denied`；真实动作只会通过注入的 `ComputerActionProvider` 执行，默认 provider 不启用真实桌面操作；broker 已具备单 action lock，重叠 action 会返回 `locked`。2026-05-23 补齐了 broker-level action budget、global stop gate、before/after screenshot observation refs、provider/observation 异常归一的 `ActionResult`、按 target/app/window/browser tab 拉高 approval 要求的策略基线，以及 broker-level 坐标/过期 observation ref 校验：normalized 坐标必须在 0..1，pixel 坐标必须声明 viewport bounds 且落在边界内，action 引用的 observation 超过 `maxObservationAgeMs` 会返回 `stale_ref`。`MacOsAccessibilityActionProvider` 已提供显式注入的真实桌面 action provider baseline，通过 `osascript` 执行 click/type/hotkey/scroll/wait；默认 broker 仍使用 unsupported provider，避免未授权启用真实桌面操作。
 
 交付：
 
@@ -333,6 +333,7 @@ No-Go：
 - [x] before/after observation：broker 默认围绕每个 approved action 记录 screenshot artifact refs。
 - [x] action budget：broker 支持 per-run `maxActionsPerRun`，超限返回 `budget_exceeded`。
 - [x] coordinate scaling / stale ref detection：broker 已有 normalized/pixel bounds 与 observation age 校验；真实显示缩放标定可在 provider 接入时继续细化。
+- [x] real action provider baseline：`MacOsAccessibilityActionProvider` 可通过 `osascript` 执行 click/type/hotkey/scroll/wait，且只能作为注入的 `ComputerActionProvider` 使用，不改变默认 unsupported action provider。
 
 验收：
 
@@ -351,6 +352,12 @@ No-Go：
 
 目标：验证真正的 checkpoint/resume/side-effect idempotency，但不全局替换 runtime。
 
+状态：2026-05-23 已落地 ledger-backed durable baseline、`design-build` spike 与 Restate adapter spike。
+`RestateDurableRunEngine` 使用 structural `RestateDurableContext.run(name, action)` 边界，把 durable step
+idempotency key 映射为 Restate action name；测试用 fake journal 验证 replay 不重复执行 side effect。
+adapter 不引入 `@restatedev/*` 依赖，Restate 细节只落在 `raw.durable.adapter/actionName` 中，不进入
+`agent-protocol` 顶层类型。DBOS 保持备选评估，尚未实现 adapter。
+
 候选：
 
 - `design-build`：多阶段、产物可引用、失败成本高。
@@ -359,7 +366,7 @@ No-Go：
 交付：
 
 - 内部 `DurableRunEngine` interface。
-- Restate adapter spike，DBOS 作为备选评估。
+- [x] Restate adapter spike；DBOS 作为备选评估。
 - LLM call、tool call、artifact patch 作为 durable step。
 - `runId + callId` idempotency key。
 - 每个 durable step 同步产生 `RuntimeEvent`。
@@ -380,9 +387,21 @@ No-Go：
 
 目标：把 Remote Agent OS 带入团队工作流。
 
+状态：2026-05-23 已补齐 Remote Agent OS team policy profile baseline：`packages/agent/src/policy`
+提供内置 `remote-agent-os` policy pack，包含 `personal`、`team-readonly`、`team-operator` 与
+`admin-approved`，分别约束远程入口 channel、device binding、workspace policy 与 Computer Use action policy。
+Slack governance baseline 已接入 remote-control Slack router：file-backed workspace/user binding snapshot 可拒绝
+revoked/unknown workspace 或 user，approval 决策要求 operator/admin role，并持久化 accepted/rejected team audit log。
+local relay socket 与 `telegraph remote slack ...` CLI 已可管理 workspace/user binding 并查看 audit log。
+Slack lifecycle revoke baseline 已接入：local relay socket 与 CLI 可提交 `tokens_revoked`、
+`user_left_workspace`、`app_uninstalled` 事件，自动 revoke 对应 user/workspace 并写入 audit。
+Slack app install/OAuth 契约 baseline 已接入：governance snapshot 记录 installation metadata 与
+secret refs，不持久化原始 OAuth token；install 会激活 workspace binding、绑定安装人为 admin 并写入
+`app_installed` audit。真实 Slack OAuth callback/network adapter、Events API adapter 与正式绑定管理 UI 仍待实现。
+
 交付：
 
-- Slack OAuth / app install。
+- [x] Slack OAuth / app install 契约 baseline。
 - slash command 与 app mention。
 - thread projection。
 - Block Kit approval。
@@ -412,12 +431,17 @@ No-Go：
 状态：2026-05-23 已在 `computer-use-protocol` 补齐隔离执行环境的协议 baseline：`ExecutionTargetDefinition`
 描述真实桌面、isolated browser 与 VM target 的 trust level、network policy、profile sync 与 artifact transfer
 边界；`selectExecutionTarget()` 可按“需要本地状态 / 互联网自动化 / 指定 target kind / domain allowlist”选择目标。
-这仍是 target/provider 接入前的协议与策略层，不代表真实 isolated browser 或 VM runtime 已可启动。
+`packages/computer-use` 已补齐 isolated browser target runtime baseline：`IsolatedBrowserTargetRuntime`
+可创建/校验/启动/停止 ephemeral isolated browser target session，默认采用 allowlist/restricted network、
+`profileSync=none/homeMount=none` 与 explicit approval artifact transfer，并通过可注入 launcher 给后续
+Playwright/Chromium provider 接入真实浏览器启动。`VmDesktopTargetRuntime` 也已补齐 VM desktop baseline：
+可创建/校验/启动/停止 managed VM target session，默认不挂载 home，仅允许 selected paths readonly，
+并拒绝 read-write home mount 与不安全 artifact transfer；真实 VM provider/hypervisor launcher 待接。
 
 交付：
 
-- isolated browser target。
-- VM desktop target。
+- [x] isolated browser target runtime baseline。
+- [x] VM desktop target runtime baseline。
 - [x] profile sync 策略 baseline：协议只允许 `none` / `bookmarks-only` / `selected-cookies` / `managed-profile`，不提供同步完整主 Chrome profile 的默认路径。
 - [x] domain allowlist。
 - [x] network policy。
@@ -459,13 +483,12 @@ No-Go：
 
 ### Remote / Mobile / Telegram
 
-- [ ] 实现 React Native Mobile App：device list、run list、live status、approval inbox、artifact/screenshot preview。
-  RN App 只作为 remote-control 的移动端入口/控制面，不承载本地 agent runtime，也不直接访问 Main/Shared/Daemon。
+- [x] 实现 React Native Mobile App：新增 `apps/mobile` 作为 remote-control/relay 控制面，包含 device list、run list、live status 轮询、approval inbox、artifact/screenshot preview 与 ask/approve/deny 操作；移动端只通过 `MobileRemoteControlClient` 调用 remote-control/relay 方法，不承载本地 agent runtime，也不直接访问 Main/Shared/Daemon。
 - [x] 实现真实 Telegram Bot API adapter：`TELEGRAPH_TELEGRAM_BOT_TOKEN` 配置后 remote-control 会启动 Bot API polling；adapter 使用 `getUpdates` 拉取 update，调用现有 command router，再用 `sendMessage` / `sendPhoto` 投递回复。HTTP(S) image artifact 会走 `sendPhoto`，本地-only artifact 会降级为文本 artifact ref；webhook 模式待后续补。
 - [x] 将 `handleTelegramUpdate` 从本地 socket 骨架接到真实 Telegram update intake：Bot API adapter 已复用同一 command router，socket `handleTelegramUpdate` 仍作为本地调试入口。
 - [x] 定稿 Telegram `/pause` 的控制语义：`run-protocol` 新增 `RunControlCommandKind` / `RunControlCommandRecord` / `evaluateRunControlCommand()`，Shared RunBroker 持久化 control command 与 change history；Telegram `/pause`、`/cancel`、`/stop` 已路由为 accepted/rejected control command。
 - [x] 将 accepted run control command 接入 chat/design pagelet 执行层：`cancel` / `stop` 会通过现有 AbortSignal/`AgentRunControl` 中断运行并回写 `applied`，控制命令同步进入 pagelet-local ledger 审计。
-- [ ] 为 checkpoint-capable runtime 实现真正 `pause` / `resume`，当前 chat/design 收到 `pause` 只写入“不支持 checkpoint pause”的审计日志，不伪装成 applied。
+- [x] 为 checkpoint-capable runtime 实现真正 `pause` / `resume`：`OrchestratorCoreRunner` 支持 checkpoint metadata 驱动的 `Command({ resume })`，`InMemoryOrchestratorCheckpointController` 可把外部 pause 请求转成 graph interrupt 并保存 checkpoint；测试覆盖 graph-native interrupt resume 与 controller-driven pause/resume。当前普通 chat/design runtime 收到 `pause` 仍只写入“不支持 checkpoint pause”的审计日志，不伪装成 applied。
 - [x] Telegram `/screen` 支持发送 screenshot artifact，而不仅是提交 read-only observation prompt：本地 command router 已可从 RunProjection `artifactRefs` 返回带附件引用的 `ChannelReply`，真实 Bot API adapter 消费待实现。
 - [x] 明确 Telegram group policy baseline：默认只允许 `/runs` 与已有 artifact 的 `/screen` 只读查询；写操作仍拒绝；`TELEGRAPH_TELEGRAM_ALLOWED_GROUPS` 可 allowlist 特定群开放本地命令路由写入口。管理员审批与审计仍待实现。
 - [x] 实现 approval inbox 的远程推送：RunBroker approval change history / subscription 与 remote-control `subscribeApprovals` local relay stream 已落地；真实 Mobile/Telegram adapter 消费待实现。
@@ -498,31 +521,31 @@ No-Go：
 - [x] coordinate scaling / stale ref detection：broker 已有 normalized/pixel bounds 与 observation age 校验；真实 provider 接入后继续补显示缩放标定。
 - [x] scoped screenshot provider：macOS provider 支持 numeric `windowId` 的 app/window scoped capture；缺少 windowId 时显式失败，不退化为 full desktop。
 - [x] redaction pipeline：ComputerUseBroker 支持 target/app/window 级 redacted/denied observation policy；redacted 目标写本地占位 artifact，denied 目标在 provider 捕获前拒绝。
-- [ ] 真实 click/type/hotkey/scroll provider：仅在 policy、approval、lock、trace 完备后启用。
+- [x] 真实 click/type/hotkey/scroll provider：`MacOsAccessibilityActionProvider` 已作为显式注入 provider baseline 接入，默认不启用；实际调用仍经过 `ComputerUseBroker` 的 policy、approval、lock、budget、before/after observation 与 failure attribution。
 
 ### Durable Run Engine
 
 - [x] 定义 `DurableRunEngine` interface 与 idempotency key 规范：`packages/agent/src/durable` 已提供 `DurableRunEngine` / `DurableStepLedger` / `durableIdempotencyKey()`，并有 ledger-backed baseline，completed step 会按 idempotency key 复用而不重复 side effect。
-- [ ] 选择 spike 场景：优先 `design-build` 或 `telegraph-subagents`。
-- [ ] Restate adapter spike；DBOS 作为备选评估。
+- [x] 选择 spike 场景：已选择 `design-build` 并落地 `DesignBuildDurableSpike` baseline，将 plan / generate artifact / apply patch 映射为 durable `llm_call` / `tool_call` / `artifact_patch` step；file-backed ledger 重启后会复用已完成 step，不重复 side effect。
+- [x] Restate adapter spike；DBOS 作为备选评估：`RestateDurableRunEngine` 通过 structural `RestateDurableContext.run(name, action)` 适配 Restate durable step 语义，使用 durable idempotency key 作为 action name；测试覆盖 replay 不重复 side effect，且没有把 `@restatedev/*` 变成 package 依赖。
 - [x] durable step 到 RuntimeEvent 的同步映射：durable baseline 只使用既有 `step_started` / `step_completed` / `runtime_log`，通过 `raw.durable` 携带 kind/idempotencyKey/callId/input，不新增 framework-specific 事件类型。
 - [x] kill/restart 后验证不重复执行已完成 side effect：`FileDurableStepLedger` 可持久化 completed step record，测试用新 engine/ledger 实例模拟重启，确认相同 idempotency key 不会再次执行 executor。
 - [x] 明确 retry/fork/resume 的 UI 与协议边界，避免伪 resume：`run-protocol` 新增 `RunContinuationKind` / `RunContinuationCapabilities` / `evaluateRunContinuation()`，`resume` 只有 runtime 声明 `checkpointed` 才允许，retry/fork 明确是新 attempt / 新 run 语义。
 
 ### Slack / Team Governance
 
-- [ ] Slack OAuth/app install 设计。
+- [x] Slack OAuth/app install 设计：`SlackAppInstallation` 只保存 Slack app/workspace/scopes/installer 与 token secret refs，不持久化 raw OAuth token；`createSlackAppInstallation` 会激活 workspace binding、绑定安装人为 admin、写入 `app_installed` audit，并通过 remote-control service/local relay socket/CLI 暴露。
 - [x] slash command、app mention、thread projection router baseline：`SlackCommandRouter` 可将 slash command / app mention 转为标准 `ExternalMessage`，并保留 Slack channel/thread 到 `ChannelReply.channelId/threadId`；真实 Slack Events API adapter 与 OAuth 待接。
 - [x] Block Kit approval router baseline：Slack `block_actions` 的 `telegraph_approve` / `telegraph_deny` 可转为 RunBroker approval decision；真实 Block Kit message rendering 与 Slack signature verification 待接。
-- [ ] workspace/user/device binding 与 team audit log。
-- [ ] policy profiles：personal、team-readonly、team-operator、admin-approved。
-- [ ] token revoke / user leave workspace 后的权限回收。
+- [x] workspace/user/device binding 与 team audit log：file-backed Slack workspace/user/device binding 校验和 team audit log baseline 已接入 remote-control Slack router；local relay socket 与 CLI 可管理 workspace/user/device binding 并查看 audit；Slack app install 契约可激活 workspace/user binding 并写入 `app_installed` audit；Slack OAuth callback baseline 已接入可注入 `oauth.v2.access` exchange client，默认由 `TELEGRAPH_SLACK_CLIENT_ID/SECRET` 启用，raw token 只进入 secret store 并落为 secret refs；Slack lifecycle revoke baseline 可处理 token revoke / user leave / app uninstall，并同步回收关联 device binding、写入 audit；`apps/mobile` Slack 管理 UI 可查看 workspace/user/device/audit 并提交 OAuth callback code。
+- [x] policy profiles：`packages/agent/src/policy` 已提供内置 `remote-agent-os` policy pack，包含 personal、team-readonly、team-operator、admin-approved，并覆盖 remote channel/device binding、workspace 与 Computer Use action policy baseline。
+- [x] token revoke / user leave workspace 后的权限回收：`SlackTeamGovernance.applyLifecycleEvent` 支持 `tokens_revoked`、`user_left_workspace` 与 `app_uninstalled`，remote-control service/local relay socket/CLI 均可触发并持久化 revoked binding + audit event；真实 Slack Events API/OAuth adapter 待接。
 
 ### Isolation / Sandbox
 
 - [x] 隔离执行环境协议 baseline：`ExecutionTargetDefinition` 已统一描述真实桌面、isolated browser 与 VM target 的 trust/network/profile/artifact 边界。
-- [ ] isolated browser target provider/runtime。
-- [ ] VM desktop target provider/runtime。
+- [x] isolated browser target provider/runtime：`IsolatedBrowserTargetRuntime` 已提供可注入 launcher 的本地 runtime baseline，能生成安全 `ExecutionTargetDefinition`、维护 running/stopped session、按 allowlist 选择 target，并拒绝 user desktop / home mount / 不安全 artifact transfer 配置；真实 Playwright/Chromium launcher 待后续接入。
+- [x] VM desktop target provider/runtime：`VmDesktopTargetRuntime` 已提供可注入 launcher 的本地 runtime baseline，能生成 managed VM `ExecutionTargetDefinition`、维护 running/stopped session、按 allowlist 选择 target，默认不挂载 home，并拒绝 read-write home mount / 双向 workspace-scoped artifact transfer；真实 VM provider/hypervisor launcher 待后续接入。
 - [x] target selection：`selectExecutionTarget()` 已支持真实桌面 / 隔离浏览器 / VM 的策略选择，互联网自动化默认偏向 isolated browser，需要本地状态时偏向真实桌面。
 - [x] domain allowlist 与 network policy：`DomainNetworkPolicy` / `evaluateDomainNetworkPolicy()` 支持 offline、allowlist、restricted、open、blocked domain 与 wildcard domain。
 - [x] artifact export/import policy：协议层已显式区分禁用、显式审批与 workspace-scoped transfer。
@@ -535,7 +558,7 @@ No-Go：
 - [x] policy packs：`packages/agent/src/policy` 新增 versioned `PolicyPack` / `PolicyProfile`，可声明 task capability profile、workspace policy、Computer Use policy 与 remote binding/channel 策略，并提供 resolver/validator。
 - [x] tool/capability marketplace：`packages/agent/src/marketplace` 新增 versioned `CapabilityMarketplaceListing` / `MarketplaceToolDefinition` 与 `InMemoryCapabilityMarketplace`，第三方 tool 必须声明 task capability、permission、approval policy 与 risk，高风险 tool 禁止 `approval=none`。
 - [x] remote run templates：`run-protocol` 新增 versioned `RunTemplate` / `RunTemplateVariable` / `instantiateRunTemplate()`，支持 required/default variables、metadata merge 与 unresolved placeholder fail-fast。
-- [ ] enterprise self-host relay packaging。
+- [x] enterprise self-host relay packaging：`@telegraph/relay-protocol` 已提供 routing-only `EnterpriseSelfHostRelayPackageManifest`、manifest validator 与 `telegraph-self-host-relay` stdio JSONL runner baseline，可注册 participant、publish/list envelope、查询 policy/manifest；HTTP endpoint、真实持久队列、operator auth 与部署 chart 仍待后续实现。
 
 ## 6. Repo 落点建议
 

@@ -20,10 +20,23 @@ import type {
 } from '@/packages/run-protocol'
 import type {
   AckChannelReplyInput,
+  CreateSlackAppInstallationInput,
   CreateDeviceBindingInput,
+  CreateSlackDeviceBindingInput,
+  CreateSlackUserBindingInput,
+  CreateSlackWorkspaceBindingInput,
   ListChannelRepliesOptions,
   RemoteControlSubmissionResult,
   RemoteControlSubmitOptions,
+  SlackAppInstallation,
+  SlackDeviceBinding,
+  SlackLifecycleEvent,
+  SlackLifecycleRevokeResult,
+  SlackOAuthCallbackInput,
+  SlackOAuthCallbackResult,
+  SlackTeamAuditEvent,
+  SlackUserBinding,
+  SlackWorkspaceBinding,
 } from '@/apps/remote-control/application/common'
 import type { TelegramUpdate } from './TelegramCommandRouter'
 import type {
@@ -75,6 +88,21 @@ export interface RemoteControlGatewayService {
   listDeviceBindings(): MaybePromise<DeviceBinding[]>
   createDeviceBinding(input: CreateDeviceBindingInput): MaybePromise<DeviceBinding>
   revokeDeviceBinding(bindingId: string): MaybePromise<DeviceBinding | null>
+  listSlackWorkspaceBindings(): MaybePromise<SlackWorkspaceBinding[]>
+  createSlackWorkspaceBinding(input: CreateSlackWorkspaceBindingInput): MaybePromise<SlackWorkspaceBinding>
+  revokeSlackWorkspaceBinding(workspaceId: string): MaybePromise<SlackWorkspaceBinding | null>
+  listSlackAppInstallations(): MaybePromise<SlackAppInstallation[]>
+  createSlackAppInstallation(input: CreateSlackAppInstallationInput): MaybePromise<SlackAppInstallation>
+  revokeSlackAppInstallation(installationId: string): MaybePromise<SlackAppInstallation | null>
+  listSlackUserBindings(): MaybePromise<SlackUserBinding[]>
+  createSlackUserBinding(input: CreateSlackUserBindingInput): MaybePromise<SlackUserBinding>
+  revokeSlackUserBinding(workspaceId: string, userId: string): MaybePromise<SlackUserBinding | null>
+  listSlackDeviceBindings(): MaybePromise<SlackDeviceBinding[]>
+  createSlackDeviceBinding(input: CreateSlackDeviceBindingInput): MaybePromise<SlackDeviceBinding>
+  revokeSlackDeviceBinding(bindingId: string): MaybePromise<SlackDeviceBinding | null>
+  handleSlackOAuthCallback(input: SlackOAuthCallbackInput): MaybePromise<SlackOAuthCallbackResult>
+  listSlackTeamAuditEvents(): MaybePromise<SlackTeamAuditEvent[]>
+  handleSlackLifecycleEvent(event: SlackLifecycleEvent): MaybePromise<SlackLifecycleRevokeResult>
 }
 
 export type RemoteControlGatewayMethod =
@@ -101,6 +129,21 @@ export type RemoteControlGatewayMethod =
   | 'listDeviceBindings'
   | 'createDeviceBinding'
   | 'revokeDeviceBinding'
+  | 'listSlackWorkspaceBindings'
+  | 'createSlackWorkspaceBinding'
+  | 'revokeSlackWorkspaceBinding'
+  | 'listSlackAppInstallations'
+  | 'createSlackAppInstallation'
+  | 'revokeSlackAppInstallation'
+  | 'listSlackUserBindings'
+  | 'createSlackUserBinding'
+  | 'revokeSlackUserBinding'
+  | 'listSlackDeviceBindings'
+  | 'createSlackDeviceBinding'
+  | 'revokeSlackDeviceBinding'
+  | 'handleSlackOAuthCallback'
+  | 'listSlackTeamAuditEvents'
+  | 'handleSlackLifecycleEvent'
 
 export interface RemoteControlGatewayRequest {
   id?: string | number
@@ -467,6 +510,56 @@ async function dispatchRemoteControlGatewayRequest(
       const params = assertObject(request.params) as { bindingId?: unknown }
       if (typeof params.bindingId !== 'string') throw new Error('Missing bindingId')
       return service.revokeDeviceBinding(params.bindingId)
+    }
+    case 'listSlackWorkspaceBindings':
+      return service.listSlackWorkspaceBindings()
+    case 'createSlackWorkspaceBinding':
+      return service.createSlackWorkspaceBinding(
+        assertObject(request.params) as unknown as CreateSlackWorkspaceBindingInput,
+      )
+    case 'revokeSlackWorkspaceBinding': {
+      const params = assertObject(request.params) as { workspaceId?: unknown }
+      if (typeof params.workspaceId !== 'string') throw new Error('Missing workspaceId')
+      return service.revokeSlackWorkspaceBinding(params.workspaceId)
+    }
+    case 'listSlackAppInstallations':
+      return service.listSlackAppInstallations()
+    case 'createSlackAppInstallation':
+      return service.createSlackAppInstallation(
+        assertObject(request.params) as unknown as CreateSlackAppInstallationInput,
+      )
+    case 'revokeSlackAppInstallation': {
+      const params = assertObject(request.params) as { installationId?: unknown }
+      if (typeof params.installationId !== 'string') throw new Error('Missing installationId')
+      return service.revokeSlackAppInstallation(params.installationId)
+    }
+    case 'listSlackUserBindings':
+      return service.listSlackUserBindings()
+    case 'createSlackUserBinding':
+      return service.createSlackUserBinding(assertObject(request.params) as unknown as CreateSlackUserBindingInput)
+    case 'revokeSlackUserBinding': {
+      const params = assertObject(request.params) as { workspaceId?: unknown; userId?: unknown }
+      if (typeof params.workspaceId !== 'string') throw new Error('Missing workspaceId')
+      if (typeof params.userId !== 'string') throw new Error('Missing userId')
+      return service.revokeSlackUserBinding(params.workspaceId, params.userId)
+    }
+    case 'listSlackDeviceBindings':
+      return service.listSlackDeviceBindings()
+    case 'createSlackDeviceBinding':
+      return service.createSlackDeviceBinding(assertObject(request.params) as unknown as CreateSlackDeviceBindingInput)
+    case 'revokeSlackDeviceBinding': {
+      const params = assertObject(request.params) as { bindingId?: unknown }
+      if (typeof params.bindingId !== 'string') throw new Error('Missing bindingId')
+      return service.revokeSlackDeviceBinding(params.bindingId)
+    }
+    case 'handleSlackOAuthCallback':
+      return service.handleSlackOAuthCallback(assertObject(request.params) as unknown as SlackOAuthCallbackInput)
+    case 'listSlackTeamAuditEvents':
+      return service.listSlackTeamAuditEvents()
+    case 'handleSlackLifecycleEvent': {
+      const params = assertObject(request.params) as { event?: SlackLifecycleEvent }
+      if (!params.event) throw new Error('Missing Slack lifecycle event')
+      return service.handleSlackLifecycleEvent(params.event)
     }
   }
 }

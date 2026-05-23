@@ -16,6 +16,21 @@ export {
   FileDurableStepLedger,
 } from './FileDurableStepLedger'
 export {
+  RestateDurableRunEngine,
+  type RestateDurableContext,
+  type RestateDurableRunEngineOptions,
+} from './RestateDurableRunEngine'
+export {
+  DesignBuildDurableSpike,
+  type DesignBuildDurableSpikeArtifact,
+  type DesignBuildDurableSpikeExecutors,
+  type DesignBuildDurableSpikeInput,
+  type DesignBuildDurableSpikeOutput,
+  type DesignBuildDurableSpikePatch,
+  type DesignBuildDurableSpikePlan,
+  type DesignBuildDurableStepId,
+} from './DesignBuildDurableSpike'
+export {
   durableIdempotencyKey,
   type DurableIdempotencyInput,
 } from './idempotency'

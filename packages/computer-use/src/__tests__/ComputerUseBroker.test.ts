@@ -282,15 +282,16 @@ describe('ComputerUseBroker', () => {
       },
       schemaVersion: COMPUTER_USE_PROTOCOL_SCHEMA_VERSION,
     })
-    expect(actionProvider.actions).toEqual([expect.objectContaining({
+    expect(actionProvider.actions).toHaveLength(1)
+    expect(actionProvider.actions[0]).toMatchObject({
       runId: 'run-2',
       kind: 'type',
       input: { text: 'hello' },
       approvalId: 'approval-1',
-      beforeObservationRef: expect.objectContaining({
-        mediaType: 'image/png',
-      }),
-    })])
+    })
+    expect(actionProvider.actions[0]?.beforeObservationRef).toMatchObject({
+      mediaType: 'image/png',
+    })
     expect(store.writes).toHaveLength(2)
     expect(broker.getActionCount('run-2')).toBe(1)
   })

@@ -53,7 +53,7 @@ export function instantiateRunTemplate(
 
 export function renderPromptTemplate(
   promptTemplate: string,
-  values: Record<string, string>,
+  values: Partial<Record<string, string>>,
 ): string {
   return promptTemplate.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*\}\}/g, (_match, name: string) => {
     const value = values[name];
@@ -70,11 +70,12 @@ function resolveTemplateValues(
 ): Record<string, string> {
   const resolved: Record<string, string> = {};
   for (const variable of template.variables ?? []) {
-    const raw = values[variable.name] ?? variable.defaultValue;
-    if ((raw === undefined || raw === null || raw === '') && variable.required) {
+    const rawInput = values[variable.name];
+    const raw = rawInput === undefined || rawInput === null ? variable.defaultValue : rawInput;
+    if ((raw === undefined || raw === '') && variable.required) {
       throw new Error(`Missing required run template variable: ${variable.name}`);
     }
-    if (raw !== undefined && raw !== null) {
+    if (raw !== undefined) {
       resolved[variable.name] = String(raw);
     }
   }

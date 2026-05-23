@@ -1,6 +1,7 @@
 import type {
   ChatSendRequest,
   ChatSendResult,
+  ChatRunTraceBundle,
   ChatStreamEvent,
   IChatPageletService,
 } from '@/apps/chat/application/common'
@@ -12,21 +13,35 @@ let streamCallback: ((event: ChatStreamEvent) => void) | null = null
 const unsubscribe = vi.fn()
 const sendMock = vi.fn((_: ChatSendRequest): Promise<ChatSendResult> => new Promise<ChatSendResult>(() => {}))
 const cancelMock = vi.fn(() => Promise.resolve(true))
+const listRunsMock = vi.fn(() => Promise.resolve([]))
+const getRunMock = vi.fn(() => Promise.resolve(null))
+const listRunEventsMock = vi.fn(() => Promise.resolve([]))
+const listRuntimeCapabilitiesMock = vi.fn(() => Promise.resolve([]))
+const exportRunTraceBundleMock = vi.fn(() => Promise.resolve(null))
+const importRunTraceBundleMock = vi.fn((bundle: ChatRunTraceBundle) => Promise.resolve({
+  status: 'imported' as const,
+  record: bundle.run,
+}))
+const listPendingPermissionsMock = vi.fn(() => Promise.resolve([]))
+const resolvePermissionRequestMock = vi.fn(() => Promise.resolve(true))
+const listSubagentsMock = vi.fn(() => Promise.resolve([]))
+const getSubagentResultMock = vi.fn(() => Promise.resolve(null))
+const cancelSubagentMock = vi.fn(() => Promise.resolve(false))
 const client: IChatPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   send: sendMock,
   cancel: cancelMock,
-  listRuns: vi.fn(() => Promise.resolve([])),
-  getRun: vi.fn(() => Promise.resolve(null)),
-  listRunEvents: vi.fn(() => Promise.resolve([])),
-  listRuntimeCapabilities: vi.fn(() => Promise.resolve([])),
-  exportRunTraceBundle: vi.fn(() => Promise.resolve(null)),
-  importRunTraceBundle: vi.fn(bundle => Promise.resolve({ status: 'imported' as const, record: bundle.run })),
-  listPendingPermissions: vi.fn(() => Promise.resolve([])),
-  resolvePermissionRequest: vi.fn(() => Promise.resolve(true)),
-  listSubagents: vi.fn(() => Promise.resolve([])),
-  getSubagentResult: vi.fn(() => Promise.resolve(null)),
-  cancelSubagent: vi.fn(() => Promise.resolve(false)),
+  listRuns: listRunsMock,
+  getRun: getRunMock,
+  listRunEvents: listRunEventsMock,
+  listRuntimeCapabilities: listRuntimeCapabilitiesMock,
+  exportRunTraceBundle: exportRunTraceBundleMock,
+  importRunTraceBundle: importRunTraceBundleMock,
+  listPendingPermissions: listPendingPermissionsMock,
+  resolvePermissionRequest: resolvePermissionRequestMock,
+  listSubagents: listSubagentsMock,
+  getSubagentResult: getSubagentResultMock,
+  cancelSubagent: cancelSubagentMock,
   onStreamEvent: vi.fn((callback: (event: ChatStreamEvent) => void) => {
     streamCallback = callback
     return { unsubscribe }
@@ -150,27 +165,27 @@ describe('PageletAgentService', () => {
     await expect(service.getSubagentResult('child-1', { consume: true })).resolves.toBeNull()
     await expect(service.cancelSubagent('child-1')).resolves.toBe(false)
 
-    expect(client.listSubagents).toHaveBeenCalled()
-    expect(client.getSubagentResult).toHaveBeenCalledWith('child-1', true)
-    expect(client.cancelSubagent).toHaveBeenCalledWith('child-1')
+    expect(listSubagentsMock).toHaveBeenCalled()
+    expect(getSubagentResultMock).toHaveBeenCalledWith('child-1', true)
+    expect(cancelSubagentMock).toHaveBeenCalledWith('child-1')
   })
 
   it('forwards persisted run console calls through the pagelet service', async () => {
     const { PageletAgentService } = await import('../pagelet-agent-service')
     const service = new PageletAgentService()
 
-    await expect(service.listRuns?.({ sessionId: 'session-1', limit: 10 })).resolves.toEqual([])
-    await expect(service.getRun?.('run-1')).resolves.toBeNull()
-    await expect(service.listRunEvents?.('run-1')).resolves.toEqual([])
+    await expect(service.listRuns({ sessionId: 'session-1', limit: 10 })).resolves.toEqual([])
+    await expect(service.getRun('run-1')).resolves.toBeNull()
+    await expect(service.listRunEvents('run-1')).resolves.toEqual([])
 
-    expect(client.listRuns).toHaveBeenCalledWith({
+    expect(listRunsMock).toHaveBeenCalledWith({
       sessionId: 'session-1',
       status: undefined,
       limit: 10,
       offset: undefined,
     })
-    expect(client.getRun).toHaveBeenCalledWith('run-1')
-    expect(client.listRunEvents).toHaveBeenCalledWith('run-1')
+    expect(getRunMock).toHaveBeenCalledWith('run-1')
+    expect(listRunEventsMock).toHaveBeenCalledWith('run-1')
   })
 
   it('forwards replay metadata and trace bundle export through the pagelet service', async () => {
@@ -203,8 +218,8 @@ describe('PageletAgentService', () => {
       },
       events: [],
     }
-    await expect(service.exportRunTraceBundle?.('run-source')).resolves.toBeNull()
-    await expect(service.importRunTraceBundle?.(bundle)).resolves.toEqual({
+    await expect(service.exportRunTraceBundle('run-source')).resolves.toBeNull()
+    await expect(service.importRunTraceBundle(bundle)).resolves.toEqual({
       status: 'imported',
       record: bundle.run,
     })
@@ -217,28 +232,28 @@ describe('PageletAgentService', () => {
         sourceEventSeq: 3,
       },
     }))
-    expect(client.exportRunTraceBundle).toHaveBeenCalledWith('run-source')
-    expect(client.importRunTraceBundle).toHaveBeenCalledWith(bundle)
+    expect(exportRunTraceBundleMock).toHaveBeenCalledWith('run-source')
+    expect(importRunTraceBundleMock).toHaveBeenCalledWith(bundle)
   })
 
   it('forwards runtime capability matrix calls through the pagelet service', async () => {
     const { PageletAgentService } = await import('../pagelet-agent-service')
     const service = new PageletAgentService()
 
-    await expect(service.listRuntimeCapabilities?.()).resolves.toEqual([])
+    await expect(service.listRuntimeCapabilities()).resolves.toEqual([])
 
-    expect(client.listRuntimeCapabilities).toHaveBeenCalled()
+    expect(listRuntimeCapabilitiesMock).toHaveBeenCalled()
   })
 
   it('forwards permission approval calls through the pagelet service', async () => {
     const { PageletAgentService } = await import('../pagelet-agent-service')
     const service = new PageletAgentService()
 
-    await expect(service.listPendingPermissions?.('run-1')).resolves.toEqual([])
-    await expect(service.resolvePermissionRequest?.('perm-1', { granted: true })).resolves.toBe(true)
+    await expect(service.listPendingPermissions('run-1')).resolves.toEqual([])
+    await expect(service.resolvePermissionRequest('perm-1', { granted: true })).resolves.toBe(true)
 
-    expect(client.listPendingPermissions).toHaveBeenCalledWith('run-1')
-    expect(client.resolvePermissionRequest).toHaveBeenCalledWith('perm-1', { granted: true })
+    expect(listPendingPermissionsMock).toHaveBeenCalledWith('run-1')
+    expect(resolvePermissionRequestMock).toHaveBeenCalledWith('perm-1', { granted: true })
   })
 })
 

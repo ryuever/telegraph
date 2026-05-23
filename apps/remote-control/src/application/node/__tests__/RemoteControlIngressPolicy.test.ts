@@ -8,9 +8,13 @@ describe('RemoteControlIngressPolicy', () => {
     const message = externalMessage({ messageId: 'msg-1' })
 
     policy.accept(message, 100)
-    expect(() => policy.accept(message, 200)).toThrow('Duplicate external message "msg-1".')
+    expect(() => {
+      policy.accept(message, 200)
+    }).toThrow('Duplicate external message "msg-1".')
 
-    expect(() => policy.accept(message, 1_200)).not.toThrow()
+    expect(() => {
+      policy.accept(message, 1_200)
+    }).not.toThrow()
   })
 
   it('rate limits messages per actor inside a sliding window', () => {
@@ -22,9 +26,12 @@ describe('RemoteControlIngressPolicy', () => {
     policy.accept(externalMessage({ messageId: 'msg-1' }), 100)
     policy.accept(externalMessage({ messageId: 'msg-2' }), 200)
 
-    expect(() => policy.accept(externalMessage({ messageId: 'msg-3' }), 300))
-      .toThrow('External message rate limit exceeded for actor "telegram:ada".')
-    expect(() => policy.accept(externalMessage({ messageId: 'msg-4' }), 1_200)).not.toThrow()
+    expect(() => {
+      policy.accept(externalMessage({ messageId: 'msg-3' }), 300)
+    }).toThrow('External message rate limit exceeded for actor "telegram:ada".')
+    expect(() => {
+      policy.accept(externalMessage({ messageId: 'msg-4' }), 1_200)
+    }).not.toThrow()
   })
 })
 

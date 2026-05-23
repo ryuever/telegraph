@@ -25,7 +25,7 @@ export type ChannelAdapterDeliveryStatus = 'sent' | 'failed' | 'skipped';
 export interface ChannelAdapterManifest {
   schemaVersion: typeof CHANNEL_ADAPTER_SDK_SCHEMA_VERSION;
   adapterId: string;
-  channelKind: ExternalChannelKind | string;
+  channelKind: ExternalChannelKind | (string & {});
   displayName: string;
   capabilities: ChannelAdapterCapabilities;
 }

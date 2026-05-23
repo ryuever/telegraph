@@ -156,7 +156,7 @@ export class TelegramBotApiAdapter {
           await this.handleUpdate(update)
         }
       } catch (error) {
-        if (signal.aborted) return
+        if (isAbortError(error)) return
         this.options.onError?.(error instanceof Error ? error : new Error(String(error)))
         await delay(1_000, signal)
       }
@@ -220,4 +220,8 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
       resolve()
     }, { once: true })
   })
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }

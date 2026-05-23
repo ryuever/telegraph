@@ -36,7 +36,7 @@ export class RemoteControlIngressPolicy {
 
     const max = this.options.maxRememberedMessageIds ?? 1_000
     while (this.seenMessageIds.size > max) {
-      const oldest = this.seenMessageIds.keys().next().value as string | undefined
+      const oldest = this.seenMessageIds.keys().next().value
       if (!oldest) return
       this.seenMessageIds.delete(oldest)
     }

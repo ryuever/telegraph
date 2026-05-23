@@ -78,7 +78,9 @@ describe('self-host relay protocol', () => {
       localOnlySecrets: true,
       storesDesktopExecutionCapability: false,
     })
-    expect(() => assertRoutingOnlyRelayPolicy(deploymentBoundary('self-host'))).not.toThrow()
+    expect(() => {
+      assertRoutingOnlyRelayPolicy(deploymentBoundary('self-host'))
+    }).not.toThrow()
   })
 })
 

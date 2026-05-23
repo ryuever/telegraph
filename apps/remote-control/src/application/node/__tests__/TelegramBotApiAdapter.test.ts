@@ -90,10 +90,9 @@ describe('TelegramBotApiAdapter', () => {
         text: 'Run queued.',
       },
     }])
-    expect(delivered).toEqual([{
-      reply: expect.objectContaining({ replyId: 'reply-1' }),
-      sent: { message_id: 99 },
-    }])
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.reply).toMatchObject({ replyId: 'reply-1' })
+    expect(delivered[0]?.sent).toEqual({ message_id: 99 })
   })
 
   it('uses sendPhoto for HTTP image artifact refs', async () => {
@@ -206,15 +205,23 @@ function fakeFetch(
   calls: Array<{ url: string; body: unknown }>,
   body: unknown,
 ): typeof fetch {
-  return ((url: string | URL | Request, init?: RequestInit) => {
+  const fetchMock: typeof fetch = (url, init) => {
+    const rawBody = init?.body
     calls.push({
-      url: String(url),
-      body: init?.body ? JSON.parse(String(init.body)) as unknown : undefined,
+      url: requestUrl(url),
+      body: typeof rawBody === 'string' ? JSON.parse(rawBody) as unknown : undefined,
     })
     return Promise.resolve({
       ok: true,
       status: 200,
       json: () => Promise.resolve(body),
     } as Response)
-  }) as typeof fetch
+  }
+  return fetchMock
+}
+
+function requestUrl(url: string | URL | Request): string {
+  if (typeof url === 'string') return url
+  if (url instanceof URL) return url.toString()
+  return url.url
 }

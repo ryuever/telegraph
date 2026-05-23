@@ -66,12 +66,9 @@ export function evaluateRunControlCommand(
       ? { allowed: true }
       : { allowed: false, reason: `cancel requires queued or running status, got ${projection.status}` };
   }
-  if (kind === 'stop') {
-    return projection.status === 'running'
-      ? { allowed: true }
-      : { allowed: false, reason: `stop requires running status, got ${projection.status}` };
-  }
-  return { allowed: false, reason: `unknown control command: ${String(kind)}` };
+  return projection.status === 'running'
+    ? { allowed: true }
+    : { allowed: false, reason: `stop requires running status, got ${projection.status}` };
 }
 
 function isTerminalProjectionStatus(status: RunProjectionStatus): boolean {

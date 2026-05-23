@@ -3,7 +3,7 @@
  */
 
 import assert from 'assert';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

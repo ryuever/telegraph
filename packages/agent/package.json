@@ -18,7 +18,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "test": "vitest",
+    "test": "vitest run --passWithNoTests",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },

@@ -16,7 +16,6 @@ import { PageletAgentService } from '@/apps/chat/application/browser/pagelet-age
 import type { ChatAgentRunRecordSnapshot } from '@/apps/chat/application/common'
 import { PageletDesignAgentService } from '@/apps/design/application/browser/pagelet-design-agent-service'
 import type { DesignAgentRunRecordSnapshot } from '@/apps/design/application/common'
-import type { AgentRunEventRecord } from '@/packages/agent/persistence/AgentRunRepository'
 import type { AgentEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common'
 import { cn } from '@/packages/ui/lib/utils'
@@ -40,6 +39,13 @@ interface ConsoleRun {
 
 interface ConsoleEvent {
   source: RunSource
+  runId: string
+  seq: number
+  ts: number
+  event: AgentEvent
+}
+
+interface ConsoleRunEventRecord {
   runId: string
   seq: number
   ts: number
@@ -472,7 +478,7 @@ function normalizeChatRun(run: ChatAgentRunRecordSnapshot): ConsoleRun {
 
 function normalizeEventRecord(
   source: RunSource,
-  record: AgentRunEventRecord,
+  record: ConsoleRunEventRecord,
 ): ConsoleEvent {
   return {
     source,

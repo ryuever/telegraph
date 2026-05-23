@@ -1,4 +1,8 @@
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
+import {
+  InMemoryOrchestratorCheckpointController,
+  createOrchestratorCheckpointMetadata,
+} from '@/packages/agent/runtime/OrchestratorCheckpointController'
 import { OrchestratorCoreRunner } from '@/packages/agent/runtime/OrchestratorCoreRunner'
 import { TelegraphOrchestratorRuntime } from '@/packages/agent/runtime/TelegraphOrchestratorRuntime'
 import { runRuntimeConformance } from '@/packages/agent/runtime/conformance'
@@ -193,6 +197,142 @@ describe('OrchestratorCoreRunner', () => {
     expect(interruptSignals).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'interrupt', nodeId: 'needs-human', resumable: true }),
       expect.objectContaining({ type: 'completed', output: { interrupted: true } }),
+    ]))
+  })
+
+  it('resumes graph-native interrupts from checkpoint metadata', async () => {
+    const State = Annotation.Root({
+      message: Annotation<string>(),
+      approved: Annotation<boolean>(),
+    })
+
+    const graph = new StateGraph(State)
+      .addNode('needs-human', async state => {
+        const response = interrupt<{ approved: boolean }>({ type: 'approval' })
+        return { message: state.message, approved: response.approved }
+      })
+      .addEdge(START, 'needs-human')
+      .addEdge('needs-human', END)
+      .compile({ checkpointer: new MemorySaver() })
+
+    const runner = new OrchestratorCoreRunner({
+      graph,
+      input: runtimeInput => ({ message: runtimeInput.message, approved: false }),
+      now: () => 123,
+    })
+    const firstSignals = []
+
+    for await (const signal of runner.run({
+      ...input,
+      metadata: createOrchestratorCheckpointMetadata({ threadId: 'thread-resume-1' }),
+    })) {
+      firstSignals.push(signal)
+    }
+
+    expect(firstSignals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'interrupt', nodeId: 'needs-human', resumable: true }),
+      expect.objectContaining({ type: 'completed', output: { interrupted: true } }),
+    ]))
+
+    const resumedSignals = []
+    for await (const signal of runner.run({
+      ...input,
+      metadata: createOrchestratorCheckpointMetadata({
+        threadId: 'thread-resume-1',
+        resume: {
+          value: { approved: true },
+          requestedBy: 'telegram:user-1',
+          reason: 'approval accepted',
+        },
+      }),
+    })) {
+      resumedSignals.push(signal)
+    }
+
+    expect(resumedSignals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'completed',
+        output: expect.objectContaining({ message: 'hello', approved: true }),
+      }),
+    ]))
+  })
+
+  it('pauses at the next node with a checkpoint controller and resumes without replaying prior nodes', async () => {
+    const State = Annotation.Root({
+      message: Annotation<string>(),
+      steps: Annotation<string[]>({
+        reducer: (left, right) => left.concat(right),
+        default: () => [],
+      }),
+    })
+    const controller = new InMemoryOrchestratorCheckpointController({ now: () => 99 })
+    const calls: string[] = []
+
+    const graph = new StateGraph(State)
+      .addNode('draft', async () => {
+        calls.push('draft')
+        return { steps: ['draft'] }
+      })
+      .addNode('apply', async () => {
+        calls.push('apply')
+        return { steps: ['apply'] }
+      })
+      .addEdge(START, 'draft')
+      .addEdge('draft', 'apply')
+      .addEdge('apply', END)
+      .compile({ checkpointer: new MemorySaver() })
+
+    const runner = new OrchestratorCoreRunner({
+      graph,
+      input: runtimeInput => ({ message: runtimeInput.message }),
+      checkpointController: controller,
+      now: () => 123,
+    })
+
+    controller.requestPause({
+      runId: input.runId,
+      requestedBy: 'telegram:user-1',
+      reason: 'remote /pause',
+      requestedAt: 88,
+    })
+
+    const pausedSignals = []
+    for await (const signal of runner.run(input)) {
+      pausedSignals.push(signal)
+    }
+
+    expect(calls).toEqual([])
+    expect(pausedSignals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'interrupt',
+        nodeId: 'draft',
+        reason: 'remote_pause',
+        resumable: true,
+      }),
+      expect.objectContaining({ type: 'completed', output: { interrupted: true } }),
+    ]))
+
+    const resumedSignals = []
+    for await (const signal of runner.run({
+      ...input,
+      metadata: createOrchestratorCheckpointMetadata({
+        threadId: input.runId,
+        resume: {
+          value: { continue: true },
+          requestedBy: 'telegram:user-1',
+          reason: 'remote /resume',
+        },
+      }),
+    })) {
+      resumedSignals.push(signal)
+    }
+
+    expect(calls).toEqual(['draft', 'apply'])
+    expect(resumedSignals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'completed',
+        output: expect.objectContaining({ steps: ['draft', 'apply'] }),
+      }),
     ]))
   })
 

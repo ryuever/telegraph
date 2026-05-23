@@ -188,13 +188,12 @@ describe('RunBrokerStore', () => {
       decidedAt: 320,
     });
     expect(store.listApprovals({ runId: 'run-1', status: 'approved' })).toHaveLength(1);
-    expect(store.listApprovalChanges({ runId: 'run-1', afterCursor: 1 })).toEqual([
-      expect.objectContaining({
-        approvalId: 'approval-1',
-        cursor: 2,
-        approval: expect.objectContaining({ status: 'approved' }),
-      }),
-    ]);
+    const [approvalChange] = store.listApprovalChanges({ runId: 'run-1', afterCursor: 1 });
+    expect(approvalChange).toMatchObject({
+      approvalId: 'approval-1',
+      cursor: 2,
+    });
+    expect(approvalChange.approval).toMatchObject({ status: 'approved' });
     expect(events).toEqual([
       '1:approval-1:pending',
       '2:approval-1:approved',

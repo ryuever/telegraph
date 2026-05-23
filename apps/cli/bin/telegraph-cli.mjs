@@ -190,6 +190,152 @@ async function main(argv) {
     throw new Error('Usage: telegraph remote device bind|revoke ...')
   }
 
+  if (command === 'remote' && subcommand === 'slack') {
+    const [resource, action, ...tail] = rest
+    if (resource === 'workspaces') {
+      printJson(await sendRemote('listSlackWorkspaceBindings'))
+      return
+    }
+    if (resource === 'workspace' && action === 'bind') {
+      const flags = parseFlags(tail)
+      if (!flags.workspace) {
+        throw new Error('Usage: telegraph remote slack workspace bind --workspace T123 [--domain example] [--policy profile]')
+      }
+      printJson(await sendRemote('createSlackWorkspaceBinding', pickDefined({
+        workspaceId: flags.workspace,
+        teamDomain: flags.domain,
+        policyProfileId: flags.policy,
+      })))
+      return
+    }
+    if (resource === 'workspace' && action === 'revoke') {
+      const [workspaceId] = tail
+      if (!workspaceId) throw new Error('Usage: telegraph remote slack workspace revoke <workspaceId>')
+      printJson(await sendRemote('revokeSlackWorkspaceBinding', { workspaceId }))
+      return
+    }
+    if (resource === 'app' && action === 'installs') {
+      printJson(await sendRemote('listSlackAppInstallations'))
+      return
+    }
+    if (resource === 'app' && action === 'install') {
+      const flags = parseFlags(tail)
+      if (!flags.workspace) {
+        throw new Error('Usage: telegraph remote slack app install --workspace T123 [--domain example] [--app A123] [--bot-user U123] [--bot-token-ref secret://...] [--scope commands,chat:write] [--installer U123] [--policy profile]')
+      }
+      printJson(await sendRemote('createSlackAppInstallation', pickDefined({
+        installationId: flags.installation,
+        workspaceId: flags.workspace,
+        teamDomain: flags.domain,
+        appId: flags.app,
+        enterpriseId: flags.enterprise,
+        botUserId: flags.botUser ?? flags['bot-user'],
+        botTokenRef: flags.botTokenRef ?? flags['bot-token-ref'],
+        userTokenRef: flags.userTokenRef ?? flags['user-token-ref'],
+        scopes: slackScopesFromFlags(flags),
+        installedByUserId: flags.installer,
+        installerRole: flags.installerRole ?? flags['installer-role'],
+        policyProfileId: flags.policy,
+      })))
+      return
+    }
+    if (resource === 'app' && action === 'revoke') {
+      const [installationId] = tail
+      if (!installationId) throw new Error('Usage: telegraph remote slack app revoke <installationId>')
+      printJson(await sendRemote('revokeSlackAppInstallation', { installationId }))
+      return
+    }
+    if (resource === 'oauth' && action === 'callback') {
+      const flags = parseFlags(tail)
+      if (!flags.code) {
+        throw new Error('Usage: telegraph remote slack oauth callback --code code [--state state] [--redirect-uri uri] [--policy profile]')
+      }
+      printJson(await sendRemote('handleSlackOAuthCallback', pickDefined({
+        code: flags.code,
+        state: flags.state,
+        redirectUri: flags.redirectUri ?? flags['redirect-uri'],
+        policyProfileId: flags.policy,
+        installerRole: flags.installerRole ?? flags['installer-role'],
+      })))
+      return
+    }
+    if (resource === 'users') {
+      printJson(await sendRemote('listSlackUserBindings'))
+      return
+    }
+    if (resource === 'user' && action === 'bind') {
+      const flags = parseFlags(tail)
+      if (!flags.workspace || !flags.user) {
+        throw new Error('Usage: telegraph remote slack user bind --workspace T123 --user U123 [--role member|operator|admin] [--policy profile]')
+      }
+      printJson(await sendRemote('createSlackUserBinding', pickDefined({
+        workspaceId: flags.workspace,
+        userId: flags.user,
+        actorId: flags.actor,
+        role: flags.role,
+        policyProfileId: flags.policy,
+      })))
+      return
+    }
+    if (resource === 'user' && action === 'revoke') {
+      const [workspaceId, userId] = tail
+      if (!workspaceId || !userId) {
+        throw new Error('Usage: telegraph remote slack user revoke <workspaceId> <userId>')
+      }
+      printJson(await sendRemote('revokeSlackUserBinding', { workspaceId, userId }))
+      return
+    }
+    if (resource === 'devices') {
+      printJson(await sendRemote('listSlackDeviceBindings'))
+      return
+    }
+    if (resource === 'device' && action === 'bind') {
+      const flags = parseFlags(tail)
+      if (!flags.workspace || !flags.user || !flags.device) {
+        throw new Error('Usage: telegraph remote slack device bind --workspace T123 --user U123 --device deviceId [--actor actorId] [--label text] [--expires-at ts]')
+      }
+      printJson(await sendRemote('createSlackDeviceBinding', pickDefined({
+        bindingId: flags.binding,
+        workspaceId: flags.workspace,
+        userId: flags.user,
+        deviceId: flags.device,
+        actorId: flags.actor,
+        label: flags.label,
+        expiresAt: flags.expiresAt ? Number(flags.expiresAt) : undefined,
+      })))
+      return
+    }
+    if (resource === 'device' && action === 'revoke') {
+      const [bindingId] = tail
+      if (!bindingId) throw new Error('Usage: telegraph remote slack device revoke <bindingId>')
+      printJson(await sendRemote('revokeSlackDeviceBinding', { bindingId }))
+      return
+    }
+    if (resource === 'audit') {
+      printJson(await sendRemote('listSlackTeamAuditEvents'))
+      return
+    }
+    if (resource === 'lifecycle') {
+      const kind = slackLifecycleKind(action)
+      const flags = parseFlags(tail)
+      if (!kind || !flags.workspace) {
+        throw new Error('Usage: telegraph remote slack lifecycle tokens-revoked|user-left|app-uninstalled --workspace T123 [--user U123|--users U123,U456] [--actor actorId] [--reason text]')
+      }
+      const userIds = slackUserIdsFromFlags(flags)
+      printJson(await sendRemote('handleSlackLifecycleEvent', {
+        event: pickDefined({
+          kind,
+          workspaceId: flags.workspace,
+          userIds: userIds.length > 0 ? userIds : undefined,
+          actorId: flags.actor,
+          reason: flags.reason,
+        }),
+      }))
+      return
+    }
+    throw new Error('Usage: telegraph remote slack workspaces|users|devices|audit|workspace bind|workspace revoke|app installs|app install|app revoke|oauth callback|user bind|user revoke|device bind|device revoke|lifecycle ...')
+  }
+
   if (command === 'runs') {
     const flags = parseFlags([subcommand, ...rest].filter(Boolean))
     printJson(await send('listRunProjections', pickDefined({
@@ -1120,6 +1266,25 @@ function runControlListOptions(flags) {
   })
 }
 
+function slackLifecycleKind(value) {
+  if (value === 'tokens-revoked' || value === 'tokens_revoked') return 'tokens_revoked'
+  if (value === 'user-left' || value === 'user_left_workspace') return 'user_left_workspace'
+  if (value === 'app-uninstalled' || value === 'app_uninstalled') return 'app_uninstalled'
+  return undefined
+}
+
+function slackUserIdsFromFlags(flags) {
+  return [
+    ...String(flags.users ?? '').split(','),
+    flags.user ?? '',
+  ].map(value => value.trim()).filter(Boolean)
+}
+
+function slackScopesFromFlags(flags) {
+  if (!flags.scope && !flags.scopes) return undefined
+  return String(flags.scope ?? flags.scopes).split(',').map(value => value.trim()).filter(Boolean)
+}
+
 function createRunIntentFromCli(flags) {
   const prompt = flags._.join(' ').trim()
   if (!prompt) throw new Error('Missing prompt')
@@ -1401,6 +1566,21 @@ Usage:
   telegraph remote projection-changes [--run runId] [--pagelet design] [--after cursor]
   telegraph remote device bind --device deviceId [--actor actorId] [--label text]
   telegraph remote device revoke <bindingId>
+  telegraph remote slack workspaces
+  telegraph remote slack workspace bind --workspace T123 [--domain example] [--policy profile]
+  telegraph remote slack workspace revoke <workspaceId>
+  telegraph remote slack app installs
+  telegraph remote slack app install --workspace T123 [--domain example] [--app A123] [--bot-user U123] [--bot-token-ref secret://...] [--scope commands,chat:write] [--installer U123] [--policy profile]
+  telegraph remote slack app revoke <installationId>
+  telegraph remote slack oauth callback --code code [--state state] [--redirect-uri uri] [--policy profile]
+  telegraph remote slack users
+  telegraph remote slack user bind --workspace T123 --user U123 [--role member|operator|admin] [--policy profile]
+  telegraph remote slack user revoke <workspaceId> <userId>
+  telegraph remote slack devices
+  telegraph remote slack device bind --workspace T123 --user U123 --device deviceId [--actor actorId] [--label text]
+  telegraph remote slack device revoke <bindingId>
+  telegraph remote slack lifecycle tokens-revoked|user-left|app-uninstalled --workspace T123 [--user U123|--users U123,U456]
+  telegraph remote slack audit
   telegraph ask [--pagelet design] [--session sessionId] <prompt>
   telegraph intents [--pagelet design] [--status queued]
   telegraph intent create [--pagelet design] [--session sessionId] <prompt>
