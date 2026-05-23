@@ -14,6 +14,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@sandpacker/core": "0.2.0",
     "@sandpacker/editor-service": "0.2.0",
     "@sandpacker/shared": "0.2.0",

@@ -9,6 +9,7 @@ import type {
   DesignSelectedComponentSnapshot,
 } from '@/apps/design/application/common'
 import { createDesignArtifactViewModel, extractDesignPatchOperations } from './design-artifact-view'
+import { DesignCodeEditor } from './DesignCodeEditor'
 import { DesignSandpackerPreview } from './DesignSandpackerPreview'
 
 type ArtifactMode = 'preview' | 'code' | 'inspect'
@@ -184,9 +185,12 @@ export function DesignArtifactWorkbench({
             onClearSelectedComponent={onClearSelectedComponent}
           />
         ) : (
-          <pre className="min-h-full whitespace-pre-wrap rounded-md border border-border bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100">
-            {viewModel.code}
-          </pre>
+          <DesignCodeEditor
+            operations={extractDesignPatchOperations(activeArtifact) ?? undefined}
+            code={viewModel.code}
+            codePath={viewModel.viewKind === 'html' ? 'index.html' : viewModel.viewKind === 'json' ? 'output.json' : undefined}
+            selectedPath={selectedComponent?.path}
+          />
         )}
       </div>
     </div>
