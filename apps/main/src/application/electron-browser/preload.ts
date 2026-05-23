@@ -1,7 +1,7 @@
 import { ipcRenderer } from 'electron';
-import { createPageBridge } from '@x-oasis/async-call-rpc-electron/electron-browser/core';
 import { clientHost } from '@x-oasis/async-call-rpc';
 
+import { createTelegraphPageBridge } from './createTelegraphPageBridge';
 import { ORCHESTRATOR_CP_CHANNEL_NAME } from '@/apps/main/application/common/cp-config';
 import {
   CONNECTION_PARTICIPANT_ID,
@@ -17,7 +17,7 @@ import { CHAT_PAGELET_SERVICE_PATH } from '@/apps/chat/application/common';
 
 const channelName = ORCHESTRATOR_CP_CHANNEL_NAME;
 
-const bridge = createPageBridge({
+const bridge = createTelegraphPageBridge({
   ipcRenderer,
   channelName,
   description: `${channelName} bridge`,

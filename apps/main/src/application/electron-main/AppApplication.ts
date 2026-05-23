@@ -1,5 +1,9 @@
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
+import {
+  ConnectionState,
+  ExponentialBackoffPolicy,
+} from '@x-oasis/async-call-rpc/orchestrator';
 
 import type { IWindowManager } from '@/apps/main/application/common';
 import { WindowManagerId } from '@/apps/main/application/common';
@@ -25,7 +29,15 @@ import type { IRemoteControlApplication } from '@/apps/remote-control/applicatio
 import { RemoteControlApplicationId } from '@/apps/remote-control/application/common';
 import type { IAppOrchestrator } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
 import { AppOrchestratorId } from '@/packages/services/pagelet-host/electron-main/AppOrchestrator';
-import { MAIN_RPC_SERVICE_PATH, MAIN_WINDOW_SERVICE_PATH } from '@/packages/services/pagelet-host/common';
+import {
+  CHAT_PARTICIPANT_ID,
+  CONNECTION_PARTICIPANT_ID,
+  DESIGN_PARTICIPANT_ID,
+  MAIN_RPC_SERVICE_PATH,
+  MAIN_WINDOW_SERVICE_PATH,
+  MONITOR_PARTICIPANT_ID,
+  RENDERER_PARTICIPANT_ID,
+} from '@/packages/services/pagelet-host/common';
 import { MAIN_METRICS_SERVICE_PATH } from '@/packages/services/main-metrics/common';
 import type { IMainMetricsService } from '@/packages/services/main-metrics/common';
 import { MainMetricsServiceId } from '@/packages/services/main-metrics/common';
@@ -188,6 +200,117 @@ export class AppApplication implements IAppApplication {
       this.mainCpServer.registerSettingWindow(win);
       this.appOrchestrator.registerSettingOrchestratorService();
     });
+
+    // Cmd+R recreates the renderer/preload context without destroying the
+    // BrowserWindow. The orchestrator's control-plane IPC can survive that
+    // transition, so READY direct MessagePorts may still point at the old
+    // preload. Close those records as soon as a reload starts; reconnect
+    // only after the new preload has loaded.
+    const reloadParticipantIds = [
+      CONNECTION_PARTICIPANT_ID,
+      MONITOR_PARTICIPANT_ID,
+      DESIGN_PARTICIPANT_ID,
+      CHAT_PARTICIPANT_ID,
+    ];
+    const reloadConfig = {
+      reconnectPolicy: new ExponentialBackoffPolicy({
+        initialDelayMs: 1_000,
+        maxDelayMs: 30_000,
+        multiplier: 2,
+        jitterFactor: 0.3,
+        maxRetries: 10,
+        maxElapsedMs: 5 * 60_000,
+      }),
+    };
+    const reloadOptions = {
+      activateTimeoutMs: 30_000,
+      retryOnInitialFailure: true,
+    };
+    let reloadEpoch = 0;
+    const pendingReloadReconnects = new Set<string>();
+
+    const markRendererReloadStarted = (source: string): void => {
+      if (pendingReloadReconnects.size > 0) return;
+
+      const orchestrator = this.mainCpServer.getOrchestrator();
+      const activeParticipantIds = reloadParticipantIds.filter((toId) => {
+        const info = orchestrator.getConnectionInfo(RENDERER_PARTICIPANT_ID, toId);
+        return (
+          info !== undefined &&
+          info.state !== ConnectionState.CLOSED &&
+          info.state !== ConnectionState.IDLE
+        );
+      });
+      if (activeParticipantIds.length === 0) return;
+
+      reloadEpoch++;
+      this.logger.info(
+        `[AppApplication] renderer reload started (${source}) — closing stale direct channels`
+      );
+
+      for (const toId of activeParticipantIds) {
+        pendingReloadReconnects.add(toId);
+        const info = orchestrator.getConnectionInfo(RENDERER_PARTICIPANT_ID, toId);
+        if (!info) continue;
+        void orchestrator.disconnect(info.connectionId).catch((err: unknown) => {
+          this.logger.warn(
+            `[AppApplication] renderer reload disconnect failed for ${toId}`,
+            err
+          );
+        });
+      }
+    };
+
+    const reconnectRendererAfterReload = (): void => {
+      if (pendingReloadReconnects.size === 0) return;
+
+      const orchestrator = this.mainCpServer.getOrchestrator();
+      const epoch = reloadEpoch;
+      const reconnectIds = [...pendingReloadReconnects];
+      pendingReloadReconnects.clear();
+
+      this.logger.info(
+        '[AppApplication] renderer reload finished — reconnecting direct channels'
+      );
+
+      for (const toId of reconnectIds) {
+        void orchestrator
+          .connect(
+            RENDERER_PARTICIPANT_ID,
+            toId,
+            reloadConfig,
+            reloadOptions
+          )
+          .catch((err: unknown) => {
+            if (epoch !== reloadEpoch) return;
+            this.logger.warn(
+              `[AppApplication] renderer reload reconnect failed for ${toId}`,
+              err
+            );
+          });
+      }
+    };
+
+    const win = this.windowManager.getMainWindow();
+    if (win) {
+      win.webContents.on('before-input-event', (_event, input) => {
+        if (
+          input.type === 'keyDown' &&
+          input.key.toLowerCase() === 'r' &&
+          (input.meta || input.control)
+        ) {
+          markRendererReloadStarted('keyboard');
+        }
+      });
+      win.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
+        if (isMainFrame) {
+          markRendererReloadStarted('navigation');
+        }
+      });
+      win.webContents.on('did-finish-load', () => {
+        reconnectRendererAfterReload();
+      });
+    }
 
     this.logger.info('[AppApplication] start() done');
   }
