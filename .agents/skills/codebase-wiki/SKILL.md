@@ -27,6 +27,7 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 | 用户意图 | 必读内容 |
 | --- | --- |
 | 仅归档单篇文档 | `SKILL.md` + `references/CONVENTIONS.md` |
+| 生成 roadmap / 路线图 / 实施计划 | 上述 + `references/ROADMAP-CHECKLIST.md` |
 | 需要维护双向引用 | 上述 + `CONVENTIONS` 中 references 关系表 |
 | 需要更新站点导航 | 上述 + 对应脚本注释（`scripts/regenerate-*.mjs`） |
 | 首次初始化站点 | 上述 + 对应引擎模板目录 `assets/<engine>/`（Fumadocs 使用 `scripts/init-fumadocs.mjs`） |
@@ -202,6 +203,20 @@ description: "将对话中的源码阅读与分析整理为规范化 Markdown，
 - **时间线**：关键排查节点（发现、验证、修复、回归）
 - **变更清单**：涉及文件、关键改动点、为什么这么改
 - **验证与回归**：复验步骤、判定标准、复发时 runbook
+
+### Roadmap 文档偏好
+
+生成 `roadmap` 类文档时，优先使用清单式实施路线图。读取
+`references/ROADMAP-CHECKLIST.md`，默认覆盖：
+
+- 决策摘要：优先押注、谨慎推进、明确不做。
+- 技术地图：能力象限、层次图或推进顺序。
+- 能力价值评估：价值、复杂度、优先级、结论。
+- 分阶段路线：每个 Phase 都包含目标、状态、交付、验收、No-Go。
+- 后续 TODO：按领域分组的 checkbox 清单。
+- Repo 落点、风险清单、第一批 PR 建议、长期判断。
+
+若用户只要轻量计划，可压缩章节，但仍保留验收标准、No-Go 和风险控制。
 
 ### 第 4 步：维护 references（双向）
 
