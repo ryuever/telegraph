@@ -589,6 +589,9 @@ importers:
       '@telegraph/orchestrator-core':
         specifier: workspace:*
         version: link:../orchestrator-core
+      ignore:
+        specifier: ^5.3.0
+        version: 5.3.2
     devDependencies:
       typescript:
         specifier: ^5.3.0

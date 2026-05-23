@@ -2,7 +2,21 @@
 
 Project-local skills that capture **Telegraph's development conventions and workflows**.
 
-These are written in Claude Code's [skill format](https://docs.claude.com/en/docs/claude-code/skills) (a `SKILL.md` file with frontmatter inside each skill folder), so any agent working on this repo can load them and follow the same rules.
+These are written in the [Agent Skills](https://agentskills.io/) format (a `SKILL.md` file with YAML frontmatter inside each skill folder), so any agent working on this repo can load them and follow the same rules.
+
+## How skills are discovered
+
+Telegraph's `@telegraph/agent` package automatically discovers skills from these locations (in priority order):
+
+| Location | Purpose | Example |
+|----------|---------|---------|
+| `<project-root>/skills/` | Project-local skills | `skills/telegraph-conventions/` |
+| `<project-root>/.telegraph/skills/` | Project-local overrides | `.telegraph/skills/my-custom-skill/` |
+| `~/.telegraph/skills/` | User-global skills | `~/.telegraph/skills/my-shared-skill/` |
+
+Skills are loaded by `loadSkills({ cwd })` from `@/packages/agent/skills` and formatted into the system prompt via `formatSkillsForPrompt()`.
+
+On name collision, the **project-local** skill wins over the **global** skill, and a collision diagnostic is emitted.
 
 ## Layout
 

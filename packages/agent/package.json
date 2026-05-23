@@ -27,7 +27,8 @@
     "@telegraph/agent-protocol": "workspace:*",
     "@telegraph/computer-use": "workspace:*",
     "@telegraph/computer-use-protocol": "workspace:*",
-    "@telegraph/orchestrator-core": "workspace:*"
+    "@telegraph/orchestrator-core": "workspace:*",
+    "ignore": "^5.3.0"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

@@ -343,3 +343,15 @@ export {
   type FactValidationRecord,
   type FactSearchResult,
 } from './persistence/FactRepository'
+// Skills module (Node.js-only — import from '@/packages/agent/skills' in Node.js contexts)
+export {
+  loadSkills,
+  loadSkillsFromDir,
+  formatSkillsForPrompt,
+  type LoadSkillsOptions,
+  type LoadSkillsFromDirOptions,
+  type Skill,
+  type SkillDiagnostic,
+  type SkillFrontmatter,
+  type LoadSkillsResult,
+} from './skills'
