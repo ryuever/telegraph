@@ -60,6 +60,13 @@ describe('createSandpackerFiles', () => {
     expect(result.files['/index.html']).not.toContain('src="/src/index.tsx?entry"')
   })
 
+  it('uses the bundled Tailwind browser runtime instead of the production-warning CDN', () => {
+    const result = createSandpackerFiles([], 'Empty preview')
+
+    expect(result.files['/index.html']).toContain('<script src="')
+    expect(result.files['/index.html']).not.toContain('cdn.tailwindcss.com')
+  })
+
   it('keeps the shared UI stub typed with TSX generics', () => {
     const result = createSandpackerFiles([], 'Empty preview')
     const uiStub = result.files['/src/telegraph-ui.tsx']

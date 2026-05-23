@@ -8,6 +8,7 @@ import { StyleEditorPanel } from '@sandpacker/style-editor'
 import type { ElementSelectionShape, FileTree, SerializedDOMNode } from '@sandpacker/shared'
 import workerUrl from '@sandpacker/worker/worker-entry?worker&url'
 import productionServiceWorkerUrl from '@sandpacker/worker/service-worker-entry?worker&url'
+import tailwindBrowserUrl from '@tailwindcss/browser?url'
 import { Button } from '@/packages/ui/components/ui/button'
 import type {
   DesignPatchFileOperation,
@@ -252,7 +253,6 @@ function SandpackerPreviewSurface({
           <iframe
             ref={iframeRef as unknown as LegacyRef<HTMLIFrameElement>}
             title={`${title} preview`}
-            sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
             className="h-full w-full bg-white"
           />
         </div>
@@ -379,7 +379,7 @@ function renderIndexHtml(title: string): string {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="${escapeHtml(tailwindBrowserUrl)}"></script>
     <style>
       :root {
         --background: 0 0% 100%;
