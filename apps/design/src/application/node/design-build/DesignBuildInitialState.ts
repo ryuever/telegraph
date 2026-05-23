@@ -17,9 +17,13 @@ export interface DesignBuildInitialStateInput {
 
 export interface DesignBuildContextSnapshot {
   runtime: 'telegraph-design-build'
-  aliasRule: '@/ mirrors the monorepo root with src elided'
   artifactPolicy: 'preview'
   defaultOutputMode: 'design-patch'
+  sandboxProject: {
+    projectRoot?: string
+    dependencySource: 'package.json'
+    requiredFiles: string[]
+  }
   revision?: DesignBuildRevisionContext
 }
 
@@ -80,7 +84,6 @@ export function createDesignBuildInitialState(
   }
   const revision = extractRevisionContext(input.metadata)
   const brief = createDesignIntentBrief(input.prompt, revision)
-  const context = createDesignBuildContext(revision)
   const components = createDefaultComponentAssetRegistry().searchComponents(input.prompt, { limit: 5 })
   const artifact = createTemplateDesignPatchArtifact({
     runId: input.runId,
@@ -89,6 +92,7 @@ export function createDesignBuildInitialState(
     revision: revision?.revision,
     changeSummary: revision?.changeSummary,
   })
+  const context = createDesignBuildContext(revision, projectRootFromArtifact(artifact))
   const plan = createPagePlan(artifact)
   const review = evaluateDesignBuildArtifact(artifact)
   return { brief, context, components, plan, artifact, review }
@@ -100,20 +104,12 @@ export function repairDesignBuildArtifact(
 ): DesignBuildArtifact {
   if (review.verdict !== 'repair_required' || artifact.kind !== 'design-patch') return artifact
 
-  const operations = artifact.operations.map(operation => ({
-    ...operation,
-    content: operation.content
-      ?.replace(/@telegraph\/ui\//g, '@/packages/ui/')
-      .replace(/@\/invalid-ui\//g, '@/packages/ui/'),
-  }))
-
   return {
     ...artifact,
     title: `${artifact.title} repaired`,
     changeSummary: artifact.changeSummary
       ? `${artifact.changeSummary} Repaired failed review checks.`
       : 'Repaired failed review checks.',
-    operations,
   }
 }
 
@@ -152,26 +148,58 @@ function createDesignIntentBrief(prompt: string, revision?: DesignBuildRevisionC
   }
 }
 
-function createDesignBuildContext(revision?: DesignBuildRevisionContext): DesignBuildContextSnapshot {
+function createDesignBuildContext(
+  revision: DesignBuildRevisionContext | undefined,
+  projectRoot: string | undefined,
+): DesignBuildContextSnapshot {
   return {
     runtime: 'telegraph-design-build',
-    aliasRule: '@/ mirrors the monorepo root with src elided',
     artifactPolicy: 'preview',
     defaultOutputMode: 'design-patch',
+    sandboxProject: {
+      projectRoot,
+      dependencySource: 'package.json',
+      requiredFiles: [
+        'package.json',
+        'index.html',
+        'src/index.tsx or src/main.tsx',
+        'component files imported by the entry',
+      ],
+    },
     revision,
   }
 }
 
 function createPagePlan(artifact: DesignBuildArtifact): DesignBuildPagePlan {
+  const appOperation = artifact.kind === 'design-patch'
+    ? artifact.operations.find(operation => operation.path.endsWith('/src/App.tsx'))
+    : undefined
   const sourceTarget = artifact.kind === 'design-patch'
-    ? artifact.operations[0]?.path ?? 'apps/design/src/generated/generated-design-page.tsx'
+    ? appOperation?.path ??
+      firstOperationPath(artifact.operations) ??
+      'apps/design/src/generated/generated-design-page/src/App.tsx'
     : 'preview-only'
   return {
     sourceTarget,
-    sections: ['Header signal', 'Primary content', 'Summary panel'],
-    componentTree: ['main', 'section', 'Badge', 'Button', 'Card'],
-    responsiveStrategy: 'Single-column mobile layout, two-column desktop layout.',
+    sections: ['Top navigation', 'Primary content', 'Project status panel'],
+    componentTree: ['main', 'nav', 'section', 'aside', 'button'],
+    responsiveStrategy: 'Single-column mobile layout, two-column desktop layout with stable spacing.',
   }
+}
+
+function firstOperationPath(operations: Array<{ path: string }>): string | undefined {
+  return operations.length > 0 ? operations[0].path : undefined
+}
+
+function projectRootFromArtifact(artifact: DesignBuildArtifact): string | undefined {
+  if (artifact.kind !== 'design-patch') return undefined
+  const packageOperation = artifact.operations.find(operation =>
+    operation.kind !== 'delete' && operation.path.split('/').at(-1) === 'package.json'
+  )
+  if (!packageOperation) return undefined
+  const segments = packageOperation.path.split('/').filter(Boolean)
+  if (segments.at(-1) !== 'package.json' || segments.length <= 1) return undefined
+  return segments.slice(0, -1).join('/')
 }
 
 function extractRevisionContext(metadata: Record<string, unknown> | undefined): DesignBuildRevisionContext | undefined {

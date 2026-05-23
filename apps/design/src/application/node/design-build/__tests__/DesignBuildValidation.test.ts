@@ -7,21 +7,83 @@ import {
 } from '../DesignBuildValidation'
 
 describe('DesignBuildValidation', () => {
-  it('repairs invalid shared UI aliases once', () => {
+  it('accepts the standalone project scaffold', () => {
     const output = outputFixture()
-    const artifact = output.artifact
-    if (artifact.kind === 'design-patch') {
-      artifact.operations[0] = {
-        ...artifact.operations[0],
-        content: artifact.operations[0]?.content?.replace(/@\/packages\/ui\//g, '@/invalid-ui/'),
+
+    const result = validateDesignBuildOutput(output)
+
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
+  })
+
+  it('flags source that is not a complete standalone project', () => {
+    const output = outputFixture()
+    if (output.artifact.kind === 'design-patch') {
+      output.artifact.operations = [
+        {
+          kind: 'add',
+          path: 'apps/design/src/generated/create-a-dashboard-page.tsx',
+          content: 'export default function App() { return <main /> }',
+        },
+      ]
+    }
+
+    const result = validateDesignBuildOutput(output)
+
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('standalone project check failed: standalone-package-root')
+    expect(result.errors).toContain('standalone project check failed: standalone-react-entry')
+  })
+
+  it('flags entry imports that do not resolve to generated files', () => {
+    const output = outputFixture()
+    if (output.artifact.kind === 'design-patch') {
+      const entry = output.artifact.operations.find(operation => operation.path.endsWith('/src/index.tsx'))
+      if (entry) {
+        entry.content = [
+          "import { createRoot } from 'react-dom/client'",
+          "import ProfilePage from './ProfilePage'",
+          '',
+          "createRoot(document.getElementById('root')!).render(<ProfilePage />)",
+        ].join('\n')
       }
     }
 
     const result = validateDesignBuildOutput(output)
 
     expect(result.valid).toBe(false)
-    expect(result.errors).toContain('patch operation does not use shared UI alias: apps/design/src/generated/create-a-dashboard-page.tsx')
-    expect(JSON.stringify(result.repaired)).toContain('@/packages/ui/components/ui/button')
+    expect(result.errors).toContain('standalone project check failed: standalone-local-imports')
+  })
+
+  it('allows component names that match the entry import instead of forcing App.tsx', () => {
+    const output = outputFixture()
+    if (output.artifact.kind === 'design-patch') {
+      output.artifact.operations = output.artifact.operations.map(operation => {
+        if (operation.path.endsWith('/src/index.tsx')) {
+          return {
+            ...operation,
+            content: [
+              "import { createRoot } from 'react-dom/client'",
+              "import ProfilePage from './ProfilePage'",
+              '',
+              "createRoot(document.getElementById('root')!).render(<ProfilePage />)",
+            ].join('\n'),
+          }
+        }
+        if (operation.path.endsWith('/src/App.tsx')) {
+          return {
+            ...operation,
+            path: operation.path.replace('/src/App.tsx', '/src/ProfilePage.tsx'),
+            content: 'export default function ProfilePage() { return <main>Profile</main> }',
+          }
+        }
+        return operation
+      })
+    }
+
+    const result = validateDesignBuildOutput(output)
+
+    expect(result.valid).toBe(true)
   })
 
   it('throws patch_invalid when output cannot be repaired', () => {
@@ -39,10 +101,6 @@ function outputFixture(): DesignBuildOrchestratorOutput {
     runId: 'run-validation',
     prompt: 'Create a dashboard',
   })
-  artifact.operations[0] = {
-    ...artifact.operations[0],
-    path: 'apps/design/src/generated/create-a-dashboard-page.tsx',
-  }
   return {
     brief: {
       prompt: 'Create a dashboard',
@@ -51,13 +109,22 @@ function outputFixture(): DesignBuildOrchestratorOutput {
     },
     context: {
       runtime: 'telegraph-design-build',
-      aliasRule: '@/ mirrors the monorepo root with src elided',
       artifactPolicy: 'preview',
       defaultOutputMode: 'design-patch',
+      sandboxProject: {
+        projectRoot: 'apps/design/src/generated/create-a-dashboard-page',
+        dependencySource: 'package.json',
+        requiredFiles: [
+          'package.json',
+          'index.html',
+          'src/index.tsx or src/main.tsx',
+          'component files imported by the entry',
+        ],
+      },
     },
     components: [],
     plan: {
-      sourceTarget: 'apps/design/src/generated/create-a-dashboard-page.tsx',
+      sourceTarget: 'apps/design/src/generated/create-a-dashboard-page/src/App.tsx',
       sections: ['Dashboard'],
       componentTree: ['main'],
       responsiveStrategy: 'Responsive',

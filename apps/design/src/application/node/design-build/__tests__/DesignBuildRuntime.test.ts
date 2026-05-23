@@ -89,7 +89,7 @@ describe('DesignBuildRuntime', () => {
     expect(childCompletions[2]?.output).toMatchObject({
       artifactId: 'run-design-build-patch',
       kind: 'design-patch',
-      operationCount: 1,
+      operationCount: 6,
     })
     expect(stringField(recordField(childCompletions[3]?.output, 'review'), 'verdict')).toBe('pass')
 
@@ -109,7 +109,8 @@ describe('DesignBuildRuntime', () => {
       'design-worker',
       'design-reviewer',
     ])
-    expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-saas-dashboard-landing-page-page.tsx')
+    expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-saas-dashboard-landing-page-page/package.json')
+    expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-saas-dashboard-landing-page-page/src/App.tsx')
   })
 
   it('emits run_cancelled when aborted before work starts', async () => {
@@ -268,8 +269,9 @@ describe('DesignBuildRuntime', () => {
     expect(numberField(recordField(repairWorkerRun, 'output'), 'repairAttempt')).toBe(1)
     expect(numberField(recordField(repairReviewerRun, 'output'), 'repairAttempt')).toBe(1)
     expect(stringField(recordField(recordField(repairReviewerRun, 'output'), 'review'), 'verdict')).toBe('pass')
-    expect(JSON.stringify(terminal)).toContain('@/packages/ui/components/ui/button')
-    expect(JSON.stringify(terminal)).not.toContain('@/invalid-ui/')
+    expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-repairable-dashboard-page/package.json')
+    const repairedArtifact = recordField(terminalOutput, 'artifact')
+    expect(JSON.stringify(arrayField(repairedArtifact, 'operations'))).not.toContain('@/packages/ui/')
   })
 
   it('consumes model-backed worker output when provided', async () => {
@@ -283,11 +285,7 @@ describe('DesignBuildRuntime', () => {
           kind: 'design-patch',
           title: 'Model generated source',
           operations: [
-            {
-              kind: 'add',
-              path: 'apps/design/src/generated/model-page.tsx',
-              content: "import { Button } from '@/packages/ui/components/ui/button'\n\nexport function ModelPage() { return <Button>Model</Button> }\n",
-            },
+            ...modelProjectOperations('model-page'),
           ],
         },
       }
@@ -348,6 +346,40 @@ class TestDesignBuildChildRunner implements DesignBuildChildRunner {
       source: 'model-backed',
     })
   }
+}
+
+function modelProjectOperations(slug: string): Array<{ kind: 'add'; path: string; content: string }> {
+  const root = `apps/design/src/generated/${slug}`
+  return [
+    {
+      kind: 'add',
+      path: `${root}/package.json`,
+      content: JSON.stringify({
+        dependencies: {
+          react: '19.1.0',
+          'react-dom': '19.1.0',
+        },
+        devDependencies: {
+          typescript: '5.3.3',
+        },
+      }, null, 2),
+    },
+    {
+      kind: 'add',
+      path: `${root}/index.html`,
+      content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+    },
+    {
+      kind: 'add',
+      path: `${root}/src/index.tsx`,
+      content: "import { createRoot } from 'react-dom/client'\nimport App from './App'\n\ncreateRoot(document.getElementById('root')!).render(<App />)\n",
+    },
+    {
+      kind: 'add',
+      path: `${root}/src/App.tsx`,
+      content: 'export default function App() { return <main>Model</main> }\n',
+    },
+  ]
 }
 
 async function collect(input: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {

@@ -3,6 +3,10 @@ import {
   type DesignBuildArtifact,
 } from './DesignBuildArtifacts'
 import type { DesignBuildReview } from './DesignBuildInitialState'
+import {
+  evaluateStandaloneProjectFiles,
+  isSafeProjectPatchPath,
+} from '@/apps/design/application/common/design-project-contract'
 
 export interface DesignBuildArtifactSummary {
   artifactId: string
@@ -82,15 +86,11 @@ export function evaluateDesignBuildArtifact(artifact: DesignBuildArtifact): Desi
   }
 
   const hasOperations = artifact.operations.length > 0
-  const pathsInScope = artifact.operations.every(operation =>
-    operation.path.trim().length > 0 && !operation.path.includes('..')
-  )
+  const pathsInScope = artifact.operations.every(operation => isSafeProjectPatchPath(operation.path))
   const sourceContentValid = artifact.operations.every(operation =>
     operation.kind === 'delete' || Boolean(operation.content?.trim())
   )
-  const aliasValid = artifact.operations.every(operation =>
-    !operation.content || operation.content.includes('@/packages/ui/')
-  )
+  const projectContract = evaluateStandaloneProjectFiles(artifact.operations)
 
   const checks = [
     {
@@ -118,11 +118,7 @@ export function evaluateDesignBuildArtifact(artifact: DesignBuildArtifact): Desi
       passed: sourceContentValid,
       summary: 'Non-delete patch operations include source content.',
     },
-    {
-      id: 'alias-rule',
-      passed: aliasValid,
-      summary: 'Generated source uses monorepo-root @/ imports for shared UI components.',
-    },
+    ...projectContract.checks,
   ]
 
   return {

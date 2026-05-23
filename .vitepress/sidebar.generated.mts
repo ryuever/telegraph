@@ -59,6 +59,10 @@ export const wikiSidebar = {
         {
           "text": "A-013 Telegraph Remote Agent OS 与外部控制架构",
           "link": "/architecture/20260522-telegraph-remote-agent-os-architecture"
+        },
+        {
+          "text": "A-014 DesignBuild 独立项目输出契约与设计系统约束底座",
+          "link": "/architecture/20260524-design-build-standalone-project-output-contract"
         }
       ]
     }

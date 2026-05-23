@@ -7,10 +7,12 @@ import {
 
 describe('DesignBuildReviewPolicy', () => {
   it('blocks unsafe patch paths before reviewer output can pass the artifact', () => {
-    const policyReview = evaluateDesignBuildArtifact(patchArtifact({
-      path: '../outside.tsx',
-      content: "import { Button } from '@/packages/ui/components/ui/button'\n",
-    }))
+    const policyReview = evaluateDesignBuildArtifact(patchArtifact([
+      {
+        path: '../outside.tsx',
+        content: 'export default function App() { return <main /> }\n',
+      },
+    ]))
 
     const merged = mergeDesignBuildReview(policyReview, {
       verdict: 'pass',
@@ -23,10 +25,12 @@ describe('DesignBuildReviewPolicy', () => {
   })
 
   it('keeps repair required when deterministic checks fail but reviewer passes', () => {
-    const policyReview = evaluateDesignBuildArtifact(patchArtifact({
-      path: 'apps/design/src/generated/page.tsx',
-      content: "import { Button } from '@/invalid-ui/components/ui/button'\n",
-    }))
+    const policyReview = evaluateDesignBuildArtifact(patchArtifact([
+      {
+        path: 'apps/design/src/generated/page.tsx',
+        content: "import { Button } from '@/packages/ui/components/ui/button'\n\nexport default function App() { return <Button /> }\n",
+      },
+    ]))
 
     const merged = mergeDesignBuildReview(policyReview, {
       verdict: 'pass',
@@ -35,21 +39,20 @@ describe('DesignBuildReviewPolicy', () => {
 
     expect(policyReview.verdict).toBe('repair_required')
     expect(merged.verdict).toBe('repair_required')
-    expect(merged.checks.some(check => check.id === 'policy:alias-rule' && !check.passed)).toBe(true)
+    expect(merged.checks.some(check => check.id === 'policy:standalone-package-root' && !check.passed)).toBe(true)
+    expect(merged.checks.some(check => check.id === 'policy:standalone-imports' && !check.passed)).toBe(true)
   })
 })
 
-function patchArtifact(operation: { path: string; content: string }): DesignBuildArtifact {
+function patchArtifact(operations: Array<{ path: string; content: string }>): DesignBuildArtifact {
   return {
     id: 'artifact-1',
     kind: 'design-patch',
     title: 'Generated page',
-    operations: [
-      {
-        kind: 'add',
-        path: operation.path,
-        content: operation.content,
-      },
-    ],
+    operations: operations.map(operation => ({
+      kind: 'add',
+      path: operation.path,
+      content: operation.content,
+    })),
   }
 }

@@ -51,13 +51,45 @@ describe('createSandpackerFiles', () => {
     const result = createSandpackerFiles([
       {
         kind: 'add',
-        path: 'apps/design/src/LoginPage.tsx',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
         content: 'export default function LoginPage() { return <main>Login</main> }',
       },
     ], 'Login page')
 
     expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
     expect(result.files['/index.html']).not.toContain('src="/src/index.tsx?entry"')
+  })
+
+  it('remaps a generated project folder to the Sandpacker root', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: JSON.stringify({
+          dependencies: {
+            react: '19.1.0',
+            'react-dom': '19.1.0',
+            '@radix-ui/react-tabs': 'latest',
+          },
+        }, null, 2),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/index.tsx',
+        content: 'import "./App"',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: 'export default function App() { return <main>Login</main> }',
+      },
+    ], 'Login page')
+
+    expect(result.files['/package.json']).toContain('@radix-ui/react-tabs')
+    expect(result.files['/src/index.tsx']).toBe('import "./App"')
+    expect(result.files['/src/App.tsx']).toContain('Login')
+    expect(result.virtualPathToOperationPath.get('/src/App.tsx'))
+      .toBe('apps/design/src/generated/login-page/src/App.tsx')
   })
 
   it('uses the bundled Tailwind browser runtime instead of the production-warning CDN', () => {
@@ -77,7 +109,7 @@ describe('createSandpackerFiles', () => {
     expect(uiStub).toContain('export function Textarea')
   })
 
-  it('injects shared UI stubs when generated code uses Textarea without an import', () => {
+  it('leaves unimported shared UI names untouched so project dependencies stay explicit', () => {
     const result = createSandpackerFiles([
       {
         kind: 'add',
@@ -92,7 +124,7 @@ describe('createSandpackerFiles', () => {
 
     const source = result.files['/apps/design/src/generated/FormPage.tsx']
 
-    expect(source).toContain("Textarea } from '/src/telegraph-ui.tsx'")
+    expect(source).not.toContain('/src/telegraph-ui.tsx')
   })
 
   it('normalizes Textarea imports from shared UI modules', () => {

@@ -115,8 +115,9 @@ function createChildSystemPrompt(request: DesignBuildChildRunRequest): string {
     `You must call the ${SUBMIT_DESIGN_CHILD_OUTPUT_TOOL_NAME} tool exactly once. Do not answer with text.`,
     'Put the final stage result in the tool argument field named "output".',
     'If you cannot improve the provided input, submit an output object with the same shape as the input.',
-    'Use the provided input as the source of truth. Keep imports using "@/..." monorepo-root aliases when source code appears.',
+    'Use the provided input as the source of truth.',
     `Stage output contract: ${stageContractDescription(request.stage)}`,
+    standaloneProjectInstruction(request.stage),
     stageInstruction(request),
   ].filter(Boolean).join('\n')
 }
@@ -137,14 +138,29 @@ function stageInstruction(request: DesignBuildChildRunRequest): string {
     case 'component-retrieval':
       return 'For component-retrieval, return {"query": string, "components": [...], "summary": string}.'
     case 'code-artifact':
-      return 'For code-artifact, return either the input summary object or {"artifact": <DesignBuildArtifact>} when producing replacement source.'
+      return 'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. Return the input summary object only if no source changes are possible.'
     case 'review':
       return 'For review, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
     case 'repair':
-      return 'For repair, return either the repaired input summary object or {"artifact": <DesignBuildArtifact>} when producing a repaired patch.'
+      return 'For repair, return {"artifact": <DesignBuildArtifact>} when producing a repaired patch. Return the input summary object only if no source changes are possible.'
     case 'review-repair':
       return 'For review-repair, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
   }
+}
+
+function standaloneProjectInstruction(stage: DesignBuildChildStage): string {
+  if (stage !== 'code-artifact' && stage !== 'repair') return ''
+  return [
+    'Standalone app contract:',
+    '- Produce a complete Sandpacker/Vite React project as a design-patch artifact.',
+    '- Include package.json, index.html, src/index.tsx or src/main.tsx, renderable React component files, and CSS files needed by the UI.',
+    '- Keep the entry file and component files consistent: if src/index.tsx imports "./ProfilePage", include src/ProfilePage.tsx; if the only component file is src/App.tsx, import "./App".',
+    '- Declare every external runtime library imported by source in package.json dependencies; declare build-only packages in devDependencies.',
+    '- Use package.json as the dependency source of truth. Do not rely on Telegraph workspace dependencies.',
+    '- Do not import from Telegraph monorepo aliases such as "@/packages/..." or "@telegraph/...". Implement local UI primitives or use npm packages declared in package.json.',
+    '- Keep files under the safe generated project root shown in the input artifact paths, for example apps/design/src/generated/<slug>/package.json; do not target the repository root package.json.',
+    '- index.html must use a sandbox-relative module script such as ./src/index.tsx?entry or ./src/main.tsx?entry.',
+  ].join('\n')
 }
 
 function createChildUserPrompt(
@@ -301,7 +317,7 @@ function stageContractDescription(stage: DesignBuildChildStage): string {
       return '{"query": string, "components": unknown[], "summary": string}'
     case 'code-artifact':
     case 'repair':
-      return '{"artifactId": string, "kind": string, "title": string} or {"artifact": DesignBuildArtifact}; DesignBuildArtifact is either design-preview {id, kind, title, html, prompt} or design-patch {id, kind, title, operations[]}.'
+      return '{"artifactId": string, "kind": string, "title": string} or {"artifact": DesignBuildArtifact}; for source generation, DesignBuildArtifact should be a design-patch whose operations describe a standalone Vite React app with package.json-driven dependencies.'
     case 'review':
     case 'review-repair':
       return '{"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}'

@@ -79,6 +79,7 @@ export function createTemplateDesignPatchArtifact(input: {
 }): DesignPatchArtifact {
   const title = titleFromPrompt(input.prompt)
   const slug = slugFromPrompt(input.prompt)
+  const projectRoot = `apps/design/src/generated/${slug}`
   return {
     id: `${input.runId}-patch`,
     kind: 'design-patch',
@@ -89,12 +90,37 @@ export function createTemplateDesignPatchArtifact(input: {
     operations: [
       {
         kind: 'add',
-        path: `apps/design/src/generated/${slug}.tsx`,
+        path: `${projectRoot}/package.json`,
+        content: renderPackageJson(slug),
+      },
+      {
+        kind: 'add',
+        path: `${projectRoot}/index.html`,
+        content: renderProjectIndexHtml(title),
+      },
+      {
+        kind: 'add',
+        path: `${projectRoot}/vite.config.ts`,
+        content: renderViteConfig(),
+      },
+      {
+        kind: 'add',
+        path: `${projectRoot}/src/index.tsx`,
+        content: renderEntrySource(),
+      },
+      {
+        kind: 'add',
+        path: `${projectRoot}/src/App.tsx`,
         content: renderTsxSource({
           componentName: componentNameFromSlug(slug),
           title,
           prompt: input.prompt,
         }),
+      },
+      {
+        kind: 'add',
+        path: `${projectRoot}/src/styles.css`,
+        content: renderProjectStyles(),
       },
     ],
   }
@@ -121,13 +147,6 @@ function componentNameFromSlug(slug: string): string {
     .map(part => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join('')
   return /^[A-Z]/.test(name) ? name : 'GeneratedDesignPage'
-}
-
-function escapeJsString(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$')
 }
 
 function escapeHtml(value: string): string {
@@ -296,16 +315,53 @@ function renderTsxSource(input: {
   title: string
   prompt: string
 }): string {
-  const title = escapeJsString(input.title)
-  const prompt = escapeJsString(input.prompt)
-  const archetype = pageArchetypeFromPrompt(input.prompt)
-  return `${importsForArchetype(archetype)}
+  return `import './styles.css'
 
-${dataForArchetype(archetype)}
+const brief = {
+  title: ${JSON.stringify(input.title)},
+  prompt: ${JSON.stringify(input.prompt)},
+}
+
+const workflow = [
+  { label: 'Brief', value: 'Captured' },
+  { label: 'Structure', value: 'Responsive' },
+  { label: 'Preview', value: 'Ready' },
+]
 
 export function ${input.componentName}() {
   return (
-${bodyForArchetype(archetype, { title, prompt })}
+    <main className="app-shell">
+      <nav className="topbar" aria-label="Primary">
+        <span className="brand">Telegraph Design</span>
+        <div className="nav-links" aria-hidden="true">
+          <span>Overview</span>
+          <span>Prototype</span>
+          <span>Review</span>
+        </div>
+      </nav>
+
+      <section className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow">Standalone React app</p>
+          <h1>{brief.title}</h1>
+          <p className="lede">{brief.prompt}</p>
+          <div className="actions">
+            <button type="button">Launch preview</button>
+            <button type="button" className="secondary">Inspect source</button>
+          </div>
+        </div>
+
+        <aside className="status-panel" aria-label="Build status">
+          <h2>Project output</h2>
+          {workflow.map(item => (
+            <div className="status-row" key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </aside>
+      </section>
+    </main>
   )
 }
 
@@ -313,256 +369,223 @@ export default ${input.componentName}
 `
 }
 
-type PageArchetype = 'dashboard' | 'login' | 'pricing' | 'settings' | 'landing'
+function renderEntrySource(): string {
+  return `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App'
 
-function pageArchetypeFromPrompt(prompt: string): PageArchetype {
-  const normalized = prompt.toLowerCase()
-  if (/\b(login|sign in|signin|auth|authentication)\b/.test(normalized)) return 'login'
-  if (/\b(pricing|price|plan|subscription|billing)\b/.test(normalized)) return 'pricing'
-  if (/\b(settings|setting|preferences|profile)\b/.test(normalized)) return 'settings'
-  if (/\b(dashboard|analytics|admin|metrics|overview)\b/.test(normalized)) return 'dashboard'
-  return 'landing'
+createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
+`
 }
 
-function importsForArchetype(archetype: PageArchetype): string {
-  const imports = [`import { Badge } from '@/packages/ui/components/ui/badge'`,
-    `import { Button } from '@/packages/ui/components/ui/button'`,
-    `import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/packages/ui/components/ui/card'`]
-  if (archetype === 'login') {
-    imports.push(`import { Input } from '@/packages/ui/components/ui/input'`)
+function renderViteConfig(): string {
+  return `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+})
+`
+}
+
+function renderPackageJson(slug: string): string {
+  return JSON.stringify({
+    name: `telegraph-generated-${slug}`,
+    version: '0.0.0',
+    private: true,
+    type: 'module',
+    scripts: {
+      dev: 'vite',
+      build: 'tsc --noEmit && vite build',
+      preview: 'vite preview',
+    },
+    dependencies: {
+      react: '19.1.0',
+      'react-dom': '19.1.0',
+    },
+    devDependencies: {
+      '@types/react': '19.1.8',
+      '@types/react-dom': '19.1.6',
+      '@vitejs/plugin-react': 'latest',
+      typescript: '5.3.3',
+      vite: '^5.4.0',
+    },
+  }, null, 2)
+}
+
+function renderProjectIndexHtml(title: string): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/index.tsx?entry"></script>
+  </body>
+</html>
+`
+}
+
+function renderProjectStyles(): string {
+  return `:root {
+  color: #172033;
+  background: #f5f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button {
+  min-height: 42px;
+  border: 1px solid #172033;
+  border-radius: 7px;
+  padding: 0 16px;
+  background: #172033;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+}
+
+button.secondary {
+  background: white;
+  color: #172033;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(22, 163, 74, 0.13), transparent 34rem),
+    linear-gradient(315deg, rgba(14, 165, 233, 0.14), transparent 30rem),
+    #f5f7fb;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 48px;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.1);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(16px);
+}
+
+.brand {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-links {
+  display: flex;
+  gap: 18px;
+  color: #5b6475;
+  font-size: 14px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 42px;
+  align-items: center;
+  width: min(1120px, calc(100% - 48px));
+  min-height: calc(100vh - 74px);
+  margin: 0 auto;
+  padding: 54px 0;
+}
+
+.eyebrow {
+  margin: 0 0 16px;
+  color: #047857;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 760px;
+  margin: 0;
+  color: #101828;
+  font-size: clamp(40px, 7vw, 76px);
+  line-height: 0.96;
+  letter-spacing: 0;
+}
+
+.lede {
+  max-width: 680px;
+  margin: 24px 0 0;
+  color: #475467;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.status-panel {
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+  padding: 22px;
+}
+
+.status-panel h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid rgba(23, 32, 51, 0.08);
+  padding: 15px 0;
+  color: #5b6475;
+}
+
+.status-row strong {
+  color: #047857;
+}
+
+@media (max-width: 820px) {
+  .topbar {
+    padding: 18px 22px;
   }
-  if (archetype === 'settings') {
-    imports.push(`import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/packages/ui/components/ui/tabs'`)
+
+  .nav-links {
+    display: none;
   }
-  return imports.join('\n')
-}
 
-function dataForArchetype(archetype: PageArchetype): string {
-  if (archetype === 'dashboard') {
-    return `const metrics = [
-  { label: 'Revenue', value: '$128.4K', delta: '+12.6%' },
-  { label: 'Activation', value: '68%', delta: '+4.1%' },
-  { label: 'Pipeline', value: '342', delta: '+28' },
-]
-
-const activity = ['Enterprise lead qualified', 'Checkout conversion improved', 'North-star metric updated']`
+  .hero {
+    grid-template-columns: 1fr;
+    width: min(100% - 36px, 640px);
+    min-height: auto;
+    padding: 42px 0;
   }
-  if (archetype === 'login') {
-    return `const trustSignals = ['SSO ready', 'Workspace aware', 'Secure session']`
-  }
-  if (archetype === 'pricing') {
-    return `const plans = [
-  { name: 'Starter', price: '$19', summary: 'For validating the first workflow' },
-  { name: 'Growth', price: '$79', summary: 'For teams shipping every week' },
-  { name: 'Scale', price: 'Custom', summary: 'For governed product organizations' },
-]`
-  }
-  if (archetype === 'settings') {
-    return `const settingsRows = [
-  ['Workspace name', 'Telegraph Design'],
-  ['Default runtime', 'Design Build'],
-  ['Artifact policy', 'Preview before apply'],
-]`
-  }
-  return `const highlights = [
-  'Structured brief',
-  'Component-aware layout',
-  'Patch-first source output',
-]`
 }
-
-function bodyForArchetype(
-  archetype: PageArchetype,
-  input: { title: string; prompt: string },
-): string {
-  if (archetype === 'dashboard') return dashboardBody(input)
-  if (archetype === 'login') return loginBody(input)
-  if (archetype === 'pricing') return pricingBody(input)
-  if (archetype === 'settings') return settingsBody(input)
-  return landingBody(input)
-}
-
-function dashboardBody(input: { title: string; prompt: string }): string {
-  return `    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
-      <section className="mx-auto flex max-w-6xl flex-col gap-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <Badge variant="secondary">Generated dashboard</Badge>
-            <h1 className="mt-4 text-4xl font-semibold tracking-normal">{\`${input.title}\`}</h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">{\`${input.prompt}\`}</p>
-          </div>
-          <Button>Export report</Button>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {metrics.map(metric => (
-            <Card key={metric.label}>
-              <CardHeader>
-                <CardDescription>{metric.label}</CardDescription>
-                <CardTitle>{metric.value}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="outline">{metric.delta}</Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest activity</CardTitle>
-            <CardDescription>Operational signals for the generated workflow</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {activity.map(item => (
-              <div key={item} className="rounded-md border border-border px-3 py-2 text-sm">{item}</div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
-    </main>`
-}
-
-function loginBody(input: { title: string; prompt: string }): string {
-  return `    <main className="grid min-h-screen bg-background px-6 py-8 text-foreground lg:grid-cols-[1fr_420px]">
-      <section className="flex items-center">
-        <div className="max-w-2xl">
-          <Badge variant="secondary">Secure access</Badge>
-          <h1 className="mt-5 text-5xl font-semibold leading-none tracking-normal">{\`${input.title}\`}</h1>
-          <p className="mt-5 text-base leading-7 text-muted-foreground">{\`${input.prompt}\`}</p>
-          <div className="mt-7 flex flex-wrap gap-2">
-            {trustSignals.map(item => <Badge key={item} variant="outline">{item}</Badge>)}
-          </div>
-        </div>
-      </section>
-
-      <Card className="self-center">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardDescription>Continue to your workspace</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Input placeholder="email@company.com" />
-          <Input placeholder="Password" type="password" />
-          <Button className="w-full">Continue</Button>
-        </CardContent>
-      </Card>
-    </main>`
-}
-
-function pricingBody(input: { title: string; prompt: string }): string {
-  return `    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
-      <section className="mx-auto max-w-6xl">
-        <Badge variant="secondary">Pricing</Badge>
-        <h1 className="mt-5 max-w-3xl text-5xl font-semibold leading-none tracking-normal">{\`${input.title}\`}</h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">{\`${input.prompt}\`}</p>
-
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {plans.map(plan => (
-            <Card key={plan.name}>
-              <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
-                <CardDescription>{plan.summary}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-semibold">{plan.price}</div>
-                <Button className="mt-5 w-full" variant={plan.name === 'Growth' ? 'default' : 'outline'}>
-                  Choose {plan.name}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-    </main>`
-}
-
-function settingsBody(input: { title: string; prompt: string }): string {
-  return `    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
-      <section className="mx-auto max-w-5xl">
-        <Badge variant="secondary">Settings</Badge>
-        <h1 className="mt-5 text-4xl font-semibold tracking-normal">{\`${input.title}\`}</h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">{\`${input.prompt}\`}</p>
-
-        <Tabs defaultValue="workspace" className="mt-8">
-          <TabsList>
-            <TabsTrigger value="workspace">Workspace</TabsTrigger>
-            <TabsTrigger value="runtime">Runtime</TabsTrigger>
-          </TabsList>
-          <TabsContent value="workspace">
-            <Card>
-              <CardHeader>
-                <CardTitle>Workspace preferences</CardTitle>
-                <CardDescription>Generated settings scaffold</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {settingsRows.map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
-                    <span>{label}</span>
-                    <Badge variant="outline">{value}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="runtime">
-            <Card>
-              <CardHeader>
-                <CardTitle>Runtime policy</CardTitle>
-                <CardDescription>Patch-first generation with review before apply</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button>Save preferences</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </section>
-    </main>`
-}
-
-function landingBody(input: { title: string; prompt: string }): string {
-  return `    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
-      <section className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-        <div>
-          <Badge variant="secondary">Generated by Telegraph Design</Badge>
-          <h1 className="mt-5 max-w-3xl text-5xl font-semibold leading-none tracking-normal">
-            {\`${input.title}\`}
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
-            {\`${input.prompt}\`}
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Button>Primary action</Button>
-            <Button variant="outline">Review source</Button>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Build summary</CardTitle>
-            <CardDescription>Initial design-build patch artifact</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {highlights.map(item => (
-              <div
-                key={item}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
-              >
-                <span>{item}</span>
-                <Badge variant="outline">ready</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
-    </main>`
+`
 }
 
 function isDesignPatchOperation(value: unknown): value is DesignPatchOperation {

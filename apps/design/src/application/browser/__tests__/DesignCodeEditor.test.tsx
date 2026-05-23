@@ -4,15 +4,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DesignCodeEditor } from '../DesignCodeEditor'
 
 vi.mock('@monaco-editor/react', () => ({
-  default: (props: { value?: string; language?: string; options?: Record<string, unknown> }) => (
-    <div
-      data-testid="monaco-editor"
-      data-language={props.language}
-      data-readonly={String(props.options?.readOnly ?? false)}
-    >
-      {props.value}
-    </div>
-  ),
+  default: (props: { value?: string; language?: string; options?: Record<string, unknown> }) => {
+    const readOnly = props.options?.readOnly
+    return (
+      <div
+        data-testid="monaco-editor"
+        data-language={props.language}
+        data-readonly={typeof readOnly === 'boolean' ? String(readOnly) : 'false'}
+      >
+        {props.value}
+      </div>
+    )
+  },
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -180,5 +183,5 @@ describe('DesignCodeEditor', () => {
 
 function findButtonByText(container: HTMLElement | undefined, text: string): HTMLButtonElement | undefined {
   return [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
-    .find(button => button.textContent?.includes(text))
+    .find(button => button.textContent.includes(text))
 }

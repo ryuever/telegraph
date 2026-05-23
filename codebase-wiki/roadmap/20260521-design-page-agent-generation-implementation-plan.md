@@ -7,7 +7,7 @@ description: >
   首轮 patch 出码、review/repair、subagents 协作与后续聊天修改。
 category: roadmap
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-05-24
 tags:
   - design-page
   - design-build
@@ -23,6 +23,9 @@ references:
   - id: P-009
     rel: extended-by
     file: ./20260521-design-page-preview-editor-handoff.md
+  - id: A-014
+    rel: related-to
+    file: ../architecture/20260524-design-build-standalone-project-output-contract.md
 ---
 
 # Design Page 一句话生成页面可执行实施计划

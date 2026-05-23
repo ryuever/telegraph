@@ -8,6 +8,10 @@ import type {
   DesignBuildReview,
 } from './DesignBuildInitialState'
 import { DesignBuildRuntimeError } from './DesignBuildInitialState'
+import {
+  evaluateStandaloneProjectFiles,
+  isSafeProjectPatchPath,
+} from '@/apps/design/application/common/design-project-contract'
 
 export interface DesignBuildValidationResult {
   valid: boolean
@@ -57,18 +61,19 @@ function validateArtifact(artifact: DesignBuildArtifact): string[] {
   for (const operation of artifact.operations) {
     errors.push(...validatePatchOperation(operation))
   }
+  const projectContract = evaluateStandaloneProjectFiles(artifact.operations)
+  for (const check of projectContract.checks) {
+    if (!check.passed) errors.push(`standalone project check failed: ${check.id}`)
+  }
   return errors
 }
 
 function validatePatchOperation(operation: DesignPatchOperation): string[] {
   const errors: string[] = []
   if (!operation.path.trim()) errors.push('patch operation path is empty')
-  if (operation.path.includes('..')) errors.push(`patch operation path escapes workspace: ${operation.path}`)
+  if (!isSafeProjectPatchPath(operation.path)) errors.push(`patch operation path escapes workspace: ${operation.path}`)
   if (operation.kind !== 'delete' && !operation.content?.trim()) {
     errors.push(`patch ${operation.kind} operation has no source content: ${operation.path}`)
-  }
-  if (operation.content && !operation.content.includes("@/packages/ui/")) {
-    errors.push(`patch operation does not use shared UI alias: ${operation.path}`)
   }
   return errors
 }
@@ -83,13 +88,7 @@ function repairArtifact(artifact: DesignBuildArtifact): DesignPatchArtifact | un
   if (artifact.kind !== 'design-patch') return undefined
 
   const operations = artifact.operations
-    .filter(operation => operation.path.trim().length > 0 && !operation.path.includes('..'))
-    .map(operation => ({
-      ...operation,
-      content: operation.content
-        ?.replace(/@telegraph\/ui\//g, '@/packages/ui/')
-        .replace(/@\/invalid-ui\//g, '@/packages/ui/'),
-    }))
+    .filter(operation => isSafeProjectPatchPath(operation.path))
     .filter(operation => operation.kind === 'delete' || Boolean(operation.content?.trim()))
 
   if (operations.length === 0) return undefined

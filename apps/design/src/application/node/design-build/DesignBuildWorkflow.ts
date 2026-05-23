@@ -134,7 +134,7 @@ export class DesignBuildWorkflow {
       stepId: `${input.runId}:review`,
       label: 'Review',
       completedOutput: value => value,
-      run: () => this.runReviewStage(input, subagents, artifact, result.context.aliasRule),
+      run: () => this.runReviewStage(input, subagents, artifact, result.context.sandboxProject),
     })
     if (reviewStage.cancelled) return
     let review = reviewStage.value
@@ -249,7 +249,7 @@ export class DesignBuildWorkflow {
     input: RuntimeInput,
     subagents: DesignBuildSubagentGateway,
     artifact: DesignBuildInitialState['artifact'],
-    aliasRule: string,
+    sandboxProject: DesignBuildInitialState['context']['sandboxProject'],
   ): AsyncGenerator<AgentEvent, DesignBuildInitialState['review'], void> {
     const policyReview = evaluateDesignBuildArtifact(artifact)
     const reviewOutput = yield* subagents.runChild({
@@ -262,7 +262,7 @@ export class DesignBuildWorkflow {
       modelInput: {
         artifact,
         review: policyReview,
-        aliasRule,
+        sandboxProject,
       },
       settings: input.settings,
       metadata: input.metadata,
@@ -372,8 +372,8 @@ export class DesignBuildWorkflow {
       modelInput: {
         artifact,
         review: policyReview,
-        aliasRule: input.context && typeof input.context === 'object' && 'aliasRule' in input.context
-          ? (input.context as { aliasRule?: unknown }).aliasRule
+        sandboxProject: input.context && typeof input.context === 'object' && 'sandboxProject' in input.context
+          ? (input.context as { sandboxProject?: unknown }).sandboxProject
           : undefined,
         repairAttempt: 1,
       },

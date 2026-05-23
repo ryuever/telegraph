@@ -4,7 +4,7 @@ title: "@orchestrator/core 作为 Harness Control 接入可行性分析"
 description: "评估 langgraphjs/libs/orchestrator 零依赖 Pregel 图编排引擎接入 Telegraph 的可行性。"
 category: discussion
 created: 2026-05-17
-updated: 2026-05-18
+updated: 2026-05-24
 tags: [orchestrator, langgraph, pregel, harness, runtime, workflow, feasibility]
 status: draft
 references:
@@ -283,8 +283,8 @@ Swarm:    createSwarm, SwarmState, createHandoffAction
 |------|------|
 | [A-005](../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md) | Agent Runtime 完整理论 |
 | [A-008](../architecture/20260509-telegraph-final-process-architecture.md) §3.4 + §8 | Runtime 在进程拓扑中的承载 |
-| [agent-runtime-design.md](../../.agents/agent-runtime-design.md) | 8 条设计原则 |
-| [agent-runtime-guard.md](../../.agents/agent-runtime-guard.md) | 红线清单 |
+| `../../.agents/agent-runtime-design.md` | 8 条设计原则 |
+| `../../.agents/agent-runtime-guard.md` | 红线清单 |
 | [D-011](./20260517-chat-agent-runtime-integration.md) | Chat Agent Runtime 接入（已实施） |
 | `packages/runtime-contracts/src/` | RuntimeEvent / AgentRuntime 类型骨架 |
 | `langgraphjs/libs/orchestrator/` | @orchestrator/core 源码 |

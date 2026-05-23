@@ -151,7 +151,7 @@ function FileTreeItem({
             'flex w-full items-center gap-1 rounded-sm px-2 py-1 text-left text-xs transition-colors hover:bg-accent/50',
             isActive && 'bg-accent/30',
           )}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
         >
           <ChevronRight
             size={12}
@@ -192,7 +192,7 @@ function FileTreeItem({
           ? 'bg-accent text-accent-foreground'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
       )}
-      style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
     >
       <FileCode2 size={13} className="shrink-0 opacity-60" />
       <span className="min-w-0 truncate">{node.name}</span>

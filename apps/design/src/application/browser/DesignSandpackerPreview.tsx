@@ -14,6 +14,10 @@ import type {
   DesignPatchFileOperation,
   DesignSelectedComponentSnapshot,
 } from '@/apps/design/application/common'
+import {
+  inferSandboxProjectRoot,
+  sandboxVirtualPathForOperation,
+} from '@/apps/design/application/common/design-project-contract'
 
 const backendFactory = new BrowserWorkerBackendFactory({ workerUrl })
 const serviceWorkerUrl = import.meta.env.DEV ? '/sandpacker-worker.js' : productionServiceWorkerUrl
@@ -296,8 +300,28 @@ export function createSandpackerFiles(
   importRestorers: Map<string, (source: string) => string>
   virtualPathToOperationPath: Map<string, string>
 } {
-  const firstSourceOperation = operations.find(operation => operation.kind !== 'delete' && operation.content)
-  const entryPath = firstSourceOperation ? toVirtualPath(firstSourceOperation.path) : '/src/Generated.tsx'
+  const projectRoot = inferSandboxProjectRoot(operations)
+  const projectedOperations = operations
+    .filter(operation => operation.kind !== 'delete' && operation.content)
+    .map(operation => ({
+      operation,
+      path: sandboxVirtualPathForOperation(operation.path, projectRoot),
+    }))
+  const providedPaths = new Set(projectedOperations.map(operation => operation.path))
+  const existingEntryPath = preferredPath(providedPaths, [
+    '/src/index.tsx',
+    '/src/main.tsx',
+    '/src/index.jsx',
+    '/src/main.jsx',
+  ])
+  const componentEntryPath = preferredPath(providedPaths, [
+    '/src/App.tsx',
+    '/src/App.jsx',
+    '/src/app.tsx',
+    '/src/app.jsx',
+  ]) ?? projectedOperations.find(item => looksLikePreviewSourcePath(item.path))?.path
+  const entryPath = componentEntryPath ?? '/src/Generated.tsx'
+  const htmlEntryPath = existingEntryPath ?? '/src/index.tsx'
   const importRestorers = new Map<string, (source: string) => string>()
   const virtualPathToOperationPath = new Map<string, string>()
   const files: FileTree = {
@@ -311,18 +335,19 @@ export function createSandpackerFiles(
         typescript: '5.3.3',
       },
     }, null, 2),
-    '/index.html': renderIndexHtml(title),
-    '/src/index.tsx': renderEntrySource(entryPath),
+    '/index.html': renderIndexHtml(title, htmlEntryPath),
     '/src/telegraph-ui.tsx': telegraphUiStubSource,
   }
 
-  for (const operation of operations) {
-    if (operation.kind === 'delete' || !operation.content) continue
-    const path = toVirtualPath(operation.path)
-    const normalized = normalizeTelegraphImports(operation.content)
-    files[path] = normalized.source
-    importRestorers.set(path, normalized.restore)
-    virtualPathToOperationPath.set(path, operation.path)
+  if (!existingEntryPath) {
+    files['/src/index.tsx'] = renderEntrySource(entryPath)
+  }
+
+  for (const item of projectedOperations) {
+    const normalized = normalizeTelegraphImports(item.operation.content ?? '')
+    files[item.path] = normalized.source
+    importRestorers.set(item.path, normalized.restore)
+    virtualPathToOperationPath.set(item.path, item.operation.path)
   }
 
   if (!files[entryPath]) {
@@ -337,9 +362,10 @@ function updateOperationsFromFiles(
   files: FileTree,
   importRestorers: Map<string, (source: string) => string>,
 ): DesignPatchFileOperation[] {
+  const projectRoot = inferSandboxProjectRoot(operations)
   return operations.map(operation => {
     if (operation.kind === 'delete') return operation
-    const path = toVirtualPath(operation.path)
+    const path = sandboxVirtualPathForOperation(operation.path, projectRoot)
     const content = fileContent(files, path)
     if (content === undefined) return operation
     const restore = importRestorers.get(path)
@@ -355,10 +381,7 @@ function normalizeTelegraphImports(source: string): {
   const matches = source.match(TELEGRAPH_UI_MODULE_IMPORT_PATTERN) ?? []
   const sourceWithoutStubImport = source.replace(TELEGRAPH_UI_STUB_IMPORT_PATTERN, '')
   const sourceWithoutUiImports = sourceWithoutStubImport.replace(TELEGRAPH_UI_MODULE_IMPORT_PATTERN, '')
-  const usesStubComponent = TELEGRAPH_UI_COMPONENTS.some(component =>
-    new RegExp(`<${component}(?:[\\s>/])`).test(sourceWithoutUiImports),
-  )
-  if (matches.length === 0 && !usesStubComponent) return { source, restore: updatedSource => updatedSource }
+  if (matches.length === 0) return { source, restore: updatedSource => updatedSource }
 
   const originalImportBlock = matches.join('').trimEnd()
   const normalized = `${TELEGRAPH_UI_IMPORT_SOURCE}${sourceWithoutUiImports}`
@@ -372,7 +395,8 @@ function normalizeTelegraphImports(source: string): {
   }
 }
 
-function renderIndexHtml(title: string): string {
+function renderIndexHtml(title: string, entryPath: string): string {
+  const entryScript = `.${entryPath}?entry`
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -399,7 +423,7 @@ function renderIndexHtml(title: string): string {
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="./src/index.tsx?entry"></script>
+    <script type="module" src="${escapeHtml(entryScript)}"></script>
   </body>
 </html>`
 }
@@ -484,13 +508,22 @@ export function TabsContent({ className, ...props }: ElementProps<'div'>) {
 }
 `
 
-function toVirtualPath(path: string): string {
-  return path.startsWith('/') ? path : `/${path}`
-}
-
 function fileContent(files: FileTree, path: string): string | undefined {
   if (!Object.prototype.hasOwnProperty.call(files, path)) return undefined
   return (files as Partial<Record<string, string>>)[path]
+}
+
+function preferredPath(paths: Set<string>, candidates: string[]): string | undefined {
+  return candidates.find(candidate => paths.has(candidate))
+}
+
+function looksLikePreviewSourcePath(path: string): boolean {
+  if (!/\.(tsx|jsx)$/i.test(path)) return false
+  return !path.endsWith('.test.tsx') && !path.endsWith('.test.jsx')
+}
+
+function toLeadingSlash(path: string): string {
+  return path.startsWith('/') ? path : `/${path}`
 }
 
 function validateSandpackerPayload(operations: DesignPatchFileOperation[]): { ok: true } | { ok: false; reason: string } {
@@ -533,7 +566,7 @@ function selectedComponentFromSandpackerSelection({
   selection: ElementSelectionShape
   virtualPathToOperationPath: Map<string, string>
 }): DesignSelectedComponentSnapshot | null {
-  const virtualPath = toVirtualPath(selection.filePath)
+  const virtualPath = toLeadingSlash(selection.filePath)
   const path = virtualPathToOperationPath.get(virtualPath) ?? selection.filePath
   const selectedNode = selectedDomNode(selection.domTree)
   const attributes = selection.attributes ?? selectedNode?.attributes
