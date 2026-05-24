@@ -254,7 +254,7 @@ describe('createSandpackerFiles', () => {
     expect(source).not.toContain('@/packages/ui/components/ui/button')
   })
 
-  it('normalizes generated project alias imports to local Sandpacker files', () => {
+  it('preserves generated project alias imports for the Sandpacker Vite resolver', () => {
     const result = createSandpackerFiles([
       {
         kind: 'add',
@@ -298,9 +298,8 @@ describe('createSandpackerFiles', () => {
 
     const source = result.files['/src/App.tsx']
 
-    expect(source).toContain("from '/src/components/ui/button.tsx'")
-    expect(source).toContain("from '/src/lib/utils.ts'")
-    expect(source).toContain("import '/src/styles.css'")
-    expect(source).not.toContain('@/components/ui/button')
+    expect(source).toContain("from '@/components/ui/button'")
+    expect(source).toContain("from '@/lib/utils'")
+    expect(source).toContain("import '@/styles.css'")
   })
 })

@@ -211,8 +211,8 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@sandpacker/worker':
-        specifier: 0.2.1
-        version: 0.2.1(react@18.3.1)(typescript@5.9.3)
+        specifier: 0.3.0
+        version: 0.3.0(react@18.3.1)(typescript@5.9.3)
       '@tailwindcss/browser':
         specifier: ^4.3.0
         version: 4.3.0
@@ -2835,7 +2835,7 @@ packages:
       react: '>=18'
 
   '@sandpacker/editor-service@0.2.0':
-    resolution: {integrity: sha512-PrPFpSoIiplFeybpHZq2cTsAy9IYYSfMXVEN+LgSiGLACfaZF24lCfm1w6Zt+Ou+/w3lpjVp0Sap4w+91Dslaw==, tarball: https://registry.npmjs.org/@sandpacker/editor-service/-/editor-service-0.2.0.tgz}
+    resolution: {integrity: sha512-PrPFpSoIiplFeybpHZq2cTsAy9IYYSfMXVEN+LgSiGLACfaZF24lCfm1w6Zt+Ou+/w3lpjVp0Sap4w+91Dslaw==}
     peerDependencies:
       react: '>=18'
 
@@ -2847,8 +2847,8 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@sandpacker/worker@0.2.1':
-    resolution: {integrity: sha512-md+85ycEOUXSiijTZmZNgWyM8HJXpsHClMFAVSk+I22x2G9lzzwPbDa3pm6uCqom/mLDL/123vN88U9zRqRyWg==}
+  '@sandpacker/worker@0.3.0':
+    resolution: {integrity: sha512-2ZB9wMBlBdftadNtcr2wRiMuwVp/ccA4YCDcCfg/CpTjkVeWOPW3OJPps3IJ2CWBr9UyDuhLrC00WIoixr5aXw==}
 
   '@shikijs/core@2.5.0':
     resolution: {integrity: sha512-uu/8RExTKtavlpH7XqnVYBrfBkUc20ngXiX9NSrBhOVZYv/7XQRKUyhtkeflY5QsxC0GbJThCerruZfsUaSldg==}
@@ -11852,7 +11852,7 @@ snapshots:
       - '@types/react-dom'
       - react-dom
 
-  '@sandpacker/worker@0.2.1(react@18.3.1)(typescript@5.9.3)':
+  '@sandpacker/worker@0.3.0(react@18.3.1)(typescript@5.9.3)':
     dependencies:
       '@sandpacker/core': 0.2.0(react@18.3.1)
       '@sandpacker/shared': 0.2.0

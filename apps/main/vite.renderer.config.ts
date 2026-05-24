@@ -19,6 +19,19 @@ function emptyNodeBuiltinPlugin(): Plugin {
   };
 }
 
+function sandpackerBabelParserShimPlugin(): Plugin {
+  const shimPath = resolve(__dirname, 'src/application/browser/sandpacker-node-stubs/babel-parser.js');
+
+  return {
+    name: 'telegraph:sandpacker-babel-parser-shim',
+    enforce: 'pre',
+    resolveId(id) {
+      if (id === '@babel/parser') return shimPath;
+      return null;
+    },
+  };
+}
+
 function devSandpackerServiceWorkerPlugin(): Plugin {
   return {
     name: 'telegraph:sandpacker-dev-service-worker',
@@ -174,7 +187,7 @@ async function waitForCache(cache, cacheKey) {
 
 export default defineConfig(({ command }) => ({
   ...(command === 'serve' ? { base: '/' } : {}),
-  plugins: [react(), emptyNodeBuiltinPlugin(), devSandpackerServiceWorkerPlugin()],
+  plugins: [sandpackerBabelParserShimPlugin(), react(), emptyNodeBuiltinPlugin(), devSandpackerServiceWorkerPlugin()],
   resolve: {
     alias: {
       assert: 'assert',
@@ -235,6 +248,7 @@ export default defineConfig(({ command }) => ({
     include: [
       // Sandpacker pulls a few CommonJS-only parser helpers through its browser worker graph.
       // Pre-bundling them makes Vite expose stable ESM default exports in the renderer.
+      '@babel/parser/lib/index.js',
       'acorn-class-fields',
       'acorn-private-class-elements',
       'acorn-static-class-features',

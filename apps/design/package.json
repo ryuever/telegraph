@@ -20,7 +20,7 @@
     "@sandpacker/editor-service": "0.2.0",
     "@sandpacker/shared": "0.2.0",
     "@sandpacker/style-editor": "0.2.0",
-    "@sandpacker/worker": "0.2.1",
+    "@sandpacker/worker": "0.3.0",
     "@tailwindcss/browser": "^4.3.0",
     "@telegraph/agent": "workspace:*",
     "@telegraph/agent-protocol": "workspace:*",
