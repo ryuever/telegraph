@@ -13,7 +13,10 @@ import type {
   DesignPatchFileOperation,
 } from '@/apps/design/application/common'
 import { createComponentEditContext } from '@/apps/design/application/common'
-import type { DesignProjectedArtifact } from './design-agent-projector'
+import {
+  upsertDesignProjectedArtifact,
+  type DesignProjectedArtifact,
+} from './design-agent-projector'
 import {
   DesignArtifactWorkbench,
   type ArtifactApplyState,
@@ -191,9 +194,14 @@ export function DesignWorkspace({
         setSessionLogItems(prev => reduceDesignSessionLogItems(prev, event))
       },
       onArtifact: artifact => {
-        rememberAssistantArtifact(assistantMessageId, artifact)
-        artifactOperationBaselines.current.set(artifact.id, extractDesignPatchOperations(artifact) ?? [])
-        setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
+        let committedArtifact = artifact
+        setArtifacts((prev) => {
+          const next = upsertDesignProjectedArtifact(prev, artifact)
+          committedArtifact = next.find(item => item.id === artifact.id) ?? artifact
+          artifactOperationBaselines.current.set(committedArtifact.id, extractDesignPatchOperations(committedArtifact) ?? [])
+          return next
+        })
+        rememberAssistantArtifact(assistantMessageId, committedArtifact)
         setDirtyArtifactOperations((prev) => {
           if (!prev.has(artifact.id)) return prev
           const next = new Map(prev)
@@ -393,7 +401,7 @@ export function DesignWorkspace({
         output: result.artifact,
         sourceEventType: 'tool_result',
       }
-      setArtifacts(prev => [...prev.filter(item => item.id !== projected.id), projected])
+      setArtifacts(prev => upsertDesignProjectedArtifact(prev, projected))
       setActiveArtifactId(projected.id)
       rememberAssistantArtifact(assistantMessageId, projected)
       appendAssistantText(`已导出 ${format}。`, assistantMessageId)

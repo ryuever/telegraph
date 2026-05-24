@@ -118,6 +118,105 @@ describe('projectAgentEventToDesign', () => {
     ])
   })
 
+  it('collapses shadcn tool source artifacts into one continuously updated draft', () => {
+    const projection = projectDesignAgentRunEventRecords([
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 1,
+        ts: 1,
+        event: {
+          type: 'tool_result',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          callId: 'call-1',
+          toolName: 'create_shadcn_project',
+          output: {
+            artifact: {
+              id: 'source-artifact',
+              kind: 'design-patch',
+              title: 'SaaS source',
+              operations: [
+                { kind: 'add', path: 'app/package.json', content: '{"dependencies":{"react":"latest"}}' },
+                { kind: 'add', path: 'app/src/App.tsx', content: 'export function App() { return null }' },
+              ],
+            },
+          },
+          ts: 1,
+        },
+      },
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 2,
+        ts: 2,
+        event: {
+          type: 'tool_result',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          callId: 'call-2',
+          toolName: 'add_shadcn_component',
+          output: {
+            artifact: {
+              id: 'source-artifact:shadcn-card',
+              kind: 'design-patch',
+              title: 'SaaS source + card',
+              operations: [
+                { kind: 'add', path: 'app/package.json', content: '{"dependencies":{"@radix-ui/react-slot":"latest"}}' },
+                { kind: 'add', path: 'app/src/components/ui/card.tsx', content: 'export function Card() { return null }' },
+              ],
+            },
+            component: { name: 'card' },
+          },
+          ts: 2,
+        },
+      },
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 3,
+        ts: 3,
+        event: {
+          type: 'tool_result',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          callId: 'call-3',
+          toolName: 'add_shadcn_component',
+          output: {
+            artifact: {
+              id: 'source-artifact:shadcn-chart',
+              kind: 'design-patch',
+              title: 'SaaS source + chart',
+              operations: [
+                { kind: 'add', path: 'app/src/components/ui/chart.tsx', content: 'export function Chart() { return null }' },
+              ],
+            },
+            component: { name: 'chart' },
+          },
+          ts: 3,
+        },
+      },
+    ])
+
+    expect(projection.artifacts).toHaveLength(1)
+    expect(projection.artifacts[0]).toEqual(expect.objectContaining({
+      id: 'source-artifact',
+      title: 'SaaS source',
+      sourceEventType: 'tool_result',
+    }))
+    expect(projection.artifacts[0]?.output).toEqual(expect.objectContaining({
+      id: 'source-artifact',
+      title: 'SaaS source',
+    }))
+    expect((projection.artifacts[0]?.output as { operations?: Array<{ path: string }> }).operations?.map(operation => operation.path)).toEqual([
+      'app/package.json',
+      'app/src/App.tsx',
+      'app/src/components/ui/card.tsx',
+      'app/src/components/ui/chart.tsx',
+    ])
+    expect(JSON.stringify((projection.artifacts[0]?.output as { operations?: Array<{ path: string; content?: string }> }).operations?.[0]?.content)).toContain('@radix-ui/react-slot')
+  })
+
   it('keeps cancelled runs distinct from failed runs', () => {
     const result = collect([
       {
