@@ -50,7 +50,7 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
         settings: {
           provider: 'telegraph-faux-subagents',
           modelId: 'subagent-test-model',
-          apiKey: '',
+          apiKey: 'test-key',
           orchestration: 'telegraph-subagents',
           orchestrationPattern: 'chain',
         },
@@ -138,7 +138,7 @@ describe('TelegraphSubagentHarness faux provider integration', () => {
         settings: {
           provider: 'telegraph-faux-subagents-tools',
           modelId: 'subagent-tool-test-model',
-          apiKey: '',
+          apiKey: 'test-key',
           orchestration: 'telegraph-subagents',
           orchestrationPattern: 'chain',
         },

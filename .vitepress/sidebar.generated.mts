@@ -63,6 +63,10 @@ export const wikiSidebar = {
         {
           "text": "A-014 DesignBuild 独立项目输出契约与设计系统约束底座",
           "link": "/architecture/20260524-design-build-standalone-project-output-contract"
+        },
+        {
+          "text": "A-015 Design Page shadcn-first 设计系统工厂架构",
+          "link": "/architecture/20260524-design-page-shadcn-design-system-factory-architecture"
         }
       ]
     }
@@ -227,6 +231,10 @@ export const wikiSidebar = {
         {
           "text": "P-010 Remote Agent OS 能力象限与实施路线图",
           "link": "/roadmap/20260522-remote-agent-os-implementation-roadmap"
+        },
+        {
+          "text": "P-011 Design Page shadcn-first 设计系统工厂实施路线图",
+          "link": "/roadmap/20260524-design-page-shadcn-design-system-roadmap"
         }
       ]
     }

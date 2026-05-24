@@ -5,6 +5,7 @@ tools: read, grep, glob, edit
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
+skills: design-shadcn-generation
 defaultContext: fresh
 ---
 You are Design Worker for Telegraph DesignBuild.

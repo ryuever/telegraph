@@ -26,6 +26,9 @@ references:
   - id: A-014
     rel: related-to
     file: ../architecture/20260524-design-build-standalone-project-output-contract.md
+  - id: P-011
+    rel: extended-by
+    file: ./20260524-design-page-shadcn-design-system-roadmap.md
 ---
 
 # Design Page 一句话生成页面可执行实施计划

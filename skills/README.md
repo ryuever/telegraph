@@ -27,6 +27,8 @@ skills/
 │   └── SKILL.md                       # umbrella skill — repo-wide coding conventions
 ├── add-pagelet/
 │   └── SKILL.md                       # workflow skill — new app → pagelet wiring
+├── design-shadcn-generation/
+│   └── SKILL.md                       # design-build convention — shadcn-first standalone artifacts
 └── <future-skill>/
     └── SKILL.md                       # …more as needed
 ```
@@ -36,6 +38,7 @@ skills/
 | Category | What goes here | Example |
 |----------|---------------|---------|
 | **Conventions** | Coding rules, style, import constraints | `telegraph-conventions/` |
+| **Design generation** | Design Page output constraints and style-system rules | `design-shadcn-generation/` |
 | **Workflows** | Multi-step procedures for common tasks | `add-pagelet/` (new app → pagelet wiring) |
 
 **Conventions** start as sections inside `telegraph-conventions/SKILL.md` and split into their own skill folder only when they become too long or need bundled assets.

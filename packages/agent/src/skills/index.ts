@@ -20,6 +20,12 @@ export {
 	type LoadSkillsFromDirOptions,
 } from './loader'
 
+export {
+	formatSelectedSkillBodiesForPrompt,
+	resolveSkillSearchRoot,
+	type FormatSelectedSkillBodiesOptions,
+} from './prompt'
+
 export type {
 	Skill,
 	SkillDiagnostic,

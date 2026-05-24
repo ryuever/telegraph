@@ -2,6 +2,12 @@ import type { RuntimeEvent } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { streamPiAiRuntimeEvents } from '@/packages/agent/runtime/streamPiAiRuntime'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
+import {
+  formatSelectedSkillBodiesForPrompt,
+  formatSkillsForPrompt,
+  loadSkills,
+  resolveSkillSearchRoot,
+} from '@/packages/agent/skills'
 import { createSubagentTools } from './tools'
 import type { SubagentDefinition, SubagentRecord } from './types'
 import { TELEGRAPH_SUBAGENTS_PRODUCER_VERSION } from './constants'
@@ -19,6 +25,7 @@ export interface SubagentRunRequest {
   sessionId?: string
   signal?: AbortSignal
   modelOverride?: string
+  skills?: string[]
 }
 
 export interface SubagentRunner {
@@ -29,7 +36,9 @@ export class StreamingSubagentRunner implements SubagentRunner {
   async *run(request: SubagentRunRequest, record: SubagentRecord): AsyncGenerator<RuntimeEvent, SubagentRecord, void> {
     const { parentRunId, childRunId, label, agent, task, settings, sessionId, signal, modelOverride } = request
     const childSettings = applyAgentSettings(settings, agent, modelOverride)
-    const prompt = buildPromptForAgent(agent, task)
+    const prompt = buildPromptForAgent(agent, task, {
+      selectedSkillNames: request.skills,
+    })
     const tools = createSubagentTools({
       runId: childRunId,
       sessionId,
@@ -92,11 +101,45 @@ export class StreamingSubagentRunner implements SubagentRunner {
 // Prompt assembly
 // ---------------------------------------------------------------------------
 
-export function buildPromptForAgent(agent: SubagentDefinition, task: string): string {
-  if (agent.systemPromptMode === 'append' || !agent.systemPrompt) {
-    return task
-  }
-  return `${agent.systemPrompt}\n\n---\n\nTask: ${task}`
+export interface BuildPromptForAgentOptions {
+  cwd?: string
+  selectedSkillNames?: string[]
+}
+
+export function buildPromptForAgent(
+  agent: SubagentDefinition,
+  task: string,
+  options: BuildPromptForAgentOptions = {},
+): string {
+  const skillPrompt = buildSkillPromptForAgent(agent, options)
+  const promptSections = [
+    agent.systemPromptMode === 'append' || !agent.systemPrompt ? undefined : agent.systemPrompt,
+    skillPrompt,
+  ].filter(Boolean)
+
+  if (promptSections.length === 0) return task
+  return `${promptSections.join('\n\n')}\n\n---\n\nTask: ${task}`
+}
+
+function buildSkillPromptForAgent(
+  agent: SubagentDefinition,
+  options: BuildPromptForAgentOptions,
+): string {
+  const selectedSkillNames = [
+    ...(agent.skills ?? []),
+    ...(options.selectedSkillNames ?? []),
+  ]
+  if (!agent.inheritSkills && selectedSkillNames.length === 0) return ''
+
+  const { skills } = loadSkills({
+    cwd: resolveSkillSearchRoot(options.cwd),
+  })
+  return [
+    agent.inheritSkills ? formatSkillsForPrompt(skills) : '',
+    selectedSkillNames.length > 0
+      ? formatSelectedSkillBodiesForPrompt(skills, selectedSkillNames)
+      : '',
+  ].filter(Boolean).join('\n\n')
 }
 
 export function applyAgentSettings(

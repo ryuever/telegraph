@@ -175,6 +175,7 @@ async function* runChain(
       settings: opts.settings,
       sessionId: opts.sessionId,
       signal: opts.signal,
+      skills: step.skills,
       modelOverride: step.model,
     })) {
       if (ev.type === 'assistant_delta' && ev.runId === childRunId) {
@@ -203,7 +204,7 @@ async function* runParallel(
   opts: ManagedOptions,
   concurrency: number = 4,
 ): AsyncGenerator<RuntimeEvent> {
-  const expanded: Array<{ agent: string; label?: string; task: string; model?: string }> = []
+  const expanded: Array<{ agent: string; label?: string; task: string; model?: string; skills?: string[] }> = []
   for (const t of tasks) {
     const count = t.count ?? 1
     for (let i = 0; i < count; i++) {
@@ -212,6 +213,7 @@ async function* runParallel(
         label: t.label,
         task: t.task ?? fallbackTask,
         model: t.model,
+        skills: t.skills,
       })
     }
   }
@@ -239,6 +241,7 @@ async function* runParallel(
       sessionId: opts.sessionId,
       signal: opts.signal,
       modelOverride: t.model,
+      skills: t.skills,
     })) {
       allChildEvents[idx].push(ev)
     }

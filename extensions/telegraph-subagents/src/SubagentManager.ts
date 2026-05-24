@@ -25,6 +25,7 @@ export interface SpawnSubagentInput {
   sessionId?: string
   signal?: AbortSignal
   modelOverride?: string
+  skills?: string[]
 }
 
 export class SubagentManager {
@@ -104,6 +105,7 @@ export class SubagentManager {
         sessionId: input.sessionId,
         signal: combinedSignal(record.abortController.signal, input.signal),
         modelOverride: input.modelOverride,
+        skills: input.skills,
       }
 
       for await (const event of this.runner.run(request, record)) {

@@ -35,6 +35,9 @@ references:
   - id: A-014
     rel: derives
     file: ../architecture/20260524-design-build-standalone-project-output-contract.md
+  - id: A-015
+    rel: extended-by
+    file: ../architecture/20260524-design-page-shadcn-design-system-factory-architecture.md
 ---
 
 # Design Page 一句话生成页面的产品定位与 Agent 编排架构

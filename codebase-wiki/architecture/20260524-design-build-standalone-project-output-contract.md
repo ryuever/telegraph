@@ -25,6 +25,12 @@ references:
   - id: I-005
     rel: related-to
     file: ../issue/20260521-design-page-preview-sandpacker-stabilization.md
+  - id: A-015
+    rel: extended-by
+    file: ./20260524-design-page-shadcn-design-system-factory-architecture.md
+  - id: P-011
+    rel: extended-by
+    file: ../roadmap/20260524-design-page-shadcn-design-system-roadmap.md
 ---
 
 # DesignBuild 独立项目输出契约与设计系统约束底座

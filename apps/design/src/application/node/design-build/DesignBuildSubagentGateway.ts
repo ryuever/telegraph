@@ -124,6 +124,8 @@ function profileFromSubagentDefinition(
     description: definition.description,
     systemPrompt: definition.systemPrompt,
     tools: definition.tools,
+    inheritSkills: definition.inheritSkills,
+    skills: definition.skills,
     sourcePath: definition.sourcePath,
     origin: definition.origin,
   }

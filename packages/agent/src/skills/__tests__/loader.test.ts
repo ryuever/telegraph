@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadSkills, loadSkillsFromDir, formatSkillsForPrompt } from '../loader'
+import { formatSelectedSkillBodiesForPrompt, resolveSkillSearchRoot } from '../prompt'
 import type { Skill } from '../types'
 
 function makeTmpDir(prefix: string): string {
@@ -164,5 +165,34 @@ describe('formatSkillsForPrompt', () => {
 		const result = formatSkillsForPrompt(skills)
 		expect(result).toContain('<name>visible</name>')
 		expect(result).not.toContain('<name>hidden</name>')
+	})
+})
+
+describe('formatSelectedSkillBodiesForPrompt', () => {
+	let tmpRoot: string
+	beforeEach(() => { tmpRoot = makeTmpDir('selected') })
+	afterEach(() => { rmSync(tmpRoot, { recursive: true, force: true }) })
+
+	it('embeds explicitly selected skill bodies and reports missing names', () => {
+		writeSkill(
+			join(tmpRoot, 'skills', 'design-system'),
+			{ name: 'design-system', description: 'Design system guidance' },
+			'Prefer project primitives.',
+		)
+		const { skills } = loadSkills({ cwd: tmpRoot })
+
+		const result = formatSelectedSkillBodiesForPrompt(skills, ['design-system', 'missing-skill'])
+
+		expect(result).toContain('<selected_skills>')
+		expect(result).toContain('name="design-system"')
+		expect(result).toContain('Prefer project primitives.')
+		expect(result).toContain('<missing_skill name="missing-skill" />')
+	})
+
+	it('walks upward to find the workspace skill root', () => {
+		mkdirSync(join(tmpRoot, 'skills'), { recursive: true })
+		mkdirSync(join(tmpRoot, 'apps', 'design'), { recursive: true })
+
+		expect(resolveSkillSearchRoot(join(tmpRoot, 'apps', 'design'))).toBe(tmpRoot)
 	})
 })

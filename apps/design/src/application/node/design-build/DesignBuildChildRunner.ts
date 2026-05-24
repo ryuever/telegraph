@@ -3,6 +3,11 @@ import {
   streamPiAiRuntimeEvents,
   type PiAiExecutableTool,
 } from '@/packages/agent/runtime/streamPiAiRuntime'
+import {
+  formatSelectedSkillBodiesForPrompt,
+  loadSkills,
+  resolveSkillSearchRoot,
+} from '@/packages/agent/skills'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 import type {
@@ -112,6 +117,7 @@ function createChildSystemPrompt(request: DesignBuildChildRunRequest): string {
   return [
     'You are a Telegraph design page generation child agent.',
     formatProfilePrompt(request.profile),
+    formatProfileSkillPrompt(request.profile),
     `You must call the ${SUBMIT_DESIGN_CHILD_OUTPUT_TOOL_NAME} tool exactly once. Do not answer with text.`,
     'Put the final stage result in the tool argument field named "output".',
     'If you cannot improve the provided input, submit an output object with the same shape as the input.',
@@ -120,6 +126,23 @@ function createChildSystemPrompt(request: DesignBuildChildRunRequest): string {
     standaloneProjectInstruction(request.stage),
     stageInstruction(request),
   ].filter(Boolean).join('\n')
+}
+
+function formatProfileSkillPrompt(profile: DesignBuildChildProfile | undefined): string {
+  const skillNames = profile?.skills ?? []
+  if (skillNames.length === 0) return ''
+
+  const { skills } = loadSkills({
+    cwd: resolveSkillSearchRoot(),
+  })
+  const selectedSkills = formatSelectedSkillBodiesForPrompt(skills, skillNames)
+  if (!selectedSkills) return ''
+
+  return [
+    'Selected skills for this DesignBuild child are embedded below.',
+    'Follow these skill instructions directly; this structured child run does not need to read skill files before submitting output.',
+    selectedSkills,
+  ].join('\n')
 }
 
 function formatProfilePrompt(profile: DesignBuildChildProfile | undefined): string {

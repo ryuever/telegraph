@@ -24,6 +24,8 @@ export interface DesignBuildChildProfile {
   description?: string
   systemPrompt: string
   tools?: string[]
+  inheritSkills?: boolean
+  skills?: string[]
   sourcePath?: string
   origin?: DesignBuildChildProfileOrigin
 }
@@ -45,6 +47,7 @@ export interface DesignBuildChildRunRaw {
   profile?: {
     title?: string
     sourcePath?: string
+    skills?: string[]
     origin?: unknown
   }
 }
@@ -63,6 +66,7 @@ export function childRunRaw(
       ? {
           title: options.profile.title,
           sourcePath: options.profile.sourcePath,
+          skills: options.profile.skills,
           origin: options.profile.origin,
         }
       : undefined,

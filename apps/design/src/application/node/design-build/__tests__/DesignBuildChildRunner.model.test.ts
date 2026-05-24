@@ -197,6 +197,46 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
     expect(request.systemPrompt).toContain('submit_design_child_output')
   })
 
+  it('embeds explicitly selected profile skills in the child system prompt', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield submitToolCall({
+        artifactId: 'model-artifact',
+        kind: 'design-patch',
+        title: 'Model artifact',
+      })
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      profile: {
+        id: DESIGN_BUILD_CHILD_PROFILES.worker,
+        title: 'Design Worker',
+        description: 'Generate design artifacts.',
+        systemPrompt: 'Produce source.',
+        skills: ['design-shadcn-generation'],
+      },
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })
+
+    const request = streamPiAiRuntimeEvents.mock.calls[0][0]
+    expect(request.systemPrompt).toContain('<selected_skills>')
+    expect(request.systemPrompt).toContain('design-shadcn-generation')
+    expect(request.systemPrompt).toContain('shadcn')
+  })
+
   it('fails invalid stage output instead of accepting a malformed contract', async () => {
     streamPiAiRuntimeEvents.mockImplementation(async function* () {
       await Promise.resolve()
