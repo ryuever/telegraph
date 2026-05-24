@@ -4,9 +4,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { DesignAgentSendOptions } from '../pagelet-design-agent-service'
 import { DesignWorkspace } from '../DesignWorkspace'
+import type { DesignSandpackerPreviewProps } from '../DesignSandpackerPreview'
 
 vi.mock('../DesignSandpackerPreview', () => ({
-  DesignSandpackerPreview: () => <div data-testid="sandpacker-preview" />,
+  DesignSandpackerPreview: (props: DesignSandpackerPreviewProps) => (
+    <div data-testid="sandpacker-preview">
+      <button
+        type="button"
+        onClick={() => {
+          props.onOperationsChange?.([
+            {
+              kind: 'update',
+              path: 'apps/design/src/Hero.tsx',
+              content: 'export function Hero() { return <button className="bg-green-600">Go</button> }',
+            },
+          ])
+        }}
+      >
+        Edit preview source
+      </button>
+    </div>
+  ),
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -283,7 +301,60 @@ describe('DesignWorkspace', () => {
       path: 'apps/design/src/Hero.tsx',
     })
   })
+
+  it('passes edited patch operation summaries into follow-up design runs', async () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      findButtonByText(container, 'Edit preview source')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const textarea = container.querySelector<HTMLTextAreaElement>('textarea')
+    expect(textarea).not.toBeNull()
+
+    await act(async () => {
+      if (!textarea) return
+      setTextAreaValue(textarea, 'make it more compact')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      findButtonByText(container, '发送')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(serviceMocks.send).toHaveBeenCalledTimes(2)
+    const secondSend = serviceMocks.send.mock.calls[1]?.[0] as DesignAgentSendOptions | undefined
+    const activeArtifact = recordField(secondSend?.context, 'activeArtifact')
+    expect(activeArtifact).toMatchObject({
+      id: 'patch-1',
+      operationPaths: ['apps/design/src/Hero.tsx'],
+    })
+    const operationSummary = recordValue(arrayField(activeArtifact, 'operationSummaries')[0])
+    expect(operationSummary).toMatchObject({
+      kind: 'update',
+      path: 'apps/design/src/Hero.tsx',
+    })
+    expect(stringField(operationSummary, 'contentPreview')).toContain('bg-green-600')
+    expect(numberField(operationSummary, 'contentLength')).toBeGreaterThan(0)
+  })
 })
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+}
 
 function recordField(value: unknown, key: string): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
@@ -291,6 +362,24 @@ function recordField(value: unknown, key: string): Record<string, unknown> | und
   return field && typeof field === 'object' && !Array.isArray(field)
     ? field as Record<string, unknown>
     : undefined
+}
+
+function arrayField(value: unknown, key: string): unknown[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  const field = (value as Record<string, unknown>)[key]
+  return Array.isArray(field) ? field : []
+}
+
+function stringField(value: unknown, key: string): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const field = (value as Record<string, unknown>)[key]
+  return typeof field === 'string' ? field : undefined
+}
+
+function numberField(value: unknown, key: string): number | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const field = (value as Record<string, unknown>)[key]
+  return typeof field === 'number' ? field : undefined
 }
 
 function setTextAreaValue(textarea: HTMLTextAreaElement, value: string): void {

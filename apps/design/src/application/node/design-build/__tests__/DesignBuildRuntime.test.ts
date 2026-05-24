@@ -159,6 +159,14 @@ describe('DesignBuildRuntime', () => {
             kind: 'design-patch',
             revision: 2,
             operationPaths: ['apps/design/src/generated/page.tsx'],
+            operationSummaries: [
+              {
+                kind: 'update',
+                path: 'apps/design/src/generated/page.tsx',
+                contentPreview: 'export function Hero() { return <button className="bg-green-600">Go</button> }',
+                contentLength: 75,
+              },
+            ],
           },
           selectedComponent: {
             id: 'artifact-parent:update:apps/design/src/generated/page.tsx:0',
@@ -180,6 +188,19 @@ describe('DesignBuildRuntime', () => {
     expect(arrayField(plannerBrief, 'acceptanceCriteria'))
       .toContain('Preserve component-level intent for Hero.')
 
+    const contextCompletion = events.find((event): event is Extract<AgentEvent, { type: 'step_completed' }> =>
+      event.type === 'step_completed' &&
+      event.stepId === 'run-revision:context'
+    )
+    const revision = recordField(contextCompletion?.output, 'revision')
+    const operationSummary = arrayField(revision, 'operationSummaries')[0]
+    expect(operationSummary).toMatchObject({
+      kind: 'update',
+      path: 'apps/design/src/generated/page.tsx',
+      contentLength: 75,
+    })
+    expect(stringField(operationSummary, 'contentPreview')).toContain('bg-green-600')
+
     const terminal = events.at(-1)
     expect(terminal?.type).toBe('run_completed')
     const artifact = terminal?.type === 'run_completed'
@@ -191,6 +212,7 @@ describe('DesignBuildRuntime', () => {
       revision: 3,
     })
     expect(stringField(artifact, 'changeSummary')).toContain('Target selected component: Hero.')
+    expect(stringField(artifact, 'changeSummary')).toContain('Current artifact operations: update apps/design/src/generated/page.tsx')
   })
 
   it('runs at most one repair attempt when reviewer requests repair', async () => {

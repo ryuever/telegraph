@@ -6,7 +6,10 @@ import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
 import { cn } from '@/packages/ui/lib/utils'
-import type { DesignAgentStreamEvent } from '@/apps/design/application/common'
+import type {
+  DesignAgentStreamEvent,
+  DesignPatchFileOperation,
+} from '@/apps/design/application/common'
 import type { DesignProjectedArtifact } from './design-agent-projector'
 import {
   DesignArtifactWorkbench,
@@ -69,6 +72,7 @@ interface DesignTraceItem {
 }
 
 const GENERIC_COMPLETION_MESSAGE = '已完成。'
+const OPERATION_CONTENT_PREVIEW_LIMIT = 320
 
 export function DesignWorkspace({
   initialPrompt,
@@ -846,27 +850,36 @@ function summarizeActiveArtifact(
 ): Record<string, unknown> | undefined {
   const artifact = artifacts.find(item => item.id === activeArtifactId) ?? artifacts.at(-1)
   if (!artifact) return undefined
+  const operations = extractDesignPatchOperations(artifact) ?? []
 
   return {
     id: artifact.id,
     kind: artifact.kind,
     title: artifact.title,
     revision: revisionFromArtifact(artifact.output),
-    operationPaths: operationPathsFromArtifact(artifact.output),
+    operationPaths: operations.map(operation => operation.path),
+    operationSummaries: summarizePatchOperations(operations),
   }
 }
 
-function operationPathsFromArtifact(output: unknown): string[] {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) return []
-  const operations = (output as { operations?: unknown }).operations
-  if (!Array.isArray(operations)) return []
+function summarizePatchOperations(
+  operations: DesignPatchFileOperation[],
+): Array<Record<string, unknown>> {
   return operations
-    .map(operation => {
-      if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return undefined
-      const path = (operation as { path?: unknown }).path
-      return typeof path === 'string' ? path : undefined
-    })
-    .filter((path): path is string => Boolean(path))
+    .map(operation => ({
+      kind: operation.kind,
+      path: operation.path,
+      contentLength: operation.content?.length,
+      contentPreview: truncateOperationContent(operation.content),
+      expectedOriginalLength: operation.expectedOriginal?.length,
+    }))
+}
+
+function truncateOperationContent(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  return value.length > OPERATION_CONTENT_PREVIEW_LIMIT
+    ? `${value.slice(0, OPERATION_CONTENT_PREVIEW_LIMIT)}...`
+    : value
 }
 
 function revisionFromArtifact(output: unknown): number | undefined {

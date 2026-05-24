@@ -6,7 +6,7 @@ description: >
   梳理下一阶段要完成的接线、数据契约、测试与验收清单，确保 preview、组件选中、属性编辑和 DesignBuild agent 迭代闭环可追踪落地。
 category: roadmap
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-05-24
 tags:
   - design-page
   - preview
@@ -34,10 +34,12 @@ references:
 ## 当前状态
 
 - `apps/design/package.json` 已接入 `@sandpacker/core`、`@sandpacker/worker`、`@sandpacker/shared`、`@sandpacker/editor-service`、`@sandpacker/style-editor`。
+- `apps/design/package.json` 已接入 `@tailwindcss/browser`，preview HTML 不再依赖 `https://cdn.tailwindcss.com`，避免生产 CDN warning。
 - `packages/ui/src/styles/globals.css` 已为 `@sandpacker/style-editor/dist` 增加 Tailwind source。
-- `apps/design/src/application/browser/DesignSandpackerPreview.tsx` 已具备 Sandpacker service worker 注册、worker backend、iframe preview、file tree、`StyleEditorPanel`、Telegraph UI import stub、file-to-operation 回写能力。
+- `apps/design/src/application/browser/DesignSandpackerPreview.tsx` 已具备 Sandpacker service worker 注册、worker backend、iframe preview、file tree、`StyleEditorPanel`、Telegraph UI import stub、standalone generated project root remap、file-to-operation 回写能力。
 - `apps/design/src/application/browser/DesignArtifactWorkbench.tsx` 已在 patch artifact preview mode 中嵌入 `DesignSandpackerPreview`，并通过 `onPatchOperationsChange` 向外传递更新后的 patch operations。
-- 当前 `ComponentInspector` 仍主要基于 patch operation target 展示结构化选择；真实 iframe DOM element selection 尚未完整映射成 `DesignSelectedComponentSnapshot`。
+- `DesignSandpackerPreview` 已将 Sandpacker `selectedElement` 映射为 `source: 'preview-dom'` 的 `DesignSelectedComponentSnapshot` 并回调 Workbench；真实浏览器点击链路仍需要 smoke test 覆盖。
+- `apps/main/vite.renderer.config.ts` 已为 Sandpacker renderer graph 增加 `util` browser stub、`buffer` browser polyfill alias 以及常用 Node/browser polyfill 预优化，避免 dev 运行中触发 Vite optimize-deps missing chunk。
 
 ## 下一阶段目标
 
@@ -53,31 +55,33 @@ references:
 
 ### 1. Preview 运行态加固
 
-- [ ] 明确 Sandpacker service worker 在 Electron renderer dev / packaged 两种环境下的 scope 与加载路径。
-- [ ] 给 `DesignSandpackerPreview` 增加非 service-worker fallback 或清晰失败态，避免 preview 整体空白。
-- [ ] 收敛 iframe sandbox 策略：允许 preview 必需能力，但不要给不必要的 host 权限。
-- [ ] 增加 preview reload / compile error / runtime error 的用户可见状态。
-- [ ] 限制单个 artifact 注入到 Sandpacker 的文件数量与 source size，避免大 payload 卡住 renderer。
+- [x] 明确 Sandpacker service worker 在 Electron renderer dev 下的 scope 与加载路径：dev 走 `/sandpacker-worker.js`，scope 为 `/`，请求按 `/<busId>/vite/<workspaceId>/...` 分流。
+- [ ] 验证 Sandpacker service worker 在 packaged Electron 环境下的加载路径与 scope。
+- [x] 给 `DesignSandpackerPreview` 增加清晰失败态：service worker 不可用或注册失败时显示错误面板，code / inspect tab 仍可用。
+- [x] 收敛 iframe sandbox 策略：Sandpacker preview 不再设置 `sandbox`，避免 `allow-scripts + allow-same-origin` 的无效安全组合；纯 HTML preview 仍保留 `sandbox=""`。
+- [x] 增加 preview reload / compile error / runtime error 的用户可见状态。
+- [x] 限制单个 artifact 注入到 Sandpacker 的文件数量与 source size，避免大 payload 卡住 renderer。
+- [x] 将 generated standalone project folder remap 到 Sandpacker root，避免 `/src/index.tsx?entry` 逃逸或 nested project 无法启动。
 
 验收：
 
-- [ ] dashboard / login / pricing / settings / landing 五类模板都能预览。
-- [ ] 语法错误时 preview 显示错误文件、行列、frame。
+- [ ] dashboard / login / pricing / settings / landing 五类模板真实 dev server smoke test。
+- [x] 语法错误时 preview 显示错误文件、行列、frame。
 - [ ] 切换 artifact 不残留上一个 artifact 的 iframe、files、selected element。
 
 ### 2. 组件选中事件打通
 
-- [ ] 从 `useSandpacker({ workspaceId })` 暴露的 `selectedElement` 中提取稳定字段，映射为 `DesignSelectedComponentSnapshot`。
-- [ ] 设计 `source: 'preview-dom'` 的 snapshot shape：至少包含 `artifactId`、`label`、`path`、`elementTag`、`className`、可选 source location。
-- [ ] 在 `DesignSandpackerPreview` 中新增 `onSelectComponent` callback，而不是只把 selection 投给 `editorService.receiveElementSelection`。
-- [ ] 让 Workbench 的 `selectedComponent` 同时支持 `patch-operation` 与 `preview-dom` 两种来源。
+- [x] 从 `useSandpacker({ workspaceId })` 暴露的 `selectedElement` 中提取稳定字段，映射为 `DesignSelectedComponentSnapshot`。
+- [x] 设计 `source: 'preview-dom'` 的 snapshot shape：至少包含 `artifactId`、`label`、`path`、`elementTag`、`className`、可选 source location。
+- [x] 在 `DesignSandpackerPreview` 中新增 `onSelectComponent` callback，而不是只把 selection 投给 `editorService.receiveElementSelection`。
+- [x] 让 Workbench 的 `selectedComponent` 同时支持 `patch-operation` 与 `preview-dom` 两种来源。
 - [ ] 选中元素后自动进入或刷新 Inspect 面板，但不要打断 preview 操作。
 
 验收：
 
-- [ ] iframe 中点击按钮、卡片、输入框都能更新右侧 Inspector。
-- [ ] selected component 会进入下一轮 `DesignWorkspace.runAgent` 的 `designContext.selectedComponent`。
-- [ ] 切换 artifact 后不误用旧 artifact 的 selected component。
+- [ ] iframe 中点击按钮、卡片、输入框都能更新右侧 Inspector（需真实浏览器 smoke test）。
+- [x] selected component 会进入下一轮 `DesignWorkspace.runAgent` 的 `designContext.selectedComponent`。
+- [x] 切换 artifact 后不误用旧 artifact 的 selected component：`DesignSandpackerPreview` 在 artifact 切换时 reset editor service 与 last emitted selection。
 
 ### 3. 组件属性编辑数据契约
 
@@ -95,7 +99,7 @@ references:
 
 ### 4. Agent 迭代闭环
 
-- [ ] 下一轮 prompt 需要携带 active artifact、selected component、edited operations summary、dirty state。
+- [ ] 下一轮 prompt 需要携带 active artifact、selected component、edited operations summary、dirty state。（active artifact、selected component、edited operations summary 已完成；dirty state 待补。）
 - [ ] `DesignBuildRuntime` 的 revision context 应区分“用户自然语言修改”和“组件编辑器产生的局部修改”。
 - [ ] worker child 的 `modelInput` 中加入 selected component DOM/source context，避免模型只看到文件级 patch。
 - [ ] reviewer 增加 component-edit 检查：修改是否仍指向同一 artifact、是否破坏 alias、是否产生空 patch。
@@ -104,14 +108,14 @@ references:
 验收：
 
 - [ ] 用户先点中一个按钮，再说“改成绿色并放大”，模型只修改相关组件。
-- [ ] 已通过组件编辑器改过的 source 能作为下一轮 agent 的 base。
+- [x] 已通过组件编辑器改过的 source 能作为下一轮 agent 的 base metadata：`activeArtifact.operationSummaries` 会进入 `DesignBuildRuntime` revision context。
 - [ ] trace 中能看出这次 run 是基于 selected component / edited operations 触发的。
 
 ### 5. 测试与验证
 
-- [ ] 为 `DesignSandpackerPreview` 增加文件转换单测：Telegraph UI import normalize / restore、operation update、artifact switch。
-- [ ] 为 `DesignArtifactWorkbench` 增加 preview-dom selection mock 测试。
-- [ ] 为 `DesignWorkspace` 增加 edited operations 进入下一轮 run context 的测试。
+- [x] 为 `DesignSandpackerPreview` 增加文件转换单测：entry path、standalone project root remap、Tailwind browser runtime、Telegraph UI import normalize / restore。
+- [x] 为 `DesignArtifactWorkbench` 增加 preview-dom selection mock 测试。
+- [x] 为 `DesignWorkspace` 增加 edited operations 进入下一轮 run context 的测试。
 - [ ] 增加一个失败路径测试：Sandpacker compile error 不影响 code/inspect tab。
 - [ ] 用浏览器自动化或手动 checklist 验证 iframe 非空、点击可选中、style editor 可更新。
 
@@ -126,21 +130,22 @@ pnpm -r typecheck
 
 ## 建议实施顺序
 
-1. **Preview hardening**：先把 service worker、artifact switch、错误态和 source size guard 做稳。
-2. **Selection bridge**：把 iframe `selectedElement` 转成 `DesignSelectedComponentSnapshot`，打通 Workbench / Workspace context。
-3. **Edit-to-patch**：把 StyleEditorPanel 或 Inspector form 产生的变更稳定回写到 operations。
-4. **Agent revision loop**：让 selected component 与 edited operations 进入真实模型 child runner 的 `modelInput`。
-5. **Browser verification**：最后用真实 dev server + browser 走一遍生成、预览、选中、编辑、追问、应用。
+1. **Browser verification**：先用真实 dev server + Electron/Chrome 走一遍生成、预览、选中、编辑、追问、应用，确认 no missing optimize chunk / no sandbox warning / iframe 非空。
+2. **Packaged preview smoke**：验证 packaged Electron 下 service worker URL、scope、worker entry 与 Tailwind browser runtime asset 都可加载。
+3. **Edit-to-patch**：把 StyleEditorPanel 或 Inspector form 产生的变更稳定回写到 operations，并明确 dirty state。
+4. **Agent revision loop**：补 dirty state、component-edit 区分字段，以及 reviewer 对局部编辑的检查。
+5. **Failure-path tests**：补 compile error、artifact switch 的回归测试。
 
 ## 当前风险点
 
 | 风险 | 影响 | 建议控制 |
 |------|------|----------|
 | Sandpacker service worker 在 Electron packaged 路径下不可用 | preview 空白或无法启动 worker | 尽早做 packaged smoke test，必要时做 fallback |
-| preview-dom selection 缺少 source location | 编辑器不知道改哪个文件/哪段代码 | selection snapshot 先存 DOM 信息，再逐步接 source map / AST 定位 |
+| Sandpacker preview iframe 不再 sandbox | 生成代码与宿主同源，安全边界依赖 artifact source trust 与 Electron renderer 策略 | 后续若需要强隔离，应迁到独立 origin / BrowserView / isolated session，而不是恢复 `allow-scripts + allow-same-origin` |
+| preview-dom selection source location 仍依赖 Sandpacker selection payload | 编辑器可能不知道精确 AST edit range | selection snapshot 先存 DOM 信息，再逐步接 source map / AST 定位 |
 | Style editor 直接改 file tree 但 artifact 未同步 | 用户看到变更但 apply 仍用旧 patch | 以 `onPatchOperationsChange` 为唯一 source-of-truth 回写口 |
-| 模型下一轮只看到 artifact summary | 组件级修改不精准 | worker `modelInput` 必须包含 selected component 与 edited operation context |
-| iframe 权限过宽 | Electron renderer 安全面扩大 | 默认最小 sandbox，按 Sandpacker 必要能力逐项开放 |
+| 模型下一轮只看到 artifact summary | 组件级修改不精准 | 已加入 selected component 与 edited operation summary；下一步补 dirty state 与 component-edit 来源标记 |
+| Vite optimize-deps 运行中重写 `.vite/deps` | 旧 iframe 请求旧 chunk hash，shell 出现 missing chunk | 维护 `optimizeDeps.include` 预热列表；变更 alias/polyfill 后重启 dev server |
 
 ## Handoff 判定
 
@@ -153,4 +158,4 @@ pnpm -r typecheck
 - `apps/design/src/application/node/design-build/DesignBuildRuntime.ts`
 - `apps/design/src/application/node/design-build/DesignBuildChildRunner.ts`
 
-第一天建议只完成两件事：preview runtime hardening，以及 `selectedElement -> DesignSelectedComponentSnapshot` 的桥接。完成这两件事后，组件属性编辑和 agent 迭代才有稳定锚点。
+下一步建议只完成两件事：真实 dev / packaged preview smoke test，以及 dirty state / component-edit 来源标记。完成这两件事后，再推进组件属性编辑和 reviewer 检查。

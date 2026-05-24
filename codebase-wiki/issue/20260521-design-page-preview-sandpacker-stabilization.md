@@ -65,7 +65,11 @@ DesignWorkspace prompt
 | 8 | scoped Vite 文件请求返回 `502 BAD GATEWAY (from service worker)` | Sandpacker service worker 对本地 scoped 请求代理边界不清 | `7465403`、`8f08451`、后续 scope 修正 |
 | 9 | `Expected ">" but found "data"` | Sandpacker JSX tagger 用 regex 扫 `<...>`，把 TypeScript generic / type syntax 误判为 JSX tag | 已在 sandpacker 源码中升级为 plugin-level TSX AST transform |
 | 10 | `Failed to fetch`，`https://esm.sh/scheduler... net::ERR_FAILED` | service worker 拦截了 CDN 请求，导致外部 ESM 拉取失败 | `fe61f93 fix: let sandpacker cdn requests bypass service worker` |
-| 11 | `Textarea is not defined` | 生成页使用 shadcn `Textarea`，sandbox UI stub 未导出且未自动注入 import | `9a3cfb9 fix: stub textarea in sandpacker preview` |
+| 11 | `Textarea is not defined` | 生成页使用 shadcn `Textarea`，sandbox UI stub 未导出且 generated source 未显式 import | `9a3cfb9 fix: stub textarea in sandpacker preview`；后续策略改为只 normalize 明确 import，不再猜测裸 JSX |
+| 12 | 首次启动出现 `Module "util"/"buffer" has been externalized` warning | Sandpacker renderer graph 中 Node builtin 被 Vite 当作 browser external，依赖访问 `util.inspect/debuglog` 或 `Buffer` 时触发 warning | `8c47362 fix: quiet sandpacker preview startup warnings`：`util` 走本地 browser stub，`buffer` 走 browser polyfill |
+| 13 | DevTools 出现 `cdn.tailwindcss.com should not be used in production` | preview HTML 注入旧 Tailwind CDN runtime | `8c47362`：改用打包进 renderer 的 `@tailwindcss/browser?url` |
+| 14 | 去掉 `allow-same-origin` 后 Vite HMR / entry script 被 CORS 拦截，origin 变 `null` | Sandboxed iframe 没有 same-origin 权限时变为 opaque origin，无法加载同源 Vite dev assets | 已回滚该方向；当前 Sandpacker preview 不设置 `sandbox`，纯 HTML preview 仍保留 `sandbox=""` |
+| 15 | shell 出现 `.vite/deps/chunk-*.js` missing，提示 optimize deps changed | dev server 运行中二次 optimize 重写 `.vite/deps`，旧 iframe 仍请求旧 hash | `8c47362` 后续加固：把 Sandpacker browser polyfill 依赖链放入 `optimizeDeps.include` 预热列表 |
 
 ## 根因分层
 
@@ -97,7 +101,7 @@ Sandpacker worker 需要接管 preview 内部请求，但不能接管所有 `loc
 - 只包含 preview 必需的轻量组件。
 - 允许正常 TypeScript / TSX 类型语法；不能通过删除 generic、type alias、`ComponentProps<'button'>` 等语法来规避问题。
 - Sandpacker selection tagger 必须在 Vite plugin transform 阶段支持 TypeScript/TSX AST，只处理真实 `JSXOpeningElement`，不能把 `Record<string>`、`ComponentProps<'button'>`、`Box<T>` 这类 TypeScript 语法当成 JSX。
-- 对已知 UI 组件支持裸 JSX 使用时自动注入 import，降低模型漏 import 的概率。
+- 对已知 UI 组件只 normalize 明确 import，不再猜测裸 JSX。这样可以避免把真实项目依赖关系静默改写；模型漏 import 应由 codegen / validation 阶段暴露。
 
 `Textarea is not defined` 就属于这个层的问题：生成代码运行起来了，但缺少运行时组件绑定。
 
@@ -145,7 +149,7 @@ Sandpacker worker 需要接管 preview 内部请求，但不能接管所有 `loc
 - `9a3cfb9 fix: stub textarea in sandpacker preview`
 - 当前未提交变更：直接修改 `/Users/ryuyutyo/Documents/code/modules/ai/sandpacker` 中的 `@sandpacker/worker` selection tagger 源码，改为 `@babel/parser` 驱动的 plugin-level TSX AST transform；发布构建会把 parser bundle 进 worker tagger 产物，避免消费方再遇到 CJS export 形态问题。
 
-前三个提交是止血：让 preview 先避开 tagger 对 TS 语法的误伤，并补上 `Textarea` 及已知 UI 组件自动 import。
+前三个提交是止血：让 preview 先避开 tagger 对 TS 语法的误伤，并补上 `Textarea` 等 UI stub。后续策略已收敛为只改写明确的 Telegraph UI import，不对裸 JSX 名称自动注入 import。
 后续修复已把方向改正：preview 应直接支持 TypeScript，tagger 负责避开 TypeScript generic/type syntax，只给真实 JSX tag 插入 selection metadata。
 
 ## 验证记录
@@ -218,12 +222,55 @@ https://esm.sh/... net::ERR_FAILED
 
 1. 检查 `/src/telegraph-ui.tsx` stub 是否导出 `X`。
 2. 检查 `normalizeTelegraphImports` 是否识别真实 package import。
-3. 检查裸 JSX `<X />` 是否触发自动注入 stub import。
+3. 如果源码里只有裸 JSX `<X />` 且没有 import，优先修 generated source 或 codegen contract；preview 不再静默自动注入 import。
+
+### 6. Node builtin externalized warning
+
+如果看到：
+
+```text
+Module "util" has been externalized for browser compatibility.
+Module "buffer" has been externalized for browser compatibility.
+```
+
+优先检查 `apps/main/vite.renderer.config.ts`：
+
+- `util` / `node:util` 应解析到 `apps/main/src/application/browser/sandpacker-node-stubs/util.ts`。
+- `buffer` / `node:buffer` 应解析到 `node_modules/buffer/index.js`，不要改成空 stub；`etag`、`crypto-browserify`、`memfs` 等依赖会实际调用 `Buffer.byteLength/from/isBuffer`。
+- 修改 alias 或 polyfill 后，重启 dev server 并重新 optimize deps。
+
+### 7. optimize deps missing chunk
+
+如果 shell 出现：
+
+```text
+The file does not exist at ".../node_modules/.vite/deps/chunk-*.js"
+```
+
+通常是 Vite dev server 运行中发现新依赖并重写 `.vite/deps`，旧 iframe 仍请求旧 hash。处理顺序：
+
+1. 停掉 dev / Electron 进程。
+2. 跑 `pnpm --filter @telegraph/main exec vite --config vite.renderer.config.ts optimize --force`。
+3. 确认新依赖已加入 `optimizeDeps.include`，尤其是 Sandpacker worker graph 的 browser polyfill 依赖。
+4. 重启 `pnpm start`。
+
+### 8. iframe sandbox warning
+
+如果看到：
+
+```text
+An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+```
+
+不要通过只删除 `allow-same-origin` 来止血；这会让 iframe origin 变成 `null`，从而打断 Vite HMR 与同源 service worker asset 加载。当前策略：
+
+- Sandpacker preview iframe 不设置 `sandbox`。
+- 纯 HTML preview iframe 仍使用 `sandbox=""`。
+- 如果后续需要强隔离，应迁到独立 origin / BrowserView / isolated browser target，而不是恢复 `allow-scripts + allow-same-origin`。
 
 ## 后续观察项
 
 - 当前 UI stub 组件清单仍是白名单。后续模型如果生成 `Select`、`Dialog`、`Label`、`Switch` 等组件，可能再次出现缺 binding，需要按同样方式补 stub 或让 codegen 阶段约束可用组件集合。
-- 当前修复位于 sandpacker 源码；发布新版 `@sandpacker/worker` 后，Telegraph 再升级依赖即可移除对本地验证上下文的依赖。
-- service worker 与 iframe scope 在 packaged Electron 环境还需要单独验收；dev server 通过不代表 packaged file protocol 一定通过。
+- service worker、Tailwind browser runtime asset 与 iframe scope 在 packaged Electron 环境还需要单独验收；dev server 通过不代表 packaged file protocol 一定通过。
 - preview 运行错误需要继续升级成用户可读的错误面板，避免只靠 DevTools console。
-- P-009 中的真实 iframe DOM element selection、style editor 回写、artifact revision dirty state 仍未完全闭环。
+- P-009 中的真实 iframe DOM element selection、style editor 回写、artifact revision dirty state 仍未完全闭环；edited operations summary 已能进入下一轮 revision context。

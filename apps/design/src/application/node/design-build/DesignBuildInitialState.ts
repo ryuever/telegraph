@@ -33,7 +33,16 @@ export interface DesignBuildRevisionContext {
   revision: number
   changeSummary: string
   operationPaths: string[]
+  operationSummaries: DesignBuildOperationContext[]
   selectedComponent?: DesignBuildSelectedComponentContext
+}
+
+export interface DesignBuildOperationContext {
+  kind: 'add' | 'update' | 'delete'
+  path: string
+  contentPreview?: string
+  contentLength?: number
+  expectedOriginalLength?: number
 }
 
 export interface DesignBuildSelectedComponentContext {
@@ -211,6 +220,7 @@ function extractRevisionContext(metadata: Record<string, unknown> | undefined): 
 
   const operationPaths = arrayField(activeArtifact, 'operationPaths')
     .filter((item): item is string => typeof item === 'string')
+  const operationSummaries = extractOperationSummaries(arrayField(activeArtifact, 'operationSummaries'))
   const previousRevision = numberField(activeArtifact, 'revision') ?? 0
   const prompt = stringField(designContext, 'prompt') ?? stringField(designContext, 'userPrompt')
   const selected = selectedComponentSummary(selectedComponent)
@@ -222,10 +232,45 @@ function extractRevisionContext(metadata: Record<string, unknown> | undefined): 
     changeSummary: [
       prompt ? `Apply requested change: ${prompt}` : 'Apply requested design change.',
       selected ? `Target selected component: ${selected}.` : undefined,
+      operationSummaries.length > 0 ? `Current artifact operations: ${operationSummaries.map(operationContextSummary).join('; ')}.` : undefined,
     ].filter(Boolean).join(' '),
-    operationPaths,
+    operationPaths: operationPaths.length > 0 ? operationPaths : operationSummaries.map(operation => operation.path),
+    operationSummaries,
     selectedComponent,
   }
+}
+
+function extractOperationSummaries(values: unknown[]): DesignBuildOperationContext[] {
+  const summaries: DesignBuildOperationContext[] = []
+  for (const value of values) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const record = value as Record<string, unknown>
+    const kind = record.kind
+    const path = record.path
+    if ((kind !== 'add' && kind !== 'update' && kind !== 'delete') || typeof path !== 'string') {
+      continue
+    }
+    const summary: DesignBuildOperationContext = { kind, path }
+    const contentPreview = stringField(record, 'contentPreview')
+    const contentLength = numberField(record, 'contentLength')
+    const expectedOriginalLength = numberField(record, 'expectedOriginalLength')
+    if (contentPreview !== undefined) summary.contentPreview = contentPreview
+    if (contentLength !== undefined) summary.contentLength = contentLength
+    if (expectedOriginalLength !== undefined) summary.expectedOriginalLength = expectedOriginalLength
+    summaries.push(summary)
+  }
+  return summaries
+}
+
+function operationContextSummary(operation: DesignBuildOperationContext): string {
+  const length = operation.contentLength !== undefined ? `, ${String(operation.contentLength)} chars` : ''
+  const preview = operation.contentPreview ? `, preview: ${inlineOperationPreview(operation.contentPreview)}` : ''
+  return `${operation.kind} ${operation.path}${length}${preview}`
+}
+
+function inlineOperationPreview(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  return normalized.length > 96 ? `${normalized.slice(0, 96)}...` : normalized
 }
 
 function extractSelectedComponentContext(
