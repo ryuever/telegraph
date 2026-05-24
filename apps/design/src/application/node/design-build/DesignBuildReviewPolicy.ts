@@ -7,6 +7,12 @@ import {
   evaluateStandaloneProjectFiles,
   isSafeProjectPatchPath,
 } from '@/apps/design/application/common/design-project-contract'
+import type { DesignSystemPolicy } from '@/apps/design/application/common/design-system-contract'
+import {
+  isShadcnPrimitivePath,
+  type ComponentEditContext,
+} from '@/apps/design/application/common/component-edit-contract'
+import { ThemePackRegistry } from './ThemePackRegistry'
 
 export interface DesignBuildArtifactSummary {
   artifactId: string
@@ -16,6 +22,11 @@ export interface DesignBuildArtifactSummary {
   revision?: number
   operationCount?: number
   repairAttempt?: number
+}
+
+export interface DesignBuildReviewPolicyOptions {
+  designSystemPolicy?: DesignSystemPolicy
+  componentEdit?: ComponentEditContext
 }
 
 export function createArtifactSummary(
@@ -66,11 +77,16 @@ export function reviewFromChildOutput(output: unknown): DesignBuildReview | unde
   return undefined
 }
 
-export function evaluateDesignBuildArtifact(artifact: DesignBuildArtifact): DesignBuildReview {
+export function evaluateDesignBuildArtifact(
+  artifact: DesignBuildArtifact,
+  options: DesignBuildReviewPolicyOptions = {},
+): DesignBuildReview {
   if (artifact.kind === 'design-preview') {
     return {
       verdict: artifact.html.trim().length > 0 ? 'pass' : 'repair_required',
       checks: [
+        ...designSystemChecks(options.designSystemPolicy),
+        ...componentEditChecks(options.componentEdit),
         {
           id: 'artifact-structured',
           passed: true,
@@ -93,6 +109,8 @@ export function evaluateDesignBuildArtifact(artifact: DesignBuildArtifact): Desi
   const projectContract = evaluateStandaloneProjectFiles(artifact.operations)
 
   const checks = [
+    ...designSystemChecks(options.designSystemPolicy),
+    ...componentEditChecks(options.componentEdit),
     {
       id: 'artifact-structured',
       passed: true,
@@ -127,6 +145,80 @@ export function evaluateDesignBuildArtifact(artifact: DesignBuildArtifact): Desi
       : 'blocked',
     checks,
   }
+}
+
+function componentEditChecks(componentEdit: ComponentEditContext | undefined): DesignBuildReview['checks'] {
+  if (!componentEdit) return []
+  const dirtyPrimitivePaths = componentEdit.dirtyOperations
+    .map(operation => operation.path)
+    .filter(isShadcnPrimitivePath)
+  const hasTargetBinding = Boolean(
+    componentEdit.target?.path ||
+    componentEdit.target?.sourceLocation ||
+    componentEdit.binding.preferredOperationPath,
+  )
+  const hasCompositionTarget = componentEdit.binding.editScope === 'composition' &&
+    Boolean(componentEdit.binding.preferredOperationPath)
+
+  return [
+    {
+      id: 'component-edit-context-bound',
+      passed: componentEdit.artifactId.length > 0,
+      summary: `Component edit context is bound to artifact ${componentEdit.artifactId}.`,
+    },
+    {
+      id: 'component-edit-source-bound',
+      passed: hasTargetBinding,
+      summary: 'Component edit target includes source path, source location, or preferred operation path.',
+    },
+    {
+      id: 'component-edit-composition-target',
+      passed: hasCompositionTarget,
+      summary: componentEdit.binding.preferredOperationPath
+        ? `Component edit prefers composition path ${componentEdit.binding.preferredOperationPath}.`
+        : 'Component edit must resolve to a composition usage path before editing.',
+    },
+    {
+      id: 'component-edit-primitive-guard',
+      passed: dirtyPrimitivePaths.length === 0,
+      summary: dirtyPrimitivePaths.length === 0
+        ? 'Dirty component edits do not directly modify shadcn primitive source files.'
+        : `Dirty component edits touch protected primitive files: ${dirtyPrimitivePaths.join(', ')}.`,
+    },
+  ]
+}
+
+function designSystemChecks(policy: DesignSystemPolicy | undefined): DesignBuildReview['checks'] {
+  if (!policy) return []
+  const allowedRegistries = policy.uiLibrary.allowedRegistries.map(registry => registry.id).join(', ') || 'none'
+  const themePack = new ThemePackRegistry().get(policy.themePack?.id)
+  return [
+    {
+      id: 'design-system-policy-resolved',
+      passed: true,
+      summary: `DesignSystemPolicy ${policy.id} resolved for ${policy.mode}; allowed registries: ${allowedRegistries}.`,
+    },
+    {
+      id: 'design-system-handwrite-policy',
+      passed: policy.uiLibrary.handwritePolicy !== 'allowed',
+      summary: `Handwritten UI policy is ${policy.uiLibrary.handwritePolicy}.`,
+    },
+    {
+      id: 'design-system-dependency-closure',
+      passed: policy.packagePolicy.requireDependencyClosure,
+      summary: 'Design system package policy requires generated projects to declare dependency closure.',
+    },
+    {
+      id: 'theme-pack-resolved',
+      passed: Boolean(themePack.id),
+      summary: `ThemePack ${themePack.id} resolved: ${themePack.description}`,
+    },
+    ...themePack.reviewerChecks.map(check => ({
+      id: check.id,
+      passed: true,
+      summary: check.summary,
+    })),
+  ]
 }
 
 export function mergeDesignBuildReview(

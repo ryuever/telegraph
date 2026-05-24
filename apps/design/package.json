@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "corpus:replay": "node scripts/replay-design-corpus.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

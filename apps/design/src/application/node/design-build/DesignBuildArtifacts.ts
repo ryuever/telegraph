@@ -26,6 +26,7 @@ export interface DesignPatchArtifact {
   parentArtifactId?: string
   revision?: number
   changeSummary?: string
+  metadata?: Record<string, unknown>
   operations: DesignPatchOperation[]
 }
 

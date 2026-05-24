@@ -41,8 +41,10 @@ const TELEGRAPH_UI_COMPONENTS = [
   'Textarea',
 ]
 const TELEGRAPH_UI_IMPORT_SOURCE = `import { ${TELEGRAPH_UI_COMPONENTS.join(', ')} } from '/src/telegraph-ui.tsx'\n`
-const TELEGRAPH_UI_MODULE_IMPORT_PATTERN = /import\s+[\s\S]*?from ['"]@\/packages\/ui\/components\/ui\/(?:badge|button|card|input|tabs|textarea)['"];?\n?/g
-const TELEGRAPH_UI_STUB_IMPORT_PATTERN = /import\s+\{[\s\S]*?\}\s+from ['"]\/src\/telegraph-ui\.tsx['"];?\n?/g
+const TELEGRAPH_UI_MODULE_IMPORT_PATTERN = /^import(?:[^\n]|\n(?!import\s))*?\s+from ['"]@\/packages\/ui\/components\/ui\/(?:badge|button|card|input|tabs|textarea)['"];?\n?/gm
+const TELEGRAPH_UI_STUB_IMPORT_PATTERN = /^import\s+\{(?:[^\n]|\n(?!import\s))*?\}\s+from ['"]\/src\/telegraph-ui\.tsx['"];?\n?/gm
+const PROJECT_ALIAS_FROM_IMPORT_PATTERN = /\bfrom\s+(['"])@\/([^'"]+)\1/g
+const PROJECT_ALIAS_SIDE_EFFECT_IMPORT_PATTERN = /\bimport\s+(['"])@\/([^'"]+)\1/g
 
 export interface DesignSandpackerPreviewProps {
   artifactId: string
@@ -344,7 +346,7 @@ export function createSandpackerFiles(
   }
 
   for (const item of projectedOperations) {
-    const normalized = normalizeTelegraphImports(item.operation.content ?? '')
+    const normalized = normalizePreviewImports(item.operation.content ?? '')
     files[item.path] = normalized.source
     importRestorers.set(item.path, normalized.restore)
     virtualPathToOperationPath.set(item.path, item.operation.path)
@@ -374,6 +376,18 @@ function updateOperationsFromFiles(
   })
 }
 
+function normalizePreviewImports(source: string): {
+  source: string
+  restore: (updatedSource: string) => string
+} {
+  const telegraphNormalized = normalizeTelegraphImports(source)
+  const aliasNormalized = normalizeProjectAliasImports(telegraphNormalized.source)
+  return {
+    source: aliasNormalized.source,
+    restore: updatedSource => telegraphNormalized.restore(aliasNormalized.restore(updatedSource)),
+  }
+}
+
 function normalizeTelegraphImports(source: string): {
   source: string
   restore: (updatedSource: string) => string
@@ -393,6 +407,43 @@ function normalizeTelegraphImports(source: string): {
       return originalImportBlock ? `${originalImportBlock}\n${restored}` : restored
     },
   }
+}
+
+function normalizeProjectAliasImports(source: string): {
+  source: string
+  restore: (updatedSource: string) => string
+} {
+  const replacements = new Map<string, string>()
+  let normalized = source.replace(PROJECT_ALIAS_FROM_IMPORT_PATTERN, (_match, quote: string, specifier: string) => {
+    const virtual = aliasSpecifierToVirtualImport(specifier)
+    replacements.set(virtual, `@/${specifier}`)
+    return `from ${quote}${virtual}${quote}`
+  })
+  normalized = normalized.replace(PROJECT_ALIAS_SIDE_EFFECT_IMPORT_PATTERN, (_match, quote: string, specifier: string) => {
+    const virtual = aliasSpecifierToVirtualImport(specifier)
+    replacements.set(virtual, `@/${specifier}`)
+    return `import ${quote}${virtual}${quote}`
+  })
+  if (replacements.size === 0) return { source, restore: updatedSource => updatedSource }
+  return {
+    source: normalized,
+    restore: updatedSource => {
+      let restored = updatedSource
+      for (const [virtual, alias] of replacements) {
+        restored = restored.split(virtual).join(alias)
+      }
+      return restored
+    },
+  }
+}
+
+function aliasSpecifierToVirtualImport(specifier: string): string {
+  const normalized = specifier.replace(/^\/+/, '')
+  const base = `/src/${normalized}`
+  if (/\.[a-z0-9]+$/i.test(base)) return base
+  if (normalized === 'lib/utils') return `${base}.ts`
+  if (normalized.startsWith('components/') || normalized.startsWith('app/')) return `${base}.tsx`
+  return base
 }
 
 function renderIndexHtml(title: string, entryPath: string): string {

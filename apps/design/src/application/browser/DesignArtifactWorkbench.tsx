@@ -1,10 +1,12 @@
+import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
-import { Check, Code2, Eye, MousePointer2, SendHorizontal, X } from 'lucide-react'
+import { Check, Code2, Eye, FileArchive, FileText, MousePointer2, Presentation, SendHorizontal, X } from 'lucide-react'
 import { Button } from '@/packages/ui/components/ui/button'
 import { cn } from '@/packages/ui/lib/utils'
 import type { DesignProjectedArtifact } from './design-agent-projector'
 import type {
   DesignPatchFileOperation,
+  DesignExportFormat,
   DesignPatchPreview,
   DesignSelectedComponentSnapshot,
 } from '@/apps/design/application/common'
@@ -30,11 +32,13 @@ interface DesignArtifactWorkbenchProps {
   applyStates?: Map<string, ArtifactApplyState>
   mode: ArtifactMode
   selectedComponent?: DesignSelectedComponent | null
+  dirtyOperationCount?: number
   onSelectArtifact: (artifactId: string) => void
   onModeChange: (mode: ArtifactMode) => void
   onSelectComponent?: (component: DesignSelectedComponent) => void
   onClearSelectedComponent?: () => void
   onPatchOperationsChange?: (artifactId: string, operations: DesignPatchFileOperation[]) => void
+  onExportArtifact?: (artifact: DesignProjectedArtifact, format: DesignExportFormat) => void
   onApplyArtifact: (artifact: DesignProjectedArtifact) => void
 }
 
@@ -45,11 +49,13 @@ export function DesignArtifactWorkbench({
   applyStates,
   mode,
   selectedComponent,
+  dirtyOperationCount = 0,
   onSelectArtifact,
   onModeChange,
   onSelectComponent,
   onClearSelectedComponent,
   onPatchOperationsChange,
+  onExportArtifact,
   onApplyArtifact,
 }: DesignArtifactWorkbenchProps): JSX.Element {
   const activeArtifact = artifacts.find(artifact => artifact.id === activeArtifactId) ?? artifacts.at(-1)
@@ -87,6 +93,11 @@ export function DesignArtifactWorkbench({
               <span className="shrink-0 rounded-md bg-surface-soft px-2 py-0.5 text-[10px] text-muted-foreground">
                 {artifactHeaderMeta(viewModel.kind, activeArtifact)}
               </span>
+              {dirtyOperationCount > 0 && (
+                <span className="shrink-0 rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700">
+                  {String(dirtyOperationCount)} dirty
+                </span>
+              )}
             </div>
             <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
               {artifacts.map(artifact => {
@@ -148,6 +159,38 @@ export function DesignArtifactWorkbench({
                 <MousePointer2 size={15} />
               </button>
             </div>
+            <div className="flex rounded-md border border-border p-0.5">
+              <button
+                type="button"
+                aria-label="Export HTML ZIP"
+                title="Export HTML ZIP"
+                onClick={() => { onExportArtifact?.(activeArtifact, 'html-zip') }}
+                disabled={!isPatch}
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FileArchive size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label="Export PDF"
+                title="Export PDF"
+                onClick={() => { onExportArtifact?.(activeArtifact, 'pdf') }}
+                disabled={!isPatch}
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FileText size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label="Export PPTX"
+                title="Export PPTX"
+                onClick={() => { onExportArtifact?.(activeArtifact, 'pptx') }}
+                disabled={!isPatch}
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Presentation size={15} />
+              </button>
+            </div>
             <Button
               type="button"
               size="sm"
@@ -183,6 +226,7 @@ export function DesignArtifactWorkbench({
             selectedComponent={selectedComponent}
             onSelectComponent={onSelectComponent}
             onClearSelectedComponent={onClearSelectedComponent}
+            onPatchOperationsChange={onPatchOperationsChange}
           />
         ) : (
           <DesignCodeEditor
@@ -235,6 +279,10 @@ function ArtifactPreview({
   onSelectComponent?: (component: DesignSelectedComponent) => void
   onPatchOperationsChange?: (artifactId: string, operations: DesignPatchFileOperation[]) => void
 }): JSX.Element {
+  if (isDesignExportArtifact(artifact.output)) {
+    return <ExportArtifactPanel artifact={artifact.output} />
+  }
+
   if (viewModel.viewKind === 'html' && viewModel.previewHtml) {
     return (
       <iframe
@@ -271,19 +319,83 @@ function ArtifactPreview({
   )
 }
 
+function ExportArtifactPanel({ artifact }: { artifact: {
+  sourceArtifactId?: string
+  sourceProjectRoot?: string
+  manifestPath?: string
+  exports?: Array<{ format?: string; status?: string; path?: string; error?: string }>
+} }): JSX.Element {
+  const exports = artifact.exports ?? []
+  return (
+    <div className="mx-auto max-w-3xl rounded-md border border-border bg-card p-4 shadow-sm">
+      <div className="text-sm font-semibold text-foreground">Export files</div>
+      <div className="mt-2 grid gap-2 text-xs">
+        {artifact.sourceArtifactId && <InspectorField label="Source" value={artifact.sourceArtifactId} />}
+        {artifact.sourceProjectRoot && <InspectorField label="Project" value={artifact.sourceProjectRoot} />}
+        {artifact.manifestPath && <InspectorField label="Manifest" value={artifact.manifestPath} />}
+      </div>
+      <div className="mt-4 space-y-2">
+        {exports.map((entry, index) => (
+          <div key={`${entry.format ?? 'export'}-${String(index)}`} className="rounded-md border border-border bg-background px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-foreground">{entry.format ?? 'export'}</span>
+              <span className="rounded bg-surface-soft px-2 py-0.5 text-[10px] text-muted-foreground">
+                {entry.status ?? 'unknown'}
+              </span>
+            </div>
+            {entry.path && <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{entry.path}</div>}
+            {entry.error && <div className="mt-1 text-[11px] text-destructive">{entry.error}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function isDesignExportArtifact(value: unknown): value is {
+  kind: 'design-export'
+  sourceArtifactId?: string
+  sourceProjectRoot?: string
+  manifestPath?: string
+  exports?: Array<{ format?: string; status?: string; path?: string; error?: string }>
+} {
+  return Boolean(value) &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (value as { kind?: unknown }).kind === 'design-export'
+}
+
 function ComponentInspector({
   artifact,
   selectedComponent,
   onSelectComponent,
   onClearSelectedComponent,
+  onPatchOperationsChange,
 }: {
   artifact: DesignProjectedArtifact
   selectedComponent?: DesignSelectedComponent | null
   onSelectComponent?: (component: DesignSelectedComponent) => void
   onClearSelectedComponent?: () => void
+  onPatchOperationsChange?: (artifactId: string, operations: DesignPatchFileOperation[]) => void
 }): JSX.Element {
   const targets = selectableComponentsFromArtifact(artifact)
   const active = selectedComponent?.artifactId === artifact.id ? selectedComponent : null
+  const operations = extractDesignPatchOperations(artifact) ?? []
+  const [classNameDraft, setClassNameDraft] = useState(active?.className ?? '')
+
+  useEffect(() => {
+    setClassNameDraft(active?.className ?? '')
+  }, [active?.id, active?.className])
+
+  const stageInspectorEdit = (): void => {
+    if (!active || !active.path) return
+    const nextOperations = applyInspectorClassNameEdit(operations, active, classNameDraft)
+    onPatchOperationsChange?.(artifact.id, nextOperations)
+    onSelectComponent?.({
+      ...active,
+      className: classNameDraft,
+    })
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -341,6 +453,25 @@ function ComponentInspector({
                 value={`${active.sourceLocation.filePath}:${String(active.sourceLocation.line)}:${String(active.sourceLocation.column)}`}
               />
             )}
+            <div className="border-t border-border pt-2">
+              <label className="text-[10px] uppercase text-muted-foreground" htmlFor="component-class-edit">
+                Class edit
+              </label>
+              <input
+                id="component-class-edit"
+                value={classNameDraft}
+                onChange={(event) => { setClassNameDraft(event.target.value) }}
+                className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 font-mono text-xs text-foreground outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={stageInspectorEdit}
+                disabled={!active.path || classNameDraft === (active.className ?? '')}
+                className="mt-2 h-7 w-full rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Stage edit
+              </button>
+            </div>
           </div>
         ) : (
           <div className="mt-3 text-xs text-muted-foreground">No selection</div>
@@ -370,6 +501,33 @@ function selectableComponentsFromArtifact(artifact: DesignProjectedArtifact): De
     path: operation.path,
     operationKind: operation.kind,
   }))
+}
+
+function applyInspectorClassNameEdit(
+  operations: DesignPatchFileOperation[],
+  selectedComponent: DesignSelectedComponent,
+  className: string,
+): DesignPatchFileOperation[] {
+  return operations.map(operation => {
+    if (operation.path !== selectedComponent.path || operation.kind === 'delete' || !operation.content) return operation
+    const nextContent = replaceSelectedClassName(operation.content, selectedComponent, className)
+    return nextContent === operation.content ? operation : { ...operation, content: nextContent }
+  })
+}
+
+function replaceSelectedClassName(
+  source: string,
+  selectedComponent: DesignSelectedComponent,
+  className: string,
+): string {
+  const escapedClassName = className.replace(/"/g, '&quot;')
+  if (selectedComponent.className) {
+    const existing = `className="${selectedComponent.className}"`
+    if (source.includes(existing)) return source.replace(existing, `className="${escapedClassName}"`)
+  }
+  if (!selectedComponent.elementTag) return source
+  const tagPattern = new RegExp(`<${selectedComponent.elementTag}(\\s|>)`)
+  return source.replace(tagPattern, `<${selectedComponent.elementTag} className="${escapedClassName}"$1`)
 }
 
 function componentLabelFromPath(path: string): string {

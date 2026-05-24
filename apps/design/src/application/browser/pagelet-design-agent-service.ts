@@ -1,21 +1,21 @@
-import type { RuntimeSettings } from '@/packages/agent-protocol'
 import type {
   DesignAgentSendRequest,
   DesignAgentStreamEvent,
   DesignAgentRunEventRecordSnapshot,
   DesignAgentRunRecordSnapshot,
   DesignArtifactPatchApplyResult,
+  DesignArtifactExportResult,
+  DesignExportFormat,
   DesignArtifactPatchPreviewResult,
   DesignPatchFileOperation,
   DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common'
-import {
-  AGENT_MODEL_SETTINGS_STORAGE_KEY,
-  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
-  readRuntimeSettingsFromStorage,
-} from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
-import { normalizeDesignRuntimeSettings } from './design-runtime-settings'
+import {
+  designSystemContextFromSettings,
+  loadDesignRuntimeSettings,
+  type DesignRuntimeSettings,
+} from './design-runtime-settings'
 import { getDesignPageletClient } from './getClient'
 import {
   projectAgentEventToDesign,
@@ -108,7 +108,7 @@ export class PageletDesignAgentService {
         sessionId: options.sessionId,
         prompt: options.prompt,
         settings: readRuntimeSettings(),
-        context: options.context,
+        context: contextWithDesignSystem(options.context),
       }
 
       try {
@@ -203,19 +203,51 @@ export class PageletDesignAgentService {
       operations: options.operations,
     })
   }
+
+  async exportArtifact(options: {
+    artifactId: string
+    artifact: unknown
+    formats: DesignExportFormat[]
+    sessionId?: string
+    signal?: AbortSignal
+  }): Promise<DesignArtifactExportResult> {
+    await waitForDesignPageletReady(options.signal)
+    throwIfAborted(options.signal)
+    const client = getDesignPageletClient()
+    const result: DesignArtifactExportResult = await client.exportArtifact({
+      runId: globalThis.crypto.randomUUID(),
+      sessionId: options.sessionId,
+      artifactId: options.artifactId,
+      artifact: options.artifact,
+      formats: options.formats,
+    })
+    return result
+  }
 }
 
-function readRuntimeSettings(): RuntimeSettings {
-  return normalizeDesignRuntimeSettings(readRuntimeSettingsFromStorage(localStorage), {
-    forceDesignProfile: !hasSavedRuntimeSettings(localStorage),
-  })
+function readRuntimeSettings(): DesignRuntimeSettings {
+  return loadDesignRuntimeSettings(localStorage)
 }
 
-function hasSavedRuntimeSettings(storage: Pick<Storage, 'getItem'>): boolean {
-  return storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
-    storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
+function contextWithDesignSystem(context: Record<string, unknown> | undefined): Record<string, unknown> {
+  const settings = readRuntimeSettings()
+  return {
+    ...context,
+    designSystem: {
+      ...designSystemContextFromSettings(settings),
+      ...(recordField(context, 'designSystem') ?? {}),
+    },
+  }
 }
 
 function isCancelledError(error: unknown): boolean {
   return error instanceof Error && error.message === 'Cancelled'
+}
+
+function recordField(value: unknown, key: string): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const field = (value as Record<string, unknown>)[key]
+  return field && typeof field === 'object' && !Array.isArray(field)
+    ? field as Record<string, unknown>
+    : undefined
 }

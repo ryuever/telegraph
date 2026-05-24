@@ -34,15 +34,27 @@ export function evaluateStandaloneProjectFiles(
   const projectRoot = inferSandboxProjectRoot(operations)
   const packageOperation = findProjectFileOperation(operations, ['package.json'], projectRoot)
   const packageJson = packageJsonStatus(packageOperation?.content)
+  const packageJsonValue = parseJsonValue(packageOperation?.content)
   const hasIndexHtml = Boolean(findProjectFileOperation(operations, ['index.html'], projectRoot))
   const hasReactEntry = Boolean(findProjectFileOperation(operations, REACT_ENTRY_FILES, projectRoot))
   const hasAppSource = hasRenderableSourceFile(operations, projectRoot)
+  const projectFiles = projectFileMap(operations, projectRoot)
   const hasStandaloneImports = operations.every(operation =>
     operation.kind === 'delete' ||
     !operation.content ||
     !FORBIDDEN_WORKSPACE_IMPORT_PATTERNS.some(pattern => pattern.test(operation.content ?? ''))
   )
   const missingLocalImports = findMissingLocalImports(operations, projectRoot)
+  const missingExternalDependencies = findMissingExternalDependencies(operations, projectRoot, packageJsonValue)
+  const aliasSpecifiers = findAliasImportSpecifiers(operations, projectRoot)
+  const aliasConfigured = aliasSpecifiers.length === 0 || hasAliasConfig(projectFiles)
+  const shadcnProject = hasShadcnSignal(projectFiles, aliasSpecifiers)
+  const missingShadcnLocalFiles = findMissingShadcnLocalFiles(aliasSpecifiers, projectFiles)
+  const provenanceStatus = shadcnProvenanceStatus(projectFiles)
+  const cnStatus = cnHelperStatus(operations, projectRoot, projectFiles, packageJsonValue)
+  const missingRadixDependencies = findMissingRadixDependencies(operations, projectRoot, packageJsonValue)
+  const tokenStatus = themeTokenStatus(projectFiles)
+  const rawColorStatus = rawColorStatusForProject(operations, projectRoot)
 
   const checks: StandaloneProjectContractCheck[] = [
     {
@@ -81,6 +93,64 @@ export function evaluateStandaloneProjectFiles(
       id: 'standalone-imports',
       passed: hasStandaloneImports,
       summary: 'Project source does not import Telegraph workspace-only modules.',
+    },
+    {
+      id: 'standalone-external-dependencies',
+      passed: missingExternalDependencies.length === 0,
+      summary: missingExternalDependencies.length === 0
+        ? 'External source imports are declared in package.json dependencies or devDependencies.'
+        : `Missing package.json dependencies for imports: ${missingExternalDependencies.slice(0, 8).join(', ')}`,
+    },
+    {
+      id: 'standalone-alias-config',
+      passed: aliasConfigured,
+      summary: aliasConfigured
+        ? '@/ imports have matching vite.config.ts and tsconfig.json alias configuration, or are not used.'
+        : `@/ imports require alias configuration: ${aliasSpecifiers.slice(0, 5).join(', ')}`,
+    },
+    {
+      id: 'standalone-shadcn-components-json',
+      passed: !shadcnProject || projectFiles.has('components.json'),
+      summary: 'shadcn projects include components.json with local component aliases.',
+    },
+    {
+      id: 'standalone-shadcn-local-files',
+      passed: missingShadcnLocalFiles.length === 0,
+      summary: missingShadcnLocalFiles.length === 0
+        ? '@/components/ui imports resolve to local generated files.'
+        : `Missing local shadcn UI files: ${missingShadcnLocalFiles.slice(0, 8).join(', ')}`,
+    },
+    {
+      id: 'standalone-shadcn-provenance',
+      passed: !shadcnProject || provenanceStatus.valid,
+      summary: provenanceStatus.summary,
+    },
+    {
+      id: 'standalone-no-fake-primitives',
+      passed: !shadcnProject || provenanceStatus.valid,
+      summary: 'shadcn primitive files are backed by design-system provenance or the project is not using shadcn primitives.',
+    },
+    {
+      id: 'standalone-cn-helper',
+      passed: cnStatus.valid,
+      summary: cnStatus.summary,
+    },
+    {
+      id: 'standalone-radix-deps',
+      passed: missingRadixDependencies.length === 0,
+      summary: missingRadixDependencies.length === 0
+        ? 'Radix primitive imports are declared in package.json.'
+        : `Missing Radix dependencies: ${missingRadixDependencies.slice(0, 8).join(', ')}`,
+    },
+    {
+      id: 'standalone-theme-tokens-present',
+      passed: !shadcnProject || tokenStatus.valid,
+      summary: tokenStatus.summary,
+    },
+    {
+      id: 'standalone-no-raw-colors',
+      passed: !shadcnProject || rawColorStatus.valid,
+      summary: rawColorStatus.summary,
     },
   ]
 
@@ -169,6 +239,223 @@ function findMissingLocalImports(
   }
 
   return [...missing].sort()
+}
+
+function projectFileMap(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+): Map<string, string> {
+  return new Map(
+    operations
+      .filter(operation => operation.kind !== 'delete' && operation.content)
+      .map(operation => [projectRelativePath(operation.path, projectRoot), operation.content ?? '']),
+  )
+}
+
+function findMissingExternalDependencies(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+  packageJson: unknown,
+): string[] {
+  const declared = packageDependencyNames(packageJson)
+  const imports = new Set<string>()
+  for (const operation of sourceOperations(operations, projectRoot)) {
+    for (const specifier of importSpecifiers(operation.content ?? '')) {
+      const packageName = externalPackageName(specifier)
+      if (packageName) imports.add(packageName)
+    }
+  }
+  return [...imports].filter(name => !declared.has(name)).sort()
+}
+
+function findAliasImportSpecifiers(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+): string[] {
+  const specifiers = new Set<string>()
+  for (const operation of sourceOperations(operations, projectRoot)) {
+    for (const specifier of importSpecifiers(operation.content ?? '')) {
+      if (specifier.startsWith('@/')) specifiers.add(specifier)
+    }
+  }
+  return [...specifiers].sort()
+}
+
+function hasAliasConfig(files: Map<string, string>): boolean {
+  const viteConfig = files.get('vite.config.ts') ?? files.get('vite.config.js') ?? ''
+  const tsconfig = files.get('tsconfig.json') ?? ''
+  return /['"]@['"]\s*:/.test(viteConfig) && /"@\/\*"\s*:/.test(tsconfig)
+}
+
+function hasShadcnSignal(files: Map<string, string>, aliasSpecifiers: string[]): boolean {
+  return files.has('components.json') ||
+    files.has('design-system.provenance.json') ||
+    [...files.keys()].some(path => path.startsWith('src/components/ui/')) ||
+    aliasSpecifiers.some(specifier => specifier.startsWith('@/components/ui/'))
+}
+
+function findMissingShadcnLocalFiles(aliasSpecifiers: string[], files: Map<string, string>): string[] {
+  const missing = new Set<string>()
+  for (const specifier of aliasSpecifiers) {
+    if (!specifier.startsWith('@/components/ui/')) continue
+    const relative = specifier.replace(/^@\//, 'src/')
+    if (!resolveAliasFile(relative, files)) missing.add(specifier)
+  }
+  return [...missing].sort()
+}
+
+function resolveAliasFile(relative: string, files: Map<string, string>): string | undefined {
+  return importCandidates(relative).find(candidate => files.has(candidate))
+}
+
+function shadcnProvenanceStatus(files: Map<string, string>): { valid: boolean; summary: string } {
+  const uiFiles = [...files.keys()].filter(path => path.startsWith('src/components/ui/') && /\.(tsx|jsx)$/i.test(path))
+  if (uiFiles.length === 0) {
+    return { valid: true, summary: 'No local shadcn primitive files require provenance.' }
+  }
+  const provenance = files.get('design-system.provenance.json')
+  if (!provenance) {
+    return { valid: false, summary: 'Local shadcn primitive files require design-system.provenance.json.' }
+  }
+  const parsed = parseJsonValue(provenance)
+  const components = isRecord(parsed) && Array.isArray(parsed.components) ? parsed.components : []
+  const componentNames = new Set(
+    components
+      .filter(isRecord)
+      .map(component => typeof component.name === 'string' ? component.name : undefined)
+      .filter((name): name is string => Boolean(name)),
+  )
+  const missing = uiFiles
+    .map(path => path.split('/').at(-1)?.replace(/\.(tsx|jsx)$/i, ''))
+    .filter((name): name is string => Boolean(name))
+    .filter(name => !componentNames.has(name))
+  return {
+    valid: missing.length === 0,
+    summary: missing.length === 0
+      ? 'Local shadcn primitive files have design-system provenance.'
+      : `Missing provenance entries for shadcn primitives: ${missing.slice(0, 8).join(', ')}`,
+  }
+}
+
+function cnHelperStatus(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+  files: Map<string, string>,
+  packageJson: unknown,
+): { valid: boolean; summary: string } {
+  const usesCn = sourceOperations(operations, projectRoot).some(operation =>
+    /from\s+['"]@\/lib\/utils['"]/.test(operation.content ?? '') ||
+    /\bcn\s*\(/.test(operation.content ?? '')
+  )
+  if (!usesCn) return { valid: true, summary: 'Project does not use cn(), or no cn helper is required.' }
+  const declared = packageDependencyNames(packageJson)
+  const missingDeps = ['clsx', 'tailwind-merge'].filter(name => !declared.has(name))
+  const hasUtils = files.has('src/lib/utils.ts') || files.has('src/lib/utils.tsx')
+  return {
+    valid: hasUtils && missingDeps.length === 0,
+    summary: hasUtils && missingDeps.length === 0
+      ? 'cn() usage has src/lib/utils.ts and clsx/tailwind-merge dependencies.'
+      : `cn() usage requires ${[
+          hasUtils ? undefined : 'src/lib/utils.ts',
+          ...missingDeps,
+        ].filter(Boolean).join(', ')}.`,
+  }
+}
+
+function findMissingRadixDependencies(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+  packageJson: unknown,
+): string[] {
+  const declared = packageDependencyNames(packageJson)
+  const radixImports = new Set<string>()
+  for (const operation of sourceOperations(operations, projectRoot)) {
+    for (const specifier of importSpecifiers(operation.content ?? '')) {
+      if (specifier.startsWith('@radix-ui/react-')) radixImports.add(specifier)
+    }
+  }
+  return [...radixImports].filter(name => !declared.has(name)).sort()
+}
+
+function themeTokenStatus(files: Map<string, string>): { valid: boolean; summary: string } {
+  const styles = files.get('src/styles.css') ?? ''
+  const required = ['--background', '--foreground', '--primary', '--primary-foreground', '--border', '--input', '--ring', '--radius']
+  const missing = required.filter(token => !styles.includes(token))
+  return {
+    valid: missing.length === 0,
+    summary: missing.length === 0
+      ? 'Theme CSS includes required shadcn semantic tokens.'
+      : `Missing required theme tokens: ${missing.join(', ')}`,
+  }
+}
+
+function rawColorStatusForProject(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+): { valid: boolean; summary: string } {
+  const offenders: string[] = []
+  const rawColorPattern = /#[0-9a-f]{3,8}\b/gi
+  for (const operation of operations) {
+    if (operation.kind === 'delete' || !operation.content) continue
+    const relativePath = projectRelativePath(operation.path, projectRoot)
+    if (!/\.(tsx|ts|jsx|js|css)$/i.test(relativePath)) continue
+    if (relativePath === 'src/styles.css') {
+      const nonTokenLines = operation.content
+        .split('\n')
+        .filter(line => {
+          rawColorPattern.lastIndex = 0
+          return rawColorPattern.test(line) && !/^\s*--[a-z0-9-]+\s*:/i.test(line)
+        })
+      if (nonTokenLines.length > 0) offenders.push(relativePath)
+      continue
+    }
+    rawColorPattern.lastIndex = 0
+    if (rawColorPattern.test(operation.content)) offenders.push(relativePath)
+  }
+  return {
+    valid: offenders.length === 0,
+    summary: offenders.length === 0
+      ? 'Raw hex colors are limited to theme token definitions.'
+      : `Raw hex colors found outside theme token definitions: ${offenders.slice(0, 8).join(', ')}`,
+  }
+}
+
+function sourceOperations(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+): DesignProjectFileOperation[] {
+  return operations.filter(operation => {
+    if (operation.kind === 'delete' || !operation.content) return false
+    const relativePath = projectRelativePath(operation.path, projectRoot)
+    return /\.(tsx|ts|jsx|js)$/i.test(relativePath)
+  })
+}
+
+function importSpecifiers(source: string): string[] {
+  const specifiers: string[] = []
+  const importPattern = /\b(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]/g
+  const dynamicImportPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+  collectMatches(source, importPattern, specifiers)
+  collectMatches(source, dynamicImportPattern, specifiers)
+  return specifiers
+}
+
+function externalPackageName(specifier: string): string | undefined {
+  if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('@/')) return undefined
+  if (/^(node|data|https?):/.test(specifier)) return undefined
+  const segments = specifier.split('/')
+  return specifier.startsWith('@') ? segments.slice(0, 2).join('/') : segments[0]
+}
+
+function packageDependencyNames(packageJson: unknown): Set<string> {
+  const names = new Set<string>()
+  if (!isRecord(packageJson)) return names
+  for (const group of ['dependencies', 'devDependencies'] as const) {
+    const dependencies = packageJson[group]
+    if (!isRecord(dependencies)) continue
+    for (const name of Object.keys(dependencies)) names.add(name)
+  }
+  return names
 }
 
 function relativeImportSpecifiers(source: string): string[] {
@@ -265,6 +552,15 @@ function parseJson(value: string): { ok: true; value: unknown } | { ok: false } 
     return { ok: true, value: JSON.parse(value) as unknown }
   } catch {
     return { ok: false }
+  }
+}
+
+function parseJsonValue(value: string | undefined): unknown {
+  if (!value) return undefined
+  try {
+    return JSON.parse(value) as unknown
+  } catch {
+    return undefined
   }
 }
 

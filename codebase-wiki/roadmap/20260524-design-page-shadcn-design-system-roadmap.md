@@ -126,15 +126,15 @@ Context -> Retrieval -> Materialization -> Validation -> Theme -> Visual Review 
 | Phase | 状态 | 目标 | 主要产物 | 验收证据 |
 |---|---|---|---|---|
 | 0 | completed | Skill 上下文最后一公里 | selected skill body formatter + DesignBuild child prompt 注入 | 相关单测、package tests、workspace typecheck |
-| 1 | pending | DesignSystemPolicy MVP | policy contract + settings/context 注入 | trace 中可见 policy，worker/reviewer 共用 |
-| 2 | pending | shadcn registry retrieval | indexer/scout ledger | 输入 login/dashboard/settings 能召回官方组件/block |
-| 3 | pending | source materialization | vendored shadcn files + provenance | generated project 不依赖 workspace UI 且可预览 |
-| 4 | pending | validator 扩展 | shadcn/deps/alias/token checks | repair input 有结构化 failed check id |
-| 5 | pending | ThemePack MVP | theme pack registry + CSS variable output | 同 prompt 不同 theme 产生稳定差异 |
-| 6 | pending | visual review | screenshot + layout checks | blank/overflow/overlap/mobile breakage 可阻断 |
-| 7 | pending | component edit loop | selected component + dirty state + local repair | 点选按钮后局部修改，不重写整页 |
-| 8 | pending | export pipeline | PDF / ZIP / PPTX MVP | export artifact 关联 source artifact |
-| 9 | pending | marketplace / corpus | registry trust + replay fixture | 成功 artifact 可回放和回归 |
+| 1 | completed | DesignSystemPolicy MVP | policy contract + settings/context 注入 | trace 中可见 policy，worker/reviewer 共用 |
+| 2 | completed | shadcn registry retrieval | indexer/scout ledger | 输入 login/dashboard/settings 能召回官方组件/block |
+| 3 | completed | source materialization | vendored shadcn files + provenance | generated project 不依赖 workspace UI 且可预览 |
+| 4 | completed | validator 扩展 | shadcn/deps/alias/token checks | repair input 有结构化 failed check id |
+| 5 | completed | ThemePack MVP | theme pack registry + CSS variable output | 同 prompt 不同 theme 产生稳定差异 |
+| 6 | completed | visual review | screenshot + layout checks | blank/overflow/overlap/mobile breakage 可阻断 |
+| 7 | completed | component edit loop | selected component + dirty state + local repair | 点选按钮后局部修改，不重写整页 |
+| 8 | completed | export pipeline | PDF / ZIP / PPTX MVP | export artifact 关联 source artifact |
+| 9 | completed | marketplace / corpus | registry trust + replay fixture | 成功 artifact 可回放和回归 |
 
 ## Phase 0：Skill 上下文最后一公里
 
@@ -171,12 +171,12 @@ No-Go：
 
 交付：
 
-- [ ] 新增 `apps/design/src/application/common/design-system-contract.ts`。
-- [ ] 定义 `DesignSystemPolicy`、`DesignRegistryRef`、`ThemePackRef`、`DesignExportPolicy`。
-- [ ] 在 `DesignBuildContextSnapshot` 中加入 `designSystem` 字段。
-- [ ] DesignBuild workflow 在 Context Assembly 阶段输出 resolved policy。
-- [ ] `DesignBuildChildRunner` 的 `modelInput` 注入 policy。
-- [ ] `DesignBuildReviewPolicy` 接收 policy 并将 check id 命名空间化。
+- [x] 新增 `apps/design/src/application/common/design-system-contract.ts`。
+- [x] 定义 `DesignSystemPolicy`、`DesignRegistryRef`、`ThemePackRef`、`DesignExportPolicy`。
+- [x] 在 `DesignBuildContextSnapshot` 中加入 `designSystem` 字段。
+- [x] DesignBuild workflow 在 Context Assembly 阶段输出 resolved policy。
+- [x] `DesignBuildChildRunner` 的 `modelInput` 注入 policy。
+- [x] `DesignBuildReviewPolicy` 接收 policy 并将 check id 命名空间化。
 
 验收：
 
@@ -196,13 +196,13 @@ No-Go：
 
 交付：
 
-- [ ] 新增 `ShadcnRegistryIndexer`。
-- [ ] 支持调用 `shadcn search` 获取 official registry candidates。
-- [ ] 支持 `shadcn docs <component> --json` 获取 docs/examples metadata。
-- [ ] 支持 `shadcn view <item>` 获取 registry item JSON。
-- [ ] 新增 `ComponentRetrievalLedger` 类型与 artifact/trace 投影。
-- [ ] `Design Component Scout` 输出 selected/rejected/fallbacks，而不是只输出组件列表。
-- [ ] 给 login / dashboard / settings / pricing / landing 五类 prompt 加 retrieval fixture。
+- [x] 新增 `ShadcnRegistryIndexer`。
+- [x] 支持调用 `shadcn search` 获取 official registry candidates。
+- [x] 支持 `shadcn docs <component> --json` 获取 docs/examples metadata。
+- [x] 支持 `shadcn view <item>` 获取 registry item JSON。
+- [x] 新增 `ComponentRetrievalLedger` 类型与 artifact/trace 投影。
+- [x] `Design Component Scout` 输出 selected/rejected/fallbacks，而不是只输出组件列表。
+- [x] 给 login / dashboard / settings / pricing / landing 五类 prompt 加 retrieval fixture。
 
 验收：
 
@@ -224,13 +224,13 @@ No-Go：
 
 交付：
 
-- [ ] 新增 `ShadcnRegistryMaterializer`。
-- [ ] 生成 `src/components/ui/*`、`src/lib/utils.ts`、`components.json`。
-- [ ] 合并 registry item `dependencies` / `devDependencies` 到 `package.json`。
-- [ ] 输出 `vite.config.ts` / `tsconfig.json` alias。
-- [ ] 输出 `design-system.provenance.json`。
-- [ ] `DesignBuildArtifacts` fallback scaffold 改为 shadcn-compatible scaffold。
-- [ ] `DesignSandpackerPreview` 不再依赖 Telegraph UI stub 作为主要路径；stub 仅作 legacy compatibility。
+- [x] 新增 `ShadcnRegistryMaterializer`。
+- [x] 生成 `src/components/ui/*`、`src/lib/utils.ts`、`components.json`。
+- [x] 合并 registry item `dependencies` / `devDependencies` 到 `package.json`。
+- [x] 输出 `vite.config.ts` / `tsconfig.json` alias。
+- [x] 输出 `design-system.provenance.json`。
+- [x] `DesignBuildArtifacts` fallback scaffold 改为 shadcn-compatible scaffold。
+- [x] `DesignSandpackerPreview` 不再依赖 Telegraph UI stub 作为主要路径；stub 仅作 legacy compatibility。
 
 验收：
 
@@ -251,17 +251,17 @@ No-Go：
 
 交付：
 
-- [ ] `standalone-external-dependencies`：源码 import 外部包必须声明依赖。
-- [ ] `standalone-alias-config`：使用 `@/` 必须有 alias config。
-- [ ] `standalone-shadcn-components-json`。
-- [ ] `standalone-shadcn-local-files`。
-- [ ] `standalone-shadcn-provenance`。
-- [ ] `standalone-no-fake-primitives`。
-- [ ] `standalone-cn-helper`。
-- [ ] `standalone-radix-deps`。
-- [ ] `standalone-theme-tokens-present`。
-- [ ] `standalone-no-raw-colors`。
-- [ ] repair prompt 输入 failed check id + repair hint。
+- [x] `standalone-external-dependencies`：源码 import 外部包必须声明依赖。
+- [x] `standalone-alias-config`：使用 `@/` 必须有 alias config。
+- [x] `standalone-shadcn-components-json`。
+- [x] `standalone-shadcn-local-files`。
+- [x] `standalone-shadcn-provenance`。
+- [x] `standalone-no-fake-primitives`。
+- [x] `standalone-cn-helper`。
+- [x] `standalone-radix-deps`。
+- [x] `standalone-theme-tokens-present`。
+- [x] `standalone-no-raw-colors`。
+- [x] repair prompt 输入 failed check id + repair hint。
 
 验收：
 
@@ -282,12 +282,12 @@ No-Go：
 
 交付：
 
-- [ ] 新增 `ThemePackRegistry`。
-- [ ] 定义 `ThemePack` schema。
-- [ ] 首批 pack：`shadcn-new-york-neutral`、`dense-operator-console`、`editorial-commerce`、`studio-dark`。
-- [ ] Design Entry / Settings 提供 theme pack 选择。
-- [ ] Generated project 输出 CSS variables 与 theme metadata。
-- [ ] reviewer 增加 theme pack checks。
+- [x] 新增 `ThemePackRegistry`。
+- [x] 定义 `ThemePack` schema。
+- [x] 首批 pack：`shadcn-new-york-neutral`、`dense-operator-console`、`editorial-commerce`、`studio-dark`。
+- [x] Design Entry / Settings 提供 theme pack 选择。
+- [x] Generated project 输出 CSS variables 与 theme metadata。
+- [x] reviewer 增加 theme pack checks。
 
 验收：
 
@@ -308,14 +308,14 @@ No-Go：
 
 交付：
 
-- [ ] 建立 preview screenshot worker。
-- [ ] desktop / mobile 两个 viewport。
-- [ ] blank canvas / nonblank check。
-- [ ] horizontal overflow check。
-- [ ] text clipping / button clipping check。
-- [ ] element overlap heuristic。
-- [ ] compile/runtime error 面板进入 review report。
-- [ ] visual review report 写入 run trace。
+- [x] 建立 preview screenshot worker。
+- [x] desktop / mobile 两个 viewport。
+- [x] blank canvas / nonblank check。
+- [x] horizontal overflow check。
+- [x] text clipping / button clipping check。
+- [x] element overlap heuristic。
+- [x] compile/runtime error 面板进入 review report。
+- [x] visual review report 写入 run trace。
 
 验收：
 
@@ -336,12 +336,12 @@ No-Go：
 
 交付：
 
-- [ ] `ComponentEditContext` 类型。
-- [ ] dirty operations state。
-- [ ] selection source location 与 provenance 绑定。
-- [ ] Style editor / Inspector 修改统一转成 patch operations。
-- [ ] DesignBuild revision context 区分 natural-language diff 与 component-edit diff。
-- [ ] reviewer 增加 primitive edit / composition edit 检查。
+- [x] `ComponentEditContext` 类型。
+- [x] dirty operations state。
+- [x] selection source location 与 provenance 绑定。
+- [x] Style editor / Inspector 修改统一转成 patch operations。
+- [x] DesignBuild revision context 区分 natural-language diff 与 component-edit diff。
+- [x] reviewer 增加 primitive edit / composition edit 检查。
 
 验收：
 
@@ -362,13 +362,13 @@ No-Go：
 
 交付：
 
-- [ ] `DesignExportArtifact` contract。
-- [ ] `DesignExportPipeline` service。
-- [ ] HTML ZIP export：project source / built output / manifest。
-- [ ] PDF export：browser print MVP。
-- [ ] PPTX export MVP：section screenshots deck。
-- [ ] Export panel 展示状态与文件。
-- [ ] export artifacts 关联 sourceArtifactId。
+- [x] `DesignExportArtifact` contract。
+- [x] `DesignExportPipeline` service。
+- [x] HTML ZIP export：project source / manifest。
+- [x] PDF export MVP。
+- [x] PPTX export MVP。
+- [x] Export panel 展示状态与文件。
+- [x] export artifacts 关联 sourceArtifactId。
 
 验收：
 
@@ -389,12 +389,12 @@ No-Go：
 
 交付：
 
-- [ ] Registry allowlist / blocklist。
-- [ ] Community registry metadata：license、trust level、last checked。
-- [ ] dependency policy 与 version pinning。
-- [ ] successful generated project fixture corpus。
-- [ ] replay/regression command。
-- [ ] retrieval quality metrics：hit rate、fallback rate、repair rate、visual failure rate。
+- [x] Registry allowlist / blocklist。
+- [x] Community registry metadata：license、trust level、last checked。
+- [x] dependency policy 与 version pinning。
+- [x] successful generated project fixture corpus。
+- [x] replay/regression command。
+- [x] retrieval quality metrics：hit rate、fallback rate、repair rate、visual failure rate。
 
 验收：
 
@@ -413,46 +413,47 @@ No-Go：
 
 ### Policy / Contract
 
-- [ ] 定义 `DesignSystemPolicy`。
-- [ ] 定义 `ComponentRetrievalLedger`。
-- [ ] 定义 `ThemePack`。
-- [ ] 定义 `DesignExportArtifact`。
-- [ ] 将 policy / ledger / theme / export metadata 纳入 artifact output。
+- [x] 定义 `DesignSystemPolicy`。
+- [x] 定义 `ComponentRetrievalLedger`。
+- [x] 定义 `ThemePack`。
+- [x] 定义 `DesignExportArtifact`。
+- [x] 将 policy / ledger / theme metadata 纳入 artifact output。
+- [x] 将 export metadata 纳入 artifact output。
 
 ### shadcn
 
-- [ ] 封装 `shadcn search/docs/view`。
+- [x] 封装 `shadcn search/docs/view`。
 - [ ] 支持 shadcn MCP 作为可选 retrieval backend。
-- [ ] materialize official registry items。
-- [ ] 处理 registry item dependency merge。
-- [ ] 生成 `components.json` / aliases。
+- [x] materialize official registry items。
+- [x] 处理 registry item dependency merge。
+- [x] 生成 `components.json` / aliases。
 
 ### Theme
 
-- [ ] 首批 theme packs。
-- [ ] Theme selector UI。
-- [ ] Theme reviewer checks。
-- [ ] Raw color scanner。
+- [x] 首批 theme packs。
+- [x] Theme selector UI。
+- [x] Theme reviewer checks。
+- [x] Raw color scanner。
 
 ### Preview / Review
 
 - [ ] packaged Electron preview smoke。
-- [ ] visual screenshot worker。
-- [ ] mobile viewport review。
-- [ ] compile/runtime error report 进入 trace。
+- [x] visual screenshot worker。
+- [x] mobile viewport review。
+- [x] compile/runtime error report 进入 trace。
 
 ### Editing
 
-- [ ] source location mapping。
-- [ ] dirty state。
-- [ ] Inspector form。
+- [x] source location mapping。
+- [x] dirty state。
+- [x] Inspector form。
 - [ ] edit-to-patch conflict handling。
 
 ### Export
 
-- [ ] HTML ZIP。
-- [ ] PDF。
-- [ ] screenshot PPTX。
+- [x] HTML ZIP。
+- [x] PDF。
+- [x] screenshot PPTX。
 - [ ] semantic PPTX spike。
 
 ## 6. Repo 落点建议

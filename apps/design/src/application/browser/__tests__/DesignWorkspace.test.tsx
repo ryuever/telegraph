@@ -12,6 +12,27 @@ vi.mock('../DesignSandpackerPreview', () => ({
       <button
         type="button"
         onClick={() => {
+          props.onSelectComponent?.({
+            id: 'patch-1:preview-dom:apps-design-src-Hero-tsx:1:1:button',
+            artifactId: 'patch-1',
+            label: 'Button .bg-primary',
+            source: 'preview-dom',
+            path: 'apps/design/src/Hero.tsx',
+            elementTag: 'button',
+            className: 'bg-primary text-white',
+            sourceLocation: {
+              filePath: 'apps/design/src/Hero.tsx',
+              line: 1,
+              column: 32,
+            },
+          })
+        }}
+      >
+        Select preview button
+      </button>
+      <button
+        type="button"
+        onClick={() => {
           props.onOperationsChange?.([
             {
               kind: 'update',
@@ -34,6 +55,7 @@ const serviceMocks = vi.hoisted(() => ({
   send: vi.fn(),
   previewArtifactPatch: vi.fn(),
   applyArtifactPatch: vi.fn(),
+  exportArtifact: vi.fn(),
 }))
 
 vi.mock('../pagelet-design-agent-service', () => ({
@@ -41,6 +63,7 @@ vi.mock('../pagelet-design-agent-service', () => ({
     send = serviceMocks.send
     previewArtifactPatch = serviceMocks.previewArtifactPatch
     applyArtifactPatch = serviceMocks.applyArtifactPatch
+    exportArtifact = serviceMocks.exportArtifact
   },
 }))
 
@@ -125,6 +148,21 @@ describe('DesignWorkspace', () => {
           { kind: 'update', path: '/repo/apps/design/src/Hero.tsx', content: 'next' },
         ],
         summary: { adds: 0, updates: 1, deletes: 0 },
+      },
+    })
+    serviceMocks.exportArtifact.mockResolvedValue({
+      runId: 'export-run',
+      artifactId: 'patch-1',
+      status: 'exported',
+      artifact: {
+        id: 'patch-1-export',
+        kind: 'design-export',
+        title: 'Hero patch export',
+        sourceArtifactId: 'patch-1',
+        formats: ['html-zip'],
+        exports: [{ format: 'html-zip', status: 'generated', path: '/tmp/html-project.zip' }],
+        manifestPath: '/tmp/export-manifest.json',
+        createdAt: 1,
       },
     })
   })
@@ -347,6 +385,87 @@ describe('DesignWorkspace', () => {
     })
     expect(stringField(operationSummary, 'contentPreview')).toContain('bg-green-600')
     expect(numberField(operationSummary, 'contentLength')).toBeGreaterThan(0)
+  })
+
+  it('passes component edit context with dirty source into follow-up design runs', async () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      findButtonByText(container, 'Select preview button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      findButtonByText(container, 'Edit preview source')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const textarea = container.querySelector<HTMLTextAreaElement>('textarea')
+    expect(textarea).not.toBeNull()
+
+    await act(async () => {
+      if (!textarea) return
+      setTextAreaValue(textarea, 'make the button green and bigger')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      findButtonByText(container, '发送')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const secondSend = serviceMocks.send.mock.calls[1]?.[0] as DesignAgentSendOptions | undefined
+    const componentEdit = recordField(secondSend?.context, 'componentEdit')
+    expect(componentEdit).toMatchObject({
+      kind: 'component-edit',
+      artifactId: 'patch-1',
+      prompt: 'make the button green and bigger',
+      dirtyOperationPaths: ['apps/design/src/Hero.tsx'],
+    })
+    expect(recordField(componentEdit, 'target')).toMatchObject({
+      source: 'preview-dom',
+      elementTag: 'button',
+      path: 'apps/design/src/Hero.tsx',
+    })
+    expect(recordField(componentEdit, 'binding')).toMatchObject({
+      editScope: 'composition',
+      preferredOperationPath: 'apps/design/src/Hero.tsx',
+    })
+    expect(recordValue(arrayField(componentEdit, 'dirtyOperations')[0])).toMatchObject({
+      source: 'style-editor',
+      path: 'apps/design/src/Hero.tsx',
+    })
+  })
+
+  it('exports the active artifact and keeps the export artifact in the workbench', async () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      container
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Export HTML ZIP"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(serviceMocks.exportArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      artifactId: 'patch-1',
+      formats: ['html-zip'],
+    }))
+    expect(container.textContent).toContain('已导出 html-zip。')
+    expect(container.textContent).toContain('Hero patch export')
   })
 })
 

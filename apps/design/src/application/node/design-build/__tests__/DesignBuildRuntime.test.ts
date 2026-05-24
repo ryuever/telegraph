@@ -47,6 +47,8 @@ describe('DesignBuildRuntime', () => {
       'child_run_started',
       'child_run_completed',
       'step_completed',
+      'step_started',
+      'step_completed',
       'assistant_delta',
       'run_completed',
     ])
@@ -83,13 +85,19 @@ describe('DesignBuildRuntime', () => {
     expect(stringField(recordField(childCompletions[0]?.output, 'brief'), 'summary'))
       .toBe('Create a SaaS dashboard landing page')
     expect(stringField(childCompletions[1]?.output, 'summary'))
-      .toBe('Selected 5 component assets for the generated page.')
+      .toContain('shadcn registry assets')
     expect(arrayField(childCompletions[1]?.output, 'components')
-      .some(component => stringField(component, 'name') === 'Button')).toBe(true)
+      .some(component => stringField(component, 'name') === 'button')).toBe(true)
+    const retrievalLedger = recordField(childCompletions[1]?.output, 'ledger')
+    expect(recordField(retrievalLedger, 'retrieval')).toMatchObject({
+      status: 'degraded',
+    })
+    expect(arrayField(retrievalLedger, 'selected')
+      .some(component => stringField(component, 'name') === 'sidebar')).toBe(true)
     expect(childCompletions[2]?.output).toMatchObject({
       artifactId: 'run-design-build-patch',
       kind: 'design-patch',
-      operationCount: 6,
+      operationCount: 15,
     })
     expect(stringField(recordField(childCompletions[3]?.output, 'review'), 'verdict')).toBe('pass')
 
@@ -102,6 +110,13 @@ describe('DesignBuildRuntime', () => {
       kind: 'design-patch',
       title: 'Create a SaaS dashboard landing page source',
     })
+    const artifactLedger = recordField(recordField(terminalArtifact, 'metadata'), 'componentRetrievalLedger')
+    expect(recordField(artifactLedger, 'retrieval')).toMatchObject({ status: 'degraded' })
+    expect(arrayField(artifactLedger, 'selected')
+      .some(component => stringField(component, 'name') === 'card')).toBe(true)
+    const visualReview = recordField(recordField(terminalArtifact, 'metadata'), 'visualReview')
+    expect(visualReview).toMatchObject({ status: 'pass' })
+    expect(arrayField(visualReview, 'viewports').map(viewport => stringField(viewport, 'id'))).toEqual(['desktop', 'mobile'])
     expect(arrayField(recordField(terminalOutput, 'orchestration'), 'childRuns')
       .map(childRun => stringField(childRun, 'profileId'))).toEqual([
       'design-product-planner',
@@ -146,8 +161,49 @@ describe('DesignBuildRuntime', () => {
     })
   })
 
+  it('emits and passes the resolved design system policy through child model inputs', async () => {
+    const requests: DesignBuildChildRunRequest[] = []
+    const runtime = createTestRuntime(request => {
+      requests.push(request)
+      return undefined
+    })
+    const events = await collect(runtime.run({
+      runId: 'run-design-system',
+      message: 'Create a login page',
+      settings: {},
+    }))
+
+    const contextCompletion = events.find((event): event is Extract<AgentEvent, { type: 'step_completed' }> =>
+      event.type === 'step_completed' &&
+      event.stepId === 'run-design-system:context'
+    )
+    const contextPolicy = recordField(contextCompletion?.output, 'designSystem')
+    expect(contextPolicy).toMatchObject({
+      id: 'shadcn-first-standalone',
+      mode: 'standalone-preview',
+    })
+
+    const modelInputPolicies = requests
+      .map(request => recordField(request.modelInput, 'designSystem'))
+      .filter(Boolean)
+    expect(modelInputPolicies).toHaveLength(4)
+    expect(modelInputPolicies.every(policy =>
+      stringField(policy, 'id') === 'shadcn-first-standalone' &&
+      stringField(policy, 'mode') === 'standalone-preview'
+    )).toBe(true)
+
+    const reviewRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer)
+    const review = recordField(reviewRequest?.input, 'review')
+    expect(arrayField(review, 'checks')
+      .some(check => stringField(check, 'id') === 'design-system-policy-resolved')).toBe(true)
+  })
+
   it('uses artifact revision context from run metadata', async () => {
-    const runtime = createTestRuntime()
+    const requests: DesignBuildChildRunRequest[] = []
+    const runtime = createTestRuntime(request => {
+      requests.push(request)
+      return undefined
+    })
     const events = await collect(runtime.run({
       runId: 'run-revision',
       message: 'Make the primary button green',
@@ -175,6 +231,47 @@ describe('DesignBuildRuntime', () => {
             path: 'apps/design/src/generated/page.tsx',
             operationKind: 'update',
           },
+          componentEdit: {
+            kind: 'component-edit',
+            artifactId: 'artifact-parent',
+            prompt: 'Make the primary button green',
+            target: {
+              id: 'artifact-parent:preview-dom:button',
+              artifactId: 'artifact-parent',
+              label: 'Primary button',
+              source: 'preview-dom',
+              path: 'apps/design/src/generated/page.tsx',
+              elementTag: 'button',
+              className: 'bg-primary',
+              sourceLocation: {
+                filePath: 'apps/design/src/generated/page.tsx',
+                line: 1,
+                column: 40,
+              },
+            },
+            binding: {
+              sourcePath: 'apps/design/src/generated/page.tsx',
+              sourceLocation: {
+                filePath: 'apps/design/src/generated/page.tsx',
+                line: 1,
+                column: 40,
+              },
+              editScope: 'composition',
+              preferredOperationPath: 'apps/design/src/generated/page.tsx',
+              protectedPrimitivePaths: ['apps/design/src/generated/src/components/ui/button.tsx'],
+              provenance: 'composition',
+            },
+            dirtyOperations: [
+              {
+                kind: 'update',
+                path: 'apps/design/src/generated/page.tsx',
+                source: 'style-editor',
+                contentPreview: '<button className="bg-green-600 px-5">Go</button>',
+                contentLength: 52,
+              },
+            ],
+            dirtyOperationPaths: ['apps/design/src/generated/page.tsx'],
+          },
         },
       },
     }))
@@ -193,6 +290,7 @@ describe('DesignBuildRuntime', () => {
       event.stepId === 'run-revision:context'
     )
     const revision = recordField(contextCompletion?.output, 'revision')
+    expect(stringField(revision, 'changeKind')).toBe('component-edit')
     const operationSummary = arrayField(revision, 'operationSummaries')[0]
     expect(operationSummary).toMatchObject({
       kind: 'update',
@@ -200,6 +298,24 @@ describe('DesignBuildRuntime', () => {
       contentLength: 75,
     })
     expect(stringField(operationSummary, 'contentPreview')).toContain('bg-green-600')
+    const componentEdit = recordField(revision, 'componentEdit')
+    expect(componentEdit).toMatchObject({
+      kind: 'component-edit',
+      artifactId: 'artifact-parent',
+      dirtyOperationPaths: ['apps/design/src/generated/page.tsx'],
+    })
+
+    const workerRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker)
+    const workerComponentEdit = recordField(workerRequest?.modelInput, 'componentEdit')
+    expect(workerComponentEdit).toMatchObject({
+      kind: 'component-edit',
+      dirtyOperationPaths: ['apps/design/src/generated/page.tsx'],
+    })
+
+    const reviewerRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer)
+    const review = recordField(reviewerRequest?.modelInput, 'review')
+    expect(arrayField(review, 'checks')
+      .some(check => stringField(check, 'id') === 'component-edit-primitive-guard')).toBe(true)
 
     const terminal = events.at(-1)
     expect(terminal?.type).toBe('run_completed')
@@ -294,6 +410,122 @@ describe('DesignBuildRuntime', () => {
     expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-repairable-dashboard-page/package.json')
     const repairedArtifact = recordField(terminalOutput, 'artifact')
     expect(JSON.stringify(arrayField(repairedArtifact, 'operations'))).not.toContain('@/packages/ui/')
+  })
+
+  it('runs a repair attempt when visual review finds blank output', async () => {
+    const runtime = createTestRuntime(request => {
+      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'code-artifact') {
+        return {
+          artifact: {
+            id: 'visual-bad-artifact',
+            kind: 'design-patch',
+            title: 'Blank source',
+            operations: modelProjectOperations('visual-bad').map(operation => operation.path.endsWith('/src/App.tsx')
+              ? { ...operation, content: 'export default function App() { return null }\n' }
+              : operation),
+          },
+        }
+      }
+      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'repair') {
+        return {
+          artifact: {
+            id: 'visual-repaired-artifact',
+            kind: 'design-patch',
+            title: 'Visual repaired source',
+            operations: modelProjectOperations('visual-bad'),
+          },
+        }
+      }
+      return undefined
+    })
+
+    const events = await collect(runtime.run({
+      runId: 'run-visual-repair',
+      message: 'Create a blank page then repair it',
+      settings: {},
+    }))
+
+    const visualReview = events.find((event): event is Extract<AgentEvent, { type: 'step_completed' }> =>
+      event.type === 'step_completed' &&
+      event.stepId === 'run-visual-repair:visual-review'
+    )
+    expect(stringField(visualReview?.output, 'status')).toBe('repair_required')
+
+    const repairWorker = events.find((event): event is Extract<AgentEvent, { type: 'child_run_completed' }> =>
+      event.type === 'child_run_completed' &&
+      event.childRunId === 'run-visual-repair:design-worker:repair-1'
+    )
+    expect(repairWorker).toBeDefined()
+
+    const terminal = events.at(-1)
+    expect(terminal?.type).toBe('run_completed')
+    const artifact = terminal?.type === 'run_completed'
+      ? recordField(terminal.output, 'artifact')
+      : undefined
+    expect(artifact).toMatchObject({
+      id: 'visual-repaired-artifact',
+      kind: 'design-patch',
+      title: 'Visual repaired source',
+    })
+  })
+
+  it('merges partial repair artifacts back onto the original standalone project', async () => {
+    const runtime = createTestRuntime(request => {
+      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'code-artifact') {
+        return {
+          artifact: {
+            id: 'partial-bad-artifact',
+            kind: 'design-patch',
+            title: 'Partial bad source',
+            operations: modelProjectOperations('partial-repair').map(operation => operation.path.endsWith('/src/App.tsx')
+              ? { ...operation, content: 'export default function App() { return null }\n' }
+              : operation),
+          },
+        }
+      }
+      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'repair') {
+        return {
+          artifact: {
+            id: 'partial-repaired-artifact',
+            kind: 'design-patch',
+            title: 'Partial repaired source',
+            operations: [
+              {
+                kind: 'add',
+                path: 'apps/design/src/generated/partial-repair/src/App.tsx',
+                content: 'export default function App() { return <main>Repaired</main> }\n',
+              },
+            ],
+          },
+        }
+      }
+      return undefined
+    })
+
+    const events = await collect(runtime.run({
+      runId: 'run-partial-repair',
+      message: 'Create a blank page then partially repair it',
+      settings: {},
+    }))
+
+    const terminal = events.at(-1)
+    expect(terminal?.type).toBe('run_completed')
+    const artifact = terminal?.type === 'run_completed'
+      ? recordField(terminal.output, 'artifact')
+      : undefined
+    const operationPaths = arrayField(artifact, 'operations').map(operation => stringField(operation, 'path'))
+    expect(artifact).toMatchObject({
+      id: 'partial-repaired-artifact',
+      kind: 'design-patch',
+      title: 'Partial repaired source',
+    })
+    expect(operationPaths).toContain('apps/design/src/generated/partial-repair/package.json')
+    expect(operationPaths).toContain('apps/design/src/generated/partial-repair/index.html')
+    expect(operationPaths).toContain('apps/design/src/generated/partial-repair/src/index.tsx')
+    const repairedApp = arrayField(artifact, 'operations').find(operation =>
+      stringField(operation, 'path') === 'apps/design/src/generated/partial-repair/src/App.tsx'
+    )
+    expect(stringField(repairedApp, 'content')).toContain('Repaired')
   })
 
   it('consumes model-backed worker output when provided', async () => {

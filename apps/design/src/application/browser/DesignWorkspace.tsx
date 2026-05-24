@@ -7,9 +7,12 @@ import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
 import { cn } from '@/packages/ui/lib/utils'
 import type {
+  ComponentEditDirtyOperation,
   DesignAgentStreamEvent,
+  DesignExportFormat,
   DesignPatchFileOperation,
 } from '@/apps/design/application/common'
+import { createComponentEditContext } from '@/apps/design/application/common'
 import type { DesignProjectedArtifact } from './design-agent-projector'
 import {
   DesignArtifactWorkbench,
@@ -90,6 +93,7 @@ export function DesignWorkspace({
   const initialRunStarted = useRef(Boolean(initialState))
   const activeControllers = useRef<Map<string, AbortController>>(new Map())
   const assistantArtifactTitles = useRef<Map<string, string>>(new Map())
+  const artifactOperationBaselines = useRef<Map<string, DesignPatchFileOperation[]>>(new Map())
   const [messages, setMessages] = useState<Message[]>(() => initialState?.messages ?? [
     { id: initialUserMessageId, role: 'user', content: initialPrompt },
     { id: initialAssistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
@@ -100,6 +104,7 @@ export function DesignWorkspace({
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(() => initialState?.activeArtifactId ?? null)
   const [artifactMode, setArtifactMode] = useState<'preview' | 'code' | 'inspect'>('preview')
   const [selectedComponent, setSelectedComponent] = useState<DesignSelectedComponent | null>(null)
+  const [dirtyArtifactOperations, setDirtyArtifactOperations] = useState<Map<string, DesignPatchFileOperation[]>>(() => new Map())
   const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
   const [traceItems, setTraceItems] = useState<DesignTraceItem[]>(() =>
@@ -177,7 +182,14 @@ export function DesignWorkspace({
       },
       onArtifact: artifact => {
         rememberAssistantArtifact(assistantMessageId, artifact)
+        artifactOperationBaselines.current.set(artifact.id, extractDesignPatchOperations(artifact) ?? [])
         setArtifacts((prev) => [...prev.filter(item => item.id !== artifact.id), artifact])
+        setDirtyArtifactOperations((prev) => {
+          if (!prev.has(artifact.id)) return prev
+          const next = new Map(prev)
+          next.delete(artifact.id)
+          return next
+        })
         setActiveArtifactId(artifact.id)
         setSelectedComponent(null)
       },
@@ -248,6 +260,13 @@ export function DesignWorkspace({
       prompt,
       activeArtifact: summarizeActiveArtifact(artifacts, activeArtifactId),
       selectedComponent: summarizeSelectedComponent(selectedComponent, activeArtifactId),
+      componentEdit: summarizeComponentEditContext({
+        artifacts,
+        activeArtifactId,
+        selectedComponent,
+        dirtyOperations: activeArtifactId ? dirtyArtifactOperations.get(activeArtifactId) : undefined,
+        prompt,
+      }),
     }, assistantMessageId)
   }
 
@@ -278,6 +297,23 @@ export function DesignWorkspace({
     artifactId: string,
     operations: NonNullable<ReturnType<typeof extractDesignPatchOperations>>,
   ): void => {
+    const currentArtifact = artifacts.find(artifact => artifact.id === artifactId)
+    const baseline = artifactOperationBaselines.current.get(artifactId) ??
+      (currentArtifact ? extractDesignPatchOperations(currentArtifact) : undefined) ??
+      []
+    if (!artifactOperationBaselines.current.has(artifactId)) {
+      artifactOperationBaselines.current.set(artifactId, baseline)
+    }
+    const changedOperations = changedPatchOperations(baseline, operations)
+    setDirtyArtifactOperations(prev => {
+      const next = new Map(prev)
+      if (changedOperations.length > 0) {
+        next.set(artifactId, changedOperations)
+      } else {
+        next.delete(artifactId)
+      }
+      return next
+    })
     setArtifacts(prev => prev.map(artifact => {
       if (artifact.id !== artifactId || !artifact.output || typeof artifact.output !== 'object' || Array.isArray(artifact.output)) {
         return artifact
@@ -317,6 +353,45 @@ export function DesignWorkspace({
       artifactKind: artifact.kind,
       artifact: artifact.output,
     }, assistantMessageId)
+  }
+
+  const exportArtifact = (artifact: DesignProjectedArtifact, format: DesignExportFormat): void => {
+    const assistantMessageId = globalThis.crypto.randomUUID()
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: globalThis.crypto.randomUUID(),
+        role: 'user',
+        content: `导出 ${artifact.title ?? artifact.id} 为 ${format}`,
+      },
+      { id: assistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
+    ])
+    setAssistantRunStatus(assistantMessageId, 'running')
+    void agent.exportArtifact({
+      artifactId: artifact.id,
+      artifact: artifact.output,
+      formats: [format],
+      sessionId,
+    }).then(result => {
+      if (result.status !== 'exported' || !result.artifact) {
+        throw new Error(result.error ?? 'Export failed')
+      }
+      const projected: DesignProjectedArtifact = {
+        id: result.artifact.id,
+        kind: result.artifact.kind,
+        title: result.artifact.title,
+        output: result.artifact,
+        sourceEventType: 'tool_result',
+      }
+      setArtifacts(prev => [...prev.filter(item => item.id !== projected.id), projected])
+      setActiveArtifactId(projected.id)
+      rememberAssistantArtifact(assistantMessageId, projected)
+      appendAssistantText(`已导出 ${format}。`, assistantMessageId)
+      setAssistantRunStatus(assistantMessageId, 'completed')
+    }).catch((error: unknown) => {
+      appendAssistantText(`导出失败：${error instanceof Error ? error.message : String(error)}`, assistantMessageId)
+      setAssistantRunStatus(assistantMessageId, 'failed')
+    })
   }
 
   const applyPatchArtifact = async (
@@ -479,16 +554,32 @@ export function DesignWorkspace({
           applyStates={artifactApplyStates}
           mode={artifactMode}
           selectedComponent={selectedComponent}
+          dirtyOperationCount={activeArtifactId ? dirtyArtifactOperations.get(activeArtifactId)?.length ?? 0 : 0}
           onSelectArtifact={handleSelectArtifact}
           onModeChange={setArtifactMode}
           onSelectComponent={handleSelectComponent}
           onClearSelectedComponent={() => { setSelectedComponent(null) }}
           onPatchOperationsChange={handlePatchOperationsChange}
+          onExportArtifact={exportArtifact}
           onApplyArtifact={applyArtifact}
         />
       </section>
     </div>
   )
+}
+
+function changedPatchOperations(
+  baseline: DesignPatchFileOperation[],
+  nextOperations: DesignPatchFileOperation[],
+): DesignPatchFileOperation[] {
+  const baselineByPath = new Map(baseline.map(operation => [operation.path, operation]))
+  return nextOperations.filter(operation => {
+    const previous = baselineByPath.get(operation.path)
+    if (!previous) return true
+    return previous.kind !== operation.kind ||
+      previous.content !== operation.content ||
+      previous.expectedOriginal !== operation.expectedOriginal
+  })
 }
 
 function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
@@ -844,6 +935,31 @@ function summarizeSelectedComponent(
   }
 }
 
+function summarizeComponentEditContext(input: {
+  artifacts: DesignProjectedArtifact[]
+  activeArtifactId: string | null
+  selectedComponent: DesignSelectedComponent | null
+  dirtyOperations?: DesignPatchFileOperation[]
+  prompt: string
+}): Record<string, unknown> | undefined {
+  const artifact = input.artifacts.find(item => item.id === input.activeArtifactId) ?? input.artifacts.at(-1)
+  if (!artifact) return undefined
+  const selected = input.selectedComponent?.artifactId === artifact.id ? input.selectedComponent : null
+  const dirtyOperations = input.dirtyOperations ?? []
+  if (!selected && dirtyOperations.length === 0) return undefined
+  const operations = extractDesignPatchOperations(artifact) ?? []
+
+  return createComponentEditContext({
+    artifactId: artifact.id,
+    parentArtifactId: parentArtifactIdFromArtifact(artifact.output),
+    revision: revisionFromArtifact(artifact.output),
+    prompt: input.prompt,
+    target: selected,
+    artifactOperationPaths: operations.map(operation => operation.path),
+    dirtyOperations: summarizeDirtyOperations(dirtyOperations),
+  }) as unknown as Record<string, unknown>
+}
+
 function summarizeActiveArtifact(
   artifacts: DesignProjectedArtifact[],
   activeArtifactId: string | null,
@@ -860,6 +976,19 @@ function summarizeActiveArtifact(
     operationPaths: operations.map(operation => operation.path),
     operationSummaries: summarizePatchOperations(operations),
   }
+}
+
+function summarizeDirtyOperations(
+  operations: DesignPatchFileOperation[],
+): ComponentEditDirtyOperation[] {
+  return operations.map(operation => ({
+    kind: operation.kind,
+    path: operation.path,
+    source: 'style-editor',
+    contentLength: operation.content?.length,
+    contentPreview: truncateOperationContent(operation.content),
+    expectedOriginalLength: operation.expectedOriginal?.length,
+  }))
 }
 
 function summarizePatchOperations(
@@ -886,4 +1015,10 @@ function revisionFromArtifact(output: unknown): number | undefined {
   if (!output || typeof output !== 'object' || Array.isArray(output)) return undefined
   const revision = (output as { revision?: unknown }).revision
   return typeof revision === 'number' ? revision : undefined
+}
+
+function parentArtifactIdFromArtifact(output: unknown): string | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return undefined
+  const parentArtifactId = (output as { parentArtifactId?: unknown }).parentArtifactId
+  return typeof parentArtifactId === 'string' ? parentArtifactId : undefined
 }

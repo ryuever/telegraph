@@ -8,6 +8,14 @@ import {
   type ComponentSearchResult,
 } from './ComponentAssetRegistry'
 import { evaluateDesignBuildArtifact } from './DesignBuildReviewPolicy'
+import {
+  resolveDesignSystemPolicy,
+  type DesignSystemPolicy,
+} from '@/apps/design/application/common/design-system-contract'
+import {
+  isComponentEditContext,
+  type ComponentEditContext,
+} from '@/apps/design/application/common/component-edit-contract'
 
 export interface DesignBuildInitialStateInput {
   runId: string
@@ -19,6 +27,7 @@ export interface DesignBuildContextSnapshot {
   runtime: 'telegraph-design-build'
   artifactPolicy: 'preview'
   defaultOutputMode: 'design-patch'
+  designSystem: DesignSystemPolicy
   sandboxProject: {
     projectRoot?: string
     dependencySource: 'package.json'
@@ -31,10 +40,12 @@ export interface DesignBuildRevisionContext {
   parentArtifactId: string
   parentArtifactKind?: string
   revision: number
+  changeKind: 'natural-language' | 'component-edit'
   changeSummary: string
   operationPaths: string[]
   operationSummaries: DesignBuildOperationContext[]
   selectedComponent?: DesignBuildSelectedComponentContext
+  componentEdit?: ComponentEditContext
 }
 
 export interface DesignBuildOperationContext {
@@ -94,6 +105,7 @@ export function createDesignBuildInitialState(
   const revision = extractRevisionContext(input.metadata)
   const brief = createDesignIntentBrief(input.prompt, revision)
   const components = createDefaultComponentAssetRegistry().searchComponents(input.prompt, { limit: 5 })
+  const designSystem = resolveDesignSystemPolicy(input.metadata)
   const artifact = createTemplateDesignPatchArtifact({
     runId: input.runId,
     prompt: input.prompt,
@@ -101,9 +113,9 @@ export function createDesignBuildInitialState(
     revision: revision?.revision,
     changeSummary: revision?.changeSummary,
   })
-  const context = createDesignBuildContext(revision, projectRootFromArtifact(artifact))
+  const context = createDesignBuildContext(revision, projectRootFromArtifact(artifact), designSystem)
   const plan = createPagePlan(artifact)
-  const review = evaluateDesignBuildArtifact(artifact)
+  const review = evaluateDesignBuildArtifact(artifact, { designSystemPolicy: context.designSystem })
   return { brief, context, components, plan, artifact, review }
 }
 
@@ -142,17 +154,22 @@ export type DesignBuildFailureCode =
 
 function createDesignIntentBrief(prompt: string, revision?: DesignBuildRevisionContext): DesignBrief {
   const selected = selectedComponentSummary(revision?.selectedComponent)
+  const componentEdit = componentEditSummary(revision?.componentEdit)
   return {
     prompt,
     summary: revision ? [
       `Revise artifact ${revision.parentArtifactId}: ${prompt.trim()}`,
       selected ? `Selected component: ${selected}.` : undefined,
+      componentEdit ? `Component edit context: ${componentEdit}.` : undefined,
     ].filter(Boolean).join(' ') : prompt.trim(),
     acceptanceCriteria: [
       'Produce a visible preview artifact.',
       'Do not write workspace files during initial generation.',
       'Keep output structured so the Design workbench can project it.',
       ...(selected ? [`Preserve component-level intent for ${selected}.`] : []),
+      ...(revision?.componentEdit ? [
+        'Apply component-edit changes to the composition usage first; do not directly edit shadcn primitive source files for instance-level styling.',
+      ] : []),
     ],
   }
 }
@@ -160,11 +177,13 @@ function createDesignIntentBrief(prompt: string, revision?: DesignBuildRevisionC
 function createDesignBuildContext(
   revision: DesignBuildRevisionContext | undefined,
   projectRoot: string | undefined,
+  designSystem: DesignSystemPolicy,
 ): DesignBuildContextSnapshot {
   return {
     runtime: 'telegraph-design-build',
     artifactPolicy: 'preview',
     defaultOutputMode: 'design-patch',
+    designSystem,
     sandboxProject: {
       projectRoot,
       dependencySource: 'package.json',
@@ -214,7 +233,12 @@ function projectRootFromArtifact(artifact: DesignBuildArtifact): string | undefi
 function extractRevisionContext(metadata: Record<string, unknown> | undefined): DesignBuildRevisionContext | undefined {
   const designContext = recordField(metadata, 'designContext')
   const activeArtifact = recordField(designContext, 'activeArtifact')
-  const selectedComponent = extractSelectedComponentContext(recordField(designContext, 'selectedComponent'))
+  const componentEdit = extractComponentEditContext(recordField(designContext, 'componentEdit'))
+  const componentEditTarget = componentEdit?.target
+    ? componentEdit.target as unknown as Record<string, unknown>
+    : undefined
+  const selectedComponent = extractSelectedComponentContext(recordField(designContext, 'selectedComponent')) ??
+    extractSelectedComponentContext(componentEditTarget)
   const id = stringField(activeArtifact, 'id') ?? stringField(designContext, 'artifactId')
   if (!id) return undefined
 
@@ -224,19 +248,23 @@ function extractRevisionContext(metadata: Record<string, unknown> | undefined): 
   const previousRevision = numberField(activeArtifact, 'revision') ?? 0
   const prompt = stringField(designContext, 'prompt') ?? stringField(designContext, 'userPrompt')
   const selected = selectedComponentSummary(selectedComponent)
+  const componentEditLabel = componentEditSummary(componentEdit)
 
   return {
     parentArtifactId: id,
     parentArtifactKind: stringField(activeArtifact, 'kind') ?? stringField(designContext, 'artifactKind'),
     revision: previousRevision + 1,
+    changeKind: componentEdit ? 'component-edit' : 'natural-language',
     changeSummary: [
       prompt ? `Apply requested change: ${prompt}` : 'Apply requested design change.',
       selected ? `Target selected component: ${selected}.` : undefined,
+      componentEditLabel ? `Use component edit context: ${componentEditLabel}.` : undefined,
       operationSummaries.length > 0 ? `Current artifact operations: ${operationSummaries.map(operationContextSummary).join('; ')}.` : undefined,
     ].filter(Boolean).join(' '),
     operationPaths: operationPaths.length > 0 ? operationPaths : operationSummaries.map(operation => operation.path),
     operationSummaries,
     selectedComponent,
+    componentEdit,
   }
 }
 
@@ -290,10 +318,26 @@ function extractSelectedComponentContext(
   }
 }
 
+function extractComponentEditContext(value: Record<string, unknown> | undefined): ComponentEditContext | undefined {
+  return isComponentEditContext(value) ? value : undefined
+}
+
 function selectedComponentSummary(component: DesignBuildSelectedComponentContext | undefined): string | undefined {
   if (!component) return undefined
   const tag = component.elementTag ? `<${component.elementTag}>` : undefined
   return [component.label ?? component.path ?? component.id, tag, component.className].filter(Boolean).join(' ')
+}
+
+function componentEditSummary(componentEdit: ComponentEditContext | undefined): string | undefined {
+  if (!componentEdit) return undefined
+  const target = componentEdit.target?.label ?? componentEdit.binding.preferredOperationPath ?? componentEdit.artifactId
+  const dirty = componentEdit.dirtyOperationPaths.length > 0
+    ? `${String(componentEdit.dirtyOperationPaths.length)} dirty operation(s)`
+    : 'no dirty operations'
+  const preferred = componentEdit.binding.preferredOperationPath
+    ? `preferred path ${componentEdit.binding.preferredOperationPath}`
+    : undefined
+  return [target, dirty, preferred, `scope ${componentEdit.binding.editScope}`].filter(Boolean).join(', ')
 }
 
 function sourceLocationField(value: unknown): DesignBuildSelectedComponentContext['sourceLocation'] {

@@ -159,7 +159,7 @@ function stageInstruction(request: DesignBuildChildRunRequest): string {
     case 'intent-brief':
       return 'For intent-brief, return {"brief": {...}} with summary and acceptanceCriteria if present.'
     case 'component-retrieval':
-      return 'For component-retrieval, return {"query": string, "components": [...], "summary": string}.'
+      return 'For component-retrieval, return {"query": string, "components": [...], "summary": string, "ledger"?: ComponentRetrievalLedger}.'
     case 'code-artifact':
       return 'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. Return the input summary object only if no source changes are possible.'
     case 'review':
@@ -337,7 +337,7 @@ function stageContractDescription(stage: DesignBuildChildStage): string {
     case 'intent-brief':
       return '{"brief": {"summary": string, "acceptanceCriteria"?: string[]}}'
     case 'component-retrieval':
-      return '{"query": string, "components": unknown[], "summary": string}'
+      return '{"query": string, "components": unknown[], "summary": string, "ledger"?: ComponentRetrievalLedger}'
     case 'code-artifact':
     case 'repair':
       return '{"artifactId": string, "kind": string, "title": string} or {"artifact": DesignBuildArtifact}; for source generation, DesignBuildArtifact should be a design-patch whose operations describe a standalone Vite React app with package.json-driven dependencies.'
@@ -361,6 +361,7 @@ function stageOutputSchema(stage: DesignBuildChildStage): Record<string, unknown
         query: { type: 'string' },
         components: { type: 'array', items: {} },
         summary: { type: 'string' },
+        ledger: { type: 'object' },
       }, ['query', 'components', 'summary'])
     case 'code-artifact':
     case 'repair':
@@ -402,10 +403,11 @@ function artifactSchema(): Record<string, unknown> {
         id: { type: 'string' },
         kind: { const: 'design-patch' },
         title: { type: 'string' },
-        parentArtifactId: { type: 'string' },
-        revision: { type: 'number' },
-        changeSummary: { type: 'string' },
-        operations: {
+            parentArtifactId: { type: 'string' },
+            revision: { type: 'number' },
+            changeSummary: { type: 'string' },
+            metadata: { type: 'object' },
+            operations: {
           type: 'array',
           items: objectSchema({
             path: { type: 'string' },

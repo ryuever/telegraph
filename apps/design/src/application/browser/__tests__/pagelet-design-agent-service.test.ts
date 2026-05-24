@@ -2,8 +2,10 @@ import type {
   DesignAgentSendRequest,
   DesignAgentSendResult,
   DesignArtifactPatchApplyResult,
+  DesignArtifactExportResult,
   DesignArtifactPatchPreviewResult,
   DesignArtifactPatchRequest,
+  DesignArtifactExportRequest,
   DesignAgentRunEventRecordSnapshot,
   DesignAgentStreamEvent,
   IDesignPageletService,
@@ -11,6 +13,7 @@ import type {
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
+import { DESIGN_RUNTIME_SETTINGS_STORAGE_KEY } from '../design-runtime-settings'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let agentEventCallback: ((event: DesignAgentStreamEvent) => void) | null = null
@@ -45,6 +48,23 @@ const applyArtifactPatchMock = vi.fn(
     summary: { adds: 0, updates: 1, deletes: 0 },
   },
 }))
+const exportArtifactMock = vi.fn(
+  (_: DesignArtifactExportRequest): Promise<DesignArtifactExportResult> => Promise.resolve({
+    runId: 'export-run',
+    artifactId: 'artifact-1',
+    status: 'exported' as const,
+    artifact: {
+      id: 'export-1',
+      kind: 'design-export',
+      title: 'Export',
+      sourceArtifactId: 'artifact-1',
+      formats: ['html-zip'],
+      exports: [{ format: 'html-zip', status: 'generated', path: '/tmp/html-project.zip' }],
+      manifestPath: '/tmp/export-manifest.json',
+      createdAt: 1,
+    },
+  }),
+)
 const client: IDesignPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   ping: vi.fn((now: number) => Promise.resolve({ pong: now, serverTime: now })),
@@ -58,6 +78,7 @@ const client: IDesignPageletService = {
   cancelSubagent: cancelSubagentMock,
   previewArtifactPatch: previewArtifactPatchMock,
   applyArtifactPatch: applyArtifactPatchMock,
+  exportArtifact: exportArtifactMock,
   onAgentEvent: vi.fn((callback: (event: DesignAgentStreamEvent) => void) => {
     agentEventCallback = callback
     return { unsubscribe }
@@ -249,6 +270,43 @@ describe('PageletDesignAgentService', () => {
         artifactPolicy: 'preview',
       },
     }))
+    expect(sendAgentMock.mock.calls[0]?.[0].context).toMatchObject({
+      designSystem: {
+        themePackId: 'shadcn-new-york-neutral',
+      },
+    })
+  })
+
+  it('passes saved theme pack context into design runs', async () => {
+    globalThis.localStorage.setItem(DESIGN_RUNTIME_SETTINGS_STORAGE_KEY, JSON.stringify({
+      themePackId: 'studio-dark',
+    }))
+    sendAgentMock.mockImplementationOnce((request) => {
+      return Promise.resolve({ runId: request.runId, status: 'completed' })
+    })
+
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+
+    await service.send({
+      prompt: 'make a design',
+      sessionId: 'session-1',
+      context: {
+        surface: 'test',
+      },
+    })
+
+    expect(sendAgentMock.mock.calls[0]?.[0].context).toMatchObject({
+      surface: 'test',
+      designSystem: {
+        themePackId: 'studio-dark',
+        themePack: {
+          id: 'studio-dark',
+          label: 'Studio Dark',
+          source: 'built-in',
+        },
+      },
+    })
   })
 
   it('passes saved design settings into artifact patch preview and apply requests', async () => {
@@ -291,6 +349,31 @@ describe('PageletDesignAgentService', () => {
       scopes: ['artifact:write', 'repo:read', 'repo:write'],
       artifactPolicy: 'apply-after-confirm',
     })
+  })
+
+  it('exports artifacts through the pagelet service with source lineage', async () => {
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+    const artifact = {
+      id: 'artifact-1',
+      kind: 'design-patch',
+      operations: [{ kind: 'add', path: 'apps/design/src/generated/page/src/App.tsx', content: 'export default function App() { return <main /> }' }],
+    }
+
+    const result = await service.exportArtifact({
+      artifactId: 'artifact-1',
+      artifact,
+      formats: ['html-zip', 'pdf'],
+      sessionId: 'session-1',
+    })
+
+    expect(result.status).toBe('exported')
+    expect(exportArtifactMock).toHaveBeenCalledWith(expect.objectContaining({
+      artifactId: 'artifact-1',
+      artifact,
+      formats: ['html-zip', 'pdf'],
+      sessionId: 'session-1',
+    }))
   })
 
   it('forwards subagent control calls through the pagelet service', async () => {

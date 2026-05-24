@@ -147,4 +147,79 @@ describe('createSandpackerFiles', () => {
     expect(source).toContain("Textarea } from '/src/telegraph-ui.tsx'")
     expect(source).not.toContain('@/packages/ui/components/ui/textarea')
   })
+
+  it('does not strip React hook imports when normalizing workspace UI imports', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/TaskPage.tsx',
+        content: [
+          "import { useState } from 'react'",
+          "import { Button } from '@/packages/ui/components/ui/button'",
+          '',
+          'export default function TaskPage() {',
+          '  const [count, setCount] = useState(0)',
+          '  return <Button onClick={() => setCount(count + 1)}>{count}</Button>',
+          '}',
+        ].join('\n'),
+      },
+    ], 'Task page')
+
+    const source = result.files['/apps/design/src/generated/TaskPage.tsx']
+
+    expect(source).toContain("import { useState } from 'react'")
+    expect(source).toContain("Button,")
+    expect(source).toContain("from '/src/telegraph-ui.tsx'")
+    expect(source).not.toContain('@/packages/ui/components/ui/button')
+  })
+
+  it('normalizes generated project alias imports to local Sandpacker files', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: JSON.stringify({
+          dependencies: {
+            react: '19.1.0',
+            'react-dom': '19.1.0',
+          },
+        }),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: [
+          "import { Button } from '@/components/ui/button'",
+          "import { cn } from '@/lib/utils'",
+          "import '@/styles.css'",
+          '',
+          'export default function App() {',
+          '  return <Button className={cn("px-4")}>Login</Button>',
+          '}',
+        ].join('\n'),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/components/ui/button.tsx',
+        content: 'export function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) { return <button {...props} /> }',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/lib/utils.ts',
+        content: 'export function cn(...items: string[]) { return items.join(" ") }',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/styles.css',
+        content: 'body { margin: 0 }',
+      },
+    ], 'Login page')
+
+    const source = result.files['/src/App.tsx']
+
+    expect(source).toContain("from '/src/components/ui/button.tsx'")
+    expect(source).toContain("from '/src/lib/utils.ts'")
+    expect(source).toContain("import '/src/styles.css'")
+    expect(source).not.toContain('@/components/ui/button')
+  })
 })

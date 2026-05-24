@@ -1,6 +1,14 @@
 import { createId } from '@x-oasis/di';
 import type { AgentEvent, RuntimeSettings } from '@/packages/agent-protocol';
 import type { AgentRunEventRecord } from '@/packages/agent/persistence/AgentRunRepository';
+import type {
+  DesignArtifactExportRequest,
+  DesignArtifactExportResult,
+} from './design-export-contract';
+export * from './design-system-contract';
+export * from './theme-pack-contract';
+export * from './component-edit-contract';
+export * from './design-export-contract';
 
 export const DESIGN_PAGELET_SERVICE_PATH = 'design-pagelet-api';
 
@@ -17,6 +25,7 @@ export interface IDesignPageletService {
   cancelSubagent(childRunId: string): Promise<boolean>;
   previewArtifactPatch(request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchPreviewResult>;
   applyArtifactPatch(request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult>;
+  exportArtifact(request: DesignArtifactExportRequest): Promise<DesignArtifactExportResult>;
   onAgentEvent(callback: (event: DesignAgentStreamEvent) => void): EventSubscription;
 }
 

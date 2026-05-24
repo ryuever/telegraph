@@ -6,7 +6,11 @@ import {
 } from '@/packages/agent/browser/runtime-settings-storage'
 import type { RuntimeSettings } from '@/packages/agent-protocol'
 import { DesignRuntimeSettingsDialog } from '../DesignRuntimeSettingsDialog'
-import { loadDesignRuntimeSettings, saveDesignRuntimeSettings } from '../design-runtime-settings'
+import {
+  DESIGN_RUNTIME_SETTINGS_STORAGE_KEY,
+  loadDesignRuntimeSettings,
+  saveDesignRuntimeSettings,
+} from '../design-runtime-settings'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -34,6 +38,9 @@ describe('DesignRuntimeSettingsDialog', () => {
 
     expect(settings).toEqual(expect.objectContaining({
       backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      designSystem: {
+        themePackId: 'shadcn-new-york-neutral',
+      },
       taskCapabilityProfile: {
         kind: 'design-build',
         scopes: ['artifact:write', 'repo:read'],
@@ -93,11 +100,10 @@ describe('DesignRuntimeSettingsDialog', () => {
       )
     })
 
-    const profileSelect = container.querySelector('select')
+    const profileSelect = container.querySelectorAll('select')[1]
     expect(profileSelect).not.toBeNull()
 
     act(() => {
-      if (!profileSelect) return
       profileSelect.value = 'design-build'
       profileSelect.dispatchEvent(new Event('change', { bubbles: true }))
     })
@@ -115,6 +121,54 @@ describe('DesignRuntimeSettingsDialog', () => {
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read'],
       artifactPolicy: 'preview',
+    })
+  })
+
+  it('saves the selected theme pack separately from model runtime settings', () => {
+    const storage = new Map<string, string>()
+    const settings: RuntimeSettings = {
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: 'pi-ai',
+      taskCapabilityProfile: { kind: 'design-build', scopes: ['artifact:write'], artifactPolicy: 'preview' },
+      extensionBlocklist: [],
+    }
+
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    act(() => {
+      root?.render(
+        <DesignRuntimeSettingsDialog
+          open
+          settings={settings}
+          onClose={() => {}}
+          onSave={next => {
+            saveDesignRuntimeSettings(next, {
+              setItem: (key, value) => { storage.set(key, value) },
+            })
+          }}
+        />
+      )
+    })
+
+    const themeSelect = container.querySelectorAll('select')[0]
+    expect(themeSelect).not.toBeNull()
+
+    act(() => {
+      themeSelect.value = 'studio-dark'
+      themeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Save design settings"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(JSON.parse(storage.get(DESIGN_RUNTIME_SETTINGS_STORAGE_KEY) ?? '{}')).toEqual({
+      themePackId: 'studio-dark',
     })
   })
 

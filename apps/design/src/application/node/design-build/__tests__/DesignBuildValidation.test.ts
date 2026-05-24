@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createDefaultDesignSystemPolicy } from '@/apps/design/application/common/design-system-contract'
 import { createTemplateDesignPatchArtifact } from '../DesignBuildArtifacts'
 import type { DesignBuildOrchestratorOutput } from '../DesignBuildOrchestrator'
 import {
@@ -111,6 +112,7 @@ function outputFixture(): DesignBuildOrchestratorOutput {
       runtime: 'telegraph-design-build',
       artifactPolicy: 'preview',
       defaultOutputMode: 'design-patch',
+      designSystem: createDefaultDesignSystemPolicy(),
       sandboxProject: {
         projectRoot: 'apps/design/src/generated/create-a-dashboard-page',
         dependencySource: 'package.json',

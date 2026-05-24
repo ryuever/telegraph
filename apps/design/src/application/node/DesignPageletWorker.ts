@@ -12,8 +12,11 @@ import {
   type DesignAgentStreamEvent,
   type DesignAgentRunRecordSnapshot,
   type DesignArtifactPatchApplyResult,
+  type DesignArtifactExportRequest,
+  type DesignArtifactExportResult,
   type DesignArtifactPatchPreviewResult,
   type DesignArtifactPatchRequest,
+  type DesignExportablePatchArtifact,
   type DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
@@ -42,6 +45,7 @@ import type {
 } from '@/apps/shared/application/common';
 import type { RemoteArtifactRef } from '@/packages/remote-protocol';
 import { DesignBuildRuntime } from './design-build/DesignBuildRuntime';
+import { DesignExportPipeline } from './design-build/DesignExportPipeline';
 import { DesignHarnessRunController } from './DesignHarnessRunController';
 import { designRunSnapshotFromLedger } from './DesignRunStore';
 
@@ -112,6 +116,8 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
           this.handlePreviewArtifactPatch(request),
         applyArtifactPatch: (request: DesignArtifactPatchRequest): Promise<DesignArtifactPatchApplyResult> =>
           this.handleApplyArtifactPatch(request),
+        exportArtifact: (request: DesignArtifactExportRequest): Promise<DesignArtifactExportResult> =>
+          this.handleExportArtifact(request),
         onAgentEvent: (callback: (event: DesignAgentStreamEvent) => void): { unsubscribe: () => void } => {
           return this.runControl.subscribe(callback);
         },
@@ -444,6 +450,34 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     }
   }
 
+  private async handleExportArtifact(
+    request: DesignArtifactExportRequest,
+  ): Promise<DesignArtifactExportResult> {
+    try {
+      const artifact = exportablePatchArtifactFromUnknown(request.artifact);
+      if (!artifact) throw new Error('Export requires a design-patch artifact with file operations.');
+      const pipeline = new DesignExportPipeline();
+      const exportArtifact = await pipeline.exportArtifact({
+        runId: request.runId,
+        artifact,
+        formats: request.formats,
+      });
+      return {
+        runId: request.runId,
+        artifactId: request.artifactId,
+        status: 'exported',
+        artifact: exportArtifact,
+      };
+    } catch (error) {
+      return {
+        runId: request.runId,
+        artifactId: request.artifactId,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   private createDesignPatchCapability(
     request: DesignArtifactPatchRequest,
     userConfirmed: boolean,
@@ -498,6 +532,33 @@ function assertDesignPatchApplyAllowed(request: DesignArtifactPatchRequest): voi
   if (!profile.scopes.includes('repo:write')) {
     throw new Error('Artifact apply requires repo:write scope');
   }
+}
+
+function exportablePatchArtifactFromUnknown(value: unknown): DesignExportablePatchArtifact | null {
+  if (!isRecord(value)) return null;
+  const operations = Array.isArray(value.operations)
+    ? value.operations.filter(isPatchOperation)
+    : [];
+  if (operations.length === 0) return null;
+  const id = typeof value.id === 'string' ? value.id : undefined;
+  const kind = typeof value.kind === 'string' ? value.kind : undefined;
+  if (!id || !kind) return null;
+  return {
+    id,
+    kind,
+    title: typeof value.title === 'string' ? value.title : undefined,
+    revision: typeof value.revision === 'number' ? value.revision : undefined,
+    metadata: isRecord(value.metadata) ? value.metadata : undefined,
+    operations,
+  };
+}
+
+function isPatchOperation(value: unknown): value is DesignExportablePatchArtifact['operations'][number] {
+  if (!isRecord(value)) return false;
+  return typeof value.path === 'string' &&
+    (value.kind === 'add' || value.kind === 'update' || value.kind === 'delete') &&
+    (value.content === undefined || typeof value.content === 'string') &&
+    (value.expectedOriginal === undefined || typeof value.expectedOriginal === 'string');
 }
 
 function feedbackRuntimeLog(input: { runId?: string; level: 'debug' | 'info' | 'warn' | 'error'; message: string; raw?: unknown; ts?: number }): AgentEvent {

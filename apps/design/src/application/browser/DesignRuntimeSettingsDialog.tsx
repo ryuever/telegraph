@@ -3,8 +3,10 @@ import type { JSX, ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/packages/ui/components/ui/button'
 import { cn } from '@/packages/ui/lib/utils'
+import { BUILTIN_THEME_PACKS } from '@/apps/design/application/common/theme-pack-contract'
 import type { RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 import {
+  DEFAULT_DESIGN_THEME_PACK_ID,
   defaultDesignProfile,
   splitSettingList,
   type DesignRuntimeSettings,
@@ -32,6 +34,7 @@ export function DesignRuntimeSettingsDialog({
   if (!open) return null
 
   const profile = draft.taskCapabilityProfile ?? { kind: 'default' }
+  const themePackId = draft.designSystem?.themePackId ?? DEFAULT_DESIGN_THEME_PACK_ID
 
   const setProfile = (taskCapabilityProfile: RuntimeTaskCapabilityProfile): void => {
     setDraft(current => ({ ...current, taskCapabilityProfile }))
@@ -45,6 +48,16 @@ export function DesignRuntimeSettingsDialog({
     setDraft(current => ({
       ...current,
       extensionBlocklist: splitSettingList(raw),
+    }))
+  }
+
+  const setThemePack = (themePackId: string): void => {
+    setDraft(current => ({
+      ...current,
+      designSystem: {
+        ...current.designSystem,
+        themePackId,
+      },
     }))
   }
 
@@ -80,6 +93,20 @@ export function DesignRuntimeSettingsDialog({
         </div>
 
         <div className="space-y-4 px-5 py-4">
+          <Field label="Theme pack" hint="Controls generated CSS variables and review checks">
+            <select
+              value={themePackId}
+              onChange={event => { setThemePack(event.target.value) }}
+              className={selectClass}
+            >
+              {BUILTIN_THEME_PACKS.map(pack => (
+                <option key={pack.id} value={pack.id}>
+                  {pack.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="Task capability profile" hint="Applies to the next design run">
             <select
               value={profile.kind}
