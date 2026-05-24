@@ -34,6 +34,8 @@ export interface RegistryProvenance {
   files: string[]
   dependencies: string[]
   reason: string
+  sourceKind?: string
+  command?: string
 }
 
 const SHADCN_RUNTIME_DEPENDENCIES: Record<string, string> = {
@@ -58,21 +60,24 @@ export class ShadcnRegistryMaterializer {
       }
     }
 
-    const selectedUi = input.ledger.selected.filter(asset => asset.type === 'registry:ui')
+    const sanitizedOperations = sanitizeRawColorOperations(input.artifact.operations, projectRoot)
+    const selectedUi = installedUiAssets(sanitizedOperations, projectRoot, input.ledger.selected)
     const dependencies = dependencyClosure(selectedUi)
     const themePack = this.themePackRegistry.get(input.policy.themePack?.id)
-    const operations = upsertOperations(input.artifact.operations, [
-      updatePackageJson(input.artifact.operations, projectRoot, dependencies),
+    const operations = upsertOperations(sanitizedOperations, [
+      updatePackageJson(sanitizedOperations, projectRoot, dependencies),
+      operation(projectRoot, 'index.html', renderIndexHtml(input.artifact.title)),
+      operation(projectRoot, 'src/index.tsx', renderEntrySource()),
       operation(projectRoot, 'components.json', renderComponentsJson()),
       operation(projectRoot, 'tsconfig.json', renderTsconfigJson()),
       operation(projectRoot, 'vite.config.ts', renderViteConfig()),
       operation(projectRoot, 'src/styles.css', renderShadcnStyles(themePack)),
       operation(projectRoot, 'src/lib/utils.ts', renderUtilsSource()),
-      ...selectedUi.flatMap(asset => materializeUiAsset(projectRoot, asset)),
       operation(projectRoot, 'design-system.theme.json', renderThemeMetadata(themePack)),
       operation(projectRoot, 'design-system.provenance.json', renderProvenance(input, selectedUi)),
     ])
 
+    const provenance = provenanceForArtifact(input, selectedUi)
     return {
       artifact: {
         ...input.artifact,
@@ -83,14 +88,7 @@ export class ShadcnRegistryMaterializer {
       aliases: {
         '@': './src',
       },
-      provenance: selectedUi.map(asset => ({
-        name: asset.name,
-        source: `${asset.registry}/${asset.name}`,
-        type: asset.type,
-        files: materializedFilesForAsset(asset),
-        dependencies: asset.dependencies ?? [],
-        reason: asset.reason,
-      })),
+      provenance,
     }
   }
 }
@@ -107,6 +105,107 @@ function dependencyClosure(selected: SelectedComponentAsset[]): Record<string, s
 
 function defaultVersionForDependency(name: string): string {
   return SHADCN_RUNTIME_DEPENDENCIES[name] ?? 'latest'
+}
+
+function installedUiAssets(
+  operations: DesignPatchOperation[],
+  projectRoot: string,
+  selected: SelectedComponentAsset[],
+): SelectedComponentAsset[] {
+  const selectedByName = new Map(selected.map(asset => [normalizeUiName(asset.name), asset]))
+  const installedNames = new Set(
+    operations
+      .filter(operation => operation.kind !== 'delete' && operation.content)
+      .map(operation => projectRelativePath(operation.path, projectRoot))
+      .map(path => path.match(/^src\/components\/ui\/([a-z0-9-]+)\.(tsx|jsx)$/i)?.[1])
+      .filter((name): name is string => Boolean(name))
+      .map(normalizeUiName),
+  )
+
+  return [...installedNames].map(name => {
+    const selectedAsset = selectedByName.get(name)
+    return selectedAsset
+      ? normalizeInstalledAsset(selectedAsset, name)
+      : {
+          registry: '@shadcn',
+          name,
+          type: 'registry:ui',
+          description: `${name} installed by shadcn component tool.`,
+          score: 0,
+          reason: 'Installed by add_shadcn_component.',
+          dependencies: [],
+          files: [`src/components/ui/${name}.tsx`],
+          materializedFiles: [`src/components/ui/${name}.tsx`],
+          importExamples: [],
+        }
+  })
+}
+
+function normalizeInstalledAsset(asset: SelectedComponentAsset, name: string): SelectedComponentAsset {
+  return {
+    ...asset,
+    name,
+    files: asset.files?.length ? asset.files : [`src/components/ui/${name}.tsx`],
+    materializedFiles: asset.materializedFiles.length ? asset.materializedFiles : [`src/components/ui/${name}.tsx`],
+  }
+}
+
+function normalizeUiName(name: string): string {
+  return name
+    .trim()
+    .replace(/\.(tsx|jsx|ts|js)$/i, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function sanitizeRawColorOperations(
+  operations: DesignPatchOperation[],
+  projectRoot: string,
+): DesignPatchOperation[] {
+  return operations.map(operation => {
+    if (!operation.content || !shouldSanitizeRawColors(operation.path, projectRoot)) return operation
+    return {
+      ...operation,
+      content: operation.content.replace(/#[0-9a-f]{3,8}\b/gi, semanticColorTokenForHex),
+    }
+  })
+}
+
+function shouldSanitizeRawColors(path: string, projectRoot: string): boolean {
+  const relativePath = projectRelativePath(path, projectRoot)
+  if (!/\.(tsx|ts|jsx|js|css)$/i.test(relativePath)) return false
+  return relativePath !== 'src/styles.css'
+}
+
+function semanticColorTokenForHex(hex: string): string {
+  const rgb = rgbFromHex(hex)
+  if (!rgb) return 'var(--primary)'
+  const [red, green, blue] = rgb
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const average = (red + green + blue) / 3
+
+  if (min > 245) return 'var(--background)'
+  if (max < 35) return 'var(--foreground)'
+  if (average > 226) return 'var(--secondary)'
+  if (max - min < 24) return average > 140 ? 'var(--muted-foreground)' : 'var(--foreground)'
+  if (green > red && green >= blue) return 'var(--accent)'
+  return 'var(--primary)'
+}
+
+function rgbFromHex(value: string): [number, number, number] | undefined {
+  const raw = value.replace('#', '')
+  const hex = raw.length === 3
+    ? raw.split('').map(character => `${character}${character}`).join('')
+    : raw.slice(0, 6)
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return undefined
+  return [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ]
 }
 
 function updatePackageJson(
@@ -127,10 +226,10 @@ function updatePackageJson(
     content: JSON.stringify({
       ...packageJson,
       dependencies: sortRecord({
-        react: '19.1.0',
-        'react-dom': '19.1.0',
         ...existingDependencies,
         ...dependencies,
+        react: '19.1.0',
+        'react-dom': '19.1.0',
       }),
       devDependencies: sortRecord({
         '@vitejs/plugin-react': 'latest',
@@ -142,216 +241,33 @@ function updatePackageJson(
   }
 }
 
-function materializeUiAsset(projectRoot: string, asset: SelectedComponentAsset): DesignPatchOperation[] {
-  const source = uiSource(asset.name)
-  if (!source) return []
-  return [operation(projectRoot, `src/components/ui/${asset.name}.tsx`, source)]
+function renderIndexHtml(title: string): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/index.tsx?entry"></script>
+  </body>
+</html>
+`
 }
 
-function uiSource(name: string): string | undefined {
-  switch (name) {
-    case 'button':
-      return `import * as React from 'react'
-import { Slot } from '@radix-ui/react-slot'
-import { cva, type VariantProps } from 'class-variance-authority'
-import { cn } from '@/lib/utils'
+function renderEntrySource(): string {
+  return `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import GeneratedDesignPage from './App'
 
-const buttonVariants = cva(
-  'inline-flex min-h-10 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary text-primary-foreground shadow hover:opacity-90',
-        secondary: 'bg-secondary text-secondary-foreground hover:opacity-90',
-        outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-      },
-      size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 rounded-md px-3',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'size-10',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  },
-)
-
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-  asChild?: boolean
-}
-
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'button'
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
-  },
-)
-Button.displayName = 'Button'
-
-export { buttonVariants }
-`
-    case 'card':
-      return `import * as React from 'react'
-import { cn } from '@/lib/utils'
-
-export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('rounded-lg border bg-card text-card-foreground shadow-sm', className)} {...props} />
-  ),
-)
-Card.displayName = 'Card'
-
-export const CardHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />
-)
-
-export const CardTitle = ({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h3 className={cn('text-2xl font-semibold leading-none tracking-normal', className)} {...props} />
-)
-
-export const CardDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className={cn('text-sm text-muted-foreground', className)} {...props} />
-)
-
-export const CardContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('p-6 pt-0', className)} {...props} />
-)
-
-export const CardFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex items-center p-6 pt-0', className)} {...props} />
+createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <GeneratedDesignPage />
+  </React.StrictMode>,
 )
 `
-    case 'input':
-      return `import * as React from 'react'
-import { cn } from '@/lib/utils'
-
-export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, type, ...props }, ref) => (
-    <input
-      type={type}
-      className={cn('flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50', className)}
-      ref={ref}
-      {...props}
-    />
-  ),
-)
-Input.displayName = 'Input'
-`
-    case 'badge':
-      return `import * as React from 'react'
-import { cva, type VariantProps } from 'class-variance-authority'
-import { cn } from '@/lib/utils'
-
-const badgeVariants = cva('inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors', {
-  variants: {
-    variant: {
-      default: 'border-transparent bg-primary text-primary-foreground',
-      secondary: 'border-transparent bg-secondary text-secondary-foreground',
-      outline: 'text-foreground',
-    },
-  },
-  defaultVariants: {
-    variant: 'default',
-  },
-})
-
-export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
-
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />
-}
-`
-    case 'table':
-      return `import * as React from 'react'
-import { cn } from '@/lib/utils'
-
-export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />,
-)
-Table.displayName = 'Table'
-
-export const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn('[&_tr]:border-b', className)} {...props} />,
-)
-TableHeader.displayName = 'TableHeader'
-
-export const TableBody = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <tbody ref={ref} className={cn('[&_tr:last-child]:border-0', className)} {...props} />,
-)
-TableBody.displayName = 'TableBody'
-
-export const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
-  ({ className, ...props }, ref) => <tr ref={ref} className={cn('border-b transition-colors hover:bg-muted/50', className)} {...props} />,
-)
-TableRow.displayName = 'TableRow'
-
-export const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => <th ref={ref} className={cn('h-12 px-4 text-left align-middle font-medium text-muted-foreground', className)} {...props} />,
-)
-TableHead.displayName = 'TableHead'
-
-export const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => <td ref={ref} className={cn('p-4 align-middle', className)} {...props} />,
-)
-TableCell.displayName = 'TableCell'
-`
-    case 'tabs':
-      return `import * as React from 'react'
-import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { cn } from '@/lib/utils'
-
-export const Tabs = TabsPrimitive.Root
-
-export const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List ref={ref} className={cn('inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground', className)} {...props} />
-))
-TabsList.displayName = TabsPrimitive.List.displayName
-
-export const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger ref={ref} className={cn('inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground', className)} {...props} />
-))
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
-
-export const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content ref={ref} className={cn('mt-2 outline-none', className)} {...props} />
-))
-TabsContent.displayName = TabsPrimitive.Content.displayName
-`
-    case 'switch':
-      return `import * as React from 'react'
-import * as SwitchPrimitive from '@radix-ui/react-switch'
-import { cn } from '@/lib/utils'
-
-export const Switch = React.forwardRef<
-  React.ElementRef<typeof SwitchPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <SwitchPrimitive.Root
-    className={cn('peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent bg-input transition-colors checked:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary', className)}
-    {...props}
-    ref={ref}
-  >
-    <SwitchPrimitive.Thumb className={cn('pointer-events-none block size-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5')} />
-  </SwitchPrimitive.Root>
-))
-Switch.displayName = SwitchPrimitive.Root.displayName
-`
-    default:
-      return undefined
-  }
 }
 
 function renderComponentsJson(): string {
@@ -606,20 +522,69 @@ function renderProvenance(
     themePackId: input.policy.themePack?.id,
     registries: input.policy.uiLibrary.allowedRegistries.map(registry => registry.id),
     retrievalStatus: input.ledger.retrieval.status,
-    components: selectedUi.map(asset => ({
-      name: asset.name,
-      source: `${asset.registry}/${asset.name}`,
-      type: asset.type,
-      files: materializedFilesForAsset(asset),
-      dependencies: asset.dependencies ?? [],
-      reason: asset.reason,
-    })),
+    components: provenanceForArtifact(input, selectedUi),
     fallbacks: input.ledger.fallbacks,
   }, null, 2)
 }
 
-function materializedFilesForAsset(asset: SelectedComponentAsset): string[] {
-  return uiSource(asset.name) ? [`src/components/ui/${asset.name}.tsx`] : asset.materializedFiles
+function provenanceForArtifact(
+  input: ShadcnRegistryMaterializerInput,
+  selectedUi: SelectedComponentAsset[],
+): RegistryProvenance[] {
+  const installations = shadcnToolInstallations(input.artifact.metadata)
+  if (installations.length > 0) {
+    return installations.map(installation => ({
+      name: installation.name,
+      source: installation.source,
+      type: 'registry:ui',
+      files: installation.files,
+      dependencies: installation.dependencies,
+      reason: installation.reason,
+      sourceKind: installation.sourceKind,
+      command: installation.command,
+    }))
+  }
+  return selectedUi.map(asset => ({
+    name: asset.name,
+    source: `${asset.registry}/${asset.name}`,
+    type: asset.type,
+    files: asset.materializedFiles,
+    dependencies: asset.dependencies ?? [],
+    reason: asset.reason,
+    sourceKind: 'legacy-installed-file',
+  }))
+}
+
+function shadcnToolInstallations(metadata: Record<string, unknown> | undefined): Array<{
+  name: string
+  source: string
+  sourceKind: string
+  command?: string
+  files: string[]
+  dependencies: string[]
+  reason: string
+}> {
+  const raw = metadata?.shadcnToolInstallations
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter(isRecord)
+    .flatMap(item => {
+      const name = stringField(item, 'name')
+      const source = stringField(item, 'source')
+      const sourceKind = stringField(item, 'sourceKind')
+      const reason = stringField(item, 'reason')
+      const files = stringArrayField(item, 'files')
+      if (!name || !source || !sourceKind || !reason || files.length === 0) return []
+      return [{
+        name,
+        source,
+        sourceKind,
+        command: stringField(item, 'command'),
+        files,
+        dependencies: stringArrayField(item, 'dependencies'),
+        reason,
+      }]
+    })
 }
 
 function operation(projectRoot: string, relativePath: string, content: string): DesignPatchOperation {
@@ -628,6 +593,21 @@ function operation(projectRoot: string, relativePath: string, content: string): 
     path: `${projectRoot}/${relativePath}`,
     content,
   }
+}
+
+function projectRelativePath(path: string, projectRoot: string): string {
+  const normalized = path.trim().replace(/^\/+/, '')
+  return normalized.startsWith(`${projectRoot}/`)
+    ? normalized.slice(projectRoot.length + 1)
+    : normalized
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function upsertOperations(
@@ -663,6 +643,16 @@ function stringRecord(value: Record<string, unknown>): Record<string, string> {
 
 function sortRecord(value: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+}
+
+function stringField(value: Record<string, unknown>, key: string): string | undefined {
+  const field = value[key]
+  return typeof field === 'string' && field.trim().length > 0 ? field : undefined
+}
+
+function stringArrayField(value: Record<string, unknown>, key: string): string[] {
+  const field = value[key]
+  return Array.isArray(field) ? field.filter((item): item is string => typeof item === 'string') : []
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

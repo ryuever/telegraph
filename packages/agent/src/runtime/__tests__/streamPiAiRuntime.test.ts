@@ -110,6 +110,18 @@ describe('streamPiAiRuntimeEvents tool loop', () => {
               role: 'user',
             }),
           ],
+          tools: [
+            expect.objectContaining({
+              name: 'read',
+              description: 'Read a file.',
+              parameters: expect.objectContaining({
+                type: 'object',
+                properties: expect.objectContaining({
+                  path: expect.objectContaining({ type: 'string' }),
+                }),
+              }),
+            }),
+          ],
         },
       })
       expect(faux.state.callCount).toBe(2)

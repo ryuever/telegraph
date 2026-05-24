@@ -90,14 +90,14 @@ describe('DesignBuildRuntime', () => {
       .some(component => stringField(component, 'name') === 'button')).toBe(true)
     const retrievalLedger = recordField(childCompletions[1]?.output, 'ledger')
     expect(recordField(retrievalLedger, 'retrieval')).toMatchObject({
-      status: 'degraded',
+      status: 'complete',
     })
     expect(arrayField(retrievalLedger, 'selected')
-      .some(component => stringField(component, 'name') === 'sidebar')).toBe(true)
+      .some(component => stringField(component, 'name') === 'card')).toBe(true)
     expect(childCompletions[2]?.output).toMatchObject({
       artifactId: 'run-design-build-patch',
       kind: 'design-patch',
-      operationCount: 15,
+      operationCount: 11,
     })
     expect(stringField(recordField(childCompletions[3]?.output, 'review'), 'verdict')).toBe('pass')
 
@@ -111,7 +111,7 @@ describe('DesignBuildRuntime', () => {
       title: 'Create a SaaS dashboard landing page source',
     })
     const artifactLedger = recordField(recordField(terminalArtifact, 'metadata'), 'componentRetrievalLedger')
-    expect(recordField(artifactLedger, 'retrieval')).toMatchObject({ status: 'degraded' })
+    expect(recordField(artifactLedger, 'retrieval')).toMatchObject({ status: 'complete' })
     expect(arrayField(artifactLedger, 'selected')
       .some(component => stringField(component, 'name') === 'card')).toBe(true)
     const visualReview = recordField(recordField(terminalArtifact, 'metadata'), 'visualReview')
@@ -191,6 +191,27 @@ describe('DesignBuildRuntime', () => {
       stringField(policy, 'id') === 'shadcn-first-standalone' &&
       stringField(policy, 'mode') === 'standalone-preview'
     )).toBe(true)
+
+    const scoutRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.scout)
+    expect(scoutRequest?.tools?.map(tool => tool.name)).toEqual([
+      'get_shadcn_project_llms',
+      'get_shadcn_component_usage',
+      'select_shadcn_components',
+    ])
+    expect(scoutRequest?.requiredTools).toEqual([
+      'get_shadcn_project_llms',
+      'get_shadcn_component_usage',
+      'select_shadcn_components',
+    ])
+    const workerRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker)
+    expect(workerRequest?.tools?.map(tool => tool.name)).toEqual([
+      'create_shadcn_project',
+      'add_shadcn_component',
+    ])
+    expect(workerRequest?.requiredTools).toEqual([
+      'create_shadcn_project',
+      'add_shadcn_component',
+    ])
 
     const reviewRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer)
     const review = recordField(reviewRequest?.input, 'review')
@@ -561,6 +582,58 @@ describe('DesignBuildRuntime', () => {
     })
   })
 
+  it('keeps the standalone shell when model worker output omits entry files', async () => {
+    const runtime = createTestRuntime(request => {
+      if (request.profileId !== DESIGN_BUILD_CHILD_PROFILES.worker || request.stage !== 'code-artifact') {
+        return undefined
+      }
+      return {
+        artifact: {
+          id: 'partial-model-artifact',
+          kind: 'design-patch',
+          title: 'Partial model source',
+          operations: [
+            {
+              kind: 'add',
+              path: 'apps/design/src/generated/generated-design-page/package.json',
+              content: JSON.stringify({
+                dependencies: {
+                  react: '19.1.0',
+                  'react-dom': '19.1.0',
+                },
+              }, null, 2),
+            },
+            {
+              kind: 'add',
+              path: 'apps/design/src/generated/generated-design-page/src/App.tsx',
+              content: "export default function App() { return <main style={{ color: '#dc2626' }}>Tasks</main> }\n",
+            },
+          ],
+        },
+      }
+    })
+    const events = await collect(runtime.run({
+      runId: 'run-partial-worker',
+      message: '设计一个任务管理界面',
+      settings: {},
+    }))
+
+    const terminal = events.at(-1)
+    expect(terminal?.type).toBe('run_completed')
+    const artifact = terminal?.type === 'run_completed'
+      ? recordField(terminal.output, 'artifact')
+      : undefined
+    const operations = arrayField(artifact, 'operations')
+    const operationPaths = operations.map(operation => stringField(operation, 'path'))
+    expect(operationPaths).toContain('apps/design/src/generated/generated-design-page/index.html')
+    expect(operationPaths).toContain('apps/design/src/generated/generated-design-page/src/index.tsx')
+    const app = operations.find(operation =>
+      stringField(operation, 'path') === 'apps/design/src/generated/generated-design-page/src/App.tsx'
+    )
+    expect(stringField(app, 'content')).toContain('var(--primary)')
+    expect(JSON.stringify(operations)).not.toContain('#dc2626')
+  })
+
   it('fails instead of falling back when the default model-backed runner has no model settings', async () => {
     const runtime = new DesignBuildRuntime()
     const events = await collect(runtime.run({
@@ -596,9 +669,99 @@ class TestDesignBuildChildRunner implements DesignBuildChildRunner {
   runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult> {
     const output = this.override ? this.override(request) : undefined
     return Promise.resolve({
-      output: output ?? request.input,
+      output: output ?? defaultChildOutput(request),
       source: 'model-backed',
     })
+  }
+}
+
+function defaultChildOutput(request: DesignBuildChildRunRequest): unknown {
+  if (request.stage === 'component-retrieval') {
+    return testComponentRetrievalOutput(request)
+  }
+  return request.input
+}
+
+function testComponentRetrievalOutput(request: DesignBuildChildRunRequest): unknown {
+  const ledger = {
+    query: {
+      prompt: stringField(request.modelInput, 'prompt') ?? 'Create a page',
+      pageType: 'test-tool-selected',
+      roles: [
+        { role: 'button', required: true, examples: ['button'] },
+        { role: 'card', required: true, examples: ['card'] },
+      ],
+      selectedThemePack: 'shadcn-new-york-neutral',
+    },
+    policy: {
+      id: 'shadcn-first-standalone',
+      mode: 'standalone-preview',
+      allowedRegistries: ['@shadcn'],
+      handwritePolicy: 'app-composition-only',
+    },
+    trust: {
+      allowedRegistries: ['@shadcn'],
+      blockedRegistries: [],
+      registries: [
+        {
+          id: '@shadcn',
+          label: 'shadcn/ui',
+          trustLevel: 'official',
+        },
+      ],
+    },
+    retrieval: {
+      status: 'complete',
+      sources: [
+        {
+          kind: 'static-shadcn-catalog',
+          registry: '@shadcn',
+          query: 'tool-catalog',
+          status: 'ok',
+        },
+      ],
+      metrics: {
+        candidateCount: 2,
+        selectedCount: 2,
+        rejectedCount: 0,
+        fallbackCount: 0,
+        hitRate: 1,
+        fallbackRate: 0,
+        repairRate: 0,
+        visualFailureRate: 0,
+      },
+    },
+    candidates: [
+      componentAsset('button', ['@radix-ui/react-slot', 'class-variance-authority']),
+      componentAsset('card', []),
+    ],
+    selected: [
+      componentAsset('button', ['@radix-ui/react-slot', 'class-variance-authority']),
+      componentAsset('card', []),
+    ],
+    fallbacks: [],
+    rejected: [],
+  }
+  return {
+    query: ledger.query.prompt,
+    components: ledger.selected,
+    summary: `Selected ${String(ledger.selected.length)} shadcn registry assets for the generated page.`,
+    ledger,
+  }
+}
+
+function componentAsset(name: string, dependencies: string[]): Record<string, unknown> {
+  return {
+    registry: '@shadcn',
+    name,
+    type: 'registry:ui',
+    description: `${name} selected by test shadcn tool output.`,
+    score: 9,
+    reason: 'Selected by the shadcn component tool.',
+    dependencies,
+    files: [`src/components/ui/${name}.tsx`],
+    materializedFiles: [`src/components/ui/${name}.tsx`],
+    importExamples: [`import { ${name.slice(0, 1).toUpperCase()}${name.slice(1)} } from "@/components/ui/${name}"`],
   }
 }
 

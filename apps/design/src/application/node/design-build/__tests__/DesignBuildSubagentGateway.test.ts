@@ -87,12 +87,44 @@ describe('DesignBuildSubagentGateway', () => {
       'child_run_completed',
     ])
   })
+
+  it('flushes buffered child trace before rethrowing child failures', async () => {
+    const childRunner = new CapturingChildRunner({
+      emitTrace: true,
+      fail: true,
+    })
+    const gateway = new DesignBuildSubagentGateway({ childRunner })
+    const generator = gateway.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:design-worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1', kind: 'design-patch', title: 'Artifact' },
+      settings: {},
+    })
+
+    const events: AgentEvent[] = []
+    await expect((async () => {
+      for (;;) {
+        const next = await generator.next()
+        if (next.done) return next.value
+        events.push(next.value)
+      }
+    })()).rejects.toThrow('child failed')
+
+    expect(events.map(event => event.type)).toEqual([
+      'child_run_started',
+      'model_request',
+      'tool_call',
+    ])
+  })
 })
 
 class CapturingChildRunner implements DesignBuildChildRunner {
   readonly requests: DesignBuildChildRunRequest[] = []
 
-  constructor(private readonly options: { emitTrace?: boolean } = {}) {}
+  constructor(private readonly options: { emitTrace?: boolean; fail?: boolean } = {}) {}
 
   runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult> {
     this.requests.push(request)
@@ -133,6 +165,9 @@ class CapturingChildRunner implements DesignBuildChildRunner {
         output: request.input,
         ts: 4,
       })
+    }
+    if (this.options.fail) {
+      return Promise.reject(new Error('child failed'))
     }
     return Promise.resolve({
       output: request.input,

@@ -1,4 +1,5 @@
 import type { AgentEvent, RuntimeSettings } from '@/packages/agent-protocol'
+import type { PiAiExecutableTool } from '@/packages/agent/runtime/streamPiAiRuntime'
 import { discoverAgents } from '@/extensions/telegraph-subagents/src/agentDiscovery'
 import type { SubagentDefinition } from '@/extensions/telegraph-subagents/src/types'
 import type {
@@ -43,6 +44,8 @@ export interface DesignBuildSubagentRunRequest {
   metadata?: Record<string, unknown>
   signal?: AbortSignal
   attempt?: number
+  tools?: PiAiExecutableTool[]
+  requiredTools?: string[]
 }
 
 export class DesignBuildSubagentGateway {
@@ -73,13 +76,21 @@ export class DesignBuildSubagentGateway {
     )
 
     const traceEvents: AgentEvent[] = []
-    const result = await this.childRunner.runChild({
-      ...request,
-      profile,
-      emitEvent: event => {
-        if (isForwardedChildTraceEvent(event)) traceEvents.push(event)
-      },
-    })
+    let result
+    try {
+      result = await this.childRunner.runChild({
+        ...request,
+        profile,
+        emitEvent: event => {
+          if (isForwardedChildTraceEvent(event)) traceEvents.push(event)
+        },
+      })
+    } catch (error) {
+      for (const event of traceEvents) {
+        yield event
+      }
+      throw error
+    }
     for (const event of traceEvents) {
       yield event
     }

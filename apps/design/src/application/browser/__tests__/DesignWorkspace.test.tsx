@@ -216,6 +216,9 @@ describe('DesignWorkspace', () => {
     expect(container.textContent).toContain('已生成「Hero patch」预览。')
     expect(container.textContent).toContain('Subagents')
     expect(container.textContent).toContain('Design Component Scout')
+    expect(container.textContent).toContain('Session Log')
+    expect(container.textContent).toContain('Model completed: Design Component Scout')
+    expect(container.textContent).toContain('components: Button')
     expect(container.textContent).not.toContain('正在生成...')
 
     await act(async () => {

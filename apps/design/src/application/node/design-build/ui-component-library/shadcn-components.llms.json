@@ -1,0 +1,592 @@
+[
+  {
+    "library": "shadcn",
+    "name": "field",
+    "title": "Field",
+    "category": "Form & Input",
+    "description": "Field component for form inputs with labels and error messages.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/field",
+    "usageUrl": "https://ui.shadcn.com/docs/components/field.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "button",
+    "title": "Button",
+    "category": "Form & Input",
+    "description": "Button component with multiple variants.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/button",
+    "usageUrl": "https://ui.shadcn.com/docs/components/button.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "button-group",
+    "title": "Button Group",
+    "category": "Form & Input",
+    "description": "Group multiple buttons together.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/button-group",
+    "usageUrl": "https://ui.shadcn.com/docs/components/button-group.md",
+    "aliases": ["buttongroup"]
+  },
+  {
+    "library": "shadcn",
+    "name": "input",
+    "title": "Input",
+    "category": "Form & Input",
+    "description": "Text input component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/input",
+    "usageUrl": "https://ui.shadcn.com/docs/components/input.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "input-group",
+    "title": "Input Group",
+    "category": "Form & Input",
+    "description": "Input component with prefix and suffix addons.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/input-group",
+    "usageUrl": "https://ui.shadcn.com/docs/components/input-group.md",
+    "aliases": ["inputgroup"]
+  },
+  {
+    "library": "shadcn",
+    "name": "input-otp",
+    "title": "Input OTP",
+    "category": "Form & Input",
+    "description": "One-time password input component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/input-otp",
+    "usageUrl": "https://ui.shadcn.com/docs/components/input-otp.md",
+    "aliases": ["inputotp"]
+  },
+  {
+    "library": "shadcn",
+    "name": "textarea",
+    "title": "Textarea",
+    "category": "Form & Input",
+    "description": "Multi-line text input component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/textarea",
+    "usageUrl": "https://ui.shadcn.com/docs/components/textarea.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "checkbox",
+    "title": "Checkbox",
+    "category": "Form & Input",
+    "description": "Checkbox input component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/checkbox",
+    "usageUrl": "https://ui.shadcn.com/docs/components/checkbox.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "radio-group",
+    "title": "Radio Group",
+    "category": "Form & Input",
+    "description": "Radio button group component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/radio-group",
+    "usageUrl": "https://ui.shadcn.com/docs/components/radio-group.md",
+    "aliases": ["radiogroup"]
+  },
+  {
+    "library": "shadcn",
+    "name": "select",
+    "title": "Select",
+    "category": "Form & Input",
+    "description": "Select dropdown component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/select",
+    "usageUrl": "https://ui.shadcn.com/docs/components/select.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "native-select",
+    "title": "Native Select",
+    "category": "Form & Input",
+    "description": "Styled native HTML select element.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/native-select",
+    "usageUrl": "https://ui.shadcn.com/docs/components/native-select.md",
+    "aliases": ["nativeselect"]
+  },
+  {
+    "library": "shadcn",
+    "name": "switch",
+    "title": "Switch",
+    "category": "Form & Input",
+    "description": "Toggle switch component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/switch",
+    "usageUrl": "https://ui.shadcn.com/docs/components/switch.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "slider",
+    "title": "Slider",
+    "category": "Form & Input",
+    "description": "Slider input component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/slider",
+    "usageUrl": "https://ui.shadcn.com/docs/components/slider.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "calendar",
+    "title": "Calendar",
+    "category": "Form & Input",
+    "description": "Calendar component for date selection.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/calendar",
+    "usageUrl": "https://ui.shadcn.com/docs/components/calendar.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "date-picker",
+    "title": "Date Picker",
+    "category": "Form & Input",
+    "description": "Date picker component combining input and calendar.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/date-picker",
+    "usageUrl": "https://ui.shadcn.com/docs/components/date-picker.md",
+    "aliases": ["datepicker"]
+  },
+  {
+    "library": "shadcn",
+    "name": "combobox",
+    "title": "Combobox",
+    "category": "Form & Input",
+    "description": "Searchable select component with autocomplete.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/combobox",
+    "usageUrl": "https://ui.shadcn.com/docs/components/combobox.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "label",
+    "title": "Label",
+    "category": "Form & Input",
+    "description": "Form label component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/label",
+    "usageUrl": "https://ui.shadcn.com/docs/components/label.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "accordion",
+    "title": "Accordion",
+    "category": "Layout & Navigation",
+    "description": "Collapsible accordion component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/accordion",
+    "usageUrl": "https://ui.shadcn.com/docs/components/accordion.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "breadcrumb",
+    "title": "Breadcrumb",
+    "category": "Layout & Navigation",
+    "description": "Breadcrumb navigation component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/breadcrumb",
+    "usageUrl": "https://ui.shadcn.com/docs/components/breadcrumb.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "navigation-menu",
+    "title": "Navigation Menu",
+    "category": "Layout & Navigation",
+    "description": "Accessible navigation menu with dropdowns.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/navigation-menu",
+    "usageUrl": "https://ui.shadcn.com/docs/components/navigation-menu.md",
+    "aliases": ["navigationmenu"]
+  },
+  {
+    "library": "shadcn",
+    "name": "sidebar",
+    "title": "Sidebar",
+    "category": "Layout & Navigation",
+    "description": "Collapsible sidebar component for app layouts.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/sidebar",
+    "usageUrl": "https://ui.shadcn.com/docs/components/sidebar.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "tabs",
+    "title": "Tabs",
+    "category": "Layout & Navigation",
+    "description": "Tabbed interface component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/tabs",
+    "usageUrl": "https://ui.shadcn.com/docs/components/tabs.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "separator",
+    "title": "Separator",
+    "category": "Layout & Navigation",
+    "description": "Visual divider between content sections.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/separator",
+    "usageUrl": "https://ui.shadcn.com/docs/components/separator.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "scroll-area",
+    "title": "Scroll Area",
+    "category": "Layout & Navigation",
+    "description": "Custom scrollable area with styled scrollbars.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/scroll-area",
+    "usageUrl": "https://ui.shadcn.com/docs/components/scroll-area.md",
+    "aliases": ["scrollarea"]
+  },
+  {
+    "library": "shadcn",
+    "name": "resizable",
+    "title": "Resizable",
+    "category": "Layout & Navigation",
+    "description": "Resizable panel layout component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/resizable",
+    "usageUrl": "https://ui.shadcn.com/docs/components/resizable.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "dialog",
+    "title": "Dialog",
+    "category": "Overlays & Dialogs",
+    "description": "Modal dialog component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/dialog",
+    "usageUrl": "https://ui.shadcn.com/docs/components/dialog.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "alert-dialog",
+    "title": "Alert Dialog",
+    "category": "Overlays & Dialogs",
+    "description": "Alert dialog for confirmation prompts.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/alert-dialog",
+    "usageUrl": "https://ui.shadcn.com/docs/components/alert-dialog.md",
+    "aliases": ["alertdialog"]
+  },
+  {
+    "library": "shadcn",
+    "name": "sheet",
+    "title": "Sheet",
+    "category": "Overlays & Dialogs",
+    "description": "Slide-out panel component (drawer).",
+    "docsUrl": "https://ui.shadcn.com/docs/components/sheet",
+    "usageUrl": "https://ui.shadcn.com/docs/components/sheet.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "drawer",
+    "title": "Drawer",
+    "category": "Overlays & Dialogs",
+    "description": "Mobile-friendly drawer component using Vaul.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/drawer",
+    "usageUrl": "https://ui.shadcn.com/docs/components/drawer.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "popover",
+    "title": "Popover",
+    "category": "Overlays & Dialogs",
+    "description": "Floating popover component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/popover",
+    "usageUrl": "https://ui.shadcn.com/docs/components/popover.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "tooltip",
+    "title": "Tooltip",
+    "category": "Overlays & Dialogs",
+    "description": "Tooltip component for additional context.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/tooltip",
+    "usageUrl": "https://ui.shadcn.com/docs/components/tooltip.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "hover-card",
+    "title": "Hover Card",
+    "category": "Overlays & Dialogs",
+    "description": "Card that appears on hover.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/hover-card",
+    "usageUrl": "https://ui.shadcn.com/docs/components/hover-card.md",
+    "aliases": ["hovercard"]
+  },
+  {
+    "library": "shadcn",
+    "name": "context-menu",
+    "title": "Context Menu",
+    "category": "Overlays & Dialogs",
+    "description": "Right-click context menu.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/context-menu",
+    "usageUrl": "https://ui.shadcn.com/docs/components/context-menu.md",
+    "aliases": ["contextmenu"]
+  },
+  {
+    "library": "shadcn",
+    "name": "dropdown-menu",
+    "title": "Dropdown Menu",
+    "category": "Overlays & Dialogs",
+    "description": "Dropdown menu component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/dropdown-menu",
+    "usageUrl": "https://ui.shadcn.com/docs/components/dropdown-menu.md",
+    "aliases": ["dropdownmenu"]
+  },
+  {
+    "library": "shadcn",
+    "name": "menubar",
+    "title": "Menubar",
+    "category": "Overlays & Dialogs",
+    "description": "Horizontal menubar component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/menubar",
+    "usageUrl": "https://ui.shadcn.com/docs/components/menubar.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "command",
+    "title": "Command",
+    "category": "Overlays & Dialogs",
+    "description": "Command palette component (cmdk).",
+    "docsUrl": "https://ui.shadcn.com/docs/components/command",
+    "usageUrl": "https://ui.shadcn.com/docs/components/command.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "alert",
+    "title": "Alert",
+    "category": "Feedback & Status",
+    "description": "Alert component for messages and notifications.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/alert",
+    "usageUrl": "https://ui.shadcn.com/docs/components/alert.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "toast",
+    "title": "Toast",
+    "category": "Feedback & Status",
+    "description": "Toast notification component using Sonner.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/toast",
+    "usageUrl": "https://ui.shadcn.com/docs/components/toast.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "sonner",
+    "title": "Sonner",
+    "category": "Feedback & Status",
+    "description": "Opinionated toast component for React.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/sonner",
+    "usageUrl": "https://ui.shadcn.com/docs/components/sonner.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "progress",
+    "title": "Progress",
+    "category": "Feedback & Status",
+    "description": "Progress bar component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/progress",
+    "usageUrl": "https://ui.shadcn.com/docs/components/progress.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "spinner",
+    "title": "Spinner",
+    "category": "Feedback & Status",
+    "description": "Loading spinner component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/spinner",
+    "usageUrl": "https://ui.shadcn.com/docs/components/spinner.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "skeleton",
+    "title": "Skeleton",
+    "category": "Feedback & Status",
+    "description": "Skeleton loading placeholder.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/skeleton",
+    "usageUrl": "https://ui.shadcn.com/docs/components/skeleton.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "badge",
+    "title": "Badge",
+    "category": "Feedback & Status",
+    "description": "Badge component for labels and status indicators.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/badge",
+    "usageUrl": "https://ui.shadcn.com/docs/components/badge.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "empty",
+    "title": "Empty",
+    "category": "Feedback & Status",
+    "description": "Empty state component for no data scenarios.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/empty",
+    "usageUrl": "https://ui.shadcn.com/docs/components/empty.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "avatar",
+    "title": "Avatar",
+    "category": "Display & Media",
+    "description": "Avatar component for user profiles.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/avatar",
+    "usageUrl": "https://ui.shadcn.com/docs/components/avatar.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "card",
+    "title": "Card",
+    "category": "Display & Media",
+    "description": "Card container component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/card",
+    "usageUrl": "https://ui.shadcn.com/docs/components/card.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "table",
+    "title": "Table",
+    "category": "Display & Media",
+    "description": "Table component for displaying data.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/table",
+    "usageUrl": "https://ui.shadcn.com/docs/components/table.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "data-table",
+    "title": "Data Table",
+    "category": "Display & Media",
+    "description": "Advanced data table with sorting, filtering, and pagination.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/data-table",
+    "usageUrl": "https://ui.shadcn.com/docs/components/data-table.md",
+    "aliases": ["datatable"]
+  },
+  {
+    "library": "shadcn",
+    "name": "chart",
+    "title": "Chart",
+    "category": "Display & Media",
+    "description": "Chart components using Recharts.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/chart",
+    "usageUrl": "https://ui.shadcn.com/docs/components/chart.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "carousel",
+    "title": "Carousel",
+    "category": "Display & Media",
+    "description": "Carousel component using Embla Carousel.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/carousel",
+    "usageUrl": "https://ui.shadcn.com/docs/components/carousel.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "aspect-ratio",
+    "title": "Aspect Ratio",
+    "category": "Display & Media",
+    "description": "Container that maintains aspect ratio.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/aspect-ratio",
+    "usageUrl": "https://ui.shadcn.com/docs/components/aspect-ratio.md",
+    "aliases": ["aspectratio"]
+  },
+  {
+    "library": "shadcn",
+    "name": "typography",
+    "title": "Typography",
+    "category": "Display & Media",
+    "description": "Typography styles and components.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/typography",
+    "usageUrl": "https://ui.shadcn.com/docs/components/typography.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "item",
+    "title": "Item",
+    "category": "Display & Media",
+    "description": "Generic item component for lists and menus.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/item",
+    "usageUrl": "https://ui.shadcn.com/docs/components/item.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "kbd",
+    "title": "Kbd",
+    "category": "Display & Media",
+    "description": "Keyboard shortcut display component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/kbd",
+    "usageUrl": "https://ui.shadcn.com/docs/components/kbd.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "collapsible",
+    "title": "Collapsible",
+    "category": "Misc",
+    "description": "Collapsible container component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/collapsible",
+    "usageUrl": "https://ui.shadcn.com/docs/components/collapsible.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "toggle",
+    "title": "Toggle",
+    "category": "Misc",
+    "description": "Toggle button component.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/toggle",
+    "usageUrl": "https://ui.shadcn.com/docs/components/toggle.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "toggle-group",
+    "title": "Toggle Group",
+    "category": "Misc",
+    "description": "Group of toggle buttons.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/toggle-group",
+    "usageUrl": "https://ui.shadcn.com/docs/components/toggle-group.md",
+    "aliases": ["togglegroup"]
+  },
+  {
+    "library": "shadcn",
+    "name": "pagination",
+    "title": "Pagination",
+    "category": "Misc",
+    "description": "Pagination component for lists and tables.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/pagination",
+    "usageUrl": "https://ui.shadcn.com/docs/components/pagination.md",
+    "aliases": []
+  },
+  {
+    "library": "shadcn",
+    "name": "direction",
+    "title": "Direction",
+    "category": "Misc",
+    "description": "Text direction provider for RTL support.",
+    "docsUrl": "https://ui.shadcn.com/docs/components/direction",
+    "usageUrl": "https://ui.shadcn.com/docs/components/direction.md",
+    "aliases": []
+  }
+]

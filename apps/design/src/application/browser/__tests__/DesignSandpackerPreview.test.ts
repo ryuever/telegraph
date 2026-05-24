@@ -60,6 +60,62 @@ describe('createSandpackerFiles', () => {
     expect(result.files['/index.html']).not.toContain('src="/src/index.tsx?entry"')
   })
 
+  it('rewrites artifact index.html absolute module entries to the Sandpacker route', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: JSON.stringify({ dependencies: { react: '19.1.0', 'react-dom': '19.1.0' } }),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/index.html',
+        content: '<div id="root"></div><script type="module" src="/src/index.tsx"></script>',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/index.tsx',
+        content: 'import "./App"',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: 'export default function App() { return <main>Login</main> }',
+      },
+    ], 'Login page')
+
+    expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
+    expect(result.files['/index.html']).not.toContain('src="/src/index.tsx"')
+  })
+
+  it('rewrites absolute module entries even when src appears before type', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: JSON.stringify({ dependencies: { react: '19.1.0', 'react-dom': '19.1.0' } }),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/index.html',
+        content: '<div id="root"></div><script src="/src/index.tsx?entry" type="module"></script>',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/index.tsx',
+        content: 'import "./App"',
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: 'export default function App() { return <main>Login</main> }',
+      },
+    ], 'Login page')
+
+    expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
+    expect(result.files['/index.html']).toContain('type="module"')
+  })
+
   it('remaps a generated project folder to the Sandpacker root', () => {
     const result = createSandpackerFiles([
       {
@@ -90,6 +146,31 @@ describe('createSandpackerFiles', () => {
     expect(result.files['/src/App.tsx']).toContain('Login')
     expect(result.virtualPathToOperationPath.get('/src/App.tsx'))
       .toBe('apps/design/src/generated/login-page/src/App.tsx')
+  })
+
+  it('pins preview React dependencies even when artifact package.json requests latest or canary', () => {
+    const result = createSandpackerFiles([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: JSON.stringify({
+          dependencies: {
+            react: 'latest',
+            'react-dom': '19.3.0-canary-fef12a01-20260413',
+          },
+        }, null, 2),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: 'export default function App() { return <main>Login</main> }',
+      },
+    ], 'Login page')
+
+    expect(result.files['/package.json']).toContain('"react": "18.3.1"')
+    expect(result.files['/package.json']).toContain('"react-dom": "18.3.1"')
+    expect(result.files['/package.json']).not.toContain('canary')
+    expect(result.files['/package.json']).not.toContain('"react": "latest"')
   })
 
   it('uses the bundled Tailwind browser runtime instead of the production-warning CDN', () => {

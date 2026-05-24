@@ -25,6 +25,7 @@ let serviceWorkerPromise: Promise<void> | null = null
 const SANDPACKER_MAX_OPERATION_FILES = 40
 const SANDPACKER_MAX_TOTAL_SOURCE_CHARS = 750_000
 const SANDPACKER_MAX_FILE_SOURCE_CHARS = 250_000
+const SANDPACKER_REACT_VERSION = '18.3.1'
 const TELEGRAPH_UI_COMPONENTS = [
   'Badge',
   'Button',
@@ -330,8 +331,8 @@ export function createSandpackerFiles(
     '/package.json': JSON.stringify({
       dependencies: {
         '@vitejs/plugin-react': 'latest',
-        react: '18.2.0',
-        'react-dom': '18.2.0',
+        react: SANDPACKER_REACT_VERSION,
+        'react-dom': SANDPACKER_REACT_VERSION,
       },
       devDependencies: {
         typescript: '5.3.3',
@@ -347,7 +348,11 @@ export function createSandpackerFiles(
 
   for (const item of projectedOperations) {
     const normalized = normalizePreviewImports(item.operation.content ?? '')
-    files[item.path] = normalized.source
+    files[item.path] = normalizePreviewFileSource({
+      path: item.path,
+      source: normalized.source,
+      htmlEntryPath,
+    })
     importRestorers.set(item.path, normalized.restore)
     virtualPathToOperationPath.set(item.path, item.operation.path)
   }
@@ -437,6 +442,52 @@ function normalizeProjectAliasImports(source: string): {
   }
 }
 
+function normalizePreviewFileSource(input: {
+  path: string
+  source: string
+  htmlEntryPath: string
+}): string {
+  if (input.path === '/index.html') {
+    return normalizeIndexHtmlEntryScript(input.source, input.htmlEntryPath)
+  }
+  if (input.path === '/package.json') {
+    return normalizePreviewPackageJson(input.source)
+  }
+  return input.source
+}
+
+function normalizeIndexHtmlEntryScript(source: string, entryPath: string): string {
+  const entryScript = `.${entryPath}?entry`
+  return source.replace(
+    /\bsrc=(['"])\/src\/(?:index|main)\.[tj]sx?(?:\?entry)?\1/gi,
+    (_match, quote: string) => `src=${quote}${entryScript}${quote}`,
+  )
+}
+
+function normalizePreviewPackageJson(source: string): string {
+  try {
+    const parsed = JSON.parse(source) as unknown
+    if (!isPlainObject(parsed)) return source
+    const dependencies = isPlainObject(parsed.dependencies) ? parsed.dependencies : {}
+    const devDependencies = isPlainObject(parsed.devDependencies) ? parsed.devDependencies : {}
+    return JSON.stringify({
+      ...parsed,
+      dependencies: {
+        ...dependencies,
+        react: SANDPACKER_REACT_VERSION,
+        'react-dom': SANDPACKER_REACT_VERSION,
+      },
+      devDependencies,
+    }, null, 2)
+  } catch {
+    return source
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
 function aliasSpecifierToVirtualImport(specifier: string): string {
   const normalized = specifier.replace(/^\/+/, '')
   const base = `/src/${normalized}`
@@ -499,7 +550,7 @@ type ElementProps<Tag extends keyof React.JSX.IntrinsicElements> = React.JSX.Int
 }
 
 type VariantProps = {
-  variant?: 'default' | 'secondary' | 'outline'
+  variant?: 'default' | 'secondary' | 'destructive' | 'outline'
 }
 
 function cx(...items: Array<string | false | null | undefined>): string {
@@ -507,11 +558,11 @@ function cx(...items: Array<string | false | null | undefined>): string {
 }
 
 export function Badge({ className, variant, ...props }: ElementProps<'span'> & VariantProps) {
-  return <span className={cx('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium', variant === 'secondary' ? 'bg-slate-100 text-slate-700' : variant === 'outline' ? 'bg-white' : 'bg-slate-900 text-white', className)} {...props} />
+  return <span className={cx('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium', variant === 'secondary' ? 'bg-slate-100 text-slate-700' : variant === 'destructive' ? 'bg-red-600 text-white' : variant === 'outline' ? 'bg-white' : 'bg-slate-900 text-white', className)} {...props} />
 }
 
 export function Button({ className, variant, ...props }: ElementProps<'button'> & VariantProps) {
-  return <button className={cx('inline-flex min-h-9 items-center justify-center rounded-md border px-3 text-sm font-medium', variant === 'outline' ? 'bg-white text-slate-900' : 'bg-slate-900 text-white', className)} {...props} />
+  return <button className={cx('inline-flex min-h-9 items-center justify-center rounded-md border px-3 text-sm font-medium', variant === 'destructive' ? 'bg-red-600 text-white' : variant === 'outline' ? 'bg-white text-slate-900' : 'bg-slate-900 text-white', className)} {...props} />
 }
 
 export function Card({ className, ...props }: ElementProps<'div'>) {

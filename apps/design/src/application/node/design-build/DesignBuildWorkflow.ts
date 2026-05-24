@@ -28,7 +28,12 @@ import {
   type DesignBuildSubagentProfileResolver,
 } from './DesignBuildSubagentGateway'
 import type { ComponentRetrievalLedger } from './ComponentRetrievalLedger'
-import { ShadcnRegistryIndexer } from './ShadcnRegistryIndexer'
+import {
+  createDesignBuildShadcnTools,
+  createDesignBuildShadcnProjectTools,
+  SHADCN_COMPONENT_RETRIEVAL_TOOL_NAMES,
+  SHADCN_PROJECT_TOOL_NAMES,
+} from './DesignBuildShadcnTools'
 import { ShadcnRegistryMaterializer } from './ShadcnRegistryMaterializer'
 import {
   reviewFromVisualReport,
@@ -47,7 +52,6 @@ import {
 export interface DesignBuildWorkflowOptions {
   childRunner?: DesignBuildChildRunner
   profileResolver?: DesignBuildSubagentProfileResolver
-  shadcnRegistryIndexer?: ShadcnRegistryIndexer
   shadcnRegistryMaterializer?: ShadcnRegistryMaterializer
   visualReviewWorker?: VisualReviewWorker
 }
@@ -59,16 +63,12 @@ export interface DesignBuildWorkflowRunOptions {
 export class DesignBuildWorkflow {
   private readonly childRunner?: DesignBuildChildRunner
   private readonly profileResolver?: DesignBuildSubagentProfileResolver
-  private readonly shadcnRegistryIndexer: ShadcnRegistryIndexer
   private readonly shadcnRegistryMaterializer: ShadcnRegistryMaterializer
   private readonly visualReviewWorker: VisualReviewWorker
 
   constructor(options: DesignBuildWorkflowOptions = {}) {
     this.childRunner = options.childRunner
     this.profileResolver = options.profileResolver
-    this.shadcnRegistryIndexer = options.shadcnRegistryIndexer ?? new ShadcnRegistryIndexer({
-      enableCli: process.env.TELEGRAPH_DESIGN_SHADCN_CLI === '1',
-    })
     this.shadcnRegistryMaterializer = options.shadcnRegistryMaterializer ?? new ShadcnRegistryMaterializer()
     this.visualReviewWorker = options.visualReviewWorker ?? new VisualReviewWorker()
   }
@@ -234,36 +234,47 @@ export class DesignBuildWorkflow {
     result: DesignBuildInitialState,
     brief: DesignBuildInitialState['brief'],
   ): AsyncGenerator<AgentEvent, ComponentRetrievalLedger, void> {
-    const ledger = await this.shadcnRegistryIndexer.retrieve({
+    const tools = createDesignBuildShadcnTools({
       prompt: input.message,
       policy: result.context.designSystem,
     })
-    const retrievalOutput = {
-      query: input.message,
-      components: ledger.selected,
-      summary: `Selected ${String(ledger.selected.length)} shadcn registry assets for the generated page.`,
-      ledger,
-    }
-    yield* subagents.runChild({
+    const retrievalOutput = yield* subagents.runChild({
       parentRunId: input.runId,
       childRunId: childRunId(input.runId, DESIGN_BUILD_CHILD_PROFILES.scout),
       profileId: DESIGN_BUILD_CHILD_PROFILES.scout,
       stage: 'component-retrieval',
       label: 'Design Component Scout',
-      input: retrievalOutput,
+      input: {
+        query: input.message,
+        components: [],
+        summary: 'Use shadcn tools to retrieve, inspect, and select registry assets for this page.',
+      },
       modelInput: {
         prompt: input.message,
         brief,
         context: result.context,
         designSystem: result.context.designSystem,
         componentEdit: result.context.revision?.componentEdit,
-        componentLedger: ledger,
         candidateComponents: result.components,
+        requiredToolWorkflow: [
+          ...SHADCN_COMPONENT_RETRIEVAL_TOOL_NAMES,
+          'submit_design_child_output',
+        ],
       },
       settings: input.settings,
       metadata: input.metadata,
       signal: input.signal,
+      tools,
+      requiredTools: [...SHADCN_COMPONENT_RETRIEVAL_TOOL_NAMES],
     })
+    const ledger = componentLedgerFromChildOutput(retrievalOutput)
+    if (!ledger) {
+      throw new DesignBuildRuntimeError(
+        'retrieval_failed',
+        'Design component scout did not submit a valid shadcn component retrieval ledger.',
+        retrievalOutput,
+      )
+    }
     return ledger
   }
 
@@ -277,6 +288,15 @@ export class DesignBuildWorkflow {
     artifact: DesignBuildInitialState['artifact']
     summary: ReturnType<typeof createArtifactSummary>
   }, void> {
+    const projectTools = artifact.kind === 'design-patch'
+      ? createDesignBuildShadcnProjectTools({
+          prompt: input.message,
+          policy: result.context.designSystem,
+          artifact,
+          ledger: componentLedger,
+          materializer: this.shadcnRegistryMaterializer,
+        })
+      : undefined
     const workerOutput = yield* subagents.runChild({
       parentRunId: input.runId,
       childRunId: childRunId(input.runId, DESIGN_BUILD_CHILD_PROFILES.worker),
@@ -298,8 +318,12 @@ export class DesignBuildWorkflow {
       settings: input.settings,
       metadata: input.metadata,
       signal: input.signal,
+      tools: projectTools,
+      requiredTools: projectTools
+        ? componentLedger.selected.length > 0 ? [...SHADCN_PROJECT_TOOL_NAMES] : ['create_shadcn_project']
+        : undefined,
     })
-    const nextArtifact = artifactFromChildOutput(workerOutput) ?? artifact
+    const nextArtifact = mergePatchArtifact(artifact, artifactFromChildOutput(workerOutput) ?? artifact)
     return {
       artifact: nextArtifact,
       summary: createArtifactSummary(nextArtifact),
@@ -399,6 +423,7 @@ export class DesignBuildWorkflow {
   }, void> {
     const { input: runtimeInput, subagents } = input
     let artifact = repairDesignBuildArtifact(input.artifact, input.review)
+    const designSystem = contextDesignSystem(input.context)
     const repairOutput = yield* subagents.runChild({
       parentRunId: runtimeInput.runId,
       childRunId: `${childRunId(runtimeInput.runId, DESIGN_BUILD_CHILD_PROFILES.worker)}:repair-1`,
@@ -410,7 +435,7 @@ export class DesignBuildWorkflow {
         prompt: runtimeInput.message,
         brief: input.brief,
         context: input.context,
-        designSystem: contextDesignSystem(input.context),
+        designSystem,
         componentEdit: contextComponentEdit(input.context),
         components: input.components,
         componentLedger: input.componentLedger,
@@ -425,8 +450,17 @@ export class DesignBuildWorkflow {
       metadata: runtimeInput.metadata,
       signal: runtimeInput.signal,
       attempt: 1,
+      tools: input.componentLedger && designSystem && artifact.kind === 'design-patch'
+        ? createDesignBuildShadcnProjectTools({
+            prompt: runtimeInput.message,
+            policy: designSystem,
+            artifact,
+            ledger: input.componentLedger as ComponentRetrievalLedger,
+            materializer: this.shadcnRegistryMaterializer,
+          })
+        : undefined,
     })
-    artifact = mergeRepairArtifact(artifact, artifactFromChildOutput(repairOutput) ?? artifact)
+    artifact = mergePatchArtifact(artifact, artifactFromChildOutput(repairOutput) ?? artifact)
     return {
       artifact,
       summary: createArtifactSummary(artifact, { repairAttempt: 1 }),
@@ -546,6 +580,25 @@ function attachComponentRetrievalMetadata(
   }
 }
 
+function componentLedgerFromChildOutput(output: unknown): ComponentRetrievalLedger | undefined {
+  if (!isRecord(output)) return undefined
+  const ledger = output.ledger
+  if (!isComponentRetrievalLedger(ledger)) return undefined
+  return ledger
+}
+
+function isComponentRetrievalLedger(value: unknown): value is ComponentRetrievalLedger {
+  if (!isRecord(value)) return false
+  return isRecord(value.query) &&
+    isRecord(value.policy) &&
+    isRecord(value.trust) &&
+    isRecord(value.retrieval) &&
+    Array.isArray(value.candidates) &&
+    Array.isArray(value.selected) &&
+    Array.isArray(value.fallbacks) &&
+    Array.isArray(value.rejected)
+}
+
 function attachVisualReviewMetadata(
   artifact: DesignBuildInitialState['artifact'],
   visualReview: VisualReviewReport,
@@ -586,23 +639,27 @@ function materializeShadcnArtifact(
   }).artifact
 }
 
-function mergeRepairArtifact(
+function mergePatchArtifact(
   base: DesignBuildInitialState['artifact'],
-  repair: DesignBuildInitialState['artifact'],
+  nextArtifact: DesignBuildInitialState['artifact'],
 ): DesignBuildInitialState['artifact'] {
-  if (base.kind !== 'design-patch' || repair.kind !== 'design-patch') return repair
+  if (base.kind !== 'design-patch' || nextArtifact.kind !== 'design-patch') return nextArtifact
   const operationsByPath = new Map(base.operations.map(operation => [operation.path, operation]))
-  for (const operation of repair.operations) {
+  for (const operation of nextArtifact.operations) {
     operationsByPath.set(operation.path, operation)
   }
   const merged: DesignPatchArtifact = {
     ...base,
-    ...repair,
+    ...nextArtifact,
     metadata: {
       ...base.metadata,
-      ...repair.metadata,
+      ...nextArtifact.metadata,
     },
     operations: [...operationsByPath.values()],
   }
   return merged
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }

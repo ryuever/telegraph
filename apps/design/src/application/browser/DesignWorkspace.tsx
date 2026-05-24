@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
+import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, FileClock, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
 import type { AgentEvent } from '@/packages/agent-protocol'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
@@ -24,6 +24,11 @@ import {
   reduceDesignSubagentItems,
   type DesignSubagentViewItem,
 } from './design-subagent-projector'
+import {
+  initialDesignSessionLogItemsFromEvents,
+  reduceDesignSessionLogItems,
+  type DesignSessionLogItem,
+} from './design-session-log-projector'
 import { DesignSubagentPanel } from './DesignSubagentPanel'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
@@ -110,6 +115,8 @@ export function DesignWorkspace({
   const [traceItems, setTraceItems] = useState<DesignTraceItem[]>(() =>
     initialTraceItemsFromEvents(initialState?.traceEvents ?? [], sessionId))
   const [subagentItems, setSubagentItems] = useState<DesignSubagentViewItem[]>(() => initialState?.subagentItems ?? [])
+  const [sessionLogItems, setSessionLogItems] = useState<DesignSessionLogItem[]>(() =>
+    initialDesignSessionLogItemsFromEvents(initialState?.traceEvents ?? [], sessionId))
 
   const appendAssistantText = (text: string, messageId?: string): void => {
     setMessages((prev) => {
@@ -169,16 +176,19 @@ export function DesignWorkspace({
       onAssistantText: text => { appendAssistantText(text, assistantMessageId) },
       onTraceEvent: event => {
         setTraceItems(prev => reduceTraceItems(prev, event))
+        setSessionLogItems(prev => reduceDesignSessionLogItems(prev, event))
         if (event.type === 'agent_event') {
           setSubagentItems(prev => reduceDesignSubagentItems(prev, event))
         }
       },
       onSubagent: subagent => {
-        setSubagentItems(prev => reduceDesignSubagentItems(prev, {
+        const event: DesignAgentStreamEvent = {
           type: 'subagent_updated',
           runId: subagent.parentRunId,
           subagent,
-        }))
+        }
+        setSubagentItems(prev => reduceDesignSubagentItems(prev, event))
+        setSessionLogItems(prev => reduceDesignSessionLogItems(prev, event))
       },
       onArtifact: artifact => {
         rememberAssistantArtifact(assistantMessageId, artifact)
@@ -504,6 +514,7 @@ export function DesignWorkspace({
         </div>
         <TraceTimeline items={traceItems} />
         <DesignSubagentPanel items={subagentItems} onCancel={cancelSubagent} />
+        <SessionLogPanel sessionId={sessionId} items={sessionLogItems} />
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
@@ -580,6 +591,63 @@ function changedPatchOperations(
       previous.content !== operation.content ||
       previous.expectedOriginal !== operation.expectedOriginal
   })
+}
+
+function SessionLogPanel({
+  sessionId,
+  items,
+}: {
+  sessionId: string
+  items: DesignSessionLogItem[]
+}): JSX.Element {
+  if (items.length === 0) return <></>
+  const latest = items.at(-1)
+  const failedCount = items.filter(item => item.status === 'failed').length
+  const latestRunId = latest?.runId
+
+  return (
+    <div className="shrink-0 border-b border-border bg-background px-3 py-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
+          <FileClock size={13} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">Session Log</span>
+        </div>
+        <div className="shrink-0 rounded bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {shortLogId(sessionId)}{latestRunId ? ` / ${shortLogId(latestRunId)}` : ''} / {String(items.length)}
+        </div>
+      </div>
+      <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <span className="truncate">Snapshot timeline for this session</span>
+        {failedCount > 0 && <span className="shrink-0 text-destructive">{String(failedCount)} failed</span>}
+      </div>
+      <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+        {items.slice(-18).map(item => (
+          <div
+            key={item.id}
+            className="grid grid-cols-[54px_10px_minmax(0,1fr)] gap-2 rounded-md border border-border bg-card px-2 py-1.5"
+          >
+            <div className="pt-0.5 text-[10px] tabular-nums text-muted-foreground">
+              {formatLogTime(item.ts)}
+            </div>
+            <span className={sessionLogStatusDotClassName(item.status)} />
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-[11px] font-medium text-foreground">{item.label}</span>
+                <span className="shrink-0 rounded bg-surface-soft px-1 py-0.5 text-[9px] uppercase tracking-normal text-muted-foreground">
+                  {item.kind}
+                </span>
+              </div>
+              {item.detail && (
+                <div className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
+                  {item.detail}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
@@ -766,6 +834,27 @@ function traceStatusDotClassName(status: DesignTraceItem['status']): string {
   if (status === 'failed') return `${base} bg-destructive`
   if (status === 'cancelled') return `${base} bg-muted-foreground`
   return `${base} bg-amber-500`
+}
+
+function sessionLogStatusDotClassName(status: DesignSessionLogItem['status']): string {
+  const base = 'mt-1 h-2 w-2 shrink-0 rounded-full'
+  if (status === 'completed') return `${base} bg-emerald-500`
+  if (status === 'failed') return `${base} bg-destructive`
+  if (status === 'cancelled') return `${base} bg-muted-foreground`
+  if (status === 'running') return `${base} bg-amber-500`
+  return `${base} bg-sky-500`
+}
+
+function formatLogTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+function shortLogId(value: string): string {
+  return value.length > 8 ? value.slice(0, 8) : value
 }
 
 function reduceTraceItems(prev: DesignTraceItem[], event: DesignAgentStreamEvent): DesignTraceItem[] {

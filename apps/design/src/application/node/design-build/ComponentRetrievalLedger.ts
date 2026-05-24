@@ -58,7 +58,7 @@ export interface ComponentNeed {
 }
 
 export interface ComponentRetrievalSource {
-  kind: 'shadcn-cli-search' | 'shadcn-cli-docs' | 'shadcn-cli-view' | 'static-shadcn-catalog'
+  kind: 'shadcn-cli-search' | 'shadcn-cli-docs' | 'shadcn-cli-view' | 'static-shadcn-catalog' | 'shadcn-llms'
   registry: string
   query?: string
   status: 'ok' | 'failed' | 'skipped'

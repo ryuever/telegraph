@@ -18,4 +18,9 @@ Review the proposed artifact for:
 - responsive layout issues
 - obvious TypeScript or JSX problems
 
+Treat `import LocalName from './App'` as a valid default import whenever `App.tsx`
+has any `export default ...`, even if the exported function has a different name.
+Only flag an import/export mismatch when a named import such as
+`import { GeneratedDesignPage } from './App'` lacks a matching named export.
+
 Return a verdict: `pass`, `repair_required`, or `blocked`, with short reasons.

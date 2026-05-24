@@ -19,6 +19,7 @@ export interface StandaloneProjectContractResult {
 const REACT_ENTRY_FILES = ['src/index.tsx', 'src/main.tsx', 'src/index.jsx', 'src/main.jsx']
 const SOURCE_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json', '.svg']
 const INDEX_SOURCE_FILES = SOURCE_EXTENSIONS.map(extension => `index${extension}`)
+const JAVASCRIPT_SOURCE_PATTERN = /\.(tsx|ts|jsx|js)$/i
 const FORBIDDEN_WORKSPACE_IMPORT_PATTERNS = [
   /from\s+['"]@\/packages\//,
   /from\s+['"]@\/apps\//,
@@ -27,6 +28,17 @@ const FORBIDDEN_WORKSPACE_IMPORT_PATTERNS = [
   /import\s*\(\s*['"]@\/apps\//,
   /import\s*\(\s*['"]@telegraph\//,
 ]
+
+interface LocalImportBinding {
+  specifier: string
+  defaultName?: string
+  named: string[]
+}
+
+interface ExportedSymbols {
+  hasDefault: boolean
+  named: Set<string>
+}
 
 export function evaluateStandaloneProjectFiles(
   operations: DesignProjectFileOperation[],
@@ -45,6 +57,7 @@ export function evaluateStandaloneProjectFiles(
     !FORBIDDEN_WORKSPACE_IMPORT_PATTERNS.some(pattern => pattern.test(operation.content ?? ''))
   )
   const missingLocalImports = findMissingLocalImports(operations, projectRoot)
+  const localImportExportMismatches = findLocalImportExportMismatches(operations, projectRoot, projectFiles)
   const missingExternalDependencies = findMissingExternalDependencies(operations, projectRoot, packageJsonValue)
   const aliasSpecifiers = findAliasImportSpecifiers(operations, projectRoot)
   const aliasConfigured = aliasSpecifiers.length === 0 || hasAliasConfig(projectFiles)
@@ -88,6 +101,13 @@ export function evaluateStandaloneProjectFiles(
       summary: missingLocalImports.length === 0
         ? 'Local relative imports resolve to generated project files.'
         : `Missing generated files for local imports: ${missingLocalImports.slice(0, 5).join(', ')}`,
+    },
+    {
+      id: 'standalone-local-import-exports',
+      passed: localImportExportMismatches.length === 0,
+      summary: localImportExportMismatches.length === 0
+        ? 'Local relative imports match default and named exports.'
+        : `Local import/export mismatches: ${localImportExportMismatches.slice(0, 5).join(', ')}`,
     },
     {
       id: 'standalone-imports',
@@ -239,6 +259,120 @@ function findMissingLocalImports(
   }
 
   return [...missing].sort()
+}
+
+function findLocalImportExportMismatches(
+  operations: DesignProjectFileOperation[],
+  projectRoot: string | undefined,
+  files: Map<string, string>,
+): string[] {
+  const filePaths = new Set(files.keys())
+  const mismatches = new Set<string>()
+
+  for (const operation of sourceOperations(operations, projectRoot)) {
+    const importerPath = projectRelativePath(operation.path, projectRoot)
+    for (const binding of localImportBindings(operation.content ?? '')) {
+      const resolved = resolveLocalImport(importerPath, binding.specifier, filePaths)
+      if (!resolved || !JAVASCRIPT_SOURCE_PATTERN.test(resolved)) continue
+      const targetSource = files.get(resolved)
+      if (!targetSource) continue
+      const targetExports = exportedSymbols(targetSource)
+      if (binding.defaultName && !targetExports.hasDefault) {
+        mismatches.add(`${importerPath} -> ${binding.specifier} default`)
+      }
+      for (const name of binding.named) {
+        if (name === 'default') {
+          if (!targetExports.hasDefault) mismatches.add(`${importerPath} -> ${binding.specifier} default`)
+          continue
+        }
+        if (!targetExports.named.has(name)) {
+          mismatches.add(`${importerPath} -> ${binding.specifier} { ${name} }`)
+        }
+      }
+    }
+  }
+
+  return [...mismatches].sort()
+}
+
+function localImportBindings(source: string): LocalImportBinding[] {
+  const bindings: LocalImportBinding[] = []
+  const importPattern = /^[ \t]*import\s+(type\s+)?([^'"\n][^\n]*?)\s+from\s+['"](\.{1,2}\/[^'"]+)['"]/gm
+  const exportFromPattern = /^[ \t]*export\s+(type\s+)?\{([^}\n]*?)\}\s+from\s+['"](\.{1,2}\/[^'"]+)['"]/gm
+
+  for (const match of source.matchAll(importPattern)) {
+    const clause = match[2].trim()
+    const specifier = match[3]
+    if (!clause || !specifier) continue
+    bindings.push({
+      specifier,
+      defaultName: defaultImportName(clause),
+      named: namedBindingImports(clause),
+    })
+  }
+
+  for (const match of source.matchAll(exportFromPattern)) {
+    const clause = match[2].trim()
+    const specifier = match[3]
+    if (!clause || !specifier) continue
+    bindings.push({
+      specifier,
+      named: namedBindingImports(`{${clause}}`),
+    })
+  }
+
+  return bindings
+}
+
+function defaultImportName(clause: string): string | undefined {
+  const first = clause.split(',')[0]?.trim()
+  if (!first || first.startsWith('{') || first.startsWith('*')) return undefined
+  return first.replace(/^type\s+/, '').trim() || undefined
+}
+
+function namedBindingImports(clause: string): string[] {
+  const namedBlock = clause.match(/\{([\s\S]*?)\}/)?.[1]
+  if (!namedBlock) return []
+  return namedBlock
+    .split(',')
+    .map(part => part.trim().replace(/^type\s+/, ''))
+    .map(part => part.split(/\s+as\s+/i)[0]?.trim())
+    .filter((name): name is string => Boolean(name))
+}
+
+function exportedSymbols(source: string): ExportedSymbols {
+  const named = new Set<string>()
+  const declarationPattern = /\bexport\s+(?:declare\s+)?(?:async\s+)?(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
+  const exportListPattern = /\bexport\s*\{([\s\S]*?)\}/g
+
+  for (const match of source.matchAll(declarationPattern)) {
+    const name = match[1]
+    if (name) named.add(name)
+  }
+
+  for (const match of source.matchAll(exportListPattern)) {
+    const block = match[1]
+    if (!block) continue
+    for (const exportName of exportedNamesFromList(block)) {
+      named.add(exportName)
+    }
+  }
+
+  return {
+    hasDefault: /\bexport\s+default\b/.test(source) || /\bexport\s*\{[\s\S]*?\bas\s+default\b[\s\S]*?\}/.test(source),
+    named,
+  }
+}
+
+function exportedNamesFromList(block: string): string[] {
+  return block
+    .split(',')
+    .map(part => part.trim())
+    .map(part => {
+      const pieces = part.split(/\s+as\s+/i)
+      return (pieces[1] ?? pieces[0]).trim()
+    })
+    .filter((name): name is string => Boolean(name && name !== 'default'))
 }
 
 function projectFileMap(
