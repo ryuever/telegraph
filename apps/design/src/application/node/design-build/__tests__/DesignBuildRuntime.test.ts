@@ -355,7 +355,7 @@ describe('DesignBuildRuntime', () => {
     expect(stringField(artifact, 'changeSummary')).toContain('Current artifact operations: update apps/design/src/generated/page.tsx')
   })
 
-  it('runs at most one repair attempt when reviewer requests repair', async () => {
+  it('does not run a follow-up worker when reviewer requests changes', async () => {
     const runtime = createTestRuntime(request => {
       if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer && request.stage === 'review') {
         return {
@@ -365,32 +365,17 @@ describe('DesignBuildRuntime', () => {
               {
                 id: 'test-review',
                 passed: false,
-                summary: 'Test runner requested one repair pass.',
+                summary: 'Test runner requested another pass.',
               },
             ],
           },
-        }
-      }
-      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer && request.stage === 'review-repair') {
-        return {
-          review: {
-            verdict: 'pass',
-            checks: [
-              {
-                id: 'test-review-repair',
-                passed: true,
-                summary: 'Test runner accepted the repaired artifact.',
-              },
-            ],
-          },
-          repairAttempt: request.attempt,
         }
       }
       return undefined
     })
     const events = await collect(runtime.run({
-      runId: 'run-repair',
-      message: 'Create a repairable dashboard',
+      runId: 'run-review-warning',
+      message: 'Create a dashboard',
       settings: {},
     }))
 
@@ -398,45 +383,29 @@ describe('DesignBuildRuntime', () => {
       event.type === 'child_run_started'
     )
     const repairStarts = childStarts.filter(event => event.childRunId.includes(':repair-1'))
-    expect(repairStarts.map(event => event.childRunId)).toEqual([
-      'run-repair:design-worker:repair-1',
-      'run-repair:design-reviewer:repair-1',
-    ])
-    expect(childStarts.filter(event => event.childRunId.includes(':repair-2'))).toHaveLength(0)
+    expect(repairStarts).toHaveLength(0)
 
     const childCompletions = events.filter((event): event is Extract<AgentEvent, { type: 'child_run_completed' }> =>
       event.type === 'child_run_completed'
     )
-    const firstReview = childCompletions.find(event => event.childRunId === 'run-repair:design-reviewer')
+    const firstReview = childCompletions.find(event => event.childRunId === 'run-review-warning:design-reviewer')
     expect(stringField(recordField(firstReview?.output, 'review'), 'verdict')).toBe('repair_required')
-    const repairReview = childCompletions.find(event => event.childRunId === 'run-repair:design-reviewer:repair-1')
-    expect(numberField(repairReview?.output, 'repairAttempt')).toBe(1)
-    expect(stringField(recordField(repairReview?.output, 'review'), 'verdict')).toBe('pass')
 
     const terminal = events.at(-1)
     expect(terminal?.type).toBe('run_completed')
     const terminalOutput = terminal?.type === 'run_completed' ? terminal.output : undefined
     expect(recordField(terminalOutput, 'artifact')).toMatchObject({
-      id: 'run-repair-patch',
+      id: 'run-review-warning-patch',
       kind: 'design-patch',
-      title: 'Create a repairable dashboard source repaired',
+      title: 'Create a dashboard source',
     })
     const childRuns = arrayField(recordField(terminalOutput, 'orchestration'), 'childRuns')
-    const repairWorkerRun = childRuns.find(childRun =>
-      stringField(childRun, 'childRunId') === 'run-repair:design-worker:repair-1'
-    )
-    const repairReviewerRun = childRuns.find(childRun =>
-      stringField(childRun, 'childRunId') === 'run-repair:design-reviewer:repair-1'
-    )
-    expect(numberField(recordField(repairWorkerRun, 'output'), 'repairAttempt')).toBe(1)
-    expect(numberField(recordField(repairReviewerRun, 'output'), 'repairAttempt')).toBe(1)
-    expect(stringField(recordField(recordField(repairReviewerRun, 'output'), 'review'), 'verdict')).toBe('pass')
-    expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-repairable-dashboard-page/package.json')
-    const repairedArtifact = recordField(terminalOutput, 'artifact')
-    expect(JSON.stringify(arrayField(repairedArtifact, 'operations'))).not.toContain('@/packages/ui/')
+    expect(childRuns.map(childRun => stringField(childRun, 'childRunId'))).not.toContain('run-review-warning:design-worker:repair-1')
+    expect(childRuns.map(childRun => stringField(childRun, 'childRunId'))).not.toContain('run-review-warning:design-reviewer:repair-1')
+    expect(JSON.stringify(terminal)).toContain('apps/design/src/generated/create-a-dashboard-page/package.json')
   })
 
-  it('runs a repair attempt when visual review finds blank output', async () => {
+  it('leaves visual review failures for preview instead of running a follow-up worker', async () => {
     const runtime = createTestRuntime(request => {
       if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'code-artifact') {
         return {
@@ -450,36 +419,26 @@ describe('DesignBuildRuntime', () => {
           },
         }
       }
-      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'repair') {
-        return {
-          artifact: {
-            id: 'visual-repaired-artifact',
-            kind: 'design-patch',
-            title: 'Visual repaired source',
-            operations: modelProjectOperationsForRequest(request, 'visual-bad'),
-          },
-        }
-      }
       return undefined
     })
 
     const events = await collect(runtime.run({
-      runId: 'run-visual-repair',
-      message: 'Create a blank page then repair it',
+      runId: 'run-visual-failure',
+      message: 'Create a blank page',
       settings: {},
     }))
 
     const visualReview = events.find((event): event is Extract<AgentEvent, { type: 'step_completed' }> =>
       event.type === 'step_completed' &&
-      event.stepId === 'run-visual-repair:visual-review'
+      event.stepId === 'run-visual-failure:visual-review'
     )
     expect(stringField(visualReview?.output, 'status')).toBe('repair_required')
 
     const repairWorker = events.find((event): event is Extract<AgentEvent, { type: 'child_run_completed' }> =>
       event.type === 'child_run_completed' &&
-      event.childRunId === 'run-visual-repair:design-worker:repair-1'
+      event.childRunId === 'run-visual-failure:design-worker:repair-1'
     )
-    expect(repairWorker).toBeDefined()
+    expect(repairWorker).toBeUndefined()
 
     const terminal = events.at(-1)
     expect(terminal?.type).toBe('run_completed')
@@ -487,13 +446,13 @@ describe('DesignBuildRuntime', () => {
       ? recordField(terminal.output, 'artifact')
       : undefined
     expect(artifact).toMatchObject({
-      id: 'visual-repaired-artifact',
+      id: 'visual-bad-artifact',
       kind: 'design-patch',
-      title: 'Visual repaired source',
+      title: 'Blank source',
     })
   })
 
-  it('merges partial repair artifacts back onto the original standalone project', async () => {
+  it('does not run a partial follow-up pass before preview', async () => {
     const runtime = createTestRuntime(request => {
       if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'code-artifact') {
         return {
@@ -501,25 +460,9 @@ describe('DesignBuildRuntime', () => {
             id: 'partial-bad-artifact',
             kind: 'design-patch',
             title: 'Partial bad source',
-            operations: modelProjectOperationsForRequest(request, 'partial-repair').map(operation => operation.path.endsWith('/src/App.tsx')
+            operations: modelProjectOperationsForRequest(request, 'partial-preview').map(operation => operation.path.endsWith('/src/App.tsx')
               ? { ...operation, content: 'export default function App() { return null }\n' }
               : operation),
-          },
-        }
-      }
-      if (request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker && request.stage === 'repair') {
-        return {
-          artifact: {
-            id: 'partial-repaired-artifact',
-            kind: 'design-patch',
-            title: 'Partial repaired source',
-            operations: [
-              {
-                kind: 'add',
-                path: `${projectRootFromRequest(request, 'partial-repair')}/src/App.tsx`,
-                content: shadcnAppSource('Repaired'),
-              },
-            ],
           },
         }
       }
@@ -527,8 +470,8 @@ describe('DesignBuildRuntime', () => {
     })
 
     const events = await collect(runtime.run({
-      runId: 'run-partial-repair',
-      message: 'Create a blank page then partially repair it',
+      runId: 'run-partial-preview',
+      message: 'Create a blank page with partial output',
       settings: {},
     }))
 
@@ -539,19 +482,20 @@ describe('DesignBuildRuntime', () => {
       : undefined
     const operationPaths = arrayField(artifact, 'operations').map(operation => stringField(operation, 'path'))
     expect(artifact).toMatchObject({
-      id: 'partial-repaired-artifact',
+      id: 'partial-bad-artifact',
       kind: 'design-patch',
-      title: 'Partial repaired source',
+      title: 'Partial bad source',
     })
     const packagePath = operationPaths.find(path => path?.endsWith('/package.json'))
-    const projectRoot = packagePath?.replace(/\/package\.json$/, '')
+    if (!packagePath) throw new Error('Expected generated project package.json operation.')
+    const projectRoot = packagePath.replace(/\/package\.json$/, '')
     expect(operationPaths).toContain(`${projectRoot}/package.json`)
     expect(operationPaths).toContain(`${projectRoot}/index.html`)
     expect(operationPaths).toContain(`${projectRoot}/src/index.tsx`)
-    const repairedApp = arrayField(artifact, 'operations').find(operation =>
+    const app = arrayField(artifact, 'operations').find(operation =>
       stringField(operation, 'path') === `${projectRoot}/src/App.tsx`
     )
-    expect(stringField(repairedApp, 'content')).toContain('Repaired')
+    expect(stringField(app, 'content')).toContain('return null')
   })
 
   it('consumes model-backed worker output when provided', async () => {
@@ -798,10 +742,6 @@ function componentAsset(name: string, dependencies: string[]): Record<string, un
   }
 }
 
-function modelProjectOperations(slug: string): Array<{ kind: 'add'; path: string; content: string }> {
-  return modelProjectOperationsForRoot(`apps/design/src/generated/${slug}`)
-}
-
 function modelProjectOperationsForRequest(
   request: DesignBuildChildRunRequest,
   fallbackSlug: string,
@@ -935,12 +875,6 @@ function stringField(value: unknown, key: string): string | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const field = (value as Record<string, unknown>)[key]
   return typeof field === 'string' ? field : undefined
-}
-
-function numberField(value: unknown, key: string): number | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const field = (value as Record<string, unknown>)[key]
-  return typeof field === 'number' ? field : undefined
 }
 
 function arrayField(value: unknown, key: string): unknown[] {

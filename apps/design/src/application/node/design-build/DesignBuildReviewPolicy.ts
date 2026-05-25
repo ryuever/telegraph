@@ -25,7 +25,6 @@ export interface DesignBuildArtifactSummary {
   parentArtifactId?: string
   revision?: number
   operationCount?: number
-  repairAttempt?: number
 }
 
 export interface DesignBuildReviewPolicyOptions {
@@ -43,7 +42,6 @@ export function createArtifactSummary(
     parentArtifactId?: string
     revision?: number
   },
-  options: { repairAttempt?: number } = {},
 ): DesignBuildArtifactSummary {
   return {
     artifactId: artifact.id,
@@ -52,7 +50,6 @@ export function createArtifactSummary(
     parentArtifactId: artifact.kind === 'design-patch' ? artifact.parentArtifactId : undefined,
     revision: artifact.kind === 'design-patch' ? artifact.revision : undefined,
     operationCount: artifact.kind === 'design-patch' ? artifact.operations?.length : undefined,
-    repairAttempt: options.repairAttempt,
   }
 }
 

@@ -15,8 +15,6 @@ export type DesignBuildChildStage =
   | 'component-retrieval'
   | 'code-artifact'
   | 'review'
-  | 'repair'
-  | 'review-repair'
 
 export interface DesignBuildChildProfile {
   id: DesignBuildChildProfileId

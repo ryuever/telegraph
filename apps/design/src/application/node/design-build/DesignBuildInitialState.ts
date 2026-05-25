@@ -119,21 +119,6 @@ export function createDesignBuildInitialState(
   return { brief, context, components, plan, artifact, review }
 }
 
-export function repairDesignBuildArtifact(
-  artifact: DesignBuildArtifact,
-  review: DesignBuildReview,
-): DesignBuildArtifact {
-  if (review.verdict !== 'repair_required' || artifact.kind !== 'design-patch') return artifact
-
-  return {
-    ...artifact,
-    title: `${artifact.title} repaired`,
-    changeSummary: artifact.changeSummary
-      ? `${artifact.changeSummary} Repaired failed review checks.`
-      : 'Repaired failed review checks.',
-  }
-}
-
 export class DesignBuildRuntimeError extends Error {
   constructor(
     readonly code: DesignBuildFailureCode,

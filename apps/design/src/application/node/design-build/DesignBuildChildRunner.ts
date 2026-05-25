@@ -250,9 +250,6 @@ function finalizeSubmittedStageOutput(
     assertFinalSelectedShadcnUsage(mergedOutput, request)
     return mergedOutput
   }
-  if (request.stage === 'repair') {
-    return mergeSubmittedOutputWithToolArtifact(output, toolArtifact)
-  }
   if (request.stage !== 'component-retrieval') return output
   if (!isComponentRetrievalLedger(selectedComponentLedger)) {
     throw new ModelChildOutputContractError(
@@ -299,9 +296,6 @@ function formatToolWorkflowPrompt(request: DesignBuildChildRunRequest): string {
     request.stage === 'code-artifact'
       ? 'For code-artifact, you must call get_shadcn_component_usage for every selected shadcn component, then create_shadcn_project, then add_shadcn_component once for each selected component, then validate_shadcn_component_usage with the candidate artifact that includes src/App.tsx, before submitting final output. Wait for each tool result and use the returned usage docs to write the composition source.'
       : undefined,
-    request.stage === 'repair'
-      ? 'For repair, use create_shadcn_project or add_shadcn_component when failed checks indicate missing shadcn project files or missing local component source.'
-      : undefined,
   ].filter(Boolean).join('\n')
 }
 
@@ -341,15 +335,11 @@ function stageInstruction(request: DesignBuildChildRunRequest): string {
       return 'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. The main composition source, usually src/App.tsx, must import and render each selected shadcn component from componentLedger.selected using the usage docs returned to this worker. The artifact should include the composition source update, not only installed primitive files. Return the input summary object only if no source changes are possible.'
     case 'review':
       return 'For review, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
-    case 'repair':
-      return 'For repair, return {"artifact": <DesignBuildArtifact>} when producing a repaired patch. If review reports selected-shadcn-components-* failures, update the composition source, usually src/App.tsx, to import and render the selected local shadcn components. Return the input summary object only if no source changes are possible.'
-    case 'review-repair':
-      return 'For review-repair, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
   }
 }
 
 function standaloneProjectInstruction(stage: DesignBuildChildStage): string {
-  if (stage !== 'code-artifact' && stage !== 'repair') return ''
+  if (stage !== 'code-artifact') return ''
   return [
     'Standalone app contract:',
     '- Produce a complete Sandpacker/Vite React project as a design-patch artifact.',
@@ -521,7 +511,7 @@ function selectedShadcnComponentNames(modelInput: unknown): string[] {
   return ledger.selected
     .flatMap(component => {
       if (!isRecord(component) || component.registry !== '@shadcn' || component.type !== 'registry:ui') return []
-      return [normalizeComponentName(String(component.name ?? ''))]
+      return [normalizeComponentName(component.name)]
     })
     .filter(name => name.length > 0)
 }
@@ -668,8 +658,7 @@ function validateStageOutput(output: unknown, stage: DesignBuildChildStage): unk
         throw new ModelChildOutputContractError('component-retrieval output requires a ledger object from select_shadcn_components.')
       }
       return output
-    case 'code-artifact':
-    case 'repair': {
+    case 'code-artifact': {
       const artifact = output.artifact
       if (artifact !== undefined && !isDesignBuildArtifact(artifact)) {
         throw new ModelChildOutputContractError(`${stage} output contains an invalid artifact.`)
@@ -682,7 +671,6 @@ function validateStageOutput(output: unknown, stage: DesignBuildChildStage): unk
       return output
     }
     case 'review':
-    case 'review-repair':
       assertReviewOutput(output, `${stage} output requires a valid review object.`)
       return output
   }
@@ -736,10 +724,8 @@ function stageContractDescription(stage: DesignBuildChildStage): string {
     case 'component-retrieval':
       return '{"query": string, "components": unknown[], "summary": string, "ledger": ComponentRetrievalLedger}'
     case 'code-artifact':
-    case 'repair':
       return '{"artifactId": string, "kind": string, "title": string} or {"artifact": DesignBuildArtifact}; for source generation, DesignBuildArtifact should be a design-patch whose operations describe a standalone Vite React app with package.json-driven dependencies.'
     case 'review':
-    case 'review-repair':
       return '{"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}'
   }
 }
@@ -761,7 +747,6 @@ function stageOutputSchema(stage: DesignBuildChildStage): Record<string, unknown
         ledger: { type: 'object' },
       }, ['query', 'components', 'summary', 'ledger'])
     case 'code-artifact':
-    case 'repair':
       return {
         anyOf: [
           objectSchema({
@@ -771,7 +756,6 @@ function stageOutputSchema(stage: DesignBuildChildStage): Record<string, unknown
             parentArtifactId: { type: 'string' },
             revision: { type: 'number' },
             operationCount: { type: 'number' },
-            repairAttempt: { type: 'number' },
           }, ['artifactId', 'kind', 'title']),
           objectSchema({
             artifact: artifactSchema(),
@@ -779,7 +763,6 @@ function stageOutputSchema(stage: DesignBuildChildStage): Record<string, unknown
         ],
       }
     case 'review':
-    case 'review-repair':
       return objectSchema({
         review: reviewSchema(),
       }, ['review'])

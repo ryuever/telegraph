@@ -1,6 +1,5 @@
 export {
   createDesignBuildInitialState as runDesignBuildOrchestrator,
-  repairDesignBuildArtifact,
   DesignBuildRuntimeError,
   type DesignBuildContextSnapshot,
   type DesignBuildFailureCode,

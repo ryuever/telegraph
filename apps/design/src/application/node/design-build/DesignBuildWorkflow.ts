@@ -7,7 +7,6 @@ import {
 import {
   createDesignBuildInitialState,
   DesignBuildRuntimeError,
-  repairDesignBuildArtifact,
   type DesignBuildInitialState,
 } from './DesignBuildInitialState'
 import type { DesignPatchArtifact } from './DesignBuildArtifacts'
@@ -36,7 +35,6 @@ import {
 } from './DesignBuildShadcnTools'
 import { ShadcnRegistryMaterializer } from './ShadcnRegistryMaterializer'
 import {
-  reviewFromVisualReport,
   VisualReviewWorker,
   type VisualReviewReport,
 } from './VisualReviewWorker'
@@ -44,7 +42,6 @@ import {
   assistantArtifactDelta,
   runCancelled,
   runCompleted,
-  runFailed,
   stepCompleted,
   stepStarted,
 } from './DesignBuildRuntimeEvents'
@@ -148,7 +145,6 @@ export class DesignBuildWorkflow {
       run: () => this.runReviewStage(input, subagents, artifact, result.context),
     })
     if (reviewStage.cancelled) return
-    let review = reviewStage.value
     let visualReview = this.visualReviewWorker.review(artifact)
 
     const visualReviewStage = yield* runner.runStep({
@@ -160,30 +156,6 @@ export class DesignBuildWorkflow {
     if (visualReviewStage.cancelled) return
     visualReview = visualReviewStage.value
     artifact = attachVisualReviewMetadata(artifact, visualReview)
-    review = mergeDesignBuildReview(review, reviewFromVisualReport(visualReview))
-
-    if (review.verdict === 'repair_required') {
-      const repairResult = yield* this.runRepairPass({
-        input,
-        subagents,
-        brief,
-        context: result.context,
-        components: componentLedger.selected,
-        componentLedger,
-        plan: result.plan,
-        artifact,
-        review,
-        visualReview,
-      })
-      if (!repairResult) return
-      artifact = repairResult.artifact
-      review = repairResult.review
-    }
-
-    if (review.verdict !== 'pass') {
-      yield runFailed(input.runId, 'review_failed', 'Design artifact review did not pass.', review)
-      return
-    }
 
     yield assistantArtifactDelta({
       runId: input.runId,
@@ -361,162 +333,6 @@ export class DesignBuildWorkflow {
     return mergeDesignBuildReview(policyReview, reviewFromChildOutput(reviewOutput))
   }
 
-  private async *runRepairPass(input: {
-    input: RuntimeInput
-    subagents: DesignBuildSubagentGateway
-    brief: unknown
-    context: unknown
-    components: unknown
-    componentLedger?: unknown
-    plan: unknown
-    artifact: DesignBuildInitialState['artifact']
-    review: DesignBuildInitialState['review']
-    visualReview?: VisualReviewReport
-  }): AsyncGenerator<AgentEvent, {
-    artifact: DesignBuildInitialState['artifact']
-    review: DesignBuildInitialState['review']
-  } | undefined, void> {
-    const { input: runtimeInput } = input
-    const runner = createDesignBuildFeatureRunner(runtimeInput)
-    const repairStage = yield* runner.runStep({
-      stepId: `${runtimeInput.runId}:repair`,
-      label: 'Repair',
-      completedOutput: value => value.summary,
-      run: () => this.runRepairWorkerStage(input),
-    })
-    if (repairStage.cancelled) return undefined
-    const designSystem = contextDesignSystem(input.context)
-    const repairedArtifact = input.componentLedger && designSystem
-      ? materializeShadcnArtifact(
-          repairStage.value.artifact,
-          input.componentLedger as ComponentRetrievalLedger,
-          designSystem,
-          this.shadcnRegistryMaterializer,
-        )
-      : repairStage.value.artifact
-    const artifact = attachComponentRetrievalMetadata(repairedArtifact, input.componentLedger)
-
-    const reviewStage = yield* runner.runStep({
-      stepId: `${runtimeInput.runId}:review-repair`,
-      label: 'Review Repair',
-      completedOutput: value => value.output,
-      run: () => this.runRepairReviewStage(input, artifact),
-    })
-    if (reviewStage.cancelled) return undefined
-    return { artifact, review: reviewStage.value.review }
-  }
-
-  private async *runRepairWorkerStage(input: {
-    input: RuntimeInput
-    subagents: DesignBuildSubagentGateway
-    brief: unknown
-    context: unknown
-    components: unknown
-    componentLedger?: unknown
-    plan: unknown
-    artifact: DesignBuildInitialState['artifact']
-    review: DesignBuildInitialState['review']
-    visualReview?: VisualReviewReport
-  }): AsyncGenerator<AgentEvent, {
-    artifact: DesignBuildInitialState['artifact']
-    summary: ReturnType<typeof createArtifactSummary>
-  }, void> {
-    const { input: runtimeInput, subagents } = input
-    let artifact = repairDesignBuildArtifact(input.artifact, input.review)
-    const designSystem = contextDesignSystem(input.context)
-    const repairOutput = yield* subagents.runChild({
-      parentRunId: runtimeInput.runId,
-      childRunId: `${childRunId(runtimeInput.runId, DESIGN_BUILD_CHILD_PROFILES.worker)}:repair-1`,
-      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
-      stage: 'repair',
-      label: 'Design Worker Repair',
-      input: createArtifactSummary(artifact, { repairAttempt: 1 }),
-      modelInput: {
-        prompt: runtimeInput.message,
-        brief: input.brief,
-        context: input.context,
-        designSystem,
-        componentEdit: contextComponentEdit(input.context),
-        components: input.components,
-        componentLedger: input.componentLedger,
-        plan: input.plan,
-        artifact,
-        review: input.review,
-        visualReview: input.visualReview,
-        failedChecks: failedDesignBuildChecks(input.review),
-        repairAttempt: 1,
-      },
-      settings: runtimeInput.settings,
-      metadata: runtimeInput.metadata,
-      signal: runtimeInput.signal,
-      attempt: 1,
-      tools: input.componentLedger && designSystem && artifact.kind === 'design-patch'
-        ? createDesignBuildShadcnProjectTools({
-            prompt: runtimeInput.message,
-            policy: designSystem,
-            artifact,
-            ledger: input.componentLedger as ComponentRetrievalLedger,
-            materializer: this.shadcnRegistryMaterializer,
-          })
-        : undefined,
-    })
-    artifact = mergePatchArtifact(artifact, artifactFromChildOutput(repairOutput) ?? artifact)
-    return {
-      artifact,
-      summary: createArtifactSummary(artifact, { repairAttempt: 1 }),
-    }
-  }
-
-  private async *runRepairReviewStage(
-    input: {
-      input: RuntimeInput
-      subagents: DesignBuildSubagentGateway
-      context: unknown
-    },
-    artifact: DesignBuildInitialState['artifact'],
-  ): AsyncGenerator<AgentEvent, {
-    review: DesignBuildInitialState['review']
-    output: unknown
-  }, void> {
-    const { input: runtimeInput, subagents } = input
-    const designSystem = contextDesignSystem(input.context)
-    const policyReview = evaluateDesignBuildArtifact(artifact, {
-      designSystemPolicy: designSystem,
-      componentEdit: contextComponentEdit(input.context),
-    })
-    const visualReview = this.visualReviewWorker.review(artifact)
-    const repairReviewOutput = yield* subagents.runChild({
-      parentRunId: runtimeInput.runId,
-      childRunId: `${childRunId(runtimeInput.runId, DESIGN_BUILD_CHILD_PROFILES.reviewer)}:repair-1`,
-      profileId: DESIGN_BUILD_CHILD_PROFILES.reviewer,
-      stage: 'review-repair',
-      label: 'Design Reviewer Repair Check',
-      input: { review: policyReview, repairAttempt: 1 },
-      modelInput: {
-        artifact,
-        review: mergeDesignBuildReview(policyReview, reviewFromVisualReport(visualReview)),
-        visualReview,
-        sandboxProject: input.context && typeof input.context === 'object' && 'sandboxProject' in input.context
-          ? (input.context as { sandboxProject?: unknown }).sandboxProject
-          : undefined,
-        designSystem,
-        componentEdit: contextComponentEdit(input.context),
-        repairAttempt: 1,
-      },
-      settings: runtimeInput.settings,
-      metadata: runtimeInput.metadata,
-      signal: runtimeInput.signal,
-      attempt: 1,
-    })
-    return {
-      review: mergeDesignBuildReview(
-        mergeDesignBuildReview(policyReview, reviewFromVisualReport(visualReview)),
-        reviewFromChildOutput(repairReviewOutput),
-      ),
-      output: repairReviewOutput,
-    }
-  }
-
 }
 
 export function normalizeDesignBuildError(error: unknown): {
@@ -550,20 +366,6 @@ function createDesignBuildFeatureRunner(input: RuntimeInput): FeatureWorkflowRun
 
 function childRunId(parentRunId: string, profileId: string): string {
   return `${parentRunId}:${profileId}`
-}
-
-function contextDesignSystem(context: unknown): DesignBuildInitialState['context']['designSystem'] | undefined {
-  return context && typeof context === 'object' && 'designSystem' in context
-    ? (context as { designSystem?: DesignBuildInitialState['context']['designSystem'] }).designSystem
-    : undefined
-}
-
-function contextComponentEdit(
-  context: unknown,
-): NonNullable<DesignBuildInitialState['context']['revision']>['componentEdit'] | undefined {
-  if (!context || typeof context !== 'object' || !('revision' in context)) return undefined
-  const revision = (context as { revision?: DesignBuildInitialState['context']['revision'] }).revision
-  return revision?.componentEdit
 }
 
 function attachComponentRetrievalMetadata(
@@ -611,18 +413,6 @@ function attachVisualReviewMetadata(
       visualReview,
     },
   }
-}
-
-function failedDesignBuildChecks(review: DesignBuildInitialState['review']): Array<{
-  id: string
-  summary: string
-}> {
-  return review.checks
-    .filter(check => !check.passed)
-    .map(check => ({
-      id: check.id,
-      summary: check.summary,
-    }))
 }
 
 function materializeShadcnArtifact(
