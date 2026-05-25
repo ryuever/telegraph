@@ -78,20 +78,43 @@ describe('DesignBuildShadcnTools', () => {
     })
 
     expect(projectTools.map(tool => tool.name)).toEqual([
+      'get_shadcn_component_usage',
       'create_shadcn_project',
       'add_shadcn_component',
+      'validate_shadcn_component_usage',
     ])
 
-    const project = await projectTools[0].execute({}, toolContext('call-create', projectTools[0].name))
+    const usage = await projectTools[0].execute({
+      components: [{ componentName: 'Badge' }],
+    }, toolContext('call-usage', projectTools[0].name))
+    expect(JSON.stringify(usage)).toContain('Badge component for labels and status indicators')
+
+    const project = await projectTools[1].execute({}, toolContext('call-create', projectTools[1].name))
     expect(JSON.stringify(project)).toContain('components.json')
 
-    const badge = await projectTools[1].execute({
+    const badge = await projectTools[2].execute({
       componentName: 'Badge',
       reason: 'Status labels',
-    }, toolContext('call-add', projectTools[1].name))
+    }, toolContext('call-add', projectTools[2].name))
     expect(JSON.stringify(badge)).toContain('src/components/ui/badge.tsx')
     expect(JSON.stringify(badge)).toContain('shadcn-registry-json')
     expect(JSON.stringify(badge)).toContain('badgeVariants')
+
+    const validation = await projectTools[3].execute({
+      artifact: {
+        id: 'candidate',
+        kind: 'design-patch',
+        title: 'Candidate',
+        operations: [
+          {
+            kind: 'update',
+            path: 'apps/design/src/generated/create-a-profile-page-with-status-badges-page/src/App.tsx',
+            content: 'import { Badge } from "@/components/ui/badge"\nexport default function App() { return <Badge>Status</Badge> }\n',
+          },
+        ],
+      },
+    }, toolContext('call-validate', projectTools[3].name))
+    expect(validation).toMatchObject({ passed: true })
   })
 })
 

@@ -74,6 +74,33 @@ describe('design-session-log-projector', () => {
     })
   })
 
+  it('keeps thinking deltas expandable with their full text', () => {
+    const thinkingText = 'First inspect the layout.\nThen keep the implementation compact and verify it.'
+    const items = reduceDesignSessionLogItems([], {
+      type: 'agent_event',
+      runId: 'run-1',
+      event: {
+        type: 'runtime_log',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1',
+        level: 'debug',
+        message: 'thinking_delta',
+        raw: {
+          delta: thinkingText,
+        },
+        ts: 8,
+      },
+    })
+
+    expect(items[0]).toMatchObject({
+      kind: 'model',
+      label: 'Thinking',
+      detail: thinkingText,
+      fullDetail: thinkingText,
+      status: 'info',
+    })
+  })
+
   it('projects child model invocation, submit tool calls, and failed review checks', () => {
     let items = reduceDesignSessionLogItems([], {
       type: 'agent_event',

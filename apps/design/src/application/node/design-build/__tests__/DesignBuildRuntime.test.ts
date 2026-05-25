@@ -94,10 +94,9 @@ describe('DesignBuildRuntime', () => {
     })
     expect(arrayField(retrievalLedger, 'selected')
       .some(component => stringField(component, 'name') === 'card')).toBe(true)
-    expect(childCompletions[2]?.output).toMatchObject({
-      artifactId: 'run-design-build-patch',
+    expect(recordField(childCompletions[2]?.output, 'artifact')).toMatchObject({
+      id: 'run-design-build-patch',
       kind: 'design-patch',
-      operationCount: 11,
     })
     expect(stringField(recordField(childCompletions[3]?.output, 'review'), 'verdict')).toBe('pass')
 
@@ -205,12 +204,16 @@ describe('DesignBuildRuntime', () => {
     ])
     const workerRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker)
     expect(workerRequest?.tools?.map(tool => tool.name)).toEqual([
+      'get_shadcn_component_usage',
       'create_shadcn_project',
       'add_shadcn_component',
+      'validate_shadcn_component_usage',
     ])
     expect(workerRequest?.requiredTools).toEqual([
+      'get_shadcn_component_usage',
       'create_shadcn_project',
       'add_shadcn_component',
+      'validate_shadcn_component_usage',
     ])
 
     const reviewRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.reviewer)
@@ -441,7 +444,7 @@ describe('DesignBuildRuntime', () => {
             id: 'visual-bad-artifact',
             kind: 'design-patch',
             title: 'Blank source',
-            operations: modelProjectOperations('visual-bad').map(operation => operation.path.endsWith('/src/App.tsx')
+            operations: modelProjectOperationsForRequest(request, 'visual-bad').map(operation => operation.path.endsWith('/src/App.tsx')
               ? { ...operation, content: 'export default function App() { return null }\n' }
               : operation),
           },
@@ -453,7 +456,7 @@ describe('DesignBuildRuntime', () => {
             id: 'visual-repaired-artifact',
             kind: 'design-patch',
             title: 'Visual repaired source',
-            operations: modelProjectOperations('visual-bad'),
+            operations: modelProjectOperationsForRequest(request, 'visual-bad'),
           },
         }
       }
@@ -498,7 +501,7 @@ describe('DesignBuildRuntime', () => {
             id: 'partial-bad-artifact',
             kind: 'design-patch',
             title: 'Partial bad source',
-            operations: modelProjectOperations('partial-repair').map(operation => operation.path.endsWith('/src/App.tsx')
+            operations: modelProjectOperationsForRequest(request, 'partial-repair').map(operation => operation.path.endsWith('/src/App.tsx')
               ? { ...operation, content: 'export default function App() { return null }\n' }
               : operation),
           },
@@ -513,8 +516,8 @@ describe('DesignBuildRuntime', () => {
             operations: [
               {
                 kind: 'add',
-                path: 'apps/design/src/generated/partial-repair/src/App.tsx',
-                content: 'export default function App() { return <main>Repaired</main> }\n',
+                path: `${projectRootFromRequest(request, 'partial-repair')}/src/App.tsx`,
+                content: shadcnAppSource('Repaired'),
               },
             ],
           },
@@ -540,11 +543,13 @@ describe('DesignBuildRuntime', () => {
       kind: 'design-patch',
       title: 'Partial repaired source',
     })
-    expect(operationPaths).toContain('apps/design/src/generated/partial-repair/package.json')
-    expect(operationPaths).toContain('apps/design/src/generated/partial-repair/index.html')
-    expect(operationPaths).toContain('apps/design/src/generated/partial-repair/src/index.tsx')
+    const packagePath = operationPaths.find(path => path?.endsWith('/package.json'))
+    const projectRoot = packagePath?.replace(/\/package\.json$/, '')
+    expect(operationPaths).toContain(`${projectRoot}/package.json`)
+    expect(operationPaths).toContain(`${projectRoot}/index.html`)
+    expect(operationPaths).toContain(`${projectRoot}/src/index.tsx`)
     const repairedApp = arrayField(artifact, 'operations').find(operation =>
-      stringField(operation, 'path') === 'apps/design/src/generated/partial-repair/src/App.tsx'
+      stringField(operation, 'path') === `${projectRoot}/src/App.tsx`
     )
     expect(stringField(repairedApp, 'content')).toContain('Repaired')
   })
@@ -560,7 +565,7 @@ describe('DesignBuildRuntime', () => {
           kind: 'design-patch',
           title: 'Model generated source',
           operations: [
-            ...modelProjectOperations('model-page'),
+            ...modelProjectOperationsForRequest(request, 'model-page'),
           ],
         },
       }
@@ -606,7 +611,23 @@ describe('DesignBuildRuntime', () => {
             {
               kind: 'add',
               path: 'apps/design/src/generated/generated-design-page/src/App.tsx',
-              content: "export default function App() { return <main style={{ color: '#dc2626' }}>Tasks</main> }\n",
+              content: [
+                'import { Button } from "@/components/ui/button"',
+                'import { Card, CardContent } from "@/components/ui/card"',
+                '',
+                "export default function App() { return <main style={{ color: '#dc2626' }}><Card><CardContent>Tasks<Button type=\"button\">Open</Button></CardContent></Card></main> }",
+                '',
+              ].join('\n'),
+            },
+            {
+              kind: 'add',
+              path: 'apps/design/src/generated/generated-design-page/src/components/ui/button.tsx',
+              content: 'export function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) { return <button {...props} /> }\n',
+            },
+            {
+              kind: 'add',
+              path: 'apps/design/src/generated/generated-design-page/src/components/ui/card.tsx',
+              content: 'export function Card(props: React.HTMLAttributes<HTMLDivElement>) { return <div {...props} /> }\nexport function CardContent(props: React.HTMLAttributes<HTMLDivElement>) { return <div {...props} /> }\n',
             },
           ],
         },
@@ -678,6 +699,18 @@ class TestDesignBuildChildRunner implements DesignBuildChildRunner {
 function defaultChildOutput(request: DesignBuildChildRunRequest): unknown {
   if (request.stage === 'component-retrieval') {
     return testComponentRetrievalOutput(request)
+  }
+  if (request.stage === 'code-artifact') {
+    const artifact = recordField(request.modelInput, 'artifact')
+    const operations = arrayField(artifact, 'operations')
+    if (operations.length > 0) {
+      return {
+        artifact: {
+          ...artifact,
+          operations: withTestShadcnUsage(operations),
+        },
+      }
+    }
   }
   return request.input
 }
@@ -766,15 +799,38 @@ function componentAsset(name: string, dependencies: string[]): Record<string, un
 }
 
 function modelProjectOperations(slug: string): Array<{ kind: 'add'; path: string; content: string }> {
-  const root = `apps/design/src/generated/${slug}`
+  return modelProjectOperationsForRoot(`apps/design/src/generated/${slug}`)
+}
+
+function modelProjectOperationsForRequest(
+  request: DesignBuildChildRunRequest,
+  fallbackSlug: string,
+): Array<{ kind: 'add'; path: string; content: string }> {
+  return modelProjectOperationsForRoot(projectRootFromRequest(request, fallbackSlug))
+}
+
+function projectRootFromRequest(request: DesignBuildChildRunRequest, fallbackSlug: string): string {
+  const artifact = recordField(request.modelInput, 'artifact')
+  const packageOperation = arrayField(artifact, 'operations').find(operation =>
+    stringField(operation, 'path')?.endsWith('/package.json')
+  )
+  return stringField(packageOperation, 'path')?.replace(/\/package\.json$/, '') ??
+    `apps/design/src/generated/${fallbackSlug}`
+}
+
+function modelProjectOperationsForRoot(root: string): Array<{ kind: 'add'; path: string; content: string }> {
   return [
     {
       kind: 'add',
       path: `${root}/package.json`,
       content: JSON.stringify({
         dependencies: {
+          '@radix-ui/react-slot': '^1.2.3',
+          'class-variance-authority': '^0.7.1',
+          clsx: '^2.1.1',
           react: '19.1.0',
           'react-dom': '19.1.0',
+          'tailwind-merge': '^3.3.1',
         },
         devDependencies: {
           typescript: '5.3.3',
@@ -794,9 +850,69 @@ function modelProjectOperations(slug: string): Array<{ kind: 'add'; path: string
     {
       kind: 'add',
       path: `${root}/src/App.tsx`,
-      content: 'export default function App() { return <main>Model</main> }\n',
+      content: shadcnAppSource('Model'),
+    },
+    {
+      kind: 'add',
+      path: `${root}/src/components/ui/button.tsx`,
+      content: 'export function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) { return <button {...props} /> }\n',
+    },
+    {
+      kind: 'add',
+      path: `${root}/src/components/ui/card.tsx`,
+      content: 'export function Card(props: React.HTMLAttributes<HTMLDivElement>) { return <div {...props} /> }\nexport function CardContent(props: React.HTMLAttributes<HTMLDivElement>) { return <div {...props} /> }\n',
+    },
+    {
+      kind: 'add',
+      path: `${root}/components.json`,
+      content: JSON.stringify({ aliases: { ui: '@/components/ui' } }),
+    },
+    {
+      kind: 'add',
+      path: `${root}/design-system.provenance.json`,
+      content: JSON.stringify({ components: [{ name: 'button' }, { name: 'card' }] }),
     },
   ]
+}
+
+function withTestShadcnUsage(operations: unknown[]): unknown[] {
+  const appPath = operations
+    .map(operation => stringField(operation, 'path'))
+    .find(path => path?.endsWith('/src/App.tsx'))
+  const root = appPath ? appPath.replace(/\/src\/App\.tsx$/, '') : 'apps/design/src/generated/generated-design-page'
+  const byPath = new Map<string, unknown>()
+  for (const operation of operations) {
+    const path = stringField(operation, 'path')
+    if (path) byPath.set(path, operation)
+  }
+  byPath.set(`${root}/src/App.tsx`, {
+    kind: 'add',
+    path: `${root}/src/App.tsx`,
+    content: shadcnAppSource('Generated'),
+  })
+  byPath.set(`${root}/src/components/ui/button.tsx`, {
+    kind: 'add',
+    path: `${root}/src/components/ui/button.tsx`,
+    content: 'export function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) { return <button {...props} /> }\n',
+  })
+  byPath.set(`${root}/src/components/ui/card.tsx`, {
+    kind: 'add',
+    path: `${root}/src/components/ui/card.tsx`,
+    content: 'export function Card(props: React.HTMLAttributes<HTMLDivElement>) { return <div {...props} /> }\nexport function CardContent(props: React.HTMLAttributes<HTMLDivElement>) { return <div {...props} /> }\n',
+  })
+  return [...byPath.values()]
+}
+
+function shadcnAppSource(label: string): string {
+  return [
+    'import { Button } from "@/components/ui/button"',
+    'import { Card, CardContent } from "@/components/ui/card"',
+    '',
+    'export default function App() {',
+    `  return <main><Card><CardContent>${label}<Button type="button">Open</Button></CardContent></Card></main>`,
+    '}',
+    '',
+  ].join('\n')
 }
 
 async function collect(input: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {

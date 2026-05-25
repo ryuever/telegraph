@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, FileClock, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
+import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
 import type { AgentEvent } from '@/packages/agent-protocol'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
@@ -28,11 +28,9 @@ import {
   type DesignSubagentViewItem,
 } from './design-subagent-projector'
 import {
-  initialDesignSessionLogItemsFromEvents,
   reduceDesignSessionLogItems,
   type DesignSessionLogItem,
 } from './design-session-log-projector'
-import { DesignSubagentPanel } from './DesignSubagentPanel'
 import { PageletDesignAgentService } from './pagelet-design-agent-service'
 
 export type DesignRunStatus = 'running' | 'completed' | 'failed' | 'cancelled'
@@ -54,6 +52,9 @@ type Message =
     role: 'assistant'
     content: string
     runStatus?: DesignRunStatus
+    traceItems?: DesignTraceItem[]
+    subagentItems?: DesignSubagentViewItem[]
+    sessionLogItems?: DesignSessionLogItem[]
   }
 
 export interface DesignWorkspaceInitialState {
@@ -75,7 +76,7 @@ interface DesignWorkspaceProps {
   onSessionUpdate?: (sessionId: string, summary: DesignWorkspaceSummary) => void
 }
 
-interface DesignTraceItem {
+export interface DesignTraceItem {
   id: string
   label: string
   status: DesignRunStatus
@@ -115,11 +116,7 @@ export function DesignWorkspace({
   const [dirtyArtifactOperations, setDirtyArtifactOperations] = useState<Map<string, DesignPatchFileOperation[]>>(() => new Map())
   const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
-  const [traceItems, setTraceItems] = useState<DesignTraceItem[]>(() =>
-    initialTraceItemsFromEvents(initialState?.traceEvents ?? [], sessionId))
-  const [subagentItems, setSubagentItems] = useState<DesignSubagentViewItem[]>(() => initialState?.subagentItems ?? [])
-  const [sessionLogItems, setSessionLogItems] = useState<DesignSessionLogItem[]>(() =>
-    initialDesignSessionLogItemsFromEvents(initialState?.traceEvents ?? [], sessionId))
+  const headerSubagentItems = useMemo(() => flattenMessageSubagents(messages), [messages])
 
   const appendAssistantText = (text: string, messageId?: string): void => {
     setMessages((prev) => {
@@ -143,6 +140,16 @@ export function DesignWorkspace({
         ? assistantCompletionMessage(assistantArtifactTitles.current.get(messageId))
         : message.content
       return { ...message, runStatus: nextStatus, content }
+    }))
+  }
+
+  const updateAssistantRunDetails = (
+    messageId: string,
+    update: (message: Extract<Message, { role: 'assistant' }>) => Partial<Extract<Message, { role: 'assistant' }>>,
+  ): void => {
+    setMessages(prev => prev.map(message => {
+      if (message.role !== 'assistant' || message.id !== messageId) return message
+      return { ...message, ...update(message) }
     }))
   }
 
@@ -178,11 +185,13 @@ export function DesignWorkspace({
       },
       onAssistantText: text => { appendAssistantText(text, assistantMessageId) },
       onTraceEvent: event => {
-        setTraceItems(prev => reduceTraceItems(prev, event))
-        setSessionLogItems(prev => reduceDesignSessionLogItems(prev, event))
-        if (event.type === 'agent_event') {
-          setSubagentItems(prev => reduceDesignSubagentItems(prev, event))
-        }
+        updateAssistantRunDetails(assistantMessageId, message => ({
+          traceItems: reduceTraceItems(message.traceItems ?? [], event),
+          sessionLogItems: reduceDesignSessionLogItems(message.sessionLogItems ?? [], event),
+          subagentItems: event.type === 'agent_event'
+            ? reduceDesignSubagentItems(message.subagentItems ?? [], event)
+            : message.subagentItems ?? [],
+        }))
       },
       onSubagent: subagent => {
         const event: DesignAgentStreamEvent = {
@@ -190,8 +199,10 @@ export function DesignWorkspace({
           runId: subagent.parentRunId,
           subagent,
         }
-        setSubagentItems(prev => reduceDesignSubagentItems(prev, event))
-        setSessionLogItems(prev => reduceDesignSessionLogItems(prev, event))
+        updateAssistantRunDetails(assistantMessageId, message => ({
+          subagentItems: reduceDesignSubagentItems(message.subagentItems ?? [], event),
+          sessionLogItems: reduceDesignSessionLogItems(message.sessionLogItems ?? [], event),
+        }))
       },
       onArtifact: artifact => {
         let committedArtifact = artifact
@@ -231,14 +242,6 @@ export function DesignWorkspace({
     }
     activeControllers.current.clear()
     setStatus('cancelled')
-  }
-
-  const cancelSubagent = (childRunId: string): void => {
-    setSubagentItems(prev => prev.map(item => {
-      if (item.id !== childRunId) return item
-      return { ...item, status: 'stopped', cancellable: false }
-    }))
-    void agent.cancelSubagent(childRunId).catch(() => {})
   }
 
   useEffect(() => {
@@ -502,6 +505,7 @@ export function DesignWorkspace({
               <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                 <Layers3 size={12} />
                 <span>{String(artifacts.length)} artifacts</span>
+                <SubagentsHeaderDropdown items={headerSubagentItems} />
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -520,12 +524,14 @@ export function DesignWorkspace({
             </div>
           </div>
         </div>
-        <TraceTimeline items={traceItems} />
-        <DesignSubagentPanel items={subagentItems} onCancel={cancelSubagent} />
-        <SessionLogPanel sessionId={sessionId} items={sessionLogItems} />
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <Fragment key={message.id}>
+              <MessageBubble message={message} />
+              {message.role === 'assistant' && (
+                <AssistantRunFeed message={message} />
+              )}
+            </Fragment>
           ))}
         </div>
         <div className="shrink-0 border-t border-border bg-card px-3 py-3">
@@ -601,171 +607,139 @@ function changedPatchOperations(
   })
 }
 
-function SessionLogPanel({
-  sessionId,
-  items,
-}: {
-  sessionId: string
-  items: DesignSessionLogItem[]
-}): JSX.Element {
-  if (items.length === 0) return <></>
-  const latest = items.at(-1)
-  const failedCount = items.filter(item => item.status === 'failed').length
-  const latestRunId = latest?.runId
+function SubagentsHeaderDropdown({ items }: { items: DesignSubagentViewItem[] }): JSX.Element {
+  const activeCount = items.filter(item => item.status === 'queued' || item.status === 'running').length
+  const failedCount = items.filter(item => item.status === 'error').length
 
   return (
-    <div className="shrink-0 border-b border-border bg-background px-3 py-2">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
-          <FileClock size={13} className="shrink-0 text-muted-foreground" />
-          <span className="truncate">Session Log</span>
-        </div>
-        <div className="shrink-0 rounded bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {shortLogId(sessionId)}{latestRunId ? ` / ${shortLogId(latestRunId)}` : ''} / {String(items.length)}
-        </div>
-      </div>
-      <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-        <span className="truncate">Snapshot timeline for this session</span>
-        {failedCount > 0 && <span className="shrink-0 text-destructive">{String(failedCount)} failed</span>}
-      </div>
-      <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
-        {items.slice(-18).map(item => (
-          <div
-            key={item.id}
-            className="grid grid-cols-[54px_10px_minmax(0,1fr)] gap-2 rounded-md border border-border bg-card px-2 py-1.5"
-          >
-            <div className="pt-0.5 text-[10px] tabular-nums text-muted-foreground">
-              {formatLogTime(item.ts)}
-            </div>
-            <span className={sessionLogStatusDotClassName(item.status)} />
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate text-[11px] font-medium text-foreground">{item.label}</span>
-                <span className="shrink-0 rounded bg-surface-soft px-1 py-0.5 text-[9px] uppercase tracking-normal text-muted-foreground">
-                  {item.kind}
-                </span>
-              </div>
-              {item.detail && (
-                <div className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
-                  {item.detail}
-                </div>
-              )}
-            </div>
+    <details className="group relative">
+      <summary className="flex h-5 cursor-pointer list-none items-center gap-1 rounded-md bg-surface-soft px-1.5 text-[10px] text-muted-foreground transition-colors marker:hidden hover:bg-background hover:text-foreground">
+        <Bot size={10} />
+        <span>{String(items.length)} subagents</span>
+        <ChevronDown size={10} className="transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="absolute left-0 top-6 z-50 w-72 rounded-md border border-border bg-background p-2 shadow-lg">
+        <div className="mb-2 flex items-center justify-between gap-2 border-b border-border pb-2">
+          <div className="text-[11px] font-medium text-foreground">Subagents</div>
+          <div className="text-[10px] text-muted-foreground">
+            {String(activeCount)} active{failedCount > 0 ? ` / ${String(failedCount)} failed` : ''}
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function TraceTimeline({ items }: { items: DesignTraceItem[] }): JSX.Element {
-  const [expanded, setExpanded] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!expanded) return
-    const ownerDocument = containerRef.current?.ownerDocument ?? document
-    const handlePointerOutside = (event: MouseEvent | TouchEvent): void => {
-      const target = event.target
-      if (target instanceof Node && containerRef.current?.contains(target)) return
-      setExpanded(false)
-    }
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setExpanded(false)
-    }
-    ownerDocument.addEventListener('mousedown', handlePointerOutside)
-    ownerDocument.addEventListener('touchstart', handlePointerOutside)
-    ownerDocument.addEventListener('keydown', handleKeyDown)
-    return () => {
-      ownerDocument.removeEventListener('mousedown', handlePointerOutside)
-      ownerDocument.removeEventListener('touchstart', handlePointerOutside)
-      ownerDocument.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [expanded])
-  if (items.length === 0) return <></>
-  const latestRunning = [...items].reverse().find(item => item.status === 'running')
-  const latestItem = latestRunning ?? items.at(-1)
-  const completedCount = items.filter(item => item.status === 'completed').length
-  const failedCount = items.filter(item => item.status === 'failed').length
-
-  return (
-    <div ref={containerRef} className="relative z-20 shrink-0 border-b border-border bg-surface-soft/55 px-3 py-2">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label="Toggle build progress"
-        onClick={() => { setExpanded(current => !current) }}
-        className="flex w-full items-center gap-2 rounded-md border border-border bg-background px-2.5 py-2 text-left shadow-sm transition-colors hover:bg-card"
-      >
-        <span className={traceStatusDotClassName(latestItem?.status ?? 'running')} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium text-foreground">
-            {latestItem?.label ?? 'Build progress'}
-          </span>
-          <span className="block truncate text-[10px] text-muted-foreground">
-            {traceSummary({ total: items.length, completed: completedCount, failed: failedCount, detail: latestItem?.detail })}
-          </span>
-        </span>
-        <ChevronDown
-          size={14}
-          className={cn(
-            'shrink-0 text-muted-foreground transition-transform',
-            expanded && 'rotate-180',
-          )}
-        />
-      </button>
-      {expanded && (
-        <div className="absolute left-3 right-3 top-[calc(100%-4px)] z-50 max-h-72 overflow-y-auto rounded-md border border-border bg-background px-2 py-2 shadow-lg">
-          <div className="mb-2 flex items-center justify-between border-b border-border px-1 pb-2">
-            <div className="text-xs font-medium text-foreground">Build progress</div>
-            <div className="text-[10px] text-muted-foreground">{String(completedCount)}/{String(items.length)} steps</div>
-          </div>
-          <div className="space-y-1.5">
-            {items.map((item, index) => (
-              <div key={item.id} className="grid grid-cols-[14px_minmax(0,1fr)] gap-2">
-                <div className="flex flex-col items-center pt-1">
-                  <span className={traceStatusDotClassName(item.status)} />
-                  {index < items.length - 1 && <span className="mt-1 h-full min-h-4 w-px bg-border" />}
-                </div>
-                <div className="min-w-0 pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 truncate text-xs font-medium text-foreground">{item.label}</div>
-                    <span className="shrink-0 rounded bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {statusLabel(item.status)}
-                    </span>
+        </div>
+        {items.length === 0 ? (
+          <div className="px-1 py-2 text-[11px] text-muted-foreground">No subagents yet</div>
+        ) : (
+          <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+            {items.map(item => (
+              <div key={item.id} className="grid grid-cols-[10px_minmax(0,1fr)_auto] gap-2 rounded-md bg-surface-soft/55 px-2 py-1.5">
+                <span className={subagentStatusDotClassName(item.status)} />
+                <div className="min-w-0">
+                  <div className="truncate text-[11px] font-medium text-foreground">{item.label}</div>
+                  <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                    {item.detail ?? item.task ?? item.profileId ?? item.id}
                   </div>
-                  {item.detail && (
-                    <div className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
-                      {item.detail}
-                    </div>
-                  )}
                 </div>
+                <span className="rounded bg-background/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {subagentStatusLabel(item.status)}
+                </span>
               </div>
             ))}
           </div>
+        )}
+      </div>
+    </details>
+  )
+}
+
+function AssistantRunFeed({
+  message,
+}: {
+  message: Extract<Message, { role: 'assistant' }>
+}): JSX.Element {
+  const sessionLogItems = message.sessionLogItems ?? []
+
+  if (sessionLogItems.length === 0) return <></>
+
+  return (
+    <>
+      {sessionLogItems.map(item => (
+        <SessionLogRunRow key={`log:${item.id}`} item={item} />
+      ))}
+    </>
+  )
+}
+
+function SessionLogRunRow({ item }: { item: DesignSessionLogItem }): JSX.Element {
+  const detail = item.fullDetail ?? item.detail
+  const isThinking = item.label === 'Thinking'
+
+  if (isThinking) {
+    return (
+      <div className="flex gap-2">
+        <BotRunAvatar />
+        <details className="group min-w-0 max-w-[88%] rounded-md bg-surface-soft/55 px-2 py-1.5">
+          <summary className="grid cursor-pointer list-none grid-cols-[10px_minmax(0,1fr)_14px] gap-2 marker:hidden">
+            <span className={sessionLogStatusDotClassName(item.status)} />
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <span className="break-words text-[11px] font-medium text-foreground">{item.label}</span>
+                <span className="shrink-0 rounded bg-background/70 px-1 py-0.5 text-[9px] uppercase tracking-normal text-muted-foreground">
+                  {item.kind}
+                </span>
+              </div>
+              {detail && (
+                <div className="mt-0.5 line-clamp-1 break-words text-[10px] leading-relaxed text-muted-foreground">
+                  {detail}
+                </div>
+              )}
+            </div>
+            <ChevronDown size={13} className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          {detail && (
+            <div className="mt-1.5 whitespace-pre-wrap break-words border-t border-border/70 pt-1.5 pl-[18px] text-[10px] leading-relaxed text-muted-foreground">
+              {detail}
+            </div>
+          )}
+        </details>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex gap-2">
+      <BotRunAvatar />
+      <div className="grid min-w-0 max-w-[88%] grid-cols-[10px_minmax(0,1fr)] gap-2 rounded-md bg-surface-soft/55 px-2 py-1.5">
+        <span className={sessionLogStatusDotClassName(item.status)} />
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="break-words text-[11px] font-medium text-foreground">{item.label}</span>
+            <span className="shrink-0 rounded bg-background/70 px-1 py-0.5 text-[9px] uppercase tracking-normal text-muted-foreground">
+              {item.kind}
+            </span>
+          </div>
+          {detail && (
+            <div className="mt-0.5 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-muted-foreground">
+              {detail}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-function traceSummary({
-  total,
-  completed,
-  failed,
-  detail,
-}: {
-  total: number
-  completed: number
-  failed: number
-  detail?: string
-}): string {
-  const parts = [`${String(completed)}/${String(total)} steps`]
-  if (failed > 0) parts.push(`${String(failed)} failed`)
-  if (detail) parts.push(detail)
-  return parts.join(' / ')
+function BotRunAvatar(): JSX.Element {
+  return (
+    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+      <Bot size={14} />
+    </div>
+  )
 }
 
-function MessageBubble({ message }: { message: Message }): JSX.Element {
+function MessageBubble({
+  message,
+}: {
+  message: Message
+}): JSX.Element {
   const isUser = message.role === 'user'
   const content = message.role === 'assistant' && message.content.length === 0 && message.runStatus === 'running'
     ? '正在生成...'
@@ -780,17 +754,19 @@ function MessageBubble({ message }: { message: Message }): JSX.Element {
       )}
       <div
         className={cn(
-          'min-w-0 max-w-[88%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm leading-relaxed shadow-sm',
+          'min-w-0 max-w-[88%] break-words rounded-md px-3 py-2 text-sm leading-relaxed shadow-sm',
           isUser
             ? 'bg-primary text-primary-foreground'
             : 'border border-border bg-background text-foreground',
         )}
       >
-        {message.role === 'assistant' && content ? (
-          <MarkdownMessage content={content} compact />
-        ) : (
-          content
-        )}
+        <div className="whitespace-pre-wrap">
+          {message.role === 'assistant' && content ? (
+            <MarkdownMessage content={content} compact />
+          ) : (
+            content
+          )}
+        </div>
       </div>
       {isUser && (
         <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -836,12 +812,23 @@ function assistantCompletionMessage(title: string | undefined): string {
   return title ? `已生成「${title}」预览。` : GENERIC_COMPLETION_MESSAGE
 }
 
-function traceStatusDotClassName(status: DesignTraceItem['status']): string {
-  const base = 'h-2 w-2 shrink-0 rounded-full'
-  if (status === 'completed') return `${base} bg-emerald-500`
-  if (status === 'failed') return `${base} bg-destructive`
-  if (status === 'cancelled') return `${base} bg-muted-foreground`
-  return `${base} bg-amber-500`
+function subagentStatusDotClassName(status: DesignSubagentViewItem['status']): string {
+  return cn(
+    'mt-1 h-2 w-2 shrink-0 rounded-full',
+    status === 'completed' && 'bg-emerald-500',
+    status === 'error' && 'bg-destructive',
+    status === 'stopped' && 'bg-muted-foreground',
+    status === 'queued' && 'bg-sky-500',
+    status === 'running' && 'bg-amber-500',
+  )
+}
+
+function subagentStatusLabel(status: DesignSubagentViewItem['status']): string {
+  if (status === 'queued') return '排队'
+  if (status === 'running') return '运行中'
+  if (status === 'completed') return '完成'
+  if (status === 'error') return '失败'
+  return '停止'
 }
 
 function sessionLogStatusDotClassName(status: DesignSessionLogItem['status']): string {
@@ -853,16 +840,15 @@ function sessionLogStatusDotClassName(status: DesignSessionLogItem['status']): s
   return `${base} bg-sky-500`
 }
 
-function formatLogTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-}
-
-function shortLogId(value: string): string {
-  return value.length > 8 ? value.slice(0, 8) : value
+function flattenMessageSubagents(messages: Message[]): DesignSubagentViewItem[] {
+  const byId = new Map<string, DesignSubagentViewItem>()
+  for (const message of messages) {
+    if (message.role !== 'assistant') continue
+    for (const item of message.subagentItems ?? []) {
+      byId.set(item.id, item)
+    }
+  }
+  return Array.from(byId.values())
 }
 
 function reduceTraceItems(prev: DesignTraceItem[], event: DesignAgentStreamEvent): DesignTraceItem[] {
@@ -872,7 +858,7 @@ function reduceTraceItems(prev: DesignTraceItem[], event: DesignAgentStreamEvent
   return next.slice(-80)
 }
 
-function initialTraceItemsFromEvents(events: AgentEvent[], fallbackRunId: string): DesignTraceItem[] {
+export function initialDesignTraceItemsFromEvents(events: AgentEvent[], fallbackRunId: string): DesignTraceItem[] {
   return events.reduce<DesignTraceItem[]>((items, event) =>
     reduceTraceItems(items, {
       type: 'agent_event',

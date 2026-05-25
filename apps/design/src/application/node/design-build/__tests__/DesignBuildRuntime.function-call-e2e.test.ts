@@ -54,6 +54,13 @@ describe('DesignBuildRuntime function-call e2e', () => {
         }, { id: 'call-scout-submit' }),
       ], { stopReason: 'toolUse' }),
       fauxAssistantMessage([
+        fauxToolCall('get_shadcn_component_usage', {
+          components: [
+            { componentName: 'Button', componentKnowledgePoint: ['actions'] },
+            { componentName: 'Card', componentKnowledgePoint: ['layout'] },
+            { componentName: 'Badge', componentKnowledgePoint: ['status'] },
+          ],
+        }, { id: 'call-worker-shadcn-docs' }),
         fauxToolCall('create_shadcn_project', {
           title: 'Create a profile settings page with status badges source',
         }, { id: 'call-create-project' }),
@@ -69,11 +76,76 @@ describe('DesignBuildRuntime function-call e2e', () => {
           componentName: 'Badge',
           reason: 'Account status labels',
         }, { id: 'call-add-badge' }),
-        fauxToolCall('submit_design_child_output', {
-          output: {
-            artifactId: 'run-fc-e2e-patch',
+        fauxToolCall('validate_shadcn_component_usage', {
+          artifact: {
+            id: 'run-fc-e2e-patch',
             kind: 'design-patch',
             title: 'Create a profile settings page with status badges source',
+            operations: [
+              {
+                kind: 'update',
+                path: 'apps/design/src/generated/create-a-profile-settings-page-with-status-badge-page/src/App.tsx',
+                content: [
+                  'import { Badge } from "@/components/ui/badge"',
+                  'import { Button } from "@/components/ui/button"',
+                  'import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"',
+                  '',
+                  'export default function App() {',
+                  '  return (',
+                  '    <main>',
+                  '      <Card>',
+                  '        <CardHeader>',
+                  '          <CardTitle>Profile settings</CardTitle>',
+                  '        </CardHeader>',
+                  '        <CardContent>',
+                  '          <Badge>Active</Badge>',
+                  '          <Button type="button">Save changes</Button>',
+                  '        </CardContent>',
+                  '      </Card>',
+                  '    </main>',
+                  '  )',
+                  '}',
+                  '',
+                ].join('\n'),
+              },
+            ],
+          },
+        }, { id: 'call-validate-shadcn-usage' }),
+        fauxToolCall('submit_design_child_output', {
+          output: {
+            artifact: {
+              id: 'run-fc-e2e-patch',
+              kind: 'design-patch',
+              title: 'Create a profile settings page with status badges source',
+              operations: [
+                {
+                  kind: 'update',
+                  path: 'apps/design/src/generated/create-a-profile-settings-page-with-status-badge-page/src/App.tsx',
+                  content: [
+                    'import { Badge } from "@/components/ui/badge"',
+                    'import { Button } from "@/components/ui/button"',
+                    'import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"',
+                    '',
+                    'export default function App() {',
+                    '  return (',
+                    '    <main>',
+                    '      <Card>',
+                    '        <CardHeader>',
+                    '          <CardTitle>Profile settings</CardTitle>',
+                    '        </CardHeader>',
+                    '        <CardContent>',
+                    '          <Badge>Active</Badge>',
+                    '          <Button type="button">Save changes</Button>',
+                    '        </CardContent>',
+                    '      </Card>',
+                    '    </main>',
+                    '  )',
+                    '}',
+                    '',
+                  ].join('\n'),
+                },
+              ],
+            },
           },
         }, { id: 'call-worker-submit' }),
       ], { stopReason: 'toolUse' }),
@@ -146,6 +218,7 @@ describe('DesignBuildRuntime function-call e2e', () => {
         'select_shadcn_components',
         'create_shadcn_project',
         'add_shadcn_component',
+        'validate_shadcn_component_usage',
         'submit_design_child_output',
       ]))
       expect(toolResultNames(events)).toEqual(expect.arrayContaining([
@@ -154,6 +227,7 @@ describe('DesignBuildRuntime function-call e2e', () => {
         'select_shadcn_components',
         'create_shadcn_project',
         'add_shadcn_component',
+        'validate_shadcn_component_usage',
       ]))
 
       const retrievalStep = events.find((event): event is Extract<AgentEvent, { type: 'step_completed' }> =>

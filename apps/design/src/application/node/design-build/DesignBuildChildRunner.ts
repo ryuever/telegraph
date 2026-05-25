@@ -24,6 +24,11 @@ import {
   type DesignBuildArtifact,
   type DesignPatchArtifact,
 } from './DesignBuildArtifacts'
+import type { ComponentRetrievalLedger } from './ComponentRetrievalLedger'
+import {
+  artifactFromChildOutput,
+  evaluateDesignBuildArtifact,
+} from './DesignBuildReviewPolicy'
 
 export interface DesignBuildChildRunRequest {
   parentRunId: string
@@ -103,6 +108,9 @@ async function runModelChildAttempt(
   const tools = [...(request.tools ?? []), submitTool]
   const submittedOutputs = new Map<string, unknown>()
   const completedWorkflowTools = new Set<string>()
+  const completedShadcnUsageLookups = new Set<string>()
+  const completedShadcnComponentInstalls = new Set<string>()
+  let shadcnUsageValidationPassed = false
   let selectedComponentLedger: unknown
   let toolArtifact: DesignBuildArtifact | undefined
 
@@ -115,7 +123,7 @@ async function runModelChildAttempt(
     systemPrompt: createChildSystemPrompt(request),
     signal: request.signal,
     tools,
-    maxToolIterations: Math.max(2, tools.length + 3),
+    maxToolIterations: Math.max(2, tools.length + selectedShadcnComponentNames(request.modelInput).length + 5),
   })) {
     request.emitEvent?.(event)
     if (event.type === 'tool_call' && event.toolName === SUBMIT_DESIGN_CHILD_OUTPUT_TOOL_NAME) {
@@ -129,19 +137,38 @@ async function runModelChildAttempt(
       if (event.toolName === 'select_shadcn_components') {
         selectedComponentLedger = ledgerFromToolResult(event.output)
       }
-      if (event.toolName === 'create_shadcn_project' || event.toolName === 'add_shadcn_component') {
+      if (event.toolName === 'get_shadcn_component_usage') {
+        for (const name of componentNamesFromUsageResult(event.output)) {
+          completedShadcnUsageLookups.add(name)
+        }
+      }
+      if (
+        event.toolName === 'create_shadcn_project' ||
+        event.toolName === 'add_shadcn_component' ||
+        event.toolName === 'validate_shadcn_component_usage'
+      ) {
         toolArtifact = mergeToolArtifact(toolArtifact, artifactFromToolResult(event.output))
+      }
+      if (event.toolName === 'add_shadcn_component') {
+        const installedName = installedComponentNameFromToolResult(event.output)
+        if (installedName) completedShadcnComponentInstalls.add(installedName)
+      }
+      if (event.toolName === 'validate_shadcn_component_usage') {
+        shadcnUsageValidationPassed = validationPassed(event.output)
       }
       if (event.toolName === SUBMIT_DESIGN_CHILD_OUTPUT_TOOL_NAME) {
         const submittedOutput = submittedOutputs.get(event.callId)
         const validated = validateStageOutput(submittedOutput, request.stage)
         return finalizeSubmittedStageOutput(
           validated,
-          request.stage,
+          request,
           request.requiredTools ?? [],
           completedWorkflowTools,
           selectedComponentLedger,
           toolArtifact,
+          completedShadcnUsageLookups,
+          completedShadcnComponentInstalls,
+          shadcnUsageValidationPassed,
         )
       }
     }
@@ -186,22 +213,47 @@ function workflowToolsAttachedLog(
 
 function finalizeSubmittedStageOutput(
   output: unknown,
-  stage: DesignBuildChildStage,
+  request: DesignBuildChildRunRequest,
   requiredTools: string[],
   completedWorkflowTools: Set<string>,
   selectedComponentLedger: unknown,
   toolArtifact: DesignBuildArtifact | undefined,
+  completedShadcnUsageLookups: Set<string>,
+  completedShadcnComponentInstalls: Set<string>,
+  shadcnUsageValidationPassed: boolean,
 ): unknown {
   const missing = requiredTools.filter(toolName => !completedWorkflowTools.has(toolName))
   if (missing.length > 0) {
     throw new ModelChildOutputContractError(
-      `${stage} did not complete required function-call tools: ${missing.join(', ')}.`,
+      `${request.stage} did not complete required function-call tools: ${missing.join(', ')}.`,
     )
   }
-  if (stage === 'code-artifact' || stage === 'repair') {
+  if (request.stage === 'code-artifact') {
+    const missingUsage = missingSelectedShadcnUsageLookups(request.modelInput, completedShadcnUsageLookups)
+    if (missingUsage.length > 0) {
+      throw new ModelChildOutputContractError(
+        `${request.stage} did not fetch usage docs for every selected shadcn component: ${missingUsage.join(', ')}.`,
+      )
+    }
+    const missingInstalls = missingSelectedShadcnInstalls(request.modelInput, completedShadcnComponentInstalls)
+    if (missingInstalls.length > 0) {
+      throw new ModelChildOutputContractError(
+        `${request.stage} did not install every selected shadcn component: ${missingInstalls.join(', ')}.`,
+      )
+    }
+    if (selectedShadcnComponentNames(request.modelInput).length > 0 && !shadcnUsageValidationPassed) {
+      throw new ModelChildOutputContractError(
+        `${request.stage} did not pass validate_shadcn_component_usage before submitting final output.`,
+      )
+    }
+    const mergedOutput = mergeSubmittedOutputWithToolArtifact(output, toolArtifact)
+    assertFinalSelectedShadcnUsage(mergedOutput, request)
+    return mergedOutput
+  }
+  if (request.stage === 'repair') {
     return mergeSubmittedOutputWithToolArtifact(output, toolArtifact)
   }
-  if (stage !== 'component-retrieval') return output
+  if (request.stage !== 'component-retrieval') return output
   if (!isComponentRetrievalLedger(selectedComponentLedger)) {
     throw new ModelChildOutputContractError(
       'component-retrieval did not receive a valid ledger from select_shadcn_components.',
@@ -245,7 +297,7 @@ function formatToolWorkflowPrompt(request: DesignBuildChildRunRequest): string {
       ? 'For component-retrieval, you must call get_shadcn_project_llms, get_shadcn_component_usage, and select_shadcn_components; include the ledger returned by select_shadcn_components in the final submitted output.'
       : undefined,
     request.stage === 'code-artifact'
-      ? 'For code-artifact, you must call create_shadcn_project, then call add_shadcn_component once for each selected shadcn component before submitting final output. The final artifact may be a summary; tool-created artifact operations will be merged into the child output.'
+      ? 'For code-artifact, you must call get_shadcn_component_usage for every selected shadcn component, then create_shadcn_project, then add_shadcn_component once for each selected component, then validate_shadcn_component_usage with the candidate artifact that includes src/App.tsx, before submitting final output. Wait for each tool result and use the returned usage docs to write the composition source.'
       : undefined,
     request.stage === 'repair'
       ? 'For repair, use create_shadcn_project or add_shadcn_component when failed checks indicate missing shadcn project files or missing local component source.'
@@ -286,11 +338,11 @@ function stageInstruction(request: DesignBuildChildRunRequest): string {
     case 'component-retrieval':
       return 'For component-retrieval, return {"query": string, "components": [...], "summary": string, "ledger": ComponentRetrievalLedger}; ledger must be the object returned by select_shadcn_components.'
     case 'code-artifact':
-      return 'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. Return the input summary object only if no source changes are possible.'
+      return 'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. The main composition source, usually src/App.tsx, must import and render each selected shadcn component from componentLedger.selected using the usage docs returned to this worker. The artifact should include the composition source update, not only installed primitive files. Return the input summary object only if no source changes are possible.'
     case 'review':
       return 'For review, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
     case 'repair':
-      return 'For repair, return {"artifact": <DesignBuildArtifact>} when producing a repaired patch. Return the input summary object only if no source changes are possible.'
+      return 'For repair, return {"artifact": <DesignBuildArtifact>} when producing a repaired patch. If review reports selected-shadcn-components-* failures, update the composition source, usually src/App.tsx, to import and render the selected local shadcn components. Return the input summary object only if no source changes are possible.'
     case 'review-repair':
       return 'For review-repair, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
   }
@@ -307,6 +359,7 @@ function standaloneProjectInstruction(stage: DesignBuildChildStage): string {
     '- Use package.json as the dependency source of truth. Do not rely on Telegraph workspace dependencies.',
     '- Do not import from Telegraph monorepo aliases such as "@/packages/..." or "@telegraph/...". Implement local UI primitives or use npm packages declared in package.json.',
     '- For shadcn primitives selected by the component scout, do not handwrite src/components/ui/*; call add_shadcn_component so the tool installs source and records provenance.',
+    '- For every selected shadcn component, import it from its local "@/components/ui/<name>" module in composition source and render it in JSX; installing source files without using them is invalid.',
     '- Keep files under the safe generated project root shown in the input artifact paths, for example apps/design/src/generated/<slug>/package.json; do not target the repository root package.json.',
     '- index.html must use a sandbox-relative module script such as ./src/index.tsx?entry or ./src/main.tsx?entry.',
   ].join('\n')
@@ -393,6 +446,92 @@ function artifactFromToolResult(output: unknown): DesignBuildArtifact | undefine
   return isDesignBuildArtifact(output.artifact) ? output.artifact : undefined
 }
 
+function componentNamesFromUsageResult(output: unknown): string[] {
+  if (!isRecord(output) || !Array.isArray(output.components)) return []
+  return output.components.flatMap(component => {
+    if (!isRecord(component)) return []
+    const name = stringField(component, 'name')
+    return name ? [normalizeComponentName(name)] : []
+  })
+}
+
+function installedComponentNameFromToolResult(output: unknown): string | undefined {
+  if (!isRecord(output)) return undefined
+  if (output.available === false) return undefined
+  const component = isRecord(output.component) ? output.component : undefined
+  const installation = isRecord(output.installation) ? output.installation : undefined
+  return normalizeComponentName(stringField(component, 'name') ?? stringField(installation, 'name') ?? '')
+}
+
+function validationPassed(output: unknown): boolean {
+  return isRecord(output) && output.passed === true
+}
+
+function assertFinalSelectedShadcnUsage(
+  output: unknown,
+  request: DesignBuildChildRunRequest,
+): void {
+  const ledger = componentLedgerFromModelInput(request.modelInput)
+  if (!ledger || selectedShadcnComponentNames(request.modelInput).length === 0) return
+
+  const artifact = artifactFromChildOutput(output)
+  if (!artifact) {
+    throw new ModelChildOutputContractError(
+      `${request.stage} final output did not include a design artifact after shadcn tool merge.`,
+    )
+  }
+  if (artifact.kind !== 'design-patch') {
+    throw new ModelChildOutputContractError(
+      `${request.stage} final output must be a design-patch artifact when shadcn components are selected.`,
+    )
+  }
+
+  const review = evaluateDesignBuildArtifact(artifact, { componentLedger: ledger })
+  const failed = review.checks.filter(check =>
+    check.id.startsWith('selected-shadcn-components-') && !check.passed
+  )
+  if (failed.length > 0) {
+    throw new ModelChildOutputContractError(
+      `${request.stage} final artifact did not use every selected shadcn component after merge: ${
+        failed.map(check => check.summary).join(' ')
+      }`,
+    )
+  }
+}
+
+function missingSelectedShadcnUsageLookups(
+  modelInput: unknown,
+  completedUsageLookups: Set<string>,
+): string[] {
+  return selectedShadcnComponentNames(modelInput)
+    .filter(name => !completedUsageLookups.has(name))
+}
+
+function missingSelectedShadcnInstalls(
+  modelInput: unknown,
+  completedInstalls: Set<string>,
+): string[] {
+  return selectedShadcnComponentNames(modelInput)
+    .filter(name => !completedInstalls.has(name))
+}
+
+function selectedShadcnComponentNames(modelInput: unknown): string[] {
+  const ledger = componentLedgerFromModelInput(modelInput)
+  if (!ledger) return []
+  return ledger.selected
+    .flatMap(component => {
+      if (!isRecord(component) || component.registry !== '@shadcn' || component.type !== 'registry:ui') return []
+      return [normalizeComponentName(String(component.name ?? ''))]
+    })
+    .filter(name => name.length > 0)
+}
+
+function componentLedgerFromModelInput(modelInput: unknown): ComponentRetrievalLedger | undefined {
+  return isRecord(modelInput) && isComponentRetrievalLedger(modelInput.componentLedger)
+    ? modelInput.componentLedger
+    : undefined
+}
+
 function mergeSubmittedOutputWithToolArtifact(
   output: unknown,
   toolArtifact: DesignBuildArtifact | undefined,
@@ -401,7 +540,7 @@ function mergeSubmittedOutputWithToolArtifact(
   const submittedArtifact = isDesignBuildArtifact(output.artifact) ? output.artifact : undefined
   return {
     ...output,
-    artifact: submittedArtifact ? mergeToolArtifact(submittedArtifact, toolArtifact) : toolArtifact,
+    artifact: submittedArtifact ? mergeToolArtifact(toolArtifact, submittedArtifact) : toolArtifact,
   }
 }
 
@@ -485,9 +624,22 @@ function arrayField(value: Record<string, unknown> | undefined, key: string): un
   return Array.isArray(field) ? field : []
 }
 
-function isComponentRetrievalLedger(value: unknown): value is {
-  selected: unknown[]
-} {
+function stringField(value: Record<string, unknown> | undefined, key: string): string | undefined {
+  const field = value?.[key]
+  return typeof field === 'string' && field.trim().length > 0 ? field.trim() : undefined
+}
+
+function normalizeComponentName(name: string): string {
+  return name
+    .trim()
+    .replace(/\.(tsx|jsx|ts|js)$/i, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function isComponentRetrievalLedger(value: unknown): value is ComponentRetrievalLedger {
   if (!isRecord(value)) return false
   return isRecord(value.query) &&
     isRecord(value.policy) &&

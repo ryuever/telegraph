@@ -21,6 +21,7 @@ vi.mock('../pagelet-design-agent-service', () => ({
 }))
 
 vi.mock('../DesignWorkspace', () => ({
+  initialDesignTraceItemsFromEvents: () => [],
   DesignWorkspace: ({
     initialPrompt,
     sessionId,

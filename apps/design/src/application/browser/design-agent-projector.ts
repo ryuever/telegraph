@@ -51,6 +51,7 @@ export function projectAgentEventToDesign(event: AgentEvent, handlers: DesignAge
       return
 
     case 'tool_result':
+      if (!shouldProjectToolResultArtifact(event.toolName)) return
       emitArtifact(event.output, event, handlers)
       return
 
@@ -70,6 +71,12 @@ export function projectAgentEventToDesign(event: AgentEvent, handlers: DesignAge
     default:
       return
   }
+}
+
+function shouldProjectToolResultArtifact(toolName: string): boolean {
+  return toolName !== 'create_shadcn_project' &&
+    toolName !== 'add_shadcn_component' &&
+    toolName !== 'validate_shadcn_component_usage'
 }
 
 export function projectDesignAgentRunEventRecords(

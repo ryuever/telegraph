@@ -131,6 +131,42 @@ describe('DesignBuildReviewPolicy', () => {
       expect.objectContaining({ id: 'component-edit-primitive-guard', passed: false }),
     ]))
   })
+
+  it('requires selected shadcn components to be imported and rendered in composition source', () => {
+    const policyReview = evaluateDesignBuildArtifact(shadcnPatchArtifact({
+      appSource: 'export default function App() { return <main>Profile settings</main> }\n',
+    }), {
+      componentLedger: componentLedger(['badge']),
+    })
+
+    expect(policyReview.verdict).toBe('repair_required')
+    expect(policyReview.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'selected-shadcn-components-installed', passed: true }),
+      expect.objectContaining({ id: 'selected-shadcn-components-imported', passed: false }),
+      expect.objectContaining({ id: 'selected-shadcn-components-rendered', passed: false }),
+    ]))
+  })
+
+  it('passes selected shadcn usage checks when composition imports and renders the selected component', () => {
+    const policyReview = evaluateDesignBuildArtifact(shadcnPatchArtifact({
+      appSource: [
+        'import { Badge } from "@/components/ui/badge"',
+        '',
+        'export default function App() {',
+        '  return <main><Badge>Active</Badge></main>',
+        '}',
+        '',
+      ].join('\n'),
+    }), {
+      componentLedger: componentLedger(['badge']),
+    })
+
+    expect(policyReview.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'selected-shadcn-components-installed', passed: true }),
+      expect.objectContaining({ id: 'selected-shadcn-components-imported', passed: true }),
+      expect.objectContaining({ id: 'selected-shadcn-components-rendered', passed: true }),
+    ]))
+  })
 })
 
 function patchArtifact(operations: Array<{ path: string; content: string }>): DesignBuildArtifact {
@@ -143,5 +179,136 @@ function patchArtifact(operations: Array<{ path: string; content: string }>): De
       path: operation.path,
       content: operation.content,
     })),
+  }
+}
+
+function shadcnPatchArtifact(input: { appSource: string }): DesignBuildArtifact {
+  const root = 'apps/design/src/generated/page'
+  return {
+    id: 'artifact-shadcn',
+    kind: 'design-patch',
+    title: 'Generated shadcn page',
+    metadata: {
+      componentRetrievalLedger: componentLedger(['badge']),
+    },
+    operations: [
+      {
+        kind: 'add',
+        path: `${root}/package.json`,
+        content: JSON.stringify({
+          dependencies: {
+            'class-variance-authority': '^0.7.1',
+            clsx: '^2.1.1',
+            react: '19.1.0',
+            'react-dom': '19.1.0',
+            'tailwind-merge': '^3.3.1',
+          },
+          devDependencies: {
+            '@vitejs/plugin-react': 'latest',
+            typescript: '5.3.3',
+            vite: '^5.4.0',
+          },
+        }),
+      },
+      {
+        kind: 'add',
+        path: `${root}/index.html`,
+        content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+      },
+      {
+        kind: 'add',
+        path: `${root}/vite.config.ts`,
+        content: "export default { resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } } }\n",
+      },
+      {
+        kind: 'add',
+        path: `${root}/tsconfig.json`,
+        content: JSON.stringify({ compilerOptions: { paths: { '@/*': ['./src/*'] } } }),
+      },
+      {
+        kind: 'add',
+        path: `${root}/components.json`,
+        content: JSON.stringify({ aliases: { ui: '@/components/ui', utils: '@/lib/utils' } }),
+      },
+      {
+        kind: 'add',
+        path: `${root}/design-system.provenance.json`,
+        content: JSON.stringify({ components: [{ name: 'badge' }] }),
+      },
+      {
+        kind: 'add',
+        path: `${root}/src/styles.css`,
+        content: ':root { --background: #fff; --foreground: #111; --primary: #111; --primary-foreground: #fff; --border: #ddd; --input: #ddd; --ring: #999; --radius: 0.5rem; }\n',
+      },
+      {
+        kind: 'add',
+        path: `${root}/src/lib/utils.ts`,
+        content: 'import { clsx, type ClassValue } from "clsx"\nimport { twMerge } from "tailwind-merge"\nexport function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\n',
+      },
+      {
+        kind: 'add',
+        path: `${root}/src/components/ui/badge.tsx`,
+        content: 'import { cva } from "class-variance-authority"\nimport { cn } from "@/lib/utils"\nconst badgeVariants = cva("")\nexport function Badge(props: React.HTMLAttributes<HTMLDivElement>) { return <div className={cn(badgeVariants())} {...props} /> }\n',
+      },
+      {
+        kind: 'add',
+        path: `${root}/src/index.tsx`,
+        content: "import App from './App'\n",
+      },
+      {
+        kind: 'add',
+        path: `${root}/src/App.tsx`,
+        content: input.appSource,
+      },
+    ],
+  }
+}
+
+function componentLedger(names: string[]) {
+  return {
+    query: {
+      prompt: 'Create a profile settings page',
+      pageType: 'test',
+      roles: names.map(name => ({ role: name, required: true, examples: [name] })),
+    },
+    policy: {
+      id: 'shadcn-first-standalone',
+      mode: 'standalone-preview' as const,
+      allowedRegistries: ['@shadcn'],
+      handwritePolicy: 'only-when-unavailable' as const,
+    },
+    trust: {
+      allowedRegistries: ['@shadcn'],
+      blockedRegistries: [],
+      registries: [],
+    },
+    retrieval: {
+      status: 'complete' as const,
+      sources: [],
+      metrics: {
+        candidateCount: names.length,
+        selectedCount: names.length,
+        rejectedCount: 0,
+        fallbackCount: 0,
+        hitRate: 1,
+        fallbackRate: 0,
+        repairRate: 0,
+        visualFailureRate: 0,
+      },
+    },
+    candidates: [],
+    selected: names.map(name => ({
+      registry: '@shadcn',
+      name,
+      type: 'registry:ui' as const,
+      description: `${name} test component`,
+      score: 9,
+      reason: 'Selected for test.',
+      files: [`src/components/ui/${name}.tsx`],
+      materializedFiles: [`src/components/ui/${name}.tsx`],
+      importExamples: [`import { Badge } from "@/components/ui/${name}"`],
+    })),
+    fallbacks: [],
+    rejected: [],
   }
 }

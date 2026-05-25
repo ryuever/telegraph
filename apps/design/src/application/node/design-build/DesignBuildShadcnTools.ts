@@ -4,6 +4,7 @@ import type {
   DesignPatchArtifact,
   DesignPatchOperation,
 } from './DesignBuildArtifacts'
+import { isDesignPatchArtifact } from './DesignBuildArtifacts'
 import {
   createRetrievalPolicySnapshot,
   type ComponentCandidate,
@@ -22,6 +23,7 @@ import {
   type UiComponentInstallPlan,
   type UiComponentLibraryProvider,
 } from './ui-component-library'
+import { evaluateDesignBuildArtifact } from './DesignBuildReviewPolicy'
 
 export interface DesignBuildShadcnToolOptions {
   prompt: string
@@ -42,8 +44,10 @@ export const SHADCN_COMPONENT_RETRIEVAL_TOOL_NAMES = [
 ] as const
 
 export const SHADCN_PROJECT_TOOL_NAMES = [
+  'get_shadcn_component_usage',
   'create_shadcn_project',
   'add_shadcn_component',
+  'validate_shadcn_component_usage',
 ] as const
 
 const SHADCN_TOOL_SOURCE: ComponentRetrievalSource = {
@@ -211,8 +215,10 @@ export function createDesignBuildShadcnProjectTools(options: DesignBuildShadcnPr
   const materializer = options.materializer ?? new ShadcnRegistryMaterializer()
   const componentLibraryProvider = options.componentLibraryProvider ?? new ShadcnUiLibraryProvider()
   const projectRoot = projectRootFromArtifact(options.artifact)
+  let currentArtifact: DesignPatchArtifact = options.artifact
 
   return [
+    createGetShadcnComponentUsageTool(componentLibraryProvider),
     {
       name: 'create_shadcn_project',
       description: [
@@ -238,6 +244,7 @@ export function createDesignBuildShadcnProjectTools(options: DesignBuildShadcnPr
           ledger: options.ledger,
           policy: options.policy,
         }).artifact
+        currentArtifact = mergePatchArtifacts(currentArtifact, artifact)
 
         return Promise.resolve({
           source: 'shadcn-tool:create-project',
@@ -317,6 +324,7 @@ export function createDesignBuildShadcnProjectTools(options: DesignBuildShadcnPr
             shadcnToolInstallations: [installation],
           },
         }
+        currentArtifact = mergePatchArtifacts(currentArtifact, artifact)
 
         return {
           available: true,
@@ -334,7 +342,92 @@ export function createDesignBuildShadcnProjectTools(options: DesignBuildShadcnPr
         }
       },
     },
+    {
+      name: 'validate_shadcn_component_usage',
+      description: [
+        'Shadcn codegen workflow final check. Validate the candidate generated composition uses every selected shadcn component.',
+        'Call after create_shadcn_project and add_shadcn_component calls, and before submit_design_child_output.',
+        'Pass the candidate design-patch artifact that includes the final src/App.tsx composition update.',
+        'If this returns passed=false, update the composition source and call this tool again before submitting.',
+      ].join(' '),
+      parameters: {
+        type: 'object',
+        properties: {
+          artifact: {
+            type: 'object',
+            description: 'Candidate DesignPatchArtifact containing the final composition source, usually src/App.tsx.',
+          },
+        },
+        required: ['artifact'],
+        additionalProperties: false,
+      },
+      execute: input => {
+        const candidate = isRecord(input) ? input.artifact : undefined
+        if (!isDesignPatchArtifact(candidate)) {
+          return Promise.resolve({
+            passed: false,
+            error: 'artifact must be a valid design-patch artifact with operations.',
+          })
+        }
+        const mergedArtifact = mergePatchArtifacts(currentArtifact, candidate)
+        const review = evaluateDesignBuildArtifact(mergedArtifact, {
+          designSystemPolicy: options.policy,
+          componentLedger: options.ledger,
+        })
+        const usageChecks = review.checks.filter(check => check.id.startsWith('selected-shadcn-components-'))
+        const failed = usageChecks.filter(check => !check.passed)
+        currentArtifact = mergedArtifact
+        return Promise.resolve({
+          passed: failed.length === 0,
+          artifact: mergedArtifact,
+          checks: usageChecks,
+          missing: failed.map(check => ({
+            id: check.id,
+            summary: check.summary,
+          })),
+        })
+      },
+    },
   ]
+}
+
+function createGetShadcnComponentUsageTool(componentLibraryProvider: UiComponentLibraryProvider): PiAiExecutableTool {
+  return {
+    name: 'get_shadcn_component_usage',
+    description: [
+      'Shadcn codegen workflow Step 0. Fetch official markdown usage docs for the selected components before writing composition source.',
+      'Call this in the Design Worker for every component from componentLedger.selected so the same model that writes src/App.tsx sees the official imports and JSX patterns.',
+    ].join(' '),
+    parameters: {
+      type: 'object',
+      properties: {
+        components: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              componentName: { type: 'string' },
+              componentKnowledgePoint: {
+                type: 'array',
+                items: { type: 'string' },
+              },
+            },
+            required: ['componentName'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['components'],
+      additionalProperties: false,
+    },
+    execute: async input => {
+      const names = componentNamesFromInput(input, componentLibraryProvider)
+      return {
+        source: 'shadcn-docs-markdown',
+        components: await componentLibraryProvider.getComponentUsages(names),
+      }
+    },
+  }
 }
 
 function component(
@@ -489,9 +582,83 @@ function retargetArtifactRoot(
   }
 }
 
+function mergePatchArtifacts(
+  base: DesignPatchArtifact,
+  next: DesignPatchArtifact,
+): DesignPatchArtifact {
+  const operationsByPath = new Map(base.operations.map(operation => [operation.path, operation]))
+  for (const operation of next.operations) {
+    operationsByPath.set(operation.path, mergeOperation(operationsByPath.get(operation.path), operation))
+  }
+  return {
+    ...base,
+    ...next,
+    metadata: {
+      ...base.metadata,
+      ...next.metadata,
+      shadcnToolInstallations: [
+        ...arrayField(base.metadata, 'shadcnToolInstallations'),
+        ...arrayField(next.metadata, 'shadcnToolInstallations'),
+      ],
+    },
+    operations: [...operationsByPath.values()],
+  }
+}
+
+function mergeOperation(
+  existing: DesignPatchOperation | undefined,
+  incoming: DesignPatchOperation,
+): DesignPatchOperation {
+  if (!existing || !existing.content || !incoming.content || !incoming.path.endsWith('/package.json')) {
+    return incoming
+  }
+  const existingJson = parseRecord(existing.content)
+  const incomingJson = parseRecord(incoming.content)
+  if (!existingJson || !incomingJson) return incoming
+  return {
+    ...incoming,
+    kind: existing.kind === 'add' && incoming.kind !== 'delete' ? 'add' : incoming.kind,
+    content: JSON.stringify({
+      ...existingJson,
+      ...incomingJson,
+      dependencies: {
+        ...recordField(existingJson, 'dependencies'),
+        ...recordField(incomingJson, 'dependencies'),
+      },
+      devDependencies: {
+        ...recordField(existingJson, 'devDependencies'),
+        ...recordField(incomingJson, 'devDependencies'),
+      },
+    }, null, 2),
+  }
+}
+
+function parseRecord(content: string): Record<string, unknown> | undefined {
+  try {
+    const value = JSON.parse(content) as unknown
+    return isRecord(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function recordField(value: Record<string, unknown>, key: string): Record<string, unknown> {
+  const field = value[key]
+  return isRecord(field) ? field : {}
+}
+
+function arrayField(value: Record<string, unknown> | undefined, key: string): unknown[] {
+  const field = value?.[key]
+  return Array.isArray(field) ? field : []
+}
+
 function stringField(value: Record<string, unknown>, key: string): string | undefined {
   const field = value[key]
   return typeof field === 'string' && field.trim().length > 0 ? field.trim() : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function normalizeComponentName(name: string): string {

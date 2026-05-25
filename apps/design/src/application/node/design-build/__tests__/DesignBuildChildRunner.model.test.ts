@@ -65,7 +65,7 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
       modelId: 'gpt-test',
       apiKey: 'test-key',
     }))
-    expect(request.maxToolIterations).toBe(4)
+    expect(request.maxToolIterations).toBe(6)
     expect(request.tools).toEqual([
       expect.objectContaining({
         name: 'submit_design_child_output',
@@ -410,6 +410,124 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
       },
     })).rejects.toThrow('component-retrieval did not complete required function-call tools')
   })
+
+  it('rejects code artifact submit when not every selected shadcn component was installed', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield toolResult('call-usage', 'get_shadcn_component_usage', {
+        components: [
+          { name: 'button' },
+          { name: 'badge' },
+        ],
+      })
+      yield toolResult('call-create', 'create_shadcn_project', { artifact: designPatchArtifact('project') })
+      yield toolResult('call-add-button', 'add_shadcn_component', {
+        available: true,
+        component: { name: 'button' },
+        artifact: designPatchArtifact('button'),
+      })
+      yield* submitToolEvents({
+        artifactId: 'model-artifact',
+        kind: 'design-patch',
+        title: 'Model artifact',
+      })
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await expect(runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      modelInput: {
+        componentLedger: componentLedger(['button', 'badge']),
+      },
+      tools: [
+        workflowTool('create_shadcn_project'),
+        workflowTool('add_shadcn_component'),
+      ],
+      requiredTools: [
+        'create_shadcn_project',
+        'add_shadcn_component',
+      ],
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })).rejects.toThrow('code-artifact did not install every selected shadcn component: badge')
+  })
+
+  it('rejects code artifact submit when final App.tsx overrides validated shadcn usage', async () => {
+    const validatedArtifact = appArtifact([
+      'import { Button } from "@/components/ui/button"',
+      '',
+      'export default function App() {',
+      '  return <Button type="button">Save</Button>',
+      '}',
+      '',
+    ].join('\n'))
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield toolResult('call-usage', 'get_shadcn_component_usage', {
+        components: [{ name: 'button' }],
+      })
+      yield toolResult('call-create', 'create_shadcn_project', { artifact: designPatchArtifact('project') })
+      yield toolResult('call-add-button', 'add_shadcn_component', {
+        available: true,
+        component: { name: 'button' },
+        artifact: componentPrimitiveArtifact('button'),
+      })
+      yield toolResult('call-validate', 'validate_shadcn_component_usage', {
+        passed: true,
+        artifact: validatedArtifact,
+      })
+      yield* submitToolEvents({
+        artifact: appArtifact([
+          'export default function App() {',
+          '  return <main>Plain generated page</main>',
+          '}',
+          '',
+        ].join('\n')),
+      })
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await expect(runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      modelInput: {
+        componentLedger: componentLedger(['button']),
+      },
+      tools: [
+        workflowTool('get_shadcn_component_usage'),
+        workflowTool('create_shadcn_project'),
+        workflowTool('add_shadcn_component'),
+        workflowTool('validate_shadcn_component_usage'),
+      ],
+      requiredTools: [
+        'get_shadcn_component_usage',
+        'create_shadcn_project',
+        'add_shadcn_component',
+        'validate_shadcn_component_usage',
+      ],
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })).rejects.toThrow('final artifact did not use every selected shadcn component after merge')
+  })
 })
 
 function submitToolEvents(output: unknown): RuntimeEvent[] {
@@ -455,6 +573,64 @@ function workflowTool(name: string) {
       additionalProperties: true,
     },
     execute: () => Promise.resolve({ ok: true }),
+  }
+}
+
+function designPatchArtifact(suffix: string) {
+  return {
+    id: `artifact-${suffix}`,
+    kind: 'design-patch',
+    title: `Artifact ${suffix}`,
+    operations: [
+      {
+        kind: 'add',
+        path: `apps/design/src/generated/${suffix}/package.json`,
+        content: JSON.stringify({
+          dependencies: {
+            react: '19.1.0',
+            'react-dom': '19.1.0',
+          },
+        }),
+      },
+    ],
+  }
+}
+
+function appArtifact(content: string) {
+  return {
+    id: 'artifact-app',
+    kind: 'design-patch',
+    title: 'Artifact App',
+    operations: [
+      {
+        kind: 'update',
+        path: 'apps/design/src/generated/project/src/App.tsx',
+        content,
+      },
+    ],
+  }
+}
+
+function componentPrimitiveArtifact(componentName: string) {
+  const componentExportName = `${componentName.charAt(0).toUpperCase()}${componentName.slice(1)}`
+  return {
+    id: `artifact-${componentName}`,
+    kind: 'design-patch',
+    title: `Artifact ${componentName}`,
+    operations: [
+      {
+        kind: 'add',
+        path: `apps/design/src/generated/project/src/components/ui/${componentName}.tsx`,
+        content: [
+          'import * as React from "react"',
+          '',
+          `export function ${componentExportName}(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {`,
+          '  return <button {...props} />',
+          '}',
+          '',
+        ].join('\n'),
+      },
+    ],
   }
 }
 

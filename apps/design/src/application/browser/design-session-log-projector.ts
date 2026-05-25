@@ -14,6 +14,7 @@ export interface DesignSessionLogItem {
   kind: 'run' | 'step' | 'model' | 'tool' | 'subagent' | 'artifact' | 'review' | 'snapshot'
   label: string
   detail?: string
+  fullDetail?: string
   status: DesignSessionLogStatus
 }
 
@@ -223,6 +224,7 @@ function agentEventLogItems(
         kind: 'model',
         label: 'Assistant output',
         detail: truncateDetail(event.text),
+        fullDetail: event.text,
         status: 'completed',
       }]
 
@@ -270,16 +272,20 @@ function agentEventLogItems(
         status: 'failed',
       }]
 
-    case 'runtime_log':
+    case 'runtime_log': {
+      const thinking = thinkingDeltaFromRaw(event.raw)
+      const detail = thinking ?? event.message
       return [{
         id: `${event.runId ?? streamRunId}:runtime-log:${String(event.ts)}:${event.message}`,
         ts: event.ts,
         runId: event.runId ?? streamRunId,
         kind: 'model',
-        label: `Runtime ${event.level}`,
-        detail: event.message,
+        label: thinking ? 'Thinking' : `Runtime ${event.level}`,
+        detail: truncateDetail(detail),
+        fullDetail: detail,
         status: event.level === 'error' ? 'failed' : 'info',
       }]
+    }
 
     default:
       return []
@@ -604,6 +610,12 @@ function numberField(value: unknown, key: string): number | undefined {
   const record = recordValue(value)
   const field = record?.[key]
   return typeof field === 'number' ? field : undefined
+}
+
+function thinkingDeltaFromRaw(value: unknown): string | undefined {
+  const record = recordValue(value)
+  const delta = record?.delta
+  return typeof delta === 'string' && delta.length > 0 ? delta : undefined
 }
 
 function isFailedCheck(value: Record<string, unknown> | undefined): value is Record<string, unknown> {

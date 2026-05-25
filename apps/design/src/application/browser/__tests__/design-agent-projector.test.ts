@@ -118,7 +118,7 @@ describe('projectAgentEventToDesign', () => {
     ])
   })
 
-  it('collapses shadcn tool source artifacts into one continuously updated draft', () => {
+  it('keeps shadcn tool source artifacts out of visible drafts until run completion', () => {
     const projection = projectDesignAgentRunEventRecords([
       {
         runId: 'design-run',
@@ -196,13 +196,38 @@ describe('projectAgentEventToDesign', () => {
           ts: 3,
         },
       },
+      {
+        runId: 'design-run',
+        sessionId: 'session-1',
+        seq: 4,
+        ts: 4,
+        event: {
+          type: 'run_completed',
+          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+          runId: 'design-run',
+          output: {
+            artifact: {
+              id: 'source-artifact',
+              kind: 'design-patch',
+              title: 'SaaS source',
+              operations: [
+                { kind: 'add', path: 'app/package.json', content: '{"dependencies":{"react":"latest","@radix-ui/react-slot":"latest"}}' },
+                { kind: 'add', path: 'app/src/App.tsx', content: 'import { Card } from "@/components/ui/card"\nexport function App() { return <Card /> }' },
+                { kind: 'add', path: 'app/src/components/ui/card.tsx', content: 'export function Card() { return null }' },
+                { kind: 'add', path: 'app/src/components/ui/chart.tsx', content: 'export function Chart() { return null }' },
+              ],
+            },
+          },
+          ts: 4,
+        },
+      },
     ])
 
     expect(projection.artifacts).toHaveLength(1)
     expect(projection.artifacts[0]).toEqual(expect.objectContaining({
       id: 'source-artifact',
       title: 'SaaS source',
-      sourceEventType: 'tool_result',
+      sourceEventType: 'run_completed',
     }))
     expect(projection.artifacts[0]?.output).toEqual(expect.objectContaining({
       id: 'source-artifact',

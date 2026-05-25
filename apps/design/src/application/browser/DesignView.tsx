@@ -9,7 +9,13 @@ import type {
   DesignAgentRunProjection,
 } from './design-agent-projector'
 import { DesignSessionSidebar, type DesignSessionListItem } from './DesignSessionSidebar'
-import { DesignWorkspace, type DesignWorkspaceInitialState, type DesignWorkspaceSummary } from './DesignWorkspace'
+import {
+  DesignWorkspace,
+  initialDesignTraceItemsFromEvents,
+  type DesignWorkspaceInitialState,
+  type DesignWorkspaceSummary,
+} from './DesignWorkspace'
+import { initialDesignSessionLogItemsFromEvents } from './design-session-log-projector'
 
 interface DesignViewProps {
   onOpenSettings?: () => void
@@ -201,6 +207,9 @@ function designSessionFromHistory(sessionId: string, group: DesignRunHistory[]):
         role: 'assistant' as const,
         content: item.projection.assistantText || fallbackAssistantMessage(item.run, item.projection),
         runStatus: item.projection.status ?? item.run.status,
+        traceItems: initialDesignTraceItemsFromEvents(item.projection.traceEvents, item.run.runId),
+        subagentItems: item.projection.subagents,
+        sessionLogItems: initialDesignSessionLogItemsFromEvents(item.projection.traceEvents, item.run.runId),
       },
     ]),
     status,

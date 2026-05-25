@@ -214,23 +214,15 @@ describe('DesignWorkspace', () => {
 
     expect(applyButton()?.textContent).toContain('预览 Patch')
     expect(container.textContent).toContain('已生成「Hero patch」预览。')
-    expect(container.textContent).toContain('Subagents')
+    expect(container.textContent).toContain('subagent')
     expect(container.textContent).toContain('Design Component Scout')
-    expect(container.textContent).toContain('Session Log')
     expect(container.textContent).toContain('Model completed: Design Component Scout')
     expect(container.textContent).toContain('components: Button')
     expect(container.textContent).not.toContain('正在生成...')
 
-    await act(async () => {
-      container
-        ?.querySelector<HTMLButtonElement>('button[aria-label="Toggle build progress"]')
-        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-    })
-
     expect(container.textContent).toContain('Intent Brief')
     expect(container.textContent).toContain('Design Component Scout')
-    expect(container.textContent).toContain('1 components')
+    expect(container.textContent).toContain('selected 1')
 
     await act(async () => {
       applyButton()?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -255,7 +247,7 @@ describe('DesignWorkspace', () => {
     expect(applyButton()?.textContent).toContain('已应用')
   })
 
-  it('closes the build progress dropdown when clicking outside', async () => {
+  it('lays run details directly in the conversation stream', async () => {
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
@@ -265,24 +257,9 @@ describe('DesignWorkspace', () => {
       await Promise.resolve()
     })
 
-    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="Toggle build progress"]')
-    expect(toggle).not.toBeNull()
-
-    await act(async () => {
-      toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-    })
-
-    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
-    expect(container.textContent).toContain('Build progress')
-
-    await act(async () => {
-      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-      await Promise.resolve()
-    })
-
-    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
-    expect(container.textContent).not.toContain('Build progress')
+    expect(container.textContent).toContain('Intent Brief')
+    expect(container.textContent).toContain('Model completed: Design Component Scout')
+    expect(container.querySelector('details')?.textContent).toContain('1 subagents')
   })
 
   it('passes active artifact context into follow-up design runs', async () => {

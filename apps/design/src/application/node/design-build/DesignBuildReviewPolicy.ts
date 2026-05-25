@@ -13,6 +13,10 @@ import {
   type ComponentEditContext,
 } from '@/apps/design/application/common/component-edit-contract'
 import { ThemePackRegistry } from './ThemePackRegistry'
+import type {
+  ComponentRetrievalLedger,
+  SelectedComponentAsset,
+} from './ComponentRetrievalLedger'
 
 export interface DesignBuildArtifactSummary {
   artifactId: string
@@ -27,6 +31,7 @@ export interface DesignBuildArtifactSummary {
 export interface DesignBuildReviewPolicyOptions {
   designSystemPolicy?: DesignSystemPolicy
   componentEdit?: ComponentEditContext
+  componentLedger?: ComponentRetrievalLedger
 }
 
 export function createArtifactSummary(
@@ -107,10 +112,12 @@ export function evaluateDesignBuildArtifact(
     operation.kind === 'delete' || Boolean(operation.content?.trim())
   )
   const projectContract = evaluateStandaloneProjectFiles(artifact.operations)
+  const componentLedger = options.componentLedger ?? componentLedgerFromArtifact(artifact)
 
   const checks = [
     ...designSystemChecks(options.designSystemPolicy),
     ...componentEditChecks(options.componentEdit),
+    ...shadcnComponentUsageChecks(artifact, componentLedger),
     {
       id: 'artifact-structured',
       passed: true,
@@ -145,6 +152,159 @@ export function evaluateDesignBuildArtifact(
       : 'blocked',
     checks,
   }
+}
+
+function shadcnComponentUsageChecks(
+  artifact: Extract<DesignBuildArtifact, { kind: 'design-patch' }>,
+  componentLedger: ComponentRetrievalLedger | undefined,
+): DesignBuildReview['checks'] {
+  const selected = selectedShadcnUiComponents(componentLedger)
+  if (selected.length === 0) return []
+
+  const usage = analyzeShadcnComponentUsage(artifact, selected)
+  return [
+    {
+      id: 'selected-shadcn-components-installed',
+      passed: usage.missingInstalled.length === 0,
+      summary: usage.missingInstalled.length === 0
+        ? 'All selected shadcn components are installed as local generated primitive files.'
+        : `Selected shadcn components are missing local files: ${usage.missingInstalled.join(', ')}.`,
+    },
+    {
+      id: 'selected-shadcn-components-imported',
+      passed: usage.missingImported.length === 0,
+      summary: usage.missingImported.length === 0
+        ? 'Composition source imports every selected shadcn component.'
+        : `Composition source does not import selected shadcn components: ${usage.missingImported.join(', ')}.`,
+    },
+    {
+      id: 'selected-shadcn-components-rendered',
+      passed: usage.missingRendered.length === 0,
+      summary: usage.missingRendered.length === 0
+        ? 'Composition source renders every selected shadcn component.'
+        : `Composition source does not render selected shadcn components: ${usage.missingRendered.join(', ')}.`,
+    },
+  ]
+}
+
+function analyzeShadcnComponentUsage(
+  artifact: Extract<DesignBuildArtifact, { kind: 'design-patch' }>,
+  selected: SelectedComponentAsset[],
+): {
+  missingInstalled: string[]
+  missingImported: string[]
+  missingRendered: string[]
+} {
+  const sourceFiles = artifact.operations
+    .filter(operation => operation.kind !== 'delete' && operation.content)
+    .map(operation => ({
+      path: operation.path,
+      content: operation.content ?? '',
+    }))
+  const compositionSources = sourceFiles.filter(file => isCompositionSourcePath(file.path))
+  const installedPaths = new Set(sourceFiles.map(file => normalizeProjectSourcePath(file.path)))
+
+  const missingInstalled: string[] = []
+  const missingImported: string[] = []
+  const missingRendered: string[] = []
+
+  for (const component of selected) {
+    const name = normalizeComponentName(component.name)
+    if (!name) continue
+    const importSymbols = importedComponentSymbols(compositionSources, name)
+    if (!hasInstalledComponentFile(installedPaths, name)) missingInstalled.push(name)
+    if (importSymbols.length === 0) {
+      missingImported.push(name)
+      missingRendered.push(name)
+      continue
+    }
+    if (!compositionSources.some(file => importSymbols.some(symbol => jsxUsesSymbol(file.content, symbol)))) {
+      missingRendered.push(name)
+    }
+  }
+
+  return { missingInstalled, missingImported, missingRendered }
+}
+
+function selectedShadcnUiComponents(componentLedger: ComponentRetrievalLedger | undefined): SelectedComponentAsset[] {
+  if (!componentLedger) return []
+  return componentLedger.selected.filter(component => component.registry === '@shadcn' && component.type === 'registry:ui')
+}
+
+function componentLedgerFromArtifact(artifact: DesignBuildArtifact): ComponentRetrievalLedger | undefined {
+  if (artifact.kind !== 'design-patch') return undefined
+  const ledger = artifact.metadata?.componentRetrievalLedger
+  return isComponentRetrievalLedger(ledger) ? ledger : undefined
+}
+
+function isComponentRetrievalLedger(value: unknown): value is ComponentRetrievalLedger {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as { selected?: unknown }
+  return Array.isArray(record.selected)
+}
+
+function importedComponentSymbols(
+  sources: Array<{ path: string; content: string }>,
+  componentName: string,
+): string[] {
+  const symbols = new Set<string>()
+  for (const source of sources) {
+    for (const match of source.content.matchAll(/import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g)) {
+      const specifier = match[2]
+      if (!specifierImportsComponent(specifier, componentName)) continue
+      for (const binding of match[1].split(',')) {
+        const symbol = binding.trim().split(/\s+as\s+/i).at(-1)?.trim()
+        if (symbol) symbols.add(symbol)
+      }
+    }
+    for (const match of source.content.matchAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/g)) {
+      if (specifierImportsComponent(match[2], componentName)) symbols.add(match[1])
+    }
+  }
+  return [...symbols]
+}
+
+function specifierImportsComponent(specifier: string, componentName: string): boolean {
+  return normalizeComponentName(specifier.split('/').at(-1) ?? '') === componentName &&
+    /(^|\/)components\/ui\//.test(specifier)
+}
+
+function jsxUsesSymbol(source: string, symbol: string): boolean {
+  return new RegExp(`<${escapeRegExp(symbol)}(?:[\\s>/])`).test(source)
+}
+
+function hasInstalledComponentFile(paths: Set<string>, componentName: string): boolean {
+  return [...paths].some(path => {
+    const match = path.match(/^src\/components\/ui\/(.+)\.(tsx|jsx|ts|js)$/i)
+    return Boolean(match && normalizeComponentName(match[1]) === componentName)
+  })
+}
+
+function isCompositionSourcePath(path: string): boolean {
+  const normalized = normalizeProjectSourcePath(path)
+  return /^src\/.+\.(tsx|jsx)$/i.test(normalized) &&
+    !/^src\/(?:index|main)\.(tsx|jsx)$/i.test(normalized) &&
+    !normalized.startsWith('src/components/ui/')
+}
+
+function normalizeProjectSourcePath(path: string): string {
+  const normalized = path.trim().replace(/\\/g, '/').replace(/^\/+/, '')
+  const srcIndex = normalized.lastIndexOf('/src/')
+  return srcIndex >= 0 ? normalized.slice(srcIndex + 1) : normalized
+}
+
+function normalizeComponentName(name: string): string {
+  return name
+    .trim()
+    .replace(/\.(tsx|jsx|ts|js)$/i, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function componentEditChecks(componentEdit: ComponentEditContext | undefined): DesignBuildReview['checks'] {
