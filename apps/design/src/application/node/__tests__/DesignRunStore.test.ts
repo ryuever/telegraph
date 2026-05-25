@@ -1,6 +1,10 @@
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { describe, expect, it } from 'vitest'
-import { DesignRunStore, designRunSnapshotFromLedger } from '../DesignRunStore'
+import {
+  DesignRunStore,
+  designRunSnapshotFromLedger,
+  designRunSnapshotFromRecord,
+} from '../DesignRunStore'
 
 describe('DesignRunStore', () => {
   it('persists run lifecycle summaries in memory', () => {
@@ -64,7 +68,7 @@ describe('DesignRunStore', () => {
       runtimeId: 'design-build',
       failureReason: 'runtime_recovery',
       failureMessage: 'Run was still active when the pagelet process started.',
-      artifactRefs: [],
+      artifactRefs: ['artifact-ledger'],
       settings: {},
       input: { message: 'make a durable page' },
       eventCount: 1,
@@ -96,7 +100,37 @@ describe('DesignRunStore', () => {
       startedAt: 110,
       updatedAt: 200,
       completedAt: 200,
+      artifactCount: 1,
       events: [{ type: 'run_started', ts: 110 }],
+    })
+  })
+
+  it('projects run records without loading event payloads for list summaries', () => {
+    const snapshot = designRunSnapshotFromRecord({
+      runId: 'run-summary',
+      sessionId: 'session-summary',
+      status: 'completed',
+      runtimeId: 'design-build',
+      artifactRefs: ['artifact-heavy'],
+      settings: {},
+      inputPreview: 'make a summary page',
+      eventCount: 42,
+      createdAt: 100,
+      startedAt: 120,
+      completedAt: 300,
+      lastEventAt: 280,
+    })
+
+    expect(snapshot).toMatchObject({
+      runId: 'run-summary',
+      sessionId: 'session-summary',
+      prompt: 'make a summary page',
+      status: 'completed',
+      startedAt: 120,
+      updatedAt: 280,
+      completedAt: 300,
+      artifactCount: 1,
+      events: [{ type: 'run_queued', ts: 100 }],
     })
   })
 })

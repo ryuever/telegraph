@@ -4,6 +4,7 @@ import {
   FeatureWorkflowRunner,
   immediateFeatureStage,
 } from '@/apps/design/application/node/feature-workflow/FeatureWorkflowRunner'
+import { mergeGeneratedPackageJsonContent } from '@/apps/design/application/common/design-package-json'
 import {
   createDesignBuildInitialState,
   DesignBuildRuntimeError,
@@ -436,7 +437,7 @@ function mergePatchArtifact(
   if (base.kind !== 'design-patch' || nextArtifact.kind !== 'design-patch') return nextArtifact
   const operationsByPath = new Map(base.operations.map(operation => [operation.path, operation]))
   for (const operation of nextArtifact.operations) {
-    operationsByPath.set(operation.path, operation)
+    operationsByPath.set(operation.path, mergePatchOperation(operationsByPath.get(operation.path), operation))
   }
   const merged: DesignPatchArtifact = {
     ...base,
@@ -448,6 +449,24 @@ function mergePatchArtifact(
     operations: [...operationsByPath.values()],
   }
   return merged
+}
+
+function mergePatchOperation(
+  existing: DesignPatchArtifact['operations'][number] | undefined,
+  incoming: DesignPatchArtifact['operations'][number],
+): DesignPatchArtifact['operations'][number] {
+  if (incoming.kind === 'delete' || !incoming.path.endsWith('/package.json')) return incoming
+  if (!existing) {
+    return {
+      ...incoming,
+      content: mergeGeneratedPackageJsonContent(undefined, incoming.content) ?? incoming.content,
+    }
+  }
+  return {
+    ...incoming,
+    kind: existing.kind === 'add' ? 'add' : incoming.kind,
+    content: mergeGeneratedPackageJsonContent(existing.content, incoming.content) ?? incoming.content,
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

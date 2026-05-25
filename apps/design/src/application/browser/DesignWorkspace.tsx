@@ -71,6 +71,7 @@ interface DesignWorkspaceProps {
   sessionId?: string
   sessionTitle?: string
   initialState?: DesignWorkspaceInitialState
+  isActive?: boolean
   onOpenSettings?: () => void
   onReturnToEntry?: () => void
   onSessionUpdate?: (sessionId: string, summary: DesignWorkspaceSummary) => void
@@ -91,6 +92,7 @@ export function DesignWorkspace({
   sessionId: providedSessionId,
   sessionTitle,
   initialState,
+  isActive = true,
   onOpenSettings,
   onReturnToEntry,
   onSessionUpdate,
@@ -577,6 +579,7 @@ export function DesignWorkspace({
           activeArtifactId={activeArtifactId}
           requestedArtifactIds={requestedArtifactIds}
           applyStates={artifactApplyStates}
+          isActive={isActive}
           mode={artifactMode}
           selectedComponent={selectedComponent}
           dirtyOperationCount={activeArtifactId ? dirtyArtifactOperations.get(activeArtifactId)?.length ?? 0 : 0}

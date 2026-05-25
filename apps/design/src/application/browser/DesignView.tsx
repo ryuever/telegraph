@@ -25,6 +25,8 @@ interface DesignSession extends DesignSessionListItem {
   prompt: string
   activeArtifactTitle?: string
   initialState?: DesignWorkspaceInitialState
+  runRecords: DesignAgentRunRecordSnapshot[]
+  needsHydration?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -33,6 +35,8 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
   const agent = useMemo(() => new PageletDesignAgentService(), [])
   const [sessions, setSessions] = useState<DesignSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [openedSessionIds, setOpenedSessionIds] = useState<Set<string>>(() => new Set())
+  const [hydratingSessionIds, setHydratingSessionIds] = useState<Set<string>>(() => new Set())
   const [activeView, setActiveView] = useState<'entry' | 'workspace'>('entry')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -61,17 +65,40 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
       prompt: nextPrompt,
       status: 'running',
       artifactCount: 0,
+      runRecords: [],
       createdAt: now,
       updatedAt: now,
     }
     setSessions(current => [session, ...current])
     setActiveSessionId(session.id)
+    setOpenedSessionIds(current => new Set(current).add(session.id))
     setActiveView('workspace')
   }
 
   const openSession = (sessionId: string): void => {
     setActiveSessionId(sessionId)
     setActiveView('workspace')
+    const session = sessions.find(item => item.id === sessionId)
+    if (!session) return
+    if (!session.needsHydration || session.initialState) {
+      setOpenedSessionIds(current => new Set(current).add(sessionId))
+      return
+    }
+    if (hydratingSessionIds.has(sessionId)) return
+    setHydratingSessionIds(current => new Set(current).add(sessionId))
+    void hydrateDesignSessionState(agent, session)
+      .then(hydrated => {
+        setSessions(current => current.map(item => item.id === sessionId ? hydrated : item))
+        setOpenedSessionIds(current => new Set(current).add(sessionId))
+      })
+      .catch(() => {})
+      .finally(() => {
+        setHydratingSessionIds(current => {
+          const next = new Set(current)
+          next.delete(sessionId)
+          return next
+        })
+      })
   }
 
   const createDesignDraft = (): void => {
@@ -81,6 +108,16 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
 
   const deleteSession = (sessionId: string): void => {
     setSessions(current => current.filter(session => session.id !== sessionId))
+    setOpenedSessionIds(current => {
+      const next = new Set(current)
+      next.delete(sessionId)
+      return next
+    })
+    setHydratingSessionIds(current => {
+      const next = new Set(current)
+      next.delete(sessionId)
+      return next
+    })
     if (activeSessionId === sessionId) {
       setActiveSessionId(null)
       setActiveView('entry')
@@ -133,21 +170,30 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
             onOpenSettings={onOpenSettings}
           />
         )}
-        {sessions.map(session => (
-          <div
-            key={session.id}
-            className={activeView === 'workspace' && activeSessionId === session.id ? 'absolute inset-0' : 'hidden'}
-          >
-            <DesignWorkspace
-              initialPrompt={session.prompt}
-              sessionId={session.id}
-              sessionTitle={session.title}
-              initialState={session.initialState}
-              onOpenSettings={onOpenSettings}
-              onSessionUpdate={updateSessionSummary}
-            />
+        {activeView === 'workspace' && activeSessionId && !openedSessionIds.has(activeSessionId) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background text-sm text-muted-foreground">
+            {hydratingSessionIds.has(activeSessionId) ? 'Loading design session...' : 'Select a design session'}
           </div>
-        ))}
+        )}
+        {sessions.filter(session => openedSessionIds.has(session.id)).map(session => {
+          const isActive = activeView === 'workspace' && activeSessionId === session.id
+          return (
+            <div
+              key={session.id}
+              className={isActive ? 'absolute inset-0' : 'hidden'}
+            >
+              <DesignWorkspace
+                initialPrompt={session.prompt}
+                sessionId={session.id}
+                sessionTitle={session.title}
+                initialState={session.initialState}
+                isActive={isActive}
+                onOpenSettings={onOpenSettings}
+                onSessionUpdate={updateSessionSummary}
+              />
+            </div>
+          )
+        })}
       </main>
     </div>
   )
@@ -170,20 +216,52 @@ async function hydrateDesignSessions(
   signal: AbortSignal,
 ): Promise<DesignSession[]> {
   const runs = await agent.listAgentRuns(signal)
-  const histories = await Promise.all(runs.map(async run => ({
-    run,
-    projection: await agent.getAgentRunProjection(run.runId, signal).catch(() => emptyRunProjection()),
-  })))
-
-  const groups = new Map<string, DesignRunHistory[]>()
-  for (const history of histories) {
-    const sessionId = history.run.sessionId ?? history.run.runId
-    groups.set(sessionId, [...(groups.get(sessionId) ?? []), history])
+  const groups = new Map<string, DesignAgentRunRecordSnapshot[]>()
+  for (const run of runs) {
+    const sessionId = run.sessionId ?? run.runId
+    groups.set(sessionId, [...(groups.get(sessionId) ?? []), run])
   }
 
   return Array.from(groups.entries())
-    .map(([sessionId, group]) => designSessionFromHistory(sessionId, group))
+    .map(([sessionId, group]) => designSessionSummaryFromRuns(sessionId, group))
     .sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+async function hydrateDesignSessionState(
+  agent: PageletDesignAgentService,
+  session: DesignSession,
+): Promise<DesignSession> {
+  const histories = await Promise.all(session.runRecords.map(async run => ({
+    run,
+    projection: await agent.getAgentRunProjection(run.runId).catch(() => emptyRunProjection()),
+  })))
+  const hydrated = designSessionFromHistory(session.id, histories)
+  return {
+    ...hydrated,
+    title: session.title,
+    needsHydration: false,
+  }
+}
+
+function designSessionSummaryFromRuns(sessionId: string, group: DesignAgentRunRecordSnapshot[]): DesignSession {
+  const ordered = group.slice().sort((a, b) => a.startedAt - b.startedAt)
+  const first = ordered[0]
+  const latest = ordered.at(-1) ?? first
+  const status = latest.status
+  const prompt = first.prompt
+  const updatedAt = Math.max(...ordered.map(item => item.updatedAt))
+
+  return {
+    id: sessionId,
+    title: deriveSessionTitle(prompt),
+    prompt,
+    status,
+    artifactCount: ordered.reduce((count, run) => count + (run.artifactCount ?? 0), 0),
+    runRecords: ordered,
+    needsHydration: true,
+    createdAt: first.startedAt,
+    updatedAt,
+  }
 }
 
 function designSessionFromHistory(sessionId: string, group: DesignRunHistory[]): DesignSession {
@@ -226,6 +304,8 @@ function designSessionFromHistory(sessionId: string, group: DesignRunHistory[]):
     status,
     artifactCount: artifacts.length,
     activeArtifactTitle: activeArtifact?.title ?? activeArtifact?.id,
+    runRecords: ordered.map(item => item.run),
+    needsHydration: false,
     createdAt: first.run.startedAt,
     updatedAt: Math.max(...ordered.map(item => item.run.updatedAt)),
     initialState,

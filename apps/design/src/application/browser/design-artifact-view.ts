@@ -64,6 +64,9 @@ export function createDesignArtifactViewModel(
 export function extractDesignPatchOperations(
   artifact: DesignProjectedArtifact,
 ): DesignPatchFileOperation[] | null {
+  const fileOperations = extractFileOperations(artifact.output)
+  if (fileOperations) return fileOperations
+
   const operations = arrayField(artifact.output, 'operations')
   if (!operations) return null
   const patchOperations: DesignPatchFileOperation[] = []
@@ -96,6 +99,49 @@ function toPatchOperation(value: unknown): DesignPatchFileOperation | null {
   if (typeof value.content === 'string') operation.content = value.content
   if (typeof value.expectedOriginal === 'string') operation.expectedOriginal = value.expectedOriginal
   return operation
+}
+
+function extractFileOperations(value: unknown): DesignPatchFileOperation[] | null {
+  if (!isRecord(value)) return null
+  const files = value.files
+  if (Array.isArray(files)) return operationsFromFileArray(files)
+  if (isRecord(files)) return operationsFromFileMap(files)
+  return null
+}
+
+function operationsFromFileMap(files: Record<string, unknown>): DesignPatchFileOperation[] | null {
+  const operations: DesignPatchFileOperation[] = []
+  for (const [path, value] of Object.entries(files)) {
+    const content = fileContent(value)
+    const normalizedPath = normalizeVirtualFilePath(path)
+    if (!normalizedPath || content === undefined) return null
+    operations.push({ kind: 'add', path: normalizedPath, content })
+  }
+  return operations.length > 0 ? operations : null
+}
+
+function operationsFromFileArray(files: unknown[]): DesignPatchFileOperation[] | null {
+  const operations: DesignPatchFileOperation[] = []
+  for (const file of files) {
+    if (!isRecord(file) || typeof file.path !== 'string') return null
+    const content = fileContent(file)
+    const path = normalizeVirtualFilePath(file.path)
+    if (!path || content === undefined) return null
+    operations.push({ kind: 'add', path, content })
+  }
+  return operations.length > 0 ? operations : null
+}
+
+function fileContent(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (!isRecord(value)) return undefined
+  if (typeof value.content === 'string') return value.content
+  if (typeof value.code === 'string') return value.code
+  return undefined
+}
+
+function normalizeVirtualFilePath(path: string): string {
+  return path.trim().replace(/^\/+/, '')
 }
 
 function arrayField(value: unknown, key: string): unknown[] | undefined {

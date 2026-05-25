@@ -39,7 +39,7 @@ export interface RegistryProvenance {
 }
 
 const SHADCN_RUNTIME_DEPENDENCIES: Record<string, string> = {
-  '@radix-ui/react-slot': '^1.2.3',
+  '@radix-ui/react-slot': 'latest',
   'class-variance-authority': '^0.7.1',
   clsx: '^2.1.1',
   'tailwind-merge': '^3.3.1',

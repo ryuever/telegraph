@@ -8,7 +8,6 @@ import { StyleEditorPanel } from '@sandpacker/style-editor'
 import type { ElementSelectionShape, FileTree, SerializedDOMNode } from '@sandpacker/shared'
 import workerUrl from '@sandpacker/worker/worker-entry?worker&url'
 import productionServiceWorkerUrl from '@sandpacker/worker/service-worker-entry?worker&url'
-import tailwindBrowserUrl from '@tailwindcss/browser?url'
 import { Button } from '@/packages/ui/components/ui/button'
 import type {
   DesignPatchFileOperation,
@@ -22,46 +21,24 @@ import {
 const backendFactory = new BrowserWorkerBackendFactory({ workerUrl })
 const serviceWorkerUrl = import.meta.env.DEV ? '/sandpacker-worker.js' : productionServiceWorkerUrl
 let serviceWorkerPromise: Promise<void> | null = null
-const SANDPACKER_MAX_OPERATION_FILES = 40
-const SANDPACKER_MAX_TOTAL_SOURCE_CHARS = 750_000
-const SANDPACKER_MAX_FILE_SOURCE_CHARS = 250_000
-const SANDPACKER_REACT_VERSION = '18.3.1'
-const TELEGRAPH_UI_COMPONENTS = [
-  'Badge',
-  'Button',
-  'Card',
-  'CardContent',
-  'CardDescription',
-  'CardHeader',
-  'CardTitle',
-  'Input',
-  'Tabs',
-  'TabsContent',
-  'TabsList',
-  'TabsTrigger',
-  'Textarea',
-]
-const TELEGRAPH_UI_IMPORT_SOURCE = `import { ${TELEGRAPH_UI_COMPONENTS.join(', ')} } from '/src/telegraph-ui.tsx'\n`
-const TELEGRAPH_UI_MODULE_IMPORT_PATTERN = /^import(?:[^\n]|\n(?!import\s))*?\s+from ['"]@\/packages\/ui\/components\/ui\/(?:badge|button|card|input|tabs|textarea)['"];?\n?/gm
-const TELEGRAPH_UI_STUB_IMPORT_PATTERN = /^import\s+\{(?:[^\n]|\n(?!import\s))*?\}\s+from ['"]\/src\/telegraph-ui\.tsx['"];?\n?/gm
+const SANDPACKER_REACT_VERSION = 'latest'
 
 export interface DesignSandpackerPreviewProps {
   artifactId: string
   title: string
   operations: DesignPatchFileOperation[]
+  isActive?: boolean
   selectedPath?: string
   onOperationsChange?: (operations: DesignPatchFileOperation[]) => void
   onSelectComponent?: (component: DesignSelectedComponentSnapshot) => void
 }
 
 export function DesignSandpackerPreview(props: DesignSandpackerPreviewProps): JSX.Element {
-  const payloadGuard = useMemo(() => validateSandpackerPayload(props.operations), [props.operations])
   const [serviceWorkerState, setServiceWorkerState] = useState<
     { status: 'pending' | 'ready' } | { status: 'failed'; error: string }
   >({ status: 'pending' })
 
   useEffect(() => {
-    if (!payloadGuard.ok) return
     let disposed = false
     ensureSandpackerServiceWorker()
       .then(() => {
@@ -78,16 +55,7 @@ export function DesignSandpackerPreview(props: DesignSandpackerPreviewProps): JS
     return () => {
       disposed = true
     }
-  }, [payloadGuard.ok])
-
-  if (!payloadGuard.ok) {
-    return (
-      <SandpackerMessage
-        title="Preview source is too large"
-        detail={payloadGuard.reason}
-      />
-    )
-  }
+  }, [])
 
   if (serviceWorkerState.status === 'failed') {
     return (
@@ -118,30 +86,49 @@ function SandpackerPreviewSurface({
   artifactId,
   title,
   operations,
+  isActive = true,
   onOperationsChange,
   onSelectComponent,
 }: DesignSandpackerPreviewProps): JSX.Element {
   const workspaceId = useMemo(() => safeRouteSegment(artifactId), [artifactId])
-  const initial = useMemo(() => createSandpackerFiles(operations, title), [artifactId])
-  const [files, setFiles] = useState<FileTree>(initial.files)
+  const operationsSignature = useMemo(() => JSON.stringify(operations), [operations])
+  const projected = useMemo(() => createSandpackerFileTree(operations), [operations])
+  const [files, setFiles] = useState<FileTree>(projected.files)
   const [status, setStatus] = useState('Preparing preview')
-  const lastEmittedOperations = useRef(JSON.stringify(operations))
+  const lastImportedOperations = useRef(operationsSignature)
+  const lastEmittedOperations = useRef(operationsSignature)
   const lastEmittedSelectionId = useRef<string | null>(null)
   const previousArtifactId = useRef(artifactId)
+  const previousActive = useRef(isActive)
   const { client, iframeRef, error, errorDetails, selectedElement, hmrMessage } = useSandpacker({
     workspaceId,
   })
 
   useEffect(() => {
-    if (previousArtifactId.current === artifactId) return
+    const artifactChanged = previousArtifactId.current !== artifactId
+    const operationsChanged = lastImportedOperations.current !== operationsSignature
+    if (!artifactChanged && !operationsChanged) return
     previousArtifactId.current = artifactId
-    const next = createSandpackerFiles(operations, title)
-    setFiles(next.files)
-    editorService.reset()
-    editorService.getCurrentFileService().setFilesFromRemote(next.files)
-    lastEmittedOperations.current = JSON.stringify(operations)
+    lastImportedOperations.current = operationsSignature
+    const nextFiles = cloneFileTree(projected.files)
+    setFiles(nextFiles)
+    if (artifactChanged) editorService.reset()
+    editorService.getCurrentFileService().setFilesFromRemote(nextFiles)
+    lastEmittedOperations.current = operationsSignature
     lastEmittedSelectionId.current = null
-  }, [artifactId, operations, title])
+  }, [artifactId, operationsSignature, projected.files])
+
+  useEffect(() => {
+    const activated = isActive && !previousActive.current
+    previousActive.current = isActive
+    if (!activated) return
+    const nextFiles = cloneFileTree(projected.files)
+    setFiles(nextFiles)
+    editorService.getCurrentFileService().setFilesFromRemote(nextFiles)
+    lastImportedOperations.current = operationsSignature
+    lastEmittedOperations.current = operationsSignature
+    lastEmittedSelectionId.current = null
+  }, [isActive, operationsSignature, projected.files])
 
   useEffect(() => {
     editorService.setEditingMode(true)
@@ -176,17 +163,20 @@ function SandpackerPreviewSurface({
     const snapshot = selectedComponentFromSandpackerSelection({
       artifactId,
       selection: selectedElement,
-      virtualPathToOperationPath: initial.virtualPathToOperationPath,
+      virtualPathToOperationPath: projected.virtualPathToOperationPath,
     })
     if (!snapshot || snapshot.id === lastEmittedSelectionId.current) return
     lastEmittedSelectionId.current = snapshot.id
     onSelectComponent(snapshot)
-  }, [artifactId, initial.virtualPathToOperationPath, onSelectComponent, selectedElement])
+  }, [artifactId, projected.virtualPathToOperationPath, onSelectComponent, selectedElement])
 
   useEffect(() => {
     if (!client) return
     let cancelled = false
     setStatus('Syncing files')
+
+    console.log('update files ', files)
+
     client
       .updateTree(files)
       .then(() => {
@@ -207,12 +197,12 @@ function SandpackerPreviewSurface({
 
   useEffect(() => {
     if (!onOperationsChange) return
-    const next = updateOperationsFromFiles(operations, files, initial.importRestorers)
+    const next = updateOperationsFromFiles(operations, files, projected.previewOnlyContent)
     const serialized = JSON.stringify(next)
     if (serialized === lastEmittedOperations.current) return
     lastEmittedOperations.current = serialized
     onOperationsChange(next)
-  }, [files, initial.importRestorers, onOperationsChange, operations])
+  }, [files, onOperationsChange, operations, projected.previewOnlyContent])
 
   const restartPreview = async (): Promise<void> => {
     if (!client) return
@@ -292,80 +282,39 @@ function ensureSandpackerServiceWorker(): Promise<void> {
   return serviceWorkerPromise
 }
 
-export function createSandpackerFiles(
+export function createSandpackerFileTree(
   operations: DesignPatchFileOperation[],
-  title: string,
 ): {
   files: FileTree
-  entryPath: string
-  importRestorers: Map<string, (source: string) => string>
+  previewOnlyContent: Map<string, string>
   virtualPathToOperationPath: Map<string, string>
 } {
   const projectRoot = inferSandboxProjectRoot(operations)
   const projectedOperations = operations
-    .filter(operation => operation.kind !== 'delete' && operation.content)
+    .filter(operation => operation.kind !== 'delete' && operation.content !== undefined)
     .map(operation => ({
       operation,
       path: sandboxVirtualPathForOperation(operation.path, projectRoot),
     }))
-  const providedPaths = new Set(projectedOperations.map(operation => operation.path))
-  const existingEntryPath = preferredPath(providedPaths, [
-    '/src/index.tsx',
-    '/src/main.tsx',
-    '/src/index.jsx',
-    '/src/main.jsx',
-  ])
-  const componentEntryPath = preferredPath(providedPaths, [
-    '/src/App.tsx',
-    '/src/App.jsx',
-    '/src/app.tsx',
-    '/src/app.jsx',
-  ]) ?? projectedOperations.find(item => looksLikePreviewSourcePath(item.path))?.path
-  const entryPath = componentEntryPath ?? '/src/Generated.tsx'
-  const htmlEntryPath = existingEntryPath ?? '/src/index.tsx'
-  const importRestorers = new Map<string, (source: string) => string>()
   const virtualPathToOperationPath = new Map<string, string>()
-  const files: FileTree = {
-    '/package.json': JSON.stringify({
-      dependencies: {
-        '@vitejs/plugin-react': 'latest',
-        react: SANDPACKER_REACT_VERSION,
-        'react-dom': SANDPACKER_REACT_VERSION,
-      },
-      devDependencies: {
-        typescript: '5.3.3',
-      },
-    }, null, 2),
-    '/index.html': renderIndexHtml(title, htmlEntryPath),
-    '/src/telegraph-ui.tsx': telegraphUiStubSource,
-  }
-
-  if (!existingEntryPath) {
-    files['/src/index.tsx'] = renderEntrySource(entryPath)
-  }
+  const previewOnlyContent = new Map<string, string>()
+  const files: FileTree = {}
 
   for (const item of projectedOperations) {
-    const normalized = normalizePreviewImports(item.operation.content ?? '')
-    files[item.path] = normalizePreviewFileSource({
-      path: item.path,
-      source: normalized.source,
-      htmlEntryPath,
-    })
-    importRestorers.set(item.path, normalized.restore)
+    const source = item.operation.content ?? ''
+    const previewSource = normalizePreviewFileSource(item.path, source)
+    files[item.path] = previewSource
+    if (previewSource !== source) previewOnlyContent.set(item.path, previewSource)
     virtualPathToOperationPath.set(item.path, item.operation.path)
   }
 
-  if (!files[entryPath]) {
-    files[entryPath] = 'export default function GeneratedDesignPreview() { return <main>No preview source</main> }'
-  }
-
-  return { files, entryPath, importRestorers, virtualPathToOperationPath }
+  return { files, previewOnlyContent, virtualPathToOperationPath }
 }
 
 function updateOperationsFromFiles(
   operations: DesignPatchFileOperation[],
   files: FileTree,
-  importRestorers: Map<string, (source: string) => string>,
+  previewOnlyContent: Map<string, string>,
 ): DesignPatchFileOperation[] {
   const projectRoot = inferSandboxProjectRoot(operations)
   return operations.map(operation => {
@@ -373,246 +322,75 @@ function updateOperationsFromFiles(
     const path = sandboxVirtualPathForOperation(operation.path, projectRoot)
     const content = fileContent(files, path)
     if (content === undefined) return operation
-    const restore = importRestorers.get(path)
-    const restored = restore ? restore(content) : content
-    return restored === operation.content ? operation : { ...operation, content: restored }
+    if (content === previewOnlyContent.get(path)) return operation
+    return content === operation.content ? operation : { ...operation, content }
   })
 }
 
-function normalizePreviewImports(source: string): {
-  source: string
-  restore: (updatedSource: string) => string
-} {
-  return normalizeTelegraphImports(source)
+function normalizePreviewFileSource(path: string, source: string): string {
+  return path === '/package.json' ? normalizePreviewPackageJsonContent(source) : source
 }
 
-function normalizeTelegraphImports(source: string): {
-  source: string
-  restore: (updatedSource: string) => string
-} {
-  const matches = source.match(TELEGRAPH_UI_MODULE_IMPORT_PATTERN) ?? []
-  const sourceWithoutStubImport = source.replace(TELEGRAPH_UI_STUB_IMPORT_PATTERN, '')
-  const sourceWithoutUiImports = sourceWithoutStubImport.replace(TELEGRAPH_UI_MODULE_IMPORT_PATTERN, '')
-  if (matches.length === 0) return { source, restore: updatedSource => updatedSource }
-
-  const originalImportBlock = matches.join('').trimEnd()
-  const normalized = `${TELEGRAPH_UI_IMPORT_SOURCE}${sourceWithoutUiImports}`
-
-  return {
-    source: normalized,
-    restore: updatedSource => {
-      const restored = updatedSource.replace(TELEGRAPH_UI_STUB_IMPORT_PATTERN, '')
-      return originalImportBlock ? `${originalImportBlock}\n${restored}` : restored
-    },
-  }
-}
-
-function normalizePreviewFileSource(input: {
-  path: string
-  source: string
-  htmlEntryPath: string
-}): string {
-  if (input.path === '/index.html') {
-    return normalizeIndexHtmlEntryScript(input.source, input.htmlEntryPath)
-  }
-  if (input.path === '/package.json') {
-    return normalizePreviewPackageJson(input.source)
-  }
-  return input.source
-}
-
-function normalizeIndexHtmlEntryScript(source: string, entryPath: string): string {
-  const entryScript = `.${entryPath}?entry`
-  return source.replace(
-    /\bsrc=(['"])\/src\/(?:index|main)\.[tj]sx?(?:\?entry)?\1/gi,
-    (_match, quote: string) => `src=${quote}${entryScript}${quote}`,
-  )
-}
-
-function normalizePreviewPackageJson(source: string): string {
+function normalizePreviewPackageJsonContent(source: string): string {
   try {
     const parsed = JSON.parse(source) as unknown
-    if (!isPlainObject(parsed)) return source
-    const dependencies = isPlainObject(parsed.dependencies) ? parsed.dependencies : {}
-    const devDependencies = isPlainObject(parsed.devDependencies) ? parsed.devDependencies : {}
+    if (!isRecord(parsed)) return source
+    const dependencies = isRecord(parsed.dependencies) ? parsed.dependencies : undefined
+    if (!dependencies) return source
+    const normalizedDependencies = normalizePreviewDependencies(dependencies)
+    if (normalizedDependencies === dependencies) return source
     return JSON.stringify({
       ...parsed,
-      dependencies: {
-        ...dependencies,
-        react: SANDPACKER_REACT_VERSION,
-        'react-dom': SANDPACKER_REACT_VERSION,
-      },
-      devDependencies,
+      dependencies: normalizedDependencies,
     }, null, 2)
   } catch {
     return source
   }
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+function normalizePreviewDependencies(
+  dependencies: Record<string, unknown>,
+): Record<string, unknown> {
+  let normalized: Record<string, unknown> | undefined
+  const ensureNormalized = (): Record<string, unknown> => {
+    normalized ??= { ...dependencies }
+    return normalized
+  }
+
+  if (hasOwn(dependencies, 'react') || hasOwn(dependencies, 'react-dom')) {
+    const next = ensureNormalized()
+    next.react = SANDPACKER_REACT_VERSION
+    next['react-dom'] = SANDPACKER_REACT_VERSION
+  }
+
+  for (const name of Object.keys(dependencies)) {
+    if (name.startsWith('@radix-ui/react-') && dependencies[name] !== 'latest') {
+      ensureNormalized()[name] = 'latest'
+    }
+  }
+
+  return normalized ?? dependencies
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-function renderIndexHtml(title: string, entryPath: string): string {
-  const entryScript = `.${entryPath}?entry`
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(title)}</title>
-    <script src="${escapeHtml(tailwindBrowserUrl)}"></script>
-    <style>
-      :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --primary: 222.2 47.4% 11.2%;
-        --primary-foreground: 210 40% 98%;
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
-        --border: 214.3 31.8% 91.4%;
-      }
-      body { margin: 0; min-height: 100vh; background: hsl(var(--background)); color: hsl(var(--foreground)); }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="${escapeHtml(entryScript)}"></script>
-  </body>
-</html>`
+function hasOwn(value: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key)
 }
-
-function renderEntrySource(entryPath: string): string {
-  return `import React from 'react'
-import { createRoot } from 'react-dom/client'
-import GeneratedDesignPreview from '${entryPath}'
-
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <GeneratedDesignPreview />
-  </React.StrictMode>,
-)
-`
-}
-
-const telegraphUiStubSource = `import React from 'react'
-
-type ElementProps<Tag extends keyof React.JSX.IntrinsicElements> = React.JSX.IntrinsicElements[Tag] & {
-  className?: string
-}
-
-type VariantProps = {
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline'
-}
-
-function cx(...items: Array<string | false | null | undefined>): string {
-  return items.filter(Boolean).join(' ')
-}
-
-export function Badge({ className, variant, ...props }: ElementProps<'span'> & VariantProps) {
-  return <span className={cx('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium', variant === 'secondary' ? 'bg-slate-100 text-slate-700' : variant === 'destructive' ? 'bg-red-600 text-white' : variant === 'outline' ? 'bg-white' : 'bg-slate-900 text-white', className)} {...props} />
-}
-
-export function Button({ className, variant, ...props }: ElementProps<'button'> & VariantProps) {
-  return <button className={cx('inline-flex min-h-9 items-center justify-center rounded-md border px-3 text-sm font-medium', variant === 'destructive' ? 'bg-red-600 text-white' : variant === 'outline' ? 'bg-white text-slate-900' : 'bg-slate-900 text-white', className)} {...props} />
-}
-
-export function Card({ className, ...props }: ElementProps<'div'>) {
-  return <div className={cx('rounded-lg border bg-white text-slate-950 shadow-sm', className)} {...props} />
-}
-
-export function CardHeader({ className, ...props }: ElementProps<'div'>) {
-  return <div className={cx('flex flex-col gap-1.5 p-6', className)} {...props} />
-}
-
-export function CardContent({ className, ...props }: ElementProps<'div'>) {
-  return <div className={cx('p-6 pt-0', className)} {...props} />
-}
-
-export function CardTitle({ className, ...props }: ElementProps<'h3'>) {
-  return <h3 className={cx('text-xl font-semibold leading-none', className)} {...props} />
-}
-
-export function CardDescription({ className, ...props }: ElementProps<'p'>) {
-  return <p className={cx('text-sm text-slate-500', className)} {...props} />
-}
-
-export function Input({ className, ...props }: ElementProps<'input'>) {
-  return <input className={cx('flex h-10 w-full rounded-md border px-3 text-sm', className)} {...props} />
-}
-
-export function Textarea({ className, ...props }: ElementProps<'textarea'>) {
-  return <textarea className={cx('min-h-24 w-full rounded-md border px-3 py-2 text-sm', className)} {...props} />
-}
-
-export function Tabs({ className, ...props }: ElementProps<'div'>) {
-  return <div className={cx('space-y-3', className)} {...props} />
-}
-
-export function TabsList({ className, ...props }: ElementProps<'div'>) {
-  return <div className={cx('inline-flex rounded-md bg-slate-100 p-1', className)} {...props} />
-}
-
-export function TabsTrigger({ className, ...props }: ElementProps<'button'>) {
-  return <button className={cx('rounded px-3 py-1.5 text-sm font-medium', className)} {...props} />
-}
-
-export function TabsContent({ className, ...props }: ElementProps<'div'>) {
-  return <div className={className} {...props} />
-}
-`
 
 function fileContent(files: FileTree, path: string): string | undefined {
   if (!Object.prototype.hasOwnProperty.call(files, path)) return undefined
   return (files as Partial<Record<string, string>>)[path]
 }
 
-function preferredPath(paths: Set<string>, candidates: string[]): string | undefined {
-  return candidates.find(candidate => paths.has(candidate))
-}
-
-function looksLikePreviewSourcePath(path: string): boolean {
-  if (!/\.(tsx|jsx)$/i.test(path)) return false
-  return !path.endsWith('.test.tsx') && !path.endsWith('.test.jsx')
+function cloneFileTree(files: FileTree): FileTree {
+  return { ...files }
 }
 
 function toLeadingSlash(path: string): string {
   return path.startsWith('/') ? path : `/${path}`
-}
-
-function validateSandpackerPayload(operations: DesignPatchFileOperation[]): { ok: true } | { ok: false; reason: string } {
-  const sourceOperations = operations.filter(operation => operation.kind !== 'delete' && operation.content)
-  if (sourceOperations.length > SANDPACKER_MAX_OPERATION_FILES) {
-    return {
-      ok: false,
-      reason: `This artifact has ${String(sourceOperations.length)} source files; preview is capped at ${String(SANDPACKER_MAX_OPERATION_FILES)} files.`,
-    }
-  }
-
-  let totalSourceChars = 0
-  for (const operation of sourceOperations) {
-    const sourceChars = operation.content?.length ?? 0
-    totalSourceChars += sourceChars
-    if (sourceChars > SANDPACKER_MAX_FILE_SOURCE_CHARS) {
-      return {
-        ok: false,
-        reason: `${operation.path} is ${String(sourceChars)} characters; preview is capped at ${String(SANDPACKER_MAX_FILE_SOURCE_CHARS)} characters per file.`,
-      }
-    }
-  }
-
-  if (totalSourceChars > SANDPACKER_MAX_TOTAL_SOURCE_CHARS) {
-    return {
-      ok: false,
-      reason: `This artifact has ${String(totalSourceChars)} source characters; preview is capped at ${String(SANDPACKER_MAX_TOTAL_SOURCE_CHARS)} characters.`,
-    }
-  }
-
-  return { ok: true }
 }
 
 function selectedComponentFromSandpackerSelection({
@@ -679,14 +457,6 @@ function formatHmr(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return 'No HMR event'
   const type = 'type' in payload ? String(payload.type) : 'update'
   return `HMR ${type}`
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 function SandpackerMessage({ title, detail }: { title: string; detail?: string }): JSX.Element {

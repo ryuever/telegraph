@@ -84,6 +84,52 @@ describe('createDesignArtifactViewModel', () => {
     expect(model.code).toContain('dashboard')
   })
 
+  it('uses artifact virtual files as preview patch operations', () => {
+    const model = createDesignArtifactViewModel(artifact({
+      kind: 'design-patch',
+      output: {
+        id: 'profile-page',
+        kind: 'design-patch',
+        title: 'Profile page',
+        files: {
+          '/package.json': '{"dependencies":{"react":"19.1.0"}}',
+          '/src/App.tsx': 'export default function App() { return <main>Profile</main> }',
+        },
+      },
+    }))
+
+    expect(model.viewKind).toBe('patch')
+    expect(model.patchSummary).toEqual({ adds: 2, updates: 0, deletes: 0 })
+    expect(extractDesignPatchOperations(artifact({
+      kind: 'design-patch',
+      output: {
+        files: {
+          '/package.json': '{"dependencies":{"react":"19.1.0"}}',
+          '/src/App.tsx': 'export default function App() { return <main>Profile</main> }',
+        },
+      },
+    }))).toEqual([
+      { kind: 'add', path: 'package.json', content: '{"dependencies":{"react":"19.1.0"}}' },
+      { kind: 'add', path: 'src/App.tsx', content: 'export default function App() { return <main>Profile</main> }' },
+    ])
+  })
+
+  it('prefers artifact files over stale operations when both are present', () => {
+    expect(extractDesignPatchOperations(artifact({
+      kind: 'design-patch',
+      output: {
+        files: {
+          '/src/App.tsx': 'fresh artifact file',
+        },
+        operations: [
+          { kind: 'add', path: 'src/App.tsx', content: 'stale operation' },
+        ],
+      },
+    }))).toEqual([
+      { kind: 'add', path: 'src/App.tsx', content: 'fresh artifact file' },
+    ])
+  })
+
   it('extracts valid patch operations and rejects malformed operations', () => {
     expect(extractDesignPatchOperations(artifact({
       kind: 'canvas_patch',

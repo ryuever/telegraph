@@ -44,24 +44,11 @@ vi.mock('@sandpacker/worker/service-worker-entry?worker&url', () => ({
   default: '/sandpacker-service-worker.js',
 }))
 
-const { createSandpackerFiles } = await import('../DesignSandpackerPreview')
+const { createSandpackerFileTree } = await import('../DesignSandpackerPreview')
 
-describe('createSandpackerFiles', () => {
-  it('uses a sandbox-relative entry script so iframe requests stay under the Sandpacker route', () => {
-    const result = createSandpackerFiles([
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/src/App.tsx',
-        content: 'export default function LoginPage() { return <main>Login</main> }',
-      },
-    ], 'Login page')
-
-    expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
-    expect(result.files['/index.html']).not.toContain('src="/src/index.tsx?entry"')
-  })
-
-  it('rewrites artifact index.html absolute module entries to the Sandpacker route', () => {
-    const result = createSandpackerFiles([
+describe('createSandpackerFileTree', () => {
+  it('projects generated artifact files without adding preview fallback files', () => {
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/login-page/package.json',
@@ -82,42 +69,24 @@ describe('createSandpackerFiles', () => {
         path: 'apps/design/src/generated/login-page/src/App.tsx',
         content: 'export default function App() { return <main>Login</main> }',
       },
-    ], 'Login page')
+    ])
 
-    expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
-    expect(result.files['/index.html']).not.toContain('src="/src/index.tsx"')
-  })
-
-  it('rewrites absolute module entries even when src appears before type', () => {
-    const result = createSandpackerFiles([
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/package.json',
-        content: JSON.stringify({ dependencies: { react: '19.1.0', 'react-dom': '19.1.0' } }),
+    expect(JSON.parse(result.files['/package.json'])).toEqual({
+      dependencies: {
+        react: 'latest',
+        'react-dom': 'latest',
       },
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/index.html',
-        content: '<div id="root"></div><script src="/src/index.tsx?entry" type="module"></script>',
-      },
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/src/index.tsx',
-        content: 'import "./App"',
-      },
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/src/App.tsx',
-        content: 'export default function App() { return <main>Login</main> }',
-      },
-    ], 'Login page')
-
-    expect(result.files['/index.html']).toContain('src="./src/index.tsx?entry"')
-    expect(result.files['/index.html']).toContain('type="module"')
+    })
+    expect(result.files).toMatchObject({
+      '/index.html': '<div id="root"></div><script type="module" src="/src/index.tsx"></script>',
+      '/src/index.tsx': 'import "./App"',
+      '/src/App.tsx': 'export default function App() { return <main>Login</main> }',
+    })
+    expect(result.files['/src/Generated.tsx']).toBeUndefined()
   })
 
   it('remaps a generated project folder to the Sandpacker root', () => {
-    const result = createSandpackerFiles([
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/login-page/package.json',
@@ -139,7 +108,7 @@ describe('createSandpackerFiles', () => {
         path: 'apps/design/src/generated/login-page/src/App.tsx',
         content: 'export default function App() { return <main>Login</main> }',
       },
-    ], 'Login page')
+    ])
 
     expect(result.files['/package.json']).toContain('@radix-ui/react-tabs')
     expect(result.files['/src/index.tsx']).toBe('import "./App"')
@@ -148,8 +117,8 @@ describe('createSandpackerFiles', () => {
       .toBe('apps/design/src/generated/login-page/src/App.tsx')
   })
 
-  it('pins preview React dependencies even when artifact package.json requests latest or canary', () => {
-    const result = createSandpackerFiles([
+  it('normalizes preview React dependencies for Sandpacker peer resolution', () => {
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/login-page/package.json',
@@ -165,33 +134,47 @@ describe('createSandpackerFiles', () => {
         path: 'apps/design/src/generated/login-page/src/App.tsx',
         content: 'export default function App() { return <main>Login</main> }',
       },
-    ], 'Login page')
+    ])
 
-    expect(result.files['/package.json']).toContain('"react": "18.3.1"')
-    expect(result.files['/package.json']).toContain('"react-dom": "18.3.1"')
+    expect(result.files['/package.json']).toContain('"react": "latest"')
+    expect(result.files['/package.json']).toContain('"react-dom": "latest"')
     expect(result.files['/package.json']).not.toContain('canary')
-    expect(result.files['/package.json']).not.toContain('"react": "latest"')
+    expect(result.files['/package.json']).not.toContain('"react": "18.3.1"')
   })
 
-  it('uses the bundled Tailwind browser runtime instead of the production-warning CDN', () => {
-    const result = createSandpackerFiles([], 'Empty preview')
+  it('normalizes Radix primitive versions for the Sandpacker esm resolver', () => {
+    const result = createSandpackerFileTree([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: JSON.stringify({
+          dependencies: {
+            react: '19.1.0',
+            'react-dom': '19.1.0',
+            '@radix-ui/react-progress': '1.2.3',
+            '@radix-ui/react-slot': '^1.2.3',
+          },
+        }, null, 2),
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: 'export default function App() { return <main>Login</main> }',
+      },
+    ])
 
-    expect(result.files['/index.html']).toContain('<script src="')
-    expect(result.files['/index.html']).not.toContain('cdn.tailwindcss.com')
-  })
-
-  it('keeps the shared UI stub typed with TSX generics', () => {
-    const result = createSandpackerFiles([], 'Empty preview')
-    const uiStub = result.files['/src/telegraph-ui.tsx']
-
-    expect(uiStub).toContain('type ElementProps<Tag extends keyof React.JSX.IntrinsicElements>')
-    expect(uiStub).toContain("ElementProps<'textarea'>")
-    expect(uiStub).toContain('Array<string | false | null | undefined>')
-    expect(uiStub).toContain('export function Textarea')
+    expect(JSON.parse(result.files['/package.json'])).toMatchObject({
+      dependencies: {
+        react: 'latest',
+        'react-dom': 'latest',
+        '@radix-ui/react-progress': 'latest',
+        '@radix-ui/react-slot': 'latest',
+      },
+    })
   })
 
   it('leaves unimported shared UI names untouched so project dependencies stay explicit', () => {
-    const result = createSandpackerFiles([
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/FormPage.tsx',
@@ -201,15 +184,16 @@ describe('createSandpackerFiles', () => {
           '}',
         ].join('\n'),
       },
-    ], 'Form page')
+    ])
 
     const source = result.files['/apps/design/src/generated/FormPage.tsx']
 
     expect(source).not.toContain('/src/telegraph-ui.tsx')
+    expect(result.files['/src/telegraph-ui.tsx']).toBeUndefined()
   })
 
-  it('normalizes Textarea imports from shared UI modules', () => {
-    const result = createSandpackerFiles([
+  it('preserves workspace UI imports instead of rewriting to preview stubs', () => {
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/FormPage.tsx',
@@ -221,16 +205,16 @@ describe('createSandpackerFiles', () => {
           '}',
         ].join('\n'),
       },
-    ], 'Form page')
+    ])
 
     const source = result.files['/apps/design/src/generated/FormPage.tsx']
 
-    expect(source).toContain("Textarea } from '/src/telegraph-ui.tsx'")
-    expect(source).not.toContain('@/packages/ui/components/ui/textarea')
+    expect(source).toContain("@/packages/ui/components/ui/textarea")
+    expect(source).not.toContain('/src/telegraph-ui.tsx')
   })
 
-  it('does not strip React hook imports when normalizing workspace UI imports', () => {
-    const result = createSandpackerFiles([
+  it('preserves React hook and workspace UI imports verbatim', () => {
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/TaskPage.tsx',
@@ -244,18 +228,17 @@ describe('createSandpackerFiles', () => {
           '}',
         ].join('\n'),
       },
-    ], 'Task page')
+    ])
 
     const source = result.files['/apps/design/src/generated/TaskPage.tsx']
 
     expect(source).toContain("import { useState } from 'react'")
-    expect(source).toContain("Button,")
-    expect(source).toContain("from '/src/telegraph-ui.tsx'")
-    expect(source).not.toContain('@/packages/ui/components/ui/button')
+    expect(source).toContain("@/packages/ui/components/ui/button")
+    expect(source).not.toContain('/src/telegraph-ui.tsx')
   })
 
   it('preserves generated project alias imports for the Sandpacker Vite resolver', () => {
-    const result = createSandpackerFiles([
+    const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/login-page/package.json',
@@ -294,7 +277,7 @@ describe('createSandpackerFiles', () => {
         path: 'apps/design/src/generated/login-page/src/styles.css',
         content: 'body { margin: 0 }',
       },
-    ], 'Login page')
+    ])
 
     const source = result.files['/src/App.tsx']
 

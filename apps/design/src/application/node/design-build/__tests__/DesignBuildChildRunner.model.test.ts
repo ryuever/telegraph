@@ -372,6 +372,74 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
     })
   })
 
+  it('keeps generated React pins when merging submitted package.json content', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield toolResult('call-create', 'create_shadcn_project', { artifact: designPatchArtifact('project') })
+      yield* submitToolEvents({
+        artifact: {
+          id: 'artifact-project',
+          kind: 'design-patch',
+          title: 'Artifact project',
+          operations: [
+            {
+              kind: 'update',
+              path: 'apps/design/src/generated/project/package.json',
+              content: JSON.stringify({
+                dependencies: {
+                  react: 'latest',
+                  'react-dom': '19.3.0-canary-fef12a01-20260413',
+                  '@radix-ui/react-slot': '^1.2.3',
+                },
+              }),
+            },
+          ],
+        },
+      })
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    const result = await runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      tools: [
+        workflowTool('create_shadcn_project'),
+      ],
+      requiredTools: [
+        'create_shadcn_project',
+      ],
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })
+
+    const output = result.output as {
+      artifact?: {
+        operations?: Array<{ path: string; content?: string }>
+      }
+    }
+    const packageOperation = output.artifact?.operations?.find(operation => operation.path.endsWith('/package.json'))
+    const packageJson = JSON.parse(packageOperation?.content ?? '{}') as {
+      dependencies?: Record<string, string>
+    }
+
+    expect(packageJson.dependencies).toEqual(expect.objectContaining({
+      react: '19.1.0',
+      'react-dom': '19.1.0',
+      '@radix-ui/react-slot': '^1.2.3',
+    }))
+    expect(packageOperation?.content).not.toContain('canary')
+    expect(packageOperation?.content).not.toContain('"react":"latest"')
+  })
+
   it('rejects component retrieval submit when shadcn selection tools were not completed', async () => {
     streamPiAiRuntimeEvents.mockImplementation(async function* () {
       await Promise.resolve()

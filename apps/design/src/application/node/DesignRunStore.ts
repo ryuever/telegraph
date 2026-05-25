@@ -108,12 +108,34 @@ export function designRunSnapshotFromLedger(
     updatedAt,
     completedAt: record.completedAt,
     error: record.failureMessage,
+    artifactCount: record.artifactRefs.length,
     events: summaries.length > 0
       ? summaries
       : [{
           type: 'run_queued',
           ts: record.createdAt,
         }],
+  }
+}
+
+export function designRunSnapshotFromRecord(record: AgentRunRecord): DesignAgentRunRecordSnapshot {
+  const startedAt = record.startedAt ?? record.createdAt
+  const updatedAt = record.lastEventAt ?? record.completedAt ?? startedAt
+
+  return {
+    runId: record.runId,
+    sessionId: record.sessionId,
+    prompt: record.input?.message ?? record.inputPreview ?? '',
+    status: designStatusFromLedger(record.status),
+    startedAt,
+    updatedAt,
+    completedAt: record.completedAt,
+    error: record.failureMessage,
+    artifactCount: record.artifactRefs.length,
+    events: [{
+      type: 'run_queued',
+      ts: record.createdAt,
+    }],
   }
 }
 

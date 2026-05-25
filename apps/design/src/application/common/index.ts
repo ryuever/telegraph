@@ -56,6 +56,7 @@ export interface DesignAgentRunRecordSnapshot {
   updatedAt: number;
   completedAt?: number;
   error?: string;
+  artifactCount?: number;
   events: DesignAgentRunEventSnapshot[];
 }
 

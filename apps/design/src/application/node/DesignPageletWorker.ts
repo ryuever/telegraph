@@ -47,7 +47,10 @@ import type { RemoteArtifactRef } from '@/packages/remote-protocol';
 import { DesignBuildRuntime } from './design-build/DesignBuildRuntime';
 import { DesignExportPipeline } from './design-build/DesignExportPipeline';
 import { DesignHarnessRunController } from './DesignHarnessRunController';
-import { designRunSnapshotFromLedger } from './DesignRunStore';
+import {
+  designRunSnapshotFromLedger,
+  designRunSnapshotFromRecord,
+} from './DesignRunStore';
 
 export const DesignPageletWorkerId = createId('DesignPageletWorker');
 
@@ -90,9 +93,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
           await this.recoveredRunsReady;
           await this.runEvents.flushAll();
           const records = await this.runs.listRuns();
-          return Promise.all(records.map(async record =>
-            designRunSnapshotFromLedger(record, await this.runs.listRunEvents(record.runId)),
-          ));
+          return records.map(record => designRunSnapshotFromRecord(record));
         },
         getAgentRun: async (runId: string): Promise<DesignAgentRunRecordSnapshot | null> => {
           await this.recoveredRunsReady;

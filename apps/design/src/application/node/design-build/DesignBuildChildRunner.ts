@@ -14,6 +14,7 @@ import {
 } from '@/packages/agent/skills'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
+import { mergeGeneratedPackageJsonContent } from '@/apps/design/application/common/design-package-json'
 import type {
   DesignBuildChildProfile,
   DesignBuildChildProfileId,
@@ -558,41 +559,19 @@ function mergeOperationsByPath(
   first: DesignPatchArtifact['operations'][number] | undefined,
   second: DesignPatchArtifact['operations'][number],
 ): DesignPatchArtifact['operations'][number] {
-  if (!first) return second
-  if (!first.content || !second.content || !second.path.endsWith('/package.json')) return second
-  const firstJson = parseRecord(first.content)
-  const secondJson = parseRecord(second.content)
-  if (!firstJson || !secondJson) return second
+  if (second.kind === 'delete' || !second.path.endsWith('/package.json')) return second
+  if (!first) {
+    return {
+      ...second,
+      content: mergeGeneratedPackageJsonContent(undefined, second.content) ?? second.content,
+    }
+  }
+  if (!first.content || !second.content) return second
   return {
     ...second,
-    kind: first.kind === 'add' && second.kind !== 'delete' ? 'add' : second.kind,
-    content: JSON.stringify({
-      ...firstJson,
-      ...secondJson,
-      dependencies: {
-        ...recordField(firstJson, 'dependencies'),
-        ...recordField(secondJson, 'dependencies'),
-      },
-      devDependencies: {
-        ...recordField(firstJson, 'devDependencies'),
-        ...recordField(secondJson, 'devDependencies'),
-      },
-    }, null, 2),
+    kind: first.kind === 'add' ? 'add' : second.kind,
+    content: mergeGeneratedPackageJsonContent(first.content, second.content) ?? second.content,
   }
-}
-
-function parseRecord(content: string): Record<string, unknown> | undefined {
-  try {
-    const value = JSON.parse(content) as unknown
-    return isRecord(value) ? value : undefined
-  } catch {
-    return undefined
-  }
-}
-
-function recordField(value: Record<string, unknown>, key: string): Record<string, unknown> {
-  const field = value[key]
-  return isRecord(field) ? field : {}
 }
 
 function mergeArtifactMetadata(

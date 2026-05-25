@@ -30,6 +30,7 @@ interface DesignArtifactWorkbenchProps {
   activeArtifactId: string | null
   requestedArtifactIds: Set<string>
   applyStates?: Map<string, ArtifactApplyState>
+  isActive?: boolean
   mode: ArtifactMode
   selectedComponent?: DesignSelectedComponent | null
   dirtyOperationCount?: number
@@ -47,6 +48,7 @@ export function DesignArtifactWorkbench({
   activeArtifactId,
   requestedArtifactIds,
   applyStates,
+  isActive = true,
   mode,
   selectedComponent,
   dirtyOperationCount = 0,
@@ -216,6 +218,7 @@ export function DesignArtifactWorkbench({
           <ArtifactPreview
             artifact={activeArtifact}
             viewModel={viewModel}
+            isActive={isActive}
             selectedComponent={selectedComponent}
             onSelectComponent={onSelectComponent}
             onPatchOperationsChange={onPatchOperationsChange}
@@ -269,12 +272,14 @@ function artifactRevisionMeta(artifact: DesignProjectedArtifact): {
 function ArtifactPreview({
   artifact,
   viewModel,
+  isActive,
   selectedComponent,
   onSelectComponent,
   onPatchOperationsChange,
 }: {
   artifact: DesignProjectedArtifact
   viewModel: ReturnType<typeof createDesignArtifactViewModel>
+  isActive: boolean
   selectedComponent?: DesignSelectedComponent | null
   onSelectComponent?: (component: DesignSelectedComponent) => void
   onPatchOperationsChange?: (artifactId: string, operations: DesignPatchFileOperation[]) => void
@@ -302,6 +307,7 @@ function ArtifactPreview({
           artifactId={artifact.id}
           title={viewModel.title}
           operations={operations}
+          isActive={isActive}
           selectedPath={selectedComponent?.path}
           onSelectComponent={onSelectComponent}
           onOperationsChange={(nextOperations) => {

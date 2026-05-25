@@ -26,12 +26,14 @@ vi.mock('../DesignWorkspace', () => ({
     initialPrompt,
     sessionId,
     initialState,
+    isActive,
     onReturnToEntry,
     onSessionUpdate,
   }: {
     initialPrompt: string
     sessionId?: string
     initialState?: { messages: Array<{ content: string }> }
+    isActive?: boolean
     onReturnToEntry?: () => void
     onSessionUpdate?: (sessionId: string, summary: { status: 'running' | 'completed' | 'failed' | 'cancelled'; artifactCount: number }) => void
   }) => {
@@ -50,6 +52,7 @@ vi.mock('../DesignWorkspace', () => ({
     return (
       <div data-testid="workspace">
         <div>Workspace: {initialPrompt}</div>
+        <div>Active: {isActive ? 'yes' : 'no'}</div>
         {initialState && <div>Restored: {initialState.messages.map(message => message.content).join(' / ')}</div>}
         <div>Edits {initialPrompt}: {edits}</div>
         {onReturnToEntry && (
@@ -190,6 +193,7 @@ describe('DesignView', () => {
     })
 
     expect(activeWorkspaceText(container)).toContain('Workspace: make a profile page')
+    expect(activeWorkspaceText(container)).toContain('Active: yes')
     expect(activeWorkspaceText(container)).toContain('Edits make a profile page: 1')
     expect(workspaceLifecycle.mounts).toBe(2)
     expect(workspaceLifecycle.unmounts).toBe(0)
@@ -205,6 +209,7 @@ describe('DesignView', () => {
         startedAt: 100,
         updatedAt: 200,
         completedAt: 200,
+        artifactCount: 1,
         events: [],
       },
     ])
@@ -235,14 +240,17 @@ describe('DesignView', () => {
     })
 
     expect(container.textContent).toContain('restore this design')
+    expect(findButtonByLabelText(container, 'restore this design')?.getAttribute('title')).toContain('1 artifacts')
+    expect(serviceMocks.getAgentRunProjection).not.toHaveBeenCalled()
 
     await act(async () => {
       findButtonByLabelText(container, 'restore this design')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await Promise.resolve()
+      await Promise.resolve()
     })
 
     expect(activeWorkspaceText(container)).toContain('Restored: restore this design / Restored assistant text')
-    expect(serviceMocks.getAgentRunProjection).toHaveBeenCalledWith('run-history', expect.any(AbortSignal))
+    expect(serviceMocks.getAgentRunProjection).toHaveBeenCalledWith('run-history')
   })
 })
 
