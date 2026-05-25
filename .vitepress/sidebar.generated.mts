@@ -173,6 +173,10 @@ export const wikiSidebar = {
         {
           "text": "I-006 DesignBuild Child 输出不应依赖自然语言 JSON 文本解析",
           "link": "/issue/20260522-design-build-child-structured-output-contract"
+        },
+        {
+          "text": "I-007 DesignBuild Worker 未调用 submit_design_child_output 导致 run failed",
+          "link": "/issue/20260525-design-build-submit-tool-not-called"
         }
       ]
     }

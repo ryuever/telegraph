@@ -7,7 +7,7 @@ description: >
   作为业务协议，应改为 tool calling 结构化提交与 stage schema 校验。
 category: issue
 created: 2026-05-22
-updated: 2026-05-22
+updated: 2026-05-25
 tags:
   - design-build
   - structured-output
@@ -22,6 +22,9 @@ references:
   - id: D-016
     rel: derived-from
     file: ../discussion/20260521-design-page-agent-generation-product-architecture.md
+  - id: I-007
+    rel: related-to
+    file: ./20260525-design-build-submit-tool-not-called.md
 ---
 
 # DesignBuild Child 输出不应依赖自然语言 JSON 文本解析

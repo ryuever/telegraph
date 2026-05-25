@@ -90,6 +90,7 @@ features:
 | I-004 | [20260519-pi-subagents-structured-plan-parsing.md](./issue/20260519-pi-subagents-structured-plan-parsing.md) | pi-subagents 触发不应由自然语言 parser 决定 | Chat Subagents 卡片已可见后，记录第一次 parser 修复为何破坏使用性；正确链路是 parent model 通过 `subagent` tool call 决定是否 delegation。 |
 | I-005 | [20260521-design-page-preview-sandpacker-stabilization.md](./issue/20260521-design-page-preview-sandpacker-stabilization.md) | Design Page Preview 与 Sandpacker 稳定化问题串复盘 | 归档 Design Page 一句话出码到 iframe preview 可运行过程中暴露的页面状态、消息 pending、JSON 输出、Sandpacker 依赖、service worker scope、entry 请求、JSX tagger、CDN 与 UI stub 缺失问题。 |
 | I-006 | [20260522-design-build-child-structured-output-contract.md](./issue/20260522-design-build-child-structured-output-contract.md) | DesignBuild Child 输出不应依赖自然语言 JSON 文本解析 | 记录 DesignBuild child agent 因非严格 JSON、连续 JSON、漏逗号、未输出 JSON object 导致 run 失败的根因；结论是改用 tool calling 结构化提交与 stage schema 校验。 |
+| I-007 | [20260525-design-build-submit-tool-not-called.md](./issue/20260525-design-build-submit-tool-not-called.md) | DesignBuild Worker 未调用 submit_design_child_output 导致 run failed | 记录 Design Worker 未调用最终提交工具时的协议失败路径，区分 submit tool 缺失、schema 错误与 preview 编译错误，并沉淀后续 degraded artifact 兜底方向。 |
 
 ### reference/ — 参考手册
 
