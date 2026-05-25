@@ -24,6 +24,7 @@
       "@/apps/chat/*": ["../chat/src/*"],
       "@/apps/cli-gateway/*": ["../cli-gateway/src/*"],
       "@/apps/remote-control/*": ["../remote-control/src/*"],
+      "@/docs/*": ["../../docs/*"],
       "@/packages/ui/useOrchestratorDashboard": ["../../packages/ui/src/hooks/useOrchestratorDashboard.ts"],
       "@/packages/ui/*": ["../../packages/ui/src/*"],
       "@/packages/stores": ["../../packages/stores/src/index.ts"],

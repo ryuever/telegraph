@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
-import { Activity, Cable, ListTree, MessageCircle, Palette, Settings, Sparkles } from 'lucide-react';
+import { Activity, Cable, ListTree, MessageCircle, Palette, Settings } from 'lucide-react';
 import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
 import { PageletHost } from '@/apps/main/application/browser/PageletHost';
 import { cn } from '@/packages/ui/lib/utils';
 import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common';
+import telegraphIconUrl from '@/docs/assets/telegraph-icon.svg';
 
 import {
   DESIGN_PAGE,
@@ -20,14 +21,6 @@ const PAGE_ICONS: Record<PageConfig['id'], typeof Palette> = {
   'run-console': ListTree,
   monitor: Activity,
   connection: Cable,
-};
-
-const PAGE_ACCENTS: Record<PageConfig['id'], string> = {
-  design: 'bg-accent-lilac text-white',
-  chat: 'bg-accent-coral text-white',
-  'run-console': 'bg-teal-700 text-white',
-  monitor: 'bg-accent-mint text-slate-900',
-  connection: 'bg-primary text-primary-foreground',
 };
 
 const ACTIVE_PAGE_STORAGE_KEY = 'telegraph.activePageId';
@@ -73,20 +66,17 @@ function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside className="flex w-[216px] shrink-0 flex-col border-r border-border bg-card/90">
-        <div className="border-b border-border px-4 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-              <Sparkles size={16} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">Telegraph</div>
-              <div className="text-[11px] text-muted-foreground">AI Agent Desktop</div>
-            </div>
+      <aside className="flex w-[60px] shrink-0 flex-col items-center border-r border-border bg-card/95">
+        <div className="flex h-12 w-full items-center justify-center border-b border-border">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[0_0_24px_rgba(255,84,54,0.18)]"
+            title="Telegraph"
+          >
+            <img src={telegraphIconUrl} alt="Telegraph" className="h-7 w-7 rounded-[5px]" />
           </div>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
           <div className="space-y-1">
             {ALL_PAGES.map((page) => {
               const Icon = PAGE_ICONS[page.id];
@@ -96,26 +86,18 @@ function App(): React.JSX.Element {
                   key={page.id}
                   type="button"
                   onClick={() => { selectPage(page); }}
+                  title={`${page.label} · ${page.description}`}
+                  aria-label={page.label}
                   className={cn(
-                    'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors',
+                    'group relative flex h-10 w-10 items-center justify-center rounded-md text-center transition-colors',
                     isActive
-                      ? 'bg-surface-soft text-foreground shadow-sm ring-1 ring-border'
+                      ? 'bg-surface-soft text-foreground shadow-sm ring-1 ring-primary/25'
                       : 'text-muted-foreground hover:bg-surface-soft/70 hover:text-foreground',
                   )}
                 >
-                  <span
-                    className={cn(
-                      'flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors',
-                      isActive ? PAGE_ACCENTS[page.id] : 'bg-muted text-muted-foreground group-hover:bg-card',
-                    )}
-                  >
-                    <Icon size={15} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-medium leading-4">{page.label}</span>
-                    <span className="block truncate text-[10.5px] leading-4 text-muted-foreground">
-                      {page.description}
-                    </span>
+                  {isActive && <span className="absolute left-0 top-2 h-6 w-0.5 rounded-r bg-primary" />}
+                  <span className={cn('transition-colors', isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')}>
+                    <Icon size={18} />
                   </span>
                 </button>
               );
@@ -123,25 +105,83 @@ function App(): React.JSX.Element {
           </div>
         </nav>
 
-        <div className="border-t border-border p-2.5">
+        <div className="w-full border-t border-border p-2">
           <button
             type="button"
             onClick={() => { void mainWindowClient.openSettingWindow(); }}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
+            aria-label="Open Settings Window"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
             title="Open Settings Window"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <Settings size={15} />
-            </span>
-            <span>Settings</span>
+            <Settings size={18} />
           </button>
         </div>
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-1 bg-background">
-        <PageletHost activePage={activePage} runConsoleFocus={runConsoleFocus} />
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+        <AppContextBar
+          activePage={activePage}
+          onOpenSettings={() => { void mainWindowClient.openSettingWindow(); }}
+        />
+        <div className="min-h-0 min-w-0 flex-1">
+          <PageletHost activePage={activePage} runConsoleFocus={runConsoleFocus} />
+        </div>
       </main>
     </div>
+  );
+}
+
+function AppContextBar({
+  activePage,
+  onOpenSettings,
+}: {
+  activePage: PageConfig;
+  onOpenSettings: () => void;
+}): React.JSX.Element {
+  const Icon = PAGE_ICONS[activePage.id];
+
+  return (
+    <header
+      className="relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 shadow-[inset_0_-1px_0_rgba(255,255,255,0.035)]"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary shadow-[0_0_18px_rgba(255,84,54,0.12)]">
+          <Icon size={15} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="truncate text-[13px] font-semibold leading-none text-foreground">{activePage.label}</div>
+            <span className="hidden h-1 w-1 shrink-0 rounded-full bg-primary/70 sm:block" />
+            <div className="hidden truncate text-[10.5px] leading-none text-muted-foreground sm:block">
+              {activePage.description}
+            </div>
+          </div>
+          <div className="mt-1 hidden h-px w-24 bg-primary/35 sm:block" />
+        </div>
+      </div>
+
+      <div
+        className="flex shrink-0 items-center gap-2 text-[10.5px] text-muted-foreground"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <div className="hidden h-7 items-center gap-2 rounded-md border border-border bg-card/55 px-2.5 sm:flex">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent-mint shadow-[0_0_10px_rgba(55,220,168,0.35)]" />
+          <span className="font-medium text-foreground">Ready</span>
+          <span className="h-3 w-px bg-border" />
+          <span>Local</span>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Open Settings Window"
+          title="Open Settings Window"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card/55 text-muted-foreground transition-colors hover:border-primary/30 hover:bg-surface-soft hover:text-foreground"
+        >
+          <Settings size={14} />
+        </button>
+      </div>
+    </header>
   );
 }
 

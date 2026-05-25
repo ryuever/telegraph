@@ -35,8 +35,8 @@ export function DesignSessionSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-border bg-card/70 transition-[width] duration-200',
-        collapsed ? 'w-12' : 'w-64',
+        'flex h-full flex-col border-r border-border bg-card/80 transition-[width] duration-200',
+        collapsed ? 'w-14' : 'w-60',
       )}
     >
       <div className="flex items-center gap-1 px-2 py-2">
@@ -65,7 +65,7 @@ export function DesignSessionSidebar({
           type="button"
           onClick={onCreate}
           aria-label="New design"
-          className="mx-2 mb-2 flex h-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-surface-soft"
+          className="mx-2 mb-2 flex h-9 items-center justify-center rounded-md border border-border bg-background text-foreground hover:border-primary/35 hover:bg-surface-soft"
         >
           <Plus size={14} />
         </button>
@@ -85,7 +85,7 @@ export function DesignSessionSidebar({
       )}
 
       {!collapsed && (
-        <div className="border-t border-border px-3 py-2 text-[10px] uppercase text-muted-foreground">
+        <div className="border-t border-border px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           Telegraph · Design
         </div>
       )}
@@ -123,10 +123,11 @@ function DesignSessionRow({
       className={cn(
         'group flex h-9 items-center gap-1 rounded-md px-2 text-[12.5px] transition-colors',
         active
-          ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+          ? 'bg-background text-foreground shadow-sm ring-1 ring-primary/25'
           : 'text-muted-foreground hover:bg-surface-soft hover:text-foreground',
       )}
     >
+      {active && <span className="mr-0.5 h-5 w-0.5 rounded-full bg-primary" />}
       <span className="relative flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
         <FileText size={14} />
         <span className={cn('absolute right-0 top-0 h-1.5 w-1.5 rounded-full', statusDotClassName(session.status))} />

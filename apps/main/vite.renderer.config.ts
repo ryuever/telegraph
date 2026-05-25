@@ -225,6 +225,7 @@ export default defineConfig(({ command }) => ({
       '@/apps/setting': resolve(__dirname, '../setting/src'),
       '@/apps/design': resolve(__dirname, '../design/src'),
       '@/apps/chat': resolve(__dirname, '../chat/src'),
+      '@/docs': resolve(__dirname, '../../docs'),
       '@/packages/stores': resolve(__dirname, '../../packages/stores/src/index.ts'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),

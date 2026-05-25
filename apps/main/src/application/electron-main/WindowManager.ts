@@ -1,5 +1,5 @@
 import { injectable } from '@x-oasis/di';
-import { BrowserWindow, Menu, app } from 'electron';
+import { BrowserWindow, Menu, app, nativeTheme } from 'electron';
 import { join } from 'path';
 
 import type { IWindowManager } from '@/apps/main/application/common';
@@ -9,6 +9,9 @@ import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/com
 export type { IWindowManager };
 export { WindowManagerId };
 
+const WINDOW_BACKGROUND_COLOR = '#080d17';
+const WINDOW_ACCENT_COLOR = '#ff5436';
+
 @injectable()
 export class WindowManager implements IWindowManager {
   private mainWindow: BrowserWindow | null = null;
@@ -17,10 +20,15 @@ export class WindowManager implements IWindowManager {
   private switchPageCallback: ((pageId: string, payload?: MainSwitchPagePayload) => void) | null = null;
 
   openMainWindow(): BrowserWindow {
+    this.applyNativeWindowTheme();
+
     this.mainWindow = new BrowserWindow({
       width: 1100,
       height: 750,
       title: 'Telegraph',
+      backgroundColor: WINDOW_BACKGROUND_COLOR,
+      accentColor: WINDOW_ACCENT_COLOR,
+      darkTheme: true,
       webPreferences: {
         preload: join(__dirname, '../preload/preload.js'),
         contextIsolation: true,
@@ -79,11 +87,16 @@ export class WindowManager implements IWindowManager {
       return this.settingWindow;
     }
 
+    this.applyNativeWindowTheme();
+
     this.settingWindow = new BrowserWindow({
       width: 900,
       height: 700,
       parent: this.mainWindow || undefined,
       title: 'Settings',
+      backgroundColor: WINDOW_BACKGROUND_COLOR,
+      accentColor: WINDOW_ACCENT_COLOR,
+      darkTheme: true,
       webPreferences: {
         preload: join(__dirname, '../preload/setting-preload.js'),
         contextIsolation: true,
@@ -107,6 +120,10 @@ export class WindowManager implements IWindowManager {
     });
 
     return this.settingWindow;
+  }
+
+  private applyNativeWindowTheme(): void {
+    nativeTheme.themeSource = 'dark';
   }
 
   private setupApplicationMenu(): void {

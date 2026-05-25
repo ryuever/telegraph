@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { Toolbar } from '@/packages/ui/components/Toolbar'
+import { Sparkles } from 'lucide-react'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatMessages } from './ChatMessages'
 import { ChatComposer } from './ChatComposer'
@@ -317,9 +317,10 @@ export function ChatPanel({ agent }: Props) {
       }
 
       if (event.type === 'text_delta' && event.text) {
+        const delta = event.text
         updateAssistant(remoteRun, message => ({
           ...message,
-          content: message.content + event.text,
+          content: `${message.content}${delta}`,
           status: 'streaming',
         }))
       } else if (event.type === 'run_completed' || event.type === 'done') {
@@ -345,14 +346,15 @@ export function ChatPanel({ agent }: Props) {
 
   useEffect(() => {
     if (!agentService.listRuns || !agentService.listRunEvents) return undefined
+    const listRuns = agentService.listRuns.bind(agentService)
+    const listRunEvents = agentService.listRunEvents.bind(agentService)
     const controller = new AbortController()
 
     const hydrateRemoteRuns = async () => {
-      const runs = await agentService.listRuns?.({ limit: 80, signal: controller.signal })
-      if (!runs || controller.signal.aborted) return
+      const runs = await listRuns({ limit: 80, signal: controller.signal })
+      if (controller.signal.aborted) return
 
       for (const run of runs.filter(isRemoteChatRun)) {
-        if (controller.signal.aborted) return
         const message = run.input?.message ?? run.inputPreview
         if (!message) continue
 
@@ -388,8 +390,7 @@ export function ChatPanel({ agent }: Props) {
           continue
         }
 
-        const events = await agentService.listRunEvents?.(run.runId, controller.signal)
-        if (!events || controller.signal.aborted) return
+        const events = await listRunEvents(run.runId, controller.signal)
         const projectionState = createChatAgentEventProjectionState()
         const updateAssistant = (
           updater: Parameters<ReturnType<typeof getSessionStore>['updateMessage']>[1],
@@ -574,7 +575,7 @@ export function ChatPanel({ agent }: Props) {
     },
     [sendMessage]
   )
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   const handleSaveSettings = (next: ChatModelSettings) => {
     setSettings(next)
@@ -583,15 +584,6 @@ export function ChatPanel({ agent }: Props) {
 
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground">
-      <Toolbar>
-        <div
-          className="text-[11px] font-medium text-muted-foreground"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          {active.title}
-        </div>
-      </Toolbar>
-
       <div className="flex min-h-0 flex-1">
         <ChatSidebar
           conversations={conversations}
@@ -619,16 +611,16 @@ export function ChatPanel({ agent }: Props) {
             />
             <div className="min-h-0 flex-1">
               {active.messages.length === 0 ? (
-              <EmptyState
-                onSuggest={text => {
-                  const id = useSessionsStore.getState().activeSessionId
-                  if (id) {
-                    setDraftBySession(prev => ({ ...prev, [id]: '' }))
-                    setComposerRemountKey(k => k + 1)
-                  }
-                  void sendMessage(text)
-                }}
-              />
+                <EmptyState
+                  onSuggest={text => {
+                    const id = useSessionsStore.getState().activeSessionId
+                    if (id) {
+                      setDraftBySession(prev => ({ ...prev, [id]: '' }))
+                      setComposerRemountKey(k => k + 1)
+                    }
+                    void sendMessage(text)
+                  }}
+                />
               ) : (
                 <ChatMessages messages={active.messages} isStreaming={isStreaming} />
               )}
@@ -880,21 +872,8 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
   return (
     <div className="flex h-full items-center justify-center px-6">
       <div className="w-full max-w-xl text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-white"
-          >
-            <path d="M12 2v4M5 5l3 3M19 5l-3 3M2 12h4M18 12h4M5 19l3-3M19 19l-3-3M12 18v4" />
-            <circle cx="12" cy="12" r="4" />
-          </svg>
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary shadow-[0_0_28px_rgba(255,84,54,0.18)]">
+          <Sparkles size={22} />
         </div>
         <h2 className="text-[18px] font-semibold text-foreground">
           How can I help you today?
@@ -903,7 +882,7 @@ function EmptyState({ onSuggest }: { onSuggest: (text: string) => void }) {
           Start a conversation, or pick a starter prompt.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-2">
+        <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {SUGGESTIONS.map(s => (
             <button
               key={s}

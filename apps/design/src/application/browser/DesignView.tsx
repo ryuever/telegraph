@@ -38,7 +38,7 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
   const [openedSessionIds, setOpenedSessionIds] = useState<Set<string>>(() => new Set())
   const [hydratingSessionIds, setHydratingSessionIds] = useState<Set<string>>(() => new Set())
   const [activeView, setActiveView] = useState<'entry' | 'workspace'>('entry')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
   useEffect(() => {
     const controller = new AbortController()
