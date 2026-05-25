@@ -237,6 +237,8 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
     expect(request.systemPrompt).toContain('<selected_skills>')
     expect(request.systemPrompt).toContain('design-shadcn-generation')
     expect(request.systemPrompt).toContain('shadcn')
+    expect(request.systemPrompt).toContain('React Hooks Requirements')
+    expect(request.systemPrompt).toContain('Never call `useState`')
   })
 
   it('fails after repeated malformed stage output', async () => {

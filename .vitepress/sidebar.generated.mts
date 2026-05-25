@@ -138,6 +138,10 @@ export const wikiSidebar = {
         {
           "text": "D-017 Durable Execution 与 Agent Run Ledger 设想",
           "link": "/discussion/20260522-durable-execution-agent-run-ledger"
+        },
+        {
+          "text": "D-018 Clauge 产品能力与 UI Shell 调研",
+          "link": "/discussion/20260526-clauge-product-ui-research"
         }
       ]
     }
@@ -177,6 +181,10 @@ export const wikiSidebar = {
         {
           "text": "I-007 DesignBuild Worker 未调用 submit_design_child_output 导致 run failed",
           "link": "/issue/20260525-design-build-submit-tool-not-called"
+        },
+        {
+          "text": "I-008 Design Preview 中 React singleton 被 esm.sh 依赖解析打散",
+          "link": "/issue/20260526-design-preview-react-singleton-esm-sh"
         }
       ]
     }

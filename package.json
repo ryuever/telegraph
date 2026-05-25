@@ -45,6 +45,9 @@
     "overrides": {
       "ansi-styles@6.2.3": "4.3.0",
       "string-width@5.1.2": "4.2.3"
+    },
+    "patchedDependencies": {
+      "@sandpacker/worker@0.4.0": "patches/@sandpacker__worker@0.4.0.patch"
     }
   }
 }

@@ -8,7 +8,7 @@ description: >
   以 Run、Trace、Permission、Handoff Contract、Replay 与 Capability Matrix 形成差异化。
 category: discussion
 created: 2026-05-19
-updated: 2026-05-21
+updated: 2026-05-26
 tags:
   - chat
   - agent-team
@@ -67,6 +67,9 @@ references:
   - id: P-006
     rel: related-to
     file: ../roadmap/20260518-harness-capability-extension-plan.md
+  - id: D-018
+    rel: related-to
+    file: ./20260526-clauge-product-ui-research.md
 ---
 
 # Chat Agent Team 与 Multica 差异化策略讨论归档

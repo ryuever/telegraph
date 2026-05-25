@@ -7,7 +7,7 @@ description: >
   首轮 patch 出码、review/repair、subagents 协作与后续聊天修改。
 category: roadmap
 created: 2026-05-21
-updated: 2026-05-24
+updated: 2026-05-26
 tags:
   - design-page
   - design-build
@@ -29,6 +29,9 @@ references:
   - id: P-011
     rel: extended-by
     file: ./20260524-design-page-shadcn-design-system-roadmap.md
+  - id: D-018
+    rel: related-to
+    file: ../discussion/20260526-clauge-product-ui-research.md
 ---
 
 # Design Page 一句话生成页面可执行实施计划

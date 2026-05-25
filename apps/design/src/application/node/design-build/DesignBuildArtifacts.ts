@@ -1,3 +1,5 @@
+import { TAILWIND_PLAY_CDN_SCRIPT_URL } from '@/apps/design/application/common/design-project-contract'
+
 export interface DesignBrief {
   prompt: string
   summary: string
@@ -425,6 +427,7 @@ function renderProjectIndexHtml(title: string): string {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)}</title>
+    <script src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"></script>
   </head>
   <body>
     <div id="root"></div>

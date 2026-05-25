@@ -2,6 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
+import { TAILWIND_PLAY_CDN_SCRIPT_URL } from '@/apps/design/application/common/design-project-contract'
 import { DesignRegressionCorpus } from '../DesignRegressionCorpus'
 
 describe('DesignRegressionCorpus', () => {
@@ -31,7 +32,7 @@ describe('DesignRegressionCorpus', () => {
           {
             kind: 'add',
             path: 'apps/design/src/generated/landing/index.html',
-            content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+            content: `<script src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"></script><div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>`,
           },
           {
             kind: 'add',

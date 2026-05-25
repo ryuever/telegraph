@@ -16,9 +16,18 @@ Generated apps are shadcn/ui-first. Use shadcn registry primitives or blocks whe
 - Do not import Telegraph workspace UI modules such as `@/packages/ui/...` in generated Sandpacker projects.
 - Vendor shadcn source into the generated project, for example `src/components/ui/button.tsx`, `src/components/ui/card.tsx`, and `src/lib/utils.ts`.
 - If generated source imports `@/components/ui/button`, also provide `vite.config.ts` and `tsconfig.json` alias config that maps `@` to `src`.
+- Add Tailwind Play CDN to generated `index.html`: `<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>`. Put custom Tailwind theme CSS in `<style type="text/tailwindcss">` when needed.
 - Include `components.json` with shadcn-compatible aliases and `tailwind.cssVariables: true`.
 - Declare every shadcn dependency in `package.json`, including Radix packages, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, and animation helpers when used.
 - Put application-specific compositions under `src/components/app/` or the page file. Do not fake shadcn primitives by writing simplified `Button`, `Card`, `Dialog`, or `Tabs` files unless the registry item is unavailable and a fallback reason is recorded.
+
+## React Hooks Requirements
+
+- Call React hooks only inside React function components or custom hooks.
+- Never call `useState`, `useEffect`, `useMemo`, `useCallback`, `useContext`, or `useRef` at module scope.
+- Never call hooks inside conditions, loops, event handlers, callbacks, or ordinary helper functions.
+- Keep stateful data and state-changing handlers inside the component or custom hook that owns the rendered interaction.
+- Name custom hooks with the `use` prefix, for example `useTodos` or `useDashboardFilters`.
 
 ## Component Retrieval
 

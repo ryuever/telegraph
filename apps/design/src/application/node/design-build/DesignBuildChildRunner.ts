@@ -353,6 +353,7 @@ function standaloneProjectInstruction(stage: DesignBuildChildStage): string {
     '- For every selected shadcn component, import it from its local "@/components/ui/<name>" module in composition source and render it in JSX; installing source files without using them is invalid.',
     '- Keep files under the safe generated project root shown in the input artifact paths, for example apps/design/src/generated/<slug>/package.json; do not target the repository root package.json.',
     '- index.html must use a sandbox-relative module script such as ./src/index.tsx?entry or ./src/main.tsx?entry.',
+    '- index.html must load Tailwind Play CDN in the head with <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>; use <style type="text/tailwindcss"> for custom Tailwind theme CSS when needed.',
   ].join('\n')
 }
 

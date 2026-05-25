@@ -79,6 +79,7 @@ features:
 | D-015 | [20260520-agent-runtime-product-layer-alignment.md](./discussion/20260520-agent-runtime-product-layer-alignment.md) | Agent Runtime 产品分层与 Telegraph Native Harness 对齐 | 明确 External Agent Runtime 与 Telegraph Native Harness 是产品层，Embedded Execution Kernel 只是 Native Harness 底层；pi-subagents 不再作为 runtime adapter，而沉淀为 Telegraph native subagent harness 的参考/导入来源。 |
 | D-016 | [20260521-design-page-agent-generation-product-architecture.md](./discussion/20260521-design-page-agent-generation-product-architecture.md) | Design Page 一句话生成页面的产品定位与 Agent 编排架构 | 归档 Design Page 对标 v0 / Lovable 的产品形态讨论，明确 repo-aware design-to-code 工作台定位、DesignBuild Runtime 目标架构、首轮出码六阶段与 subagents 受控协作边界。 |
 | D-017 | [20260522-durable-execution-agent-run-ledger.md](./discussion/20260522-durable-execution-agent-run-ledger.md) | Durable Execution 与 Agent Run Ledger 设想 | 归档 agent 层引入 durable execution 的概念分层、现有 repository 落点、Restate / DBOS / Temporal / LangGraph 选型取舍，以及从 Run Ledger 到 Resume 的分阶段路线。 |
+| D-018 | [20260526-clauge-product-ui-research.md](./discussion/20260526-clauge-product-ui-research.md) | Clauge 产品能力与 UI Shell 调研 | 调研 Clauge 的核心能力、开发者场景特点与工程图纸式 UI 风格，并映射到 Telegraph 当前 Run Cockpit、Design Page 与主界面 shell 的可借鉴方向。 |
 
 ### issue/ — Issue 记录
 
@@ -91,6 +92,7 @@ features:
 | I-005 | [20260521-design-page-preview-sandpacker-stabilization.md](./issue/20260521-design-page-preview-sandpacker-stabilization.md) | Design Page Preview 与 Sandpacker 稳定化问题串复盘 | 归档 Design Page 一句话出码到 iframe preview 可运行过程中暴露的页面状态、消息 pending、JSON 输出、Sandpacker 依赖、service worker scope、entry 请求、JSX tagger、CDN 与 UI stub 缺失问题。 |
 | I-006 | [20260522-design-build-child-structured-output-contract.md](./issue/20260522-design-build-child-structured-output-contract.md) | DesignBuild Child 输出不应依赖自然语言 JSON 文本解析 | 记录 DesignBuild child agent 因非严格 JSON、连续 JSON、漏逗号、未输出 JSON object 导致 run 失败的根因；结论是改用 tool calling 结构化提交与 stage schema 校验。 |
 | I-007 | [20260525-design-build-submit-tool-not-called.md](./issue/20260525-design-build-submit-tool-not-called.md) | DesignBuild Worker 未调用 submit_design_child_output 导致 run failed | 记录 Design Worker 未调用最终提交工具时的协议失败路径，区分 submit tool 缺失、schema 错误与 preview 编译错误，并沉淀后续 degraded artifact 兜底方向。 |
+| I-008 | [20260526-design-preview-react-singleton-esm-sh.md](./issue/20260526-design-preview-react-singleton-esm-sh.md) | Design Preview 中 React singleton 被 esm.sh 依赖解析打散 | 记录 Design Page preview 在 Radix / Recharts / lucide-react 依赖下触发 useContext null 的排查过程、根因分层、本地 Sandpacker worker patch，以及适合沉淀到 Sandpacker 源码的 resolver 修复建议。 |
 
 ### reference/ — 参考手册
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateStandaloneProjectFiles } from '../design-project-contract'
+import {
+  evaluateStandaloneProjectFiles,
+  TAILWIND_PLAY_CDN_SCRIPT_URL,
+} from '../design-project-contract'
 
 describe('design-project-contract', () => {
   it('accepts renamed default imports from generated App sources', () => {
@@ -26,11 +29,27 @@ describe('design-project-contract', () => {
     expect(mismatchCheck?.summary).toContain('src/index.tsx -> ./App { GeneratedDesignPage }')
     expect(contract.passed).toBe(false)
   })
+
+  it('rejects generated projects that omit the Tailwind Play CDN script', () => {
+    const contract = evaluateStandaloneProjectFiles(projectOperations({
+      entrySource: "import GeneratedDesignPage from './App'\n\nvoid GeneratedDesignPage\n",
+      appSource: 'export default function SaasPage() { return <main>SaaS</main> }\n',
+      indexHtml: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+    }))
+
+    expect(contract.checks).toContainEqual(expect.objectContaining({
+      id: 'standalone-tailwind-play-cdn',
+      passed: false,
+    }))
+    expect(contract.passed).toBe(false)
+  })
+
 })
 
 function projectOperations(input: {
   entrySource: string
   appSource: string
+  indexHtml?: string
 }): Array<{ kind: 'add'; path: string; content: string }> {
   const root = 'apps/design/src/generated/import-contract'
   return [
@@ -47,7 +66,7 @@ function projectOperations(input: {
     {
       kind: 'add',
       path: `${root}/index.html`,
-      content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+      content: input.indexHtml ?? indexHtml(),
     },
     {
       kind: 'add',
@@ -60,4 +79,8 @@ function projectOperations(input: {
       content: input.appSource,
     },
   ]
+}
+
+function indexHtml(): string {
+  return `<script src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"></script><div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>`
 }

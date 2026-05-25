@@ -1,3 +1,4 @@
+import { TAILWIND_PLAY_CDN_SCRIPT_URL } from '@/apps/design/application/common/design-project-contract'
 import { describe, expect, it } from 'vitest'
 import {
   createTemplateDesignPatchArtifact,
@@ -54,6 +55,8 @@ describe('DesignBuildArtifacts', () => {
       .toContain('"dev": "vite"')
     expect(artifact.operations.find(operation => operation.path.endsWith('/index.html'))?.content)
       .toContain('src="./src/index.tsx?entry"')
+    expect(artifact.operations.find(operation => operation.path.endsWith('/index.html'))?.content)
+      .toContain(`src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"`)
     expect(artifact.operations.find(operation => operation.path.endsWith('/src/index.tsx'))?.content)
       .toContain("import App from './App'")
     expect(artifact.operations.find(operation => operation.path.endsWith('/src/styles.css'))?.content)

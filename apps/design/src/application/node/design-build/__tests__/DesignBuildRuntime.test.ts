@@ -1,4 +1,5 @@
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
+import { TAILWIND_PLAY_CDN_SCRIPT_URL } from '@/apps/design/application/common/design-project-contract'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent } from '@/packages/agent-protocol'
 import { describe, expect, it } from 'vitest'
 import {
@@ -596,7 +597,9 @@ describe('DesignBuildRuntime', () => {
       stringField(operation, 'path') === 'apps/design/src/generated/generated-design-page/src/App.tsx'
     )
     expect(stringField(app, 'content')).toContain('var(--primary)')
-    expect(JSON.stringify(operations)).not.toContain('#dc2626')
+    expect(JSON.stringify(operations.filter(operation =>
+      !stringField(operation, 'path')?.endsWith('/src/styles.css')
+    ))).not.toContain('#dc2626')
   })
 
   it('fails instead of falling back when the default model-backed runner has no model settings', async () => {
@@ -780,7 +783,7 @@ function modelProjectOperationsForRoot(root: string): Array<{ kind: 'add'; path:
     {
       kind: 'add',
       path: `${root}/index.html`,
-      content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+      content: `<script src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"></script><div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>`,
     },
     {
       kind: 'add',

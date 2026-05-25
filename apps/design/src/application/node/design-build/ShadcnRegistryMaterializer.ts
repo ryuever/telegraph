@@ -1,5 +1,6 @@
 import {
   inferSandboxProjectRoot,
+  TAILWIND_PLAY_CDN_SCRIPT_URL,
 } from '@/apps/design/application/common/design-project-contract'
 import type { DesignSystemPolicy } from '@/apps/design/application/common/design-system-contract'
 import type { ThemePack } from '@/apps/design/application/common/theme-pack-contract'
@@ -66,7 +67,7 @@ export class ShadcnRegistryMaterializer {
     const themePack = this.themePackRegistry.get(input.policy.themePack?.id)
     const operations = upsertOperations(sanitizedOperations, [
       updatePackageJson(sanitizedOperations, projectRoot, dependencies),
-      operation(projectRoot, 'index.html', renderIndexHtml(input.artifact.title)),
+      operation(projectRoot, 'index.html', renderIndexHtml(input.artifact.title, themePack)),
       operation(projectRoot, 'src/index.tsx', renderEntrySource()),
       operation(projectRoot, 'components.json', renderComponentsJson()),
       operation(projectRoot, 'tsconfig.json', renderTsconfigJson()),
@@ -241,13 +242,17 @@ function updatePackageJson(
   }
 }
 
-function renderIndexHtml(title: string): string {
+function renderIndexHtml(title: string, themePack: ThemePack): string {
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)}</title>
+    <script src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"></script>
+    <style type="text/tailwindcss">
+${renderTailwindThemeBridge(themePack)}
+    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -258,7 +263,8 @@ function renderIndexHtml(title: string): string {
 }
 
 function renderEntrySource(): string {
-  return `import React from 'react'
+  return `import './styles.css'
+import React from 'react'
 import { createRoot } from 'react-dom/client'
 import GeneratedDesignPage from './App'
 
@@ -491,12 +497,88 @@ h1 {
 }
 
 function renderCssVariables(themePack: ThemePack): string {
-  return Object.entries({
-    ...themePack.tokens.cssVariables,
-    '--radius': themePack.tokens.radius,
-  })
+  return Object.entries(shadcnCssVariables(themePack))
     .map(([name, value]) => `  ${name}: ${value};`)
     .join('\n')
+}
+
+function renderTailwindThemeBridge(themePack: ThemePack): string {
+  const cssVariables = shadcnCssVariables(themePack)
+  const colorLines = TAILWIND_COLOR_TOKENS
+    .filter(token => cssVariables[`--${token}`])
+    .map(token => `        --color-${token}: var(--${token});`)
+
+  return [
+    '      @custom-variant dark (&:is(.dark *));',
+    '      @theme inline {',
+    ...colorLines,
+    '        --radius-sm: calc(var(--radius) - 4px);',
+    '        --radius-md: calc(var(--radius) - 2px);',
+    '        --radius-lg: var(--radius);',
+    '        --radius-xl: calc(var(--radius) + 4px);',
+    '      }',
+  ].join('\n')
+}
+
+const TAILWIND_COLOR_TOKENS = [
+  'background',
+  'foreground',
+  'card',
+  'card-foreground',
+  'popover',
+  'popover-foreground',
+  'primary',
+  'primary-foreground',
+  'secondary',
+  'secondary-foreground',
+  'muted',
+  'muted-foreground',
+  'accent',
+  'accent-foreground',
+  'destructive',
+  'destructive-foreground',
+  'border',
+  'input',
+  'ring',
+  'chart-1',
+  'chart-2',
+  'chart-3',
+  'chart-4',
+  'chart-5',
+] as const
+
+function shadcnCssVariables(themePack: ThemePack): Record<string, string> {
+  const variables: Partial<Record<string, string>> = themePack.tokens.cssVariables
+  return {
+    '--background': variables['--background'] ?? '#ffffff',
+    '--foreground': variables['--foreground'] ?? '#0f172a',
+    '--card': variables['--card'] ?? variables['--background'] ?? '#ffffff',
+    '--card-foreground': variables['--card-foreground'] ?? variables['--foreground'] ?? '#0f172a',
+    '--popover': variables['--popover'] ?? variables['--card'] ?? variables['--background'] ?? '#ffffff',
+    '--popover-foreground': variables['--popover-foreground'] ??
+      variables['--card-foreground'] ??
+      variables['--foreground'] ??
+      '#0f172a',
+    '--primary': variables['--primary'] ?? '#111827',
+    '--primary-foreground': variables['--primary-foreground'] ?? '#f8fafc',
+    '--secondary': variables['--secondary'] ?? '#f1f5f9',
+    '--secondary-foreground': variables['--secondary-foreground'] ?? variables['--foreground'] ?? '#0f172a',
+    '--muted': variables['--muted'] ?? '#f8fafc',
+    '--muted-foreground': variables['--muted-foreground'] ?? '#64748b',
+    '--accent': variables['--accent'] ?? variables['--secondary'] ?? '#f1f5f9',
+    '--accent-foreground': variables['--accent-foreground'] ?? variables['--foreground'] ?? '#0f172a',
+    '--destructive': variables['--destructive'] ?? '#dc2626',
+    '--destructive-foreground': variables['--destructive-foreground'] ?? '#ffffff',
+    '--border': variables['--border'] ?? '#e2e8f0',
+    '--input': variables['--input'] ?? variables['--border'] ?? '#e2e8f0',
+    '--ring': variables['--ring'] ?? variables['--primary'] ?? '#94a3b8',
+    '--chart-1': variables['--chart-1'] ?? variables['--primary'] ?? '#111827',
+    '--chart-2': variables['--chart-2'] ?? variables['--accent'] ?? '#0891b2',
+    '--chart-3': variables['--chart-3'] ?? variables['--secondary'] ?? '#64748b',
+    '--chart-4': variables['--chart-4'] ?? variables['--muted'] ?? '#cbd5e1',
+    '--chart-5': variables['--chart-5'] ?? variables['--ring'] ?? '#94a3b8',
+    '--radius': themePack.tokens.radius,
+  }
 }
 
 function renderThemeMetadata(themePack: ThemePack): string {

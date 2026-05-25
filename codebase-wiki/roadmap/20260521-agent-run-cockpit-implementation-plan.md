@@ -6,7 +6,7 @@ description: >
   再接 Runtime Capability Matrix、Permission Approval、Team Router v0 与 Replay/Fork。
 category: roadmap
 created: 2026-05-21
-updated: 2026-05-22
+updated: 2026-05-26
 tags:
   - chat
   - run-registry
@@ -46,6 +46,9 @@ references:
   - id: D-017
     rel: related-to
     file: ../discussion/20260522-durable-execution-agent-run-ledger.md
+  - id: D-018
+    rel: related-to
+    file: ../discussion/20260526-clauge-product-ui-research.md
 ---
 
 # Agent Run Cockpit 可跟踪实施计划

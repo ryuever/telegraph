@@ -175,6 +175,7 @@ function createDesignBuildContext(
       requiredFiles: [
         'package.json',
         'index.html',
+        'Tailwind Play CDN script in index.html head',
         'src/index.tsx or src/main.tsx',
         'component files imported by the entry',
       ],

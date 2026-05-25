@@ -16,6 +16,8 @@ export interface StandaloneProjectContractResult {
   passed: boolean
 }
 
+export const TAILWIND_PLAY_CDN_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4'
+
 const REACT_ENTRY_FILES = ['src/index.tsx', 'src/main.tsx', 'src/index.jsx', 'src/main.jsx']
 const SOURCE_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json', '.svg']
 const INDEX_SOURCE_FILES = SOURCE_EXTENSIONS.map(extension => `index${extension}`)
@@ -47,7 +49,9 @@ export function evaluateStandaloneProjectFiles(
   const packageOperation = findProjectFileOperation(operations, ['package.json'], projectRoot)
   const packageJson = packageJsonStatus(packageOperation?.content)
   const packageJsonValue = parseJsonValue(packageOperation?.content)
-  const hasIndexHtml = Boolean(findProjectFileOperation(operations, ['index.html'], projectRoot))
+  const indexHtmlOperation = findProjectFileOperation(operations, ['index.html'], projectRoot)
+  const hasIndexHtml = Boolean(indexHtmlOperation)
+  const hasTailwindPlayCdn = hasTailwindPlayCdnScript(indexHtmlOperation?.content)
   const hasReactEntry = Boolean(findProjectFileOperation(operations, REACT_ENTRY_FILES, projectRoot))
   const hasAppSource = hasRenderableSourceFile(operations, projectRoot)
   const projectFiles = projectFileMap(operations, projectRoot)
@@ -84,6 +88,13 @@ export function evaluateStandaloneProjectFiles(
       id: 'standalone-index-html',
       passed: hasIndexHtml,
       summary: 'Project includes index.html with the browser mount point.',
+    },
+    {
+      id: 'standalone-tailwind-play-cdn',
+      passed: hasTailwindPlayCdn,
+      summary: hasTailwindPlayCdn
+        ? 'index.html loads Tailwind Play CDN for browser-side utility generation.'
+        : 'index.html must load Tailwind Play CDN via @tailwindcss/browser@4.',
     },
     {
       id: 'standalone-react-entry',
@@ -198,6 +209,12 @@ export function sandboxVirtualPathForOperation(path: string, projectRoot: string
     ? normalized.slice(projectRoot.length).replace(/^\/+/, '')
     : normalized
   return `/${relative}`
+}
+
+export function hasTailwindPlayCdnScript(content: string | undefined): boolean {
+  if (!content) return false
+  return content.includes(`src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"`) ||
+    content.includes(`src='${TAILWIND_PLAY_CDN_SCRIPT_URL}'`)
 }
 
 export function isSafeProjectPatchPath(path: string): boolean {

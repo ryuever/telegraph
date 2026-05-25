@@ -48,11 +48,12 @@ const { createSandpackerFileTree } = await import('../DesignSandpackerPreview')
 
 describe('createSandpackerFileTree', () => {
   it('projects generated artifact files without adding preview fallback files', () => {
+    const packageJson = JSON.stringify({ dependencies: { react: '19.1.0', 'react-dom': '19.1.0' } })
     const result = createSandpackerFileTree([
       {
         kind: 'add',
         path: 'apps/design/src/generated/login-page/package.json',
-        content: JSON.stringify({ dependencies: { react: '19.1.0', 'react-dom': '19.1.0' } }),
+        content: packageJson,
       },
       {
         kind: 'add',
@@ -71,12 +72,7 @@ describe('createSandpackerFileTree', () => {
       },
     ])
 
-    expect(JSON.parse(result.files['/package.json'])).toEqual({
-      dependencies: {
-        react: 'latest',
-        'react-dom': 'latest',
-      },
-    })
+    expect(result.files['/package.json']).toBe(packageJson)
     expect(result.files).toMatchObject({
       '/index.html': '<div id="root"></div><script type="module" src="/src/index.tsx"></script>',
       '/src/index.tsx': 'import "./App"',
@@ -117,60 +113,31 @@ describe('createSandpackerFileTree', () => {
       .toBe('apps/design/src/generated/login-page/src/App.tsx')
   })
 
-  it('normalizes preview React dependencies for Sandpacker peer resolution', () => {
-    const result = createSandpackerFileTree([
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/package.json',
-        content: JSON.stringify({
-          dependencies: {
-            react: 'latest',
-            'react-dom': '19.3.0-canary-fef12a01-20260413',
-          },
-        }, null, 2),
-      },
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/src/App.tsx',
-        content: 'export default function App() { return <main>Login</main> }',
-      },
-    ])
-
-    expect(result.files['/package.json']).toContain('"react": "latest"')
-    expect(result.files['/package.json']).toContain('"react-dom": "latest"')
-    expect(result.files['/package.json']).not.toContain('canary')
-    expect(result.files['/package.json']).not.toContain('"react": "18.3.1"')
-  })
-
-  it('normalizes Radix primitive versions for the Sandpacker esm resolver', () => {
-    const result = createSandpackerFileTree([
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/package.json',
-        content: JSON.stringify({
-          dependencies: {
-            react: '19.1.0',
-            'react-dom': '19.1.0',
-            '@radix-ui/react-progress': '1.2.3',
-            '@radix-ui/react-slot': '^1.2.3',
-          },
-        }, null, 2),
-      },
-      {
-        kind: 'add',
-        path: 'apps/design/src/generated/login-page/src/App.tsx',
-        content: 'export default function App() { return <main>Login</main> }',
-      },
-    ])
-
-    expect(JSON.parse(result.files['/package.json'])).toMatchObject({
+  it('preserves package.json content verbatim instead of normalizing dependencies', () => {
+    const packageJson = JSON.stringify({
       dependencies: {
-        react: 'latest',
-        'react-dom': 'latest',
-        '@radix-ui/react-progress': 'latest',
-        '@radix-ui/react-slot': 'latest',
+        react: '19.1.0',
+        'react-dom': '19.1.0',
+        '@radix-ui/react-progress': '1.2.3',
+        '@radix-ui/react-slot': '^1.2.3',
+        '@radix-ui/react-tabs': 'latest',
+        recharts: '2.15.4',
       },
-    })
+    }, null, 2)
+    const result = createSandpackerFileTree([
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/package.json',
+        content: packageJson,
+      },
+      {
+        kind: 'add',
+        path: 'apps/design/src/generated/login-page/src/App.tsx',
+        content: 'export default function App() { return <main>Login</main> }',
+      },
+    ])
+
+    expect(result.files['/package.json']).toBe(packageJson)
   })
 
   it('leaves unimported shared UI names untouched so project dependencies stay explicit', () => {

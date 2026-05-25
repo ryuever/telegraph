@@ -1,0 +1,75 @@
+diff --git a/dist/compiler/plugins/dependency-cdn.js b/dist/compiler/plugins/dependency-cdn.js
+index f287c926d144d7f5a82c05d956f702f630e3e698..09fc4a68c846e3c35f71b9737b89afb8a3d69013 100644
+--- a/dist/compiler/plugins/dependency-cdn.js
++++ b/dist/compiler/plugins/dependency-cdn.js
+@@ -69,14 +69,15 @@ export function createImportMap(projectInfo) {
+         if (isCompileOnlyDependency(pkg))
+             continue;
+         const resolved = resolveAliasedDependency(pkg);
+-        imports[pkg] = buildCdnUrl(resolved, resolveDependencyVersion(resolved, dependencies, version));
++        imports[pkg] = buildCdnUrl(resolved, resolveDependencyVersion(resolved, dependencies, version), '', true, dependencies);
+         imports[`${pkg}/`] = buildCdnUrl(resolved, resolveDependencyVersion(resolved, dependencies, version), '/', false);
+     }
+     for (const [origin, target] of Object.entries(dependencyAliases)) {
+         const version = resolveDependencyVersion(target, dependencies);
+-        imports[origin] = buildCdnUrl(target, version);
++        imports[origin] = buildCdnUrl(target, version, '', true, dependencies);
+         imports[`${origin}/`] = buildCdnUrl(target, version, '/', false);
+     }
++    addReactEntrypoints(imports, dependencies);
+     return Object.keys(imports).length > 0 ? { imports } : null;
+ }
+ function resolveDependencyCdnUrl(specifier, projectInfo) {
+@@ -90,17 +91,47 @@ function resolveDependencyCdnUrl(specifier, projectInfo) {
+     const version = resolveDependencyVersion(resolved, dependencies, dependencies[parsed.base]);
+     if (!version)
+         return null;
+-    return buildCdnUrl(resolved, version, parsed.subPath);
++    return buildCdnUrl(resolved, version, parsed.subPath, true, dependencies);
+ }
+-function buildCdnUrl(pkg, version, subPath = '', withBundleQuery = true) {
++function buildCdnUrl(pkg, version, subPath = '', withBundleQuery = true, dependencies = {}) {
+     const normalizedSubPath = subPath === '/' ? '/' : subPath;
+-    const query = withBundleQuery ? buildCdnQuery(pkg) : '';
++    const query = withBundleQuery ? buildCdnQuery(pkg, dependencies) : '';
+     return `https://esm.sh/${pkg}@${version}${normalizedSubPath}${query}`;
+ }
+-function buildCdnQuery(pkg) {
++function buildCdnQuery(pkg, dependencies) {
++    if (pkg === 'react')
++        return '?dev';
+     if (pkg === 'react-dom')
+         return '?dev&external=react';
+-    return '?bundle&dev';
++    const peerDeps = reactPeerDependencyQuery(pkg, dependencies);
++    return peerDeps ? `?bundle&dev&deps=${peerDeps}` : '?bundle&dev';
++}
++function reactPeerDependencyQuery(pkg, dependencies) {
++    if (pkg === 'react' || pkg === 'react-dom')
++        return '';
++    const pins = [];
++    const reactVersion = pinnedDependencyVersion('react', dependencies);
++    const reactDomVersion = pinnedDependencyVersion('react-dom', dependencies);
++    if (reactVersion)
++        pins.push(`react@${reactVersion}`);
++    if (reactDomVersion)
++        pins.push(`react-dom@${reactDomVersion}`);
++    return pins.join(',');
++}
++function pinnedDependencyVersion(pkg, dependencies) {
++    const version = normalizeDependencyVersion(dependencies[pkg]);
++    return version && version !== 'latest' ? version : '';
++}
++function addReactEntrypoints(imports, dependencies) {
++    const reactVersion = resolveDependencyVersion('react', dependencies);
++    if (!reactVersion)
++        return;
++    imports['react/jsx-runtime'] = buildCdnUrl('react', reactVersion, '/jsx-runtime', true, dependencies);
++    imports['react/jsx-dev-runtime'] = buildCdnUrl('react', reactVersion, '/jsx-dev-runtime', true, dependencies);
++    if (!dependencies['react-dom'])
++        return;
++    const reactDomVersion = resolveDependencyVersion('react-dom', dependencies);
++    imports['react-dom/client'] = buildCdnUrl('react-dom', reactDomVersion, '/client', true, dependencies);
+ }
+ function getRuntimeDependencies(projectInfo) {
+     const dependencies = {

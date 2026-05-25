@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { TAILWIND_PLAY_CDN_SCRIPT_URL } from '@/apps/design/application/common/design-project-contract'
 import type { DesignBuildArtifact } from '../DesignBuildArtifacts'
 import {
   createDefaultDesignSystemPolicy,
@@ -59,7 +60,7 @@ describe('DesignBuildReviewPolicy', () => {
       },
       {
         path: 'apps/design/src/generated/page/index.html',
-        content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+        content: indexHtml(),
       },
       {
         path: 'apps/design/src/generated/page/src/index.tsx',
@@ -93,7 +94,7 @@ describe('DesignBuildReviewPolicy', () => {
       },
       {
         path: 'apps/design/src/generated/page/index.html',
-        content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+        content: indexHtml(),
       },
       {
         path: 'apps/design/src/generated/page/src/index.tsx',
@@ -213,7 +214,7 @@ function shadcnPatchArtifact(input: { appSource: string }): DesignBuildArtifact 
       {
         kind: 'add',
         path: `${root}/index.html`,
-        content: '<div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>',
+        content: indexHtml(),
       },
       {
         kind: 'add',
@@ -262,6 +263,10 @@ function shadcnPatchArtifact(input: { appSource: string }): DesignBuildArtifact 
       },
     ],
   }
+}
+
+function indexHtml(): string {
+  return `<script src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"></script><div id="root"></div><script type="module" src="./src/index.tsx?entry"></script>`
 }
 
 function componentLedger(names: string[]) {

@@ -18,10 +18,11 @@ import {
   sandboxVirtualPathForOperation,
 } from '@/apps/design/application/common/design-project-contract'
 
-const backendFactory = new BrowserWorkerBackendFactory({ workerUrl })
+const backendFactory = new BrowserWorkerBackendFactory({
+  workerUrl: withQueryParam(workerUrl, 'telegraphPatch', 'react-peer-singleton-v2'),
+})
 const serviceWorkerUrl = import.meta.env.DEV ? '/sandpacker-worker.js' : productionServiceWorkerUrl
 let serviceWorkerPromise: Promise<void> | null = null
-const SANDPACKER_REACT_VERSION = 'latest'
 
 export interface DesignSandpackerPreviewProps {
   artifactId: string
@@ -175,8 +176,6 @@ function SandpackerPreviewSurface({
     let cancelled = false
     setStatus('Syncing files')
 
-    console.log('update files ', files)
-
     client
       .updateTree(files)
       .then(() => {
@@ -197,12 +196,12 @@ function SandpackerPreviewSurface({
 
   useEffect(() => {
     if (!onOperationsChange) return
-    const next = updateOperationsFromFiles(operations, files, projected.previewOnlyContent)
+    const next = updateOperationsFromFiles(operations, files)
     const serialized = JSON.stringify(next)
     if (serialized === lastEmittedOperations.current) return
     lastEmittedOperations.current = serialized
     onOperationsChange(next)
-  }, [files, onOperationsChange, operations, projected.previewOnlyContent])
+  }, [files, onOperationsChange, operations])
 
   const restartPreview = async (): Promise<void> => {
     if (!client) return
@@ -286,7 +285,6 @@ export function createSandpackerFileTree(
   operations: DesignPatchFileOperation[],
 ): {
   files: FileTree
-  previewOnlyContent: Map<string, string>
   virtualPathToOperationPath: Map<string, string>
 } {
   const projectRoot = inferSandboxProjectRoot(operations)
@@ -297,24 +295,19 @@ export function createSandpackerFileTree(
       path: sandboxVirtualPathForOperation(operation.path, projectRoot),
     }))
   const virtualPathToOperationPath = new Map<string, string>()
-  const previewOnlyContent = new Map<string, string>()
   const files: FileTree = {}
 
   for (const item of projectedOperations) {
-    const source = item.operation.content ?? ''
-    const previewSource = normalizePreviewFileSource(item.path, source)
-    files[item.path] = previewSource
-    if (previewSource !== source) previewOnlyContent.set(item.path, previewSource)
+    files[item.path] = item.operation.content ?? ''
     virtualPathToOperationPath.set(item.path, item.operation.path)
   }
 
-  return { files, previewOnlyContent, virtualPathToOperationPath }
+  return { files, virtualPathToOperationPath }
 }
 
 function updateOperationsFromFiles(
   operations: DesignPatchFileOperation[],
   files: FileTree,
-  previewOnlyContent: Map<string, string>,
 ): DesignPatchFileOperation[] {
   const projectRoot = inferSandboxProjectRoot(operations)
   return operations.map(operation => {
@@ -322,62 +315,8 @@ function updateOperationsFromFiles(
     const path = sandboxVirtualPathForOperation(operation.path, projectRoot)
     const content = fileContent(files, path)
     if (content === undefined) return operation
-    if (content === previewOnlyContent.get(path)) return operation
     return content === operation.content ? operation : { ...operation, content }
   })
-}
-
-function normalizePreviewFileSource(path: string, source: string): string {
-  return path === '/package.json' ? normalizePreviewPackageJsonContent(source) : source
-}
-
-function normalizePreviewPackageJsonContent(source: string): string {
-  try {
-    const parsed = JSON.parse(source) as unknown
-    if (!isRecord(parsed)) return source
-    const dependencies = isRecord(parsed.dependencies) ? parsed.dependencies : undefined
-    if (!dependencies) return source
-    const normalizedDependencies = normalizePreviewDependencies(dependencies)
-    if (normalizedDependencies === dependencies) return source
-    return JSON.stringify({
-      ...parsed,
-      dependencies: normalizedDependencies,
-    }, null, 2)
-  } catch {
-    return source
-  }
-}
-
-function normalizePreviewDependencies(
-  dependencies: Record<string, unknown>,
-): Record<string, unknown> {
-  let normalized: Record<string, unknown> | undefined
-  const ensureNormalized = (): Record<string, unknown> => {
-    normalized ??= { ...dependencies }
-    return normalized
-  }
-
-  if (hasOwn(dependencies, 'react') || hasOwn(dependencies, 'react-dom')) {
-    const next = ensureNormalized()
-    next.react = SANDPACKER_REACT_VERSION
-    next['react-dom'] = SANDPACKER_REACT_VERSION
-  }
-
-  for (const name of Object.keys(dependencies)) {
-    if (name.startsWith('@radix-ui/react-') && dependencies[name] !== 'latest') {
-      ensureNormalized()[name] = 'latest'
-    }
-  }
-
-  return normalized ?? dependencies
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function hasOwn(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key)
 }
 
 function fileContent(files: FileTree, path: string): string | undefined {
@@ -387,6 +326,11 @@ function fileContent(files: FileTree, path: string): string | undefined {
 
 function cloneFileTree(files: FileTree): FileTree {
   return { ...files }
+}
+
+function withQueryParam(url: string, key: string, value: string): string {
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`
 }
 
 function toLeadingSlash(path: string): string {

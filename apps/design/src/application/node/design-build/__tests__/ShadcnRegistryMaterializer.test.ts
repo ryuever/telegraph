@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateStandaloneProjectFiles } from '@/apps/design/application/common/design-project-contract'
+import {
+  evaluateStandaloneProjectFiles,
+  TAILWIND_PLAY_CDN_SCRIPT_URL,
+} from '@/apps/design/application/common/design-project-contract'
 import { createDefaultDesignSystemPolicy } from '@/apps/design/application/common/design-system-contract'
 import { createTemplateDesignPatchArtifact } from '../DesignBuildArtifacts'
 import { ShadcnRegistryIndexer } from '../ShadcnRegistryIndexer'
@@ -27,6 +30,10 @@ describe('ShadcnRegistryMaterializer', () => {
     expect(operationContent(result.artifact.operations, 'package.json')).toContain('@radix-ui/react-slot')
     expect(operationContent(result.artifact.operations, 'components.json')).toContain('"ui": "@/components/ui"')
     expect(operationContent(result.artifact.operations, 'index.html')).toContain('<div id="root"></div>')
+    expect(operationContent(result.artifact.operations, 'index.html')).toContain(`src="${TAILWIND_PLAY_CDN_SCRIPT_URL}"`)
+    expect(operationContent(result.artifact.operations, 'index.html')).toContain('type="text/tailwindcss"')
+    expect(operationContent(result.artifact.operations, 'index.html')).toContain('--color-background: var(--background);')
+    expect(operationContent(result.artifact.operations, 'src/index.tsx')).toContain("import './styles.css'")
     expect(operationContent(result.artifact.operations, 'src/index.tsx')).toContain("import GeneratedDesignPage from './App'")
     expect(operationContent(result.artifact.operations, 'tsconfig.json')).toContain('"@/*"')
     expect(operationContent(result.artifact.operations, 'vite.config.ts')).toContain("'@': new URL('./src', import.meta.url).pathname")
@@ -41,6 +48,7 @@ describe('ShadcnRegistryMaterializer', () => {
 
     const contract = evaluateStandaloneProjectFiles(result.artifact.operations)
     expect(contract.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'standalone-tailwind-play-cdn', passed: true }),
       expect.objectContaining({ id: 'standalone-external-dependencies', passed: true }),
       expect.objectContaining({ id: 'standalone-alias-config', passed: true }),
       expect.objectContaining({ id: 'standalone-shadcn-components-json', passed: true }),
