@@ -575,7 +575,7 @@ export function ChatPanel({ agent }: Props) {
     },
     [sendMessage]
   )
-  const [collapsed, setCollapsed] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
 
   const handleSaveSettings = (next: ChatModelSettings) => {
     setSettings(next)

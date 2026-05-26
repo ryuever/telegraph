@@ -97,7 +97,7 @@ describe('App page navigation', () => {
   it('persists sidebar page selection', () => {
     const app = renderApp()
     const chatButton = Array.from(app.querySelectorAll('button'))
-      .find((button) => button.textContent.includes('Chat'))
+      .find((button) => button.getAttribute('aria-label') === 'Chat')
 
     expect(chatButton).toBeDefined()
 
@@ -112,7 +112,7 @@ describe('App page navigation', () => {
   it('persists run console page selection', () => {
     const app = renderApp()
     const runsButton = Array.from(app.querySelectorAll('button'))
-      .find((button) => button.textContent.includes('Runs'))
+      .find((button) => button.getAttribute('aria-label') === 'Runs')
 
     expect(runsButton).toBeDefined()
 

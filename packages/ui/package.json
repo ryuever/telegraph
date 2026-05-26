@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./styles/globals.css": "./src/styles/globals.css",
+    "./components/ai-elements": "./src/components/ai-elements/index.ts",
     "./components/ui/*": "./src/components/ui/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",

@@ -1,4 +1,10 @@
 import React, { useEffect, useRef } from 'react'
+import {
+  AgentActivity,
+  AgentReasoning,
+  AgentToolCall,
+  type AgentActivityStatus,
+} from '@/packages/ui/components/ai-elements'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { cn } from '@/packages/ui/lib/utils'
 import type { ChatMessage, ChatSubagentGroup, ChatSubagentStatus } from '@/apps/chat/application/common'
@@ -57,6 +63,7 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
   const isError = message.status === 'error'
   const showCursor = isStreaming
   const showThinking = isStreaming && message.content.length === 0
+  const hasActivity = showThinking || (message.toolCalls?.length ?? 0) > 0
 
   return (
     <div className="flex gap-3">
@@ -68,43 +75,28 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
           {isError && <span className="text-destructive">error</span>}
         </div>
 
-        {message.toolCalls?.map(call => (
-          <div
-            key={call.id}
-            className="mb-2 rounded-md border border-border bg-card px-3 py-2 text-[12px] shadow-sm"
-          >
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span>tool</span>
-              <span className="font-mono text-foreground">{call.name}</span>
-              <span
-                className={cn(
-                  'ml-auto rounded px-1.5 py-0.5 text-[10px] uppercase',
-                  call.status === 'running' && 'bg-amber-500/15 text-amber-300',
-                  call.status === 'done' && 'bg-emerald-500/15 text-emerald-300',
-                  call.status === 'error' && 'bg-rose-500/15 text-rose-300'
-                )}
-              >
-                {call.status}
-              </span>
-            </div>
-            {call.errorMessage && (
-              <div className="mt-1 text-[11.5px] text-rose-300">{call.errorMessage}</div>
-            )}
-            {call.output !== undefined && (
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-slate-950 p-2 font-mono text-[11px] leading-relaxed text-slate-100">
-                {formatToolOutput(call.output)}
-              </pre>
-            )}
-          </div>
-        ))}
+        {hasActivity && (
+          <AgentActivity density="compact" className="mb-3">
+            {message.toolCalls?.map(call => (
+              <AgentToolCall
+                key={call.id}
+                toolName={call.name}
+                status={agentToolStatus(call.status)}
+                callId={call.id}
+                input={call.input}
+                output={call.output}
+                error={call.errorMessage}
+              />
+            ))}
+            {showThinking && <AgentReasoning status="running" title="Thinking" />}
+          </AgentActivity>
+        )}
 
         {message.subagentGroups?.map(group => (
           <SubagentGroupCard key={group.id} group={group} />
         ))}
 
-        {showThinking ? (
-          <ThinkingIndicator />
-        ) : (
+        {!showThinking && (
           <div
             className={cn(
               'rounded-md border border-border bg-card/70 px-4 py-3 shadow-sm',
@@ -197,15 +189,6 @@ function formatElapsed(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function formatToolOutput(output: unknown): string {
-  if (typeof output === 'string') return output
-  try {
-    return JSON.stringify(output, null, 2)
-  } catch {
-    return String(output)
-  }
-}
-
 function Avatar() {
   return (
     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-lilac text-[11px] font-semibold text-white shadow-sm">
@@ -226,6 +209,12 @@ function Avatar() {
   )
 }
 
+function agentToolStatus(status: NonNullable<ChatMessage['toolCalls']>[number]['status']): AgentActivityStatus {
+  if (status === 'done') return 'complete'
+  if (status === 'error') return 'error'
+  return 'running'
+}
+
 function Pulse({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -235,19 +224,5 @@ function Pulse({ label }: { label: string }) {
       </span>
       {label}
     </span>
-  )
-}
-
-function ThinkingIndicator() {
-  return (
-    <div className="flex h-6 items-center gap-1">
-      {[0, 150, 300].map(d => (
-        <span
-          key={d}
-          className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground"
-          style={{ animationDelay: `${String(d)}ms` }}
-        />
-      ))}
-    </div>
   )
 }

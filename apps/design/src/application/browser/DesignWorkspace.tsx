@@ -2,6 +2,15 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
 import type { AgentEvent } from '@/packages/agent-protocol'
+import {
+  AgentActivity,
+  AgentActivityItem,
+  AgentReasoning,
+  AgentResult,
+  AgentToolCall,
+  type AgentActivityStatus,
+  type AgentActivityTone,
+} from '@/packages/ui/components/ai-elements'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
@@ -663,79 +672,226 @@ function AssistantRunFeed({
   if (sessionLogItems.length === 0) return <></>
 
   return (
-    <>
-      {sessionLogItems.map(item => (
-        <SessionLogRunRow key={`log:${item.id}`} item={item} />
-      ))}
-    </>
+    <div className="flex gap-2">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+        <Bot size={14} />
+      </div>
+      <AgentActivity density="compact" className="min-w-0 max-w-[88%] flex-1">
+        {coalesceSessionLogItems(sessionLogItems).map(item => (
+          <DesignSessionActivityItem key={item.id} item={item} />
+        ))}
+      </AgentActivity>
+    </div>
   )
 }
 
-function SessionLogRunRow({ item }: { item: DesignSessionLogItem }): JSX.Element {
-  const detail = item.fullDetail ?? item.detail
-  const isThinking = item.label === 'Thinking'
+type DesignSessionActivityEntry =
+  | { type: 'single'; id: string; item: DesignSessionLogItem }
+  | {
+    type: 'tool'
+    id: string
+    toolName: string
+    status: AgentActivityStatus
+    call?: DesignSessionLogItem
+    result?: DesignSessionLogItem
+    error?: DesignSessionLogItem
+  }
 
-  if (isThinking) {
+function DesignSessionActivityItem({ item }: { item: DesignSessionActivityEntry }): JSX.Element {
+  if (item.type === 'tool') {
+    const detail = item.error?.fullDetail ??
+      item.error?.detail ??
+      item.result?.fullDetail ??
+      item.result?.detail ??
+      item.call?.fullDetail ??
+      item.call?.detail
+    const hasToolDetail = Boolean(item.call?.detail || item.result?.detail || item.error?.detail)
+
     return (
-      <div className="flex gap-2">
-        <BotRunAvatar />
-        <details className="group min-w-0 max-w-[88%] rounded-md bg-surface-soft/55 px-2 py-1.5">
-          <summary className="grid cursor-pointer list-none grid-cols-[10px_minmax(0,1fr)_14px] gap-2 marker:hidden">
-            <span className={sessionLogStatusDotClassName(item.status)} />
-            <div className="min-w-0">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <span className="break-words text-[11px] font-medium text-foreground">{item.label}</span>
-                <span className="shrink-0 rounded bg-background/70 px-1 py-0.5 text-[9px] uppercase tracking-normal text-muted-foreground">
-                  {item.kind}
-                </span>
-              </div>
-              {detail && (
-                <div className="mt-0.5 line-clamp-1 break-words text-[10px] leading-relaxed text-muted-foreground">
-                  {detail}
-                </div>
-              )}
-            </div>
-            <ChevronDown size={13} className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-          </summary>
-          {detail && (
-            <div className="mt-1.5 whitespace-pre-wrap break-words border-t border-border/70 pt-1.5 pl-[18px] text-[10px] leading-relaxed text-muted-foreground">
-              {detail}
-            </div>
-          )}
-        </details>
-      </div>
+      <AgentToolCall
+        toolName={item.toolName}
+        title={toolActivityTitle(item)}
+        status={item.status}
+        input={item.call?.detail}
+        output={item.result?.detail}
+        error={item.error?.detail}
+        defaultOpen={hasToolDetail || item.status === 'running' || item.status === 'error'}
+      >
+        {detail && detail !== item.call?.detail && detail !== item.result?.detail && detail !== item.error?.detail ? (
+          <SessionActivityDetail detail={detail} />
+        ) : undefined}
+      </AgentToolCall>
     )
   }
 
+  const logItem = item.item
+  if (logItem.label === 'Thinking') {
+    return (
+      <AgentReasoning
+        title="Thinking"
+        status={logItem.status === 'running' ? 'running' : 'complete'}
+        subtitle={logItem.kind}
+        summary={logItem.detail}
+        defaultOpen={logItem.status === 'running'}
+      >
+        {logItem.fullDetail && logItem.fullDetail !== logItem.detail ? (
+          <SessionActivityDetail detail={logItem.fullDetail} />
+        ) : undefined}
+      </AgentReasoning>
+    )
+  }
+
+  if (logItem.kind === 'artifact' || logItem.kind === 'review' || logItem.kind === 'snapshot') {
+    return (
+      <AgentResult
+        title={logItem.label}
+        status={agentStatusFromSessionLog(logItem.status)}
+        subtitle={logItem.kind}
+        description={logItem.detail}
+        defaultOpen={Boolean(logItem.detail || logItem.fullDetail) || logItem.status === 'failed'}
+      >
+        {logItem.fullDetail && logItem.fullDetail !== logItem.detail ? (
+          <SessionActivityDetail detail={logItem.fullDetail} />
+        ) : undefined}
+      </AgentResult>
+    )
+  }
+
+  const detail = logItem.fullDetail ?? logItem.detail
   return (
-    <div className="flex gap-2">
-      <BotRunAvatar />
-      <div className="grid min-w-0 max-w-[88%] grid-cols-[10px_minmax(0,1fr)] gap-2 rounded-md bg-surface-soft/55 px-2 py-1.5">
-        <span className={sessionLogStatusDotClassName(item.status)} />
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="break-words text-[11px] font-medium text-foreground">{item.label}</span>
-            <span className="shrink-0 rounded bg-background/70 px-1 py-0.5 text-[9px] uppercase tracking-normal text-muted-foreground">
-              {item.kind}
-            </span>
-          </div>
-          {detail && (
-            <div className="mt-0.5 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-muted-foreground">
-              {detail}
-            </div>
-          )}
-        </div>
-      </div>
+    <AgentActivityItem
+      title={logItem.label}
+      subtitle={logItem.kind}
+      tone={agentToneFromSessionLog(logItem.kind)}
+      status={agentStatusFromSessionLog(logItem.status)}
+      meta={sessionLogMeta(logItem)}
+      defaultOpen={Boolean(detail) || logItem.status === 'running' || logItem.status === 'failed'}
+    >
+      {detail ? <SessionActivityDetail detail={detail} /> : undefined}
+    </AgentActivityItem>
+  )
+}
+
+function SessionActivityDetail({ detail }: { detail: string }): JSX.Element {
+  return (
+    <div className="whitespace-pre-wrap break-words text-[11.5px] leading-relaxed text-muted-foreground">
+      {detail}
     </div>
   )
 }
 
-function BotRunAvatar(): JSX.Element {
-  return (
-    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
-      <Bot size={14} />
-    </div>
-  )
+function coalesceSessionLogItems(items: DesignSessionLogItem[]): DesignSessionActivityEntry[] {
+  const toolEntries = new Map<string, Extract<DesignSessionActivityEntry, { type: 'tool' }>>()
+  const entries: DesignSessionActivityEntry[] = []
+
+  for (const item of items) {
+    const tool = toolEntryFromSessionLogItem(item)
+    if (!tool) {
+      entries.push({ type: 'single', id: item.id, item })
+      continue
+    }
+
+    const existing = toolEntries.get(tool.id)
+    if (existing) {
+      const next = mergeToolEntry(existing, tool)
+      toolEntries.set(tool.id, next)
+      const entryIndex = entries.findIndex(entry => entry.id === tool.id)
+      if (entryIndex >= 0) entries[entryIndex] = next
+      continue
+    }
+
+    toolEntries.set(tool.id, tool)
+    entries.push(tool)
+  }
+
+  return entries
+}
+
+function toolEntryFromSessionLogItem(
+  item: DesignSessionLogItem,
+): Extract<DesignSessionActivityEntry, { type: 'tool' }> | null {
+  if (item.kind !== 'tool') return null
+  const callId = toolCallIdFromSessionLogItem(item)
+  const toolName = toolNameFromSessionLogLabel(item.label)
+  if (!callId || !toolName) return null
+  const base = {
+    type: 'tool' as const,
+    id: `${item.runId ?? 'run'}:tool:${callId}`,
+    toolName,
+    status: 'running' as AgentActivityStatus,
+  }
+  if (item.label.startsWith('Tool result:')) return { ...base, status: 'complete', result: item }
+  if (item.label.startsWith('Tool error:')) return { ...base, status: 'error', error: item }
+  return { ...base, call: item }
+}
+
+function mergeToolEntry(
+  previous: Extract<DesignSessionActivityEntry, { type: 'tool' }>,
+  next: Extract<DesignSessionActivityEntry, { type: 'tool' }>,
+): Extract<DesignSessionActivityEntry, { type: 'tool' }> {
+  const error = next.error ?? previous.error
+  const result = next.result ?? previous.result
+  return {
+    ...previous,
+    call: next.call ?? previous.call,
+    result,
+    error,
+    status: error ? 'error' : result ? 'complete' : next.status,
+  }
+}
+
+function toolCallIdFromSessionLogItem(item: DesignSessionLogItem): string | undefined {
+  const match = /:tool-(?:call|result|error):(.+)$/.exec(item.id)
+  return match?.[1]
+}
+
+function toolNameFromSessionLogLabel(label: string): string | undefined {
+  const match = /^Tool (?:call|result|error):\s*(.+)$/.exec(label)
+  return match?.[1]
+}
+
+function toolActivityTitle(item: Extract<DesignSessionActivityEntry, { type: 'tool' }>): string {
+  if (item.status === 'error') return 'Tool failed'
+  if (item.status === 'complete') return 'Used tool'
+  return 'Using tool'
+}
+
+function agentStatusFromSessionLog(status: DesignSessionLogItem['status']): AgentActivityStatus {
+  if (status === 'running') return 'running'
+  if (status === 'completed') return 'complete'
+  if (status === 'failed') return 'error'
+  if (status === 'cancelled') return 'cancelled'
+  return 'complete'
+}
+
+function agentToneFromSessionLog(kind: DesignSessionLogItem['kind']): AgentActivityTone {
+  switch (kind) {
+    case 'model':
+      return 'model'
+    case 'tool':
+      return 'tool'
+    case 'artifact':
+    case 'review':
+    case 'snapshot':
+      return 'result'
+    case 'step':
+    case 'run':
+    case 'subagent':
+      return 'workflow'
+  }
+}
+
+function sessionLogMeta(item: DesignSessionLogItem): Array<{ label: string; value: string }> | undefined {
+  const meta = [
+    item.runId ? { label: 'run', value: shortId(item.runId) } : undefined,
+    item.childRunId ? { label: 'child', value: shortId(item.childRunId) } : undefined,
+  ].filter((entry): entry is { label: string; value: string } => Boolean(entry))
+
+  return meta.length > 0 ? meta : undefined
+}
+
+function shortId(id: string): string {
+  return id.length > 10 ? `${id.slice(0, 10)}...` : id
 }
 
 function MessageBubble({
@@ -744,6 +900,11 @@ function MessageBubble({
   message: Message
 }): JSX.Element {
   const isUser = message.role === 'user'
+  const hasAssistantActivity = message.role === 'assistant' && (message.sessionLogItems?.length ?? 0) > 0
+  if (message.role === 'assistant' && message.content.length === 0 && message.runStatus === 'running' && hasAssistantActivity) {
+    return <></>
+  }
+
   const content = message.role === 'assistant' && message.content.length === 0 && message.runStatus === 'running'
     ? '正在生成...'
     : message.content
@@ -832,15 +993,6 @@ function subagentStatusLabel(status: DesignSubagentViewItem['status']): string {
   if (status === 'completed') return '完成'
   if (status === 'error') return '失败'
   return '停止'
-}
-
-function sessionLogStatusDotClassName(status: DesignSessionLogItem['status']): string {
-  const base = 'mt-1 h-2 w-2 shrink-0 rounded-full'
-  if (status === 'completed') return `${base} bg-emerald-500`
-  if (status === 'failed') return `${base} bg-destructive`
-  if (status === 'cancelled') return `${base} bg-muted-foreground`
-  if (status === 'running') return `${base} bg-amber-500`
-  return `${base} bg-sky-500`
 }
 
 function flattenMessageSubagents(messages: Message[]): DesignSubagentViewItem[] {

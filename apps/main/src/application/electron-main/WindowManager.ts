@@ -1,5 +1,5 @@
 import { injectable } from '@x-oasis/di';
-import { BrowserWindow, Menu, app, nativeTheme } from 'electron';
+import { BrowserWindow, Menu, app, nativeImage, nativeTheme } from 'electron';
 import { join } from 'path';
 
 import type { IWindowManager } from '@/apps/main/application/common';
@@ -11,6 +11,7 @@ export { WindowManagerId };
 
 const WINDOW_BACKGROUND_COLOR = '#080d17';
 const WINDOW_ACCENT_COLOR = '#ff5436';
+const APP_ICON_PATH = join(app.getAppPath(), 'assets/icons/icon.png');
 
 @injectable()
 export class WindowManager implements IWindowManager {
@@ -26,6 +27,7 @@ export class WindowManager implements IWindowManager {
       width: 1100,
       height: 750,
       title: 'Telegraph',
+      icon: APP_ICON_PATH,
       backgroundColor: WINDOW_BACKGROUND_COLOR,
       accentColor: WINDOW_ACCENT_COLOR,
       darkTheme: true,
@@ -94,6 +96,7 @@ export class WindowManager implements IWindowManager {
       height: 700,
       parent: this.mainWindow || undefined,
       title: 'Settings',
+      icon: APP_ICON_PATH,
       backgroundColor: WINDOW_BACKGROUND_COLOR,
       accentColor: WINDOW_ACCENT_COLOR,
       darkTheme: true,
@@ -124,6 +127,12 @@ export class WindowManager implements IWindowManager {
 
   private applyNativeWindowTheme(): void {
     nativeTheme.themeSource = 'dark';
+    if (process.platform === 'darwin') {
+      const appIcon = nativeImage.createFromPath(APP_ICON_PATH);
+      if (!appIcon.isEmpty()) {
+        app.dock?.setIcon(appIcon);
+      }
+    }
   }
 
   private setupApplicationMenu(): void {

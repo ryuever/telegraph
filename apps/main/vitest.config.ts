@@ -12,6 +12,7 @@ export default defineConfig({
       '@/apps/daemon': resolve(__dirname, '../daemon/src'),
       '@/apps/shared': resolve(__dirname, '../shared/src'),
       '@/apps/setting': resolve(__dirname, '../setting/src'),
+      '@/docs': resolve(__dirname, '../../docs'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src'),
       '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),

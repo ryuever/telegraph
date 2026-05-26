@@ -1,0 +1,78 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title description">
+  <title id="title">Telegraph icon</title>
+  <desc id="description">A dark engineering cockpit icon with a coral Telegraph signal mark, grid lines, and connected runtime nodes.</desc>
+  <defs>
+    <linearGradient id="bg" x1="150" y1="88" x2="874" y2="936" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="0.46" stop-color="#090D15"/>
+      <stop offset="1" stop-color="#05070D"/>
+    </linearGradient>
+    <radialGradient id="coralGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 464) rotate(90) scale(430)">
+      <stop stop-color="#FF8060" stop-opacity="0.42"/>
+      <stop offset="0.54" stop-color="#FF5436" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#FF5436" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="signal" x1="297" y1="248" x2="735" y2="792" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE2D8"/>
+      <stop offset="0.25" stop-color="#FF8060"/>
+      <stop offset="0.62" stop-color="#FF5436"/>
+      <stop offset="1" stop-color="#A63228"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="122" y1="100" x2="904" y2="924" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB199"/>
+      <stop offset="0.45" stop-color="#FF5436"/>
+      <stop offset="1" stop-color="#1F2937"/>
+    </linearGradient>
+    <filter id="softShadow" x="44" y="44" width="936" height="936" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="36" flood-color="#000000" flood-opacity="0.42"/>
+    </filter>
+    <filter id="signalGlow" x="152" y="152" width="720" height="720" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 1 0 0 0 0 0.29 0 0 0 0 0.18 0 0 0 0.95 0"/>
+      <feBlend in2="SourceGraphic" mode="screen"/>
+    </filter>
+    <clipPath id="clip">
+      <path d="M512 72C672.5 72 752.8 72 815.4 104.8C864.9 130.8 901.2 167.1 927.2 216.6C960 279.2 960 359.5 960 520C960 680.5 960 760.8 927.2 823.4C901.2 872.9 864.9 909.2 815.4 935.2C752.8 968 672.5 968 512 968C351.5 968 271.2 968 208.6 935.2C159.1 909.2 122.8 872.9 96.8 823.4C64 760.8 64 680.5 64 520C64 359.5 64 279.2 96.8 216.6C122.8 167.1 159.1 130.8 208.6 104.8C271.2 72 351.5 72 512 72Z"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <path d="M512 72C672.5 72 752.8 72 815.4 104.8C864.9 130.8 901.2 167.1 927.2 216.6C960 279.2 960 359.5 960 520C960 680.5 960 760.8 927.2 823.4C901.2 872.9 864.9 909.2 815.4 935.2C752.8 968 672.5 968 512 968C351.5 968 271.2 968 208.6 935.2C159.1 909.2 122.8 872.9 96.8 823.4C64 760.8 64 680.5 64 520C64 359.5 64 279.2 96.8 216.6C122.8 167.1 159.1 130.8 208.6 104.8C271.2 72 351.5 72 512 72Z" fill="url(#bg)"/>
+    <g clip-path="url(#clip)">
+      <path d="M64 72H960V968H64V72Z" fill="url(#coralGlow)"/>
+      <g opacity="0.22" stroke="#E8ECF2" stroke-width="1.5">
+        <path d="M192 72V968"/>
+        <path d="M320 72V968"/>
+        <path d="M448 72V968"/>
+        <path d="M576 72V968"/>
+        <path d="M704 72V968"/>
+        <path d="M832 72V968"/>
+        <path d="M64 200H960"/>
+        <path d="M64 328H960"/>
+        <path d="M64 456H960"/>
+        <path d="M64 584H960"/>
+        <path d="M64 712H960"/>
+        <path d="M64 840H960"/>
+      </g>
+      <path d="M176 642C300 566 418 552 530 600C662 656 778 626 874 528" stroke="#FF5436" stroke-opacity="0.32" stroke-width="10" stroke-linecap="round"/>
+      <path d="M158 382C286 308 410 302 530 366C654 432 770 422 874 336" stroke="#FFE2D8" stroke-opacity="0.16" stroke-width="6" stroke-linecap="round"/>
+      <path d="M236 760C350 818 664 820 790 752" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="42" stroke-linecap="round"/>
+
+      <g filter="url(#signalGlow)">
+        <path d="M300 284H724C738.4 284 750 295.6 750 310V374C750 388.4 738.4 400 724 400H580V750C580 764.4 568.4 776 554 776H470C455.6 776 444 764.4 444 750V400H300C285.6 400 274 388.4 274 374V310C274 295.6 285.6 284 300 284Z" fill="url(#signal)"/>
+      </g>
+      <path d="M326 326H698C705.7 326 712 332.3 712 340V348C712 355.7 705.7 362 698 362H552V734C552 741.7 545.7 748 538 748H486C478.3 748 472 741.7 472 734V362H326C318.3 362 312 355.7 312 348V340C312 332.3 318.3 326 326 326Z" fill="#FFFFFF" fill-opacity="0.18"/>
+      <path d="M512 244V804" stroke="#FFE2D8" stroke-opacity="0.36" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 30"/>
+
+      <g>
+        <circle cx="282" cy="480" r="19" fill="#080C14" stroke="#FF8060" stroke-width="8"/>
+        <circle cx="742" cy="462" r="21" fill="#080C14" stroke="#FF5436" stroke-width="8"/>
+        <circle cx="682" cy="704" r="17" fill="#080C14" stroke="#FFB199" stroke-width="7"/>
+        <circle cx="342" cy="692" r="15" fill="#080C14" stroke="#FF8060" stroke-width="7"/>
+        <circle cx="512" cy="224" r="16" fill="#FFE2D8"/>
+        <circle cx="512" cy="224" r="35" stroke="#FF8060" stroke-opacity="0.38" stroke-width="4"/>
+      </g>
+    </g>
+    <path d="M512 72C672.5 72 752.8 72 815.4 104.8C864.9 130.8 901.2 167.1 927.2 216.6C960 279.2 960 359.5 960 520C960 680.5 960 760.8 927.2 823.4C901.2 872.9 864.9 909.2 815.4 935.2C752.8 968 672.5 968 512 968C351.5 968 271.2 968 208.6 935.2C159.1 909.2 122.8 872.9 96.8 823.4C64 760.8 64 680.5 64 520C64 359.5 64 279.2 96.8 216.6C122.8 167.1 159.1 130.8 208.6 104.8C271.2 72 351.5 72 512 72Z" stroke="url(#rim)" stroke-width="6"/>
+  </g>
+</svg>

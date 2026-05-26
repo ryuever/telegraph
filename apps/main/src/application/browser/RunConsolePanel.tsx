@@ -8,7 +8,9 @@ import {
   File,
   FileJson,
   Image,
+  ListTree,
   Loader2,
+  MessagesSquare,
   RefreshCw,
   XCircle,
 } from 'lucide-react'
@@ -43,6 +45,23 @@ interface ConsoleEvent {
   seq: number
   ts: number
   event: AgentEvent
+}
+
+interface ConsoleLogGroup {
+  key: string
+  marker: string
+  ts: number
+  title: string
+  summary: string
+  messages: ConsoleLogMessage[]
+  event?: AgentEvent
+}
+
+interface ConsoleLogMessage {
+  key: string
+  role: 'system' | 'user' | 'assistant' | 'tool' | 'event'
+  title: string
+  content: string
 }
 
 interface ConsoleRunEventRecord {
@@ -87,10 +106,16 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
   const [events, setEvents] = useState<ConsoleEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | undefined>()
+  const [selectedLogKey, setSelectedLogKey] = useState<string | null>(null)
 
   const selectedRun = useMemo(
     () => runs.find(run => runKey(run) === selectedRunKey) ?? null,
     [runs, selectedRunKey],
+  )
+
+  const logGroups = useMemo(
+    () => events.flatMap(event => projectConsoleLogGroups(event)),
+    [events],
   )
 
   const visibleRuns = useMemo(() => {
@@ -159,10 +184,18 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
   }, [refreshRuns])
 
   useEffect(() => {
+    setSelectedLogKey(current => {
+      if (current && logGroups.some(group => group.key === current)) return current
+      return logGroups[0]?.key ?? null
+    })
+  }, [logGroups])
+
+  useEffect(() => {
     if (!selectedRun) {
       setEvents([])
       setEventsError(undefined)
       setEventsLoading(false)
+      setSelectedLogKey(null)
       return
     }
 
@@ -201,7 +234,7 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
   }, [selectedRun])
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background text-foreground">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background pb-8 text-foreground">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white">
@@ -314,45 +347,115 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                 <AlertCircle size={16} />
                 <span>{eventsError}</span>
               </div>
-            ) : events.length === 0 ? (
+            ) : logGroups.length === 0 ? (
               <div className="flex h-full min-h-40 items-center justify-center px-4 text-sm text-muted-foreground">
                 No events
               </div>
             ) : (
-              <div className="divide-y divide-border">
-                {events.map(event => {
-                  const artifacts = extractObservationArtifacts(event.event)
-                  return (
-                    <article
-                      key={`${event.source}:${event.runId}:${String(event.seq)}`}
-                      className="grid min-h-14 grid-cols-[56px_150px_minmax(0,1fr)] gap-3 px-4 py-3 max-md:grid-cols-[48px_minmax(0,1fr)]"
-                    >
-                      <span className="text-xs tabular-nums text-muted-foreground">#{event.seq}</span>
-                      <span className="text-xs text-muted-foreground max-md:hidden">{formatTime(event.ts)}</span>
-                      <div className="min-w-0">
-                        <span className="block truncate text-[13px] font-medium text-foreground">
-                          {event.event.type}
-                        </span>
-                        <span className="mt-1 block truncate text-xs text-muted-foreground">
-                          {eventSummary(event.event)}
-                        </span>
-                        {artifacts.length > 0 ? (
-                          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                            {artifacts.map(artifact => (
-                              <ObservationArtifactCard key={artifact.uri} artifact={artifact} />
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
+              <RunLogInspector
+                groups={logGroups}
+                selectedKey={selectedLogKey}
+                onSelect={setSelectedLogKey}
+              />
             )}
           </div>
         </section>
       </div>
     </div>
+  )
+}
+
+function RunLogInspector({
+  groups,
+  selectedKey,
+  onSelect,
+}: {
+  groups: ConsoleLogGroup[]
+  selectedKey: string | null
+  onSelect: (key: string) => void
+}): React.JSX.Element {
+  const selected = groups.find(group => group.key === selectedKey) ?? groups[0]
+  const artifacts = selected.event ? extractObservationArtifacts(selected.event) : []
+
+  return (
+    <div className="grid h-full min-h-0 grid-cols-[minmax(220px,300px)_minmax(0,1fr)] max-md:grid-cols-1">
+      <aside className="flex min-h-0 min-w-0 flex-col border-r border-border bg-muted/20 max-md:max-h-56 max-md:border-b max-md:border-r-0">
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3 text-[11px] font-medium uppercase text-muted-foreground">
+          <ListTree size={13} />
+          Events
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {groups.map(group => {
+            const selectedGroup = group.key === selected.key
+            return (
+              <button
+                key={group.key}
+                type="button"
+                onClick={() => { onSelect(group.key); }}
+                className={cn(
+                  'grid min-h-14 w-full grid-cols-[46px_minmax(0,1fr)] gap-2 border-b border-border px-3 py-2 text-left transition-colors',
+                  selectedGroup ? 'bg-background' : 'hover:bg-background/70',
+                )}
+              >
+                <span className="pt-0.5 text-[11px] tabular-nums text-muted-foreground">{group.marker}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-medium text-foreground">{group.title}</span>
+                  <span className="mt-1 block truncate text-[11px] text-muted-foreground">{group.summary}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-col">
+        <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <MessagesSquare size={15} className="shrink-0 text-muted-foreground" />
+              <span className="truncate text-sm font-semibold">{selected.title}</span>
+            </div>
+            <div className="mt-1 truncate text-[11px] text-muted-foreground">
+              {selected.marker} · {formatTime(selected.ts)}
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="grid gap-3">
+            {selected.messages.map(message => (
+              <MessageBlock key={message.key} message={message} />
+            ))}
+            {artifacts.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {artifacts.map(artifact => (
+                  <ObservationArtifactCard key={artifact.uri} artifact={artifact} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MessageBlock({ message }: { message: ConsoleLogMessage }): React.JSX.Element {
+  return (
+    <section className="overflow-hidden rounded-md border border-border bg-card">
+      <div className="flex min-h-8 items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
+        <span className={cn(
+          'rounded px-1.5 py-0.5 text-[11px] font-medium',
+          messageRoleClassName(message.role),
+        )}
+        >
+          {message.title}
+        </span>
+      </div>
+      <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2 text-xs leading-5 text-foreground">
+        {message.content}
+      </pre>
+    </section>
   )
 }
 
@@ -493,6 +596,166 @@ function runKey(run: Pick<ConsoleRun, 'source' | 'runId'>): string {
   return `${run.source}:${run.runId}`
 }
 
+export function projectConsoleLogGroups(item: ConsoleEvent): ConsoleLogGroup[] {
+  const event = item.event
+  if (isThinkingEvent(event)) return []
+
+  if (event.type === 'model_request') {
+    return [consoleLogGroup(item, {
+      title: 'Model request',
+      summary: modelRequestSummary(event),
+      messages: [modelRequestPayloadMessage(event)],
+      event,
+    })]
+  }
+
+  if (event.type === 'run_completed') {
+    const assistantText = textFromMessageLike(event.output)
+    if (assistantText) {
+      return [consoleLogGroup(item, {
+        suffix: 'assistant-final',
+        title: 'Assistant message',
+        summary: assistantText,
+        messages: [consoleLogMessage({
+          key: 'assistant-final',
+          role: 'assistant',
+          title: 'Assistant',
+          content: assistantText,
+        })],
+      })]
+    }
+  }
+
+  const summary = eventSummary(event)
+  return [consoleLogGroup(item, {
+    title: eventTitle(event),
+    summary,
+    messages: [consoleLogMessage({
+      key: event.type,
+      role: eventRole(event),
+      title: eventTitle(event),
+      content: eventDetail(event),
+    })],
+    event,
+  })]
+}
+
+function modelRequestPayloadMessage(event: Extract<AgentEvent, { type: 'model_request' }>): ConsoleLogMessage {
+  const payload = recordValue(event.payload)
+  const raw = recordValue(event.raw)
+  const rawContext = recordValue(raw?.context)
+  const content = payload ?? rawContext ?? event.payload
+  return consoleLogMessage({
+    key: 'model-request-payload',
+    role: 'event',
+    title: 'Request payload',
+    content: formatJson(content),
+  })
+}
+
+function modelRequestSummary(event: Extract<AgentEvent, { type: 'model_request' }>): string {
+  const payload = recordValue(event.payload)
+  const raw = recordValue(event.raw)
+  const rawContext = recordValue(raw?.context)
+  const messages = arrayField(payload, 'messages').length > 0
+    ? arrayField(payload, 'messages')
+    : arrayField(rawContext, 'messages')
+  if (messages.length > 0) {
+    return `${String(messages.length)} messages`
+  }
+  return event.requestId
+}
+
+function consoleLogGroup(
+  item: ConsoleEvent,
+  input: { suffix?: string; title: string; summary: string; messages: ConsoleLogMessage[]; event?: AgentEvent },
+): ConsoleLogGroup {
+  const suffix = input.suffix ? `:${input.suffix}` : ''
+  return {
+    key: `${item.source}:${item.runId}:${String(item.seq)}${suffix}`,
+    marker: input.suffix ? `#${String(item.seq)}.${entrySuffixMarker(input.suffix)}` : `#${String(item.seq)}`,
+    ts: item.ts,
+    title: input.title,
+    summary: input.summary,
+    messages: input.messages,
+    event: input.event,
+  }
+}
+
+function consoleLogMessage(input: ConsoleLogMessage): ConsoleLogMessage {
+  return input
+}
+
+function entrySuffixMarker(suffix: string): string {
+  if (suffix === 'system') return 's'
+  if (suffix === 'assistant-final') return 'a'
+  const parts = suffix.split(':')
+  const role = parts[0] ?? ''
+  const index = parts.length > 1 ? parts[1] : ''
+  const first = role.slice(0, 1)
+  return `${first}${index}`
+}
+
+function eventTitle(event: AgentEvent): string {
+  switch (event.type) {
+    case 'assistant_delta':
+    case 'assistant_message':
+      return 'Assistant message'
+    case 'model_request':
+      return 'Model request'
+    case 'model_event':
+      return 'Model event'
+    case 'runtime_log':
+      return `Runtime ${event.level}`
+    case 'run_started':
+      return 'Run started'
+    case 'run_completed':
+      return 'Run completed'
+    case 'run_failed':
+      return 'Run failed'
+    case 'run_cancelled':
+      return 'Run cancelled'
+    case 'tool_call':
+      return `Tool call: ${event.toolName}`
+    case 'tool_result':
+      return `Tool result: ${event.toolName}`
+    case 'tool_error':
+      return `Tool error: ${event.toolName}`
+    case 'permission_requested':
+      return 'Permission requested'
+    case 'permission_resolved':
+      return 'Permission resolved'
+    case 'step_started':
+      return 'Step started'
+    case 'step_completed':
+      return 'Step completed'
+    case 'edge_taken':
+      return 'Edge taken'
+    case 'child_run_started':
+      return 'Child run started'
+    case 'child_run_completed':
+      return 'Child run completed'
+    case 'extension_activated':
+      return 'Extension activated'
+    case 'extension_deactivated':
+      return 'Extension deactivated'
+  }
+}
+
+function eventRole(event: AgentEvent): ConsoleLogMessage['role'] {
+  if (event.type === 'assistant_delta' || event.type === 'assistant_message' || event.type === 'run_completed') return 'assistant'
+  if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_error') return 'tool'
+  return 'event'
+}
+
+function messageRoleClassName(role: ConsoleLogMessage['role']): string {
+  if (role === 'system') return 'bg-slate-100 text-slate-700'
+  if (role === 'user') return 'bg-sky-50 text-sky-700'
+  if (role === 'assistant') return 'bg-emerald-50 text-emerald-700'
+  if (role === 'tool') return 'bg-amber-50 text-amber-700'
+  return 'bg-muted text-muted-foreground'
+}
+
 function findFocusedRun(runs: ConsoleRun[], focus: MainSwitchPagePayload): ConsoleRun | undefined {
   if (!focus.runId) return undefined
   const source = focus.pageletId === 'design' || focus.pageletId === 'chat'
@@ -519,14 +782,29 @@ function statusIcon(status: string): typeof CheckCircle2 {
 
 function eventSummary(event: AgentEvent): string {
   switch (event.type) {
+    case 'run_started':
+      return [
+        event.pattern,
+        event.origin?.runtimeId,
+      ].filter(Boolean).join(' / ') || 'Run started'
+    case 'run_completed':
+      return summarizeRunOutput(event.output) ?? 'Run completed'
+    case 'run_cancelled':
+      return event.reason ?? 'Run cancelled'
+    case 'model_request':
+      return event.requestId
+    case 'model_event':
+      return rawEventType(event.raw) || event.requestId
     case 'assistant_delta':
-      return compactText(event.text) || 'assistant delta'
+      return event.text || 'assistant delta'
     case 'assistant_message':
-      return compactText(messageText(event.message)) || 'assistant message'
+      return messageText(event.message) || 'assistant message'
     case 'tool_call':
+      return summarizeToolPayload(event.toolName, event.input)
     case 'tool_result':
+      return summarizeToolPayload(event.toolName, event.output)
     case 'tool_error':
-      return event.toolName
+      return `${event.toolName}: ${event.error.message}`
     case 'runtime_log':
       return compactText(event.message)
     case 'run_failed':
@@ -536,18 +814,165 @@ function eventSummary(event: AgentEvent): string {
       return event.permission.type
     case 'step_started':
       return compactText(event.label)
+    case 'step_completed':
+      return summarizeToolPayload(event.stepId, event.output)
+    case 'edge_taken':
+      return event.condition
+        ? `${event.from} -> ${event.to} (${event.condition})`
+        : `${event.from} -> ${event.to}`
     case 'child_run_started':
-      return event.childRunId
+      return event.label ?? event.childRunId
+    case 'child_run_completed':
+      return summarizeToolPayload(event.childRunId, event.output)
     case 'extension_activated':
     case 'extension_deactivated':
       return event.extensionId
-    default:
-      return ''
   }
 }
 
 function messageText(message: RuntimeMessage): string {
   return message.content
+}
+
+function eventDetail(event: AgentEvent): string {
+  switch (event.type) {
+    case 'run_started':
+      return lines([
+        `Run: ${event.runId}`,
+        event.pattern ? `Pattern: ${event.pattern}` : undefined,
+        event.origin?.runtimeId ? `Runtime: ${event.origin.runtimeId}` : undefined,
+        event.producerVersion ? `Producer: ${event.producerVersion}` : undefined,
+      ])
+    case 'run_completed':
+      return summarizeRunOutput(event.output) ?? formatJson(event.output)
+    case 'run_cancelled':
+      return event.reason ?? 'Cancelled'
+    case 'run_failed':
+      return lines([
+        event.error.message,
+        event.error.code ? `Code: ${event.error.code}` : undefined,
+        event.error.details ? formatJson(event.error.details) : undefined,
+      ])
+    case 'model_request': {
+      return modelRequestPayloadMessage(event).content
+    }
+    case 'model_event':
+      return formatJson(event.raw)
+    case 'assistant_delta':
+      return event.text || 'assistant delta'
+    case 'assistant_message':
+      return messageText(event.message) || 'assistant message'
+    case 'tool_call':
+      return formatJson(event.input)
+    case 'tool_result':
+      return formatJson(event.output)
+    case 'tool_error':
+      return lines([
+        event.error.message,
+        event.error.code ? `Code: ${event.error.code}` : undefined,
+        event.error.details ? formatJson(event.error.details) : undefined,
+      ])
+    case 'runtime_log':
+      return event.raw ? `${event.message}\n\n${formatJson(event.raw)}` : event.message
+    case 'permission_requested':
+      return formatJson(event.permission)
+    case 'permission_resolved':
+      return `${event.granted ? 'Granted' : 'Denied'}\n\n${formatJson(event.permission)}`
+    case 'step_started':
+      return lines([
+        event.label,
+        `Step: ${event.stepId}`,
+        event.kind ? `Kind: ${event.kind}` : undefined,
+      ])
+    case 'step_completed':
+      return formatJson(event.output ?? { stepId: event.stepId })
+    case 'edge_taken':
+      return eventSummary(event)
+    case 'child_run_started':
+      return lines([
+        event.label,
+        `Child run: ${event.childRunId}`,
+        `Parent run: ${event.parentRunId}`,
+      ])
+    case 'child_run_completed':
+      return formatJson(event.output)
+    case 'extension_activated':
+    case 'extension_deactivated':
+      return event.extensionId
+  }
+}
+
+function isThinkingEvent(event: AgentEvent): boolean {
+  if (event.type === 'runtime_log') {
+    return event.message === 'thinking_delta' || rawEventType(event.raw).includes('thinking')
+  }
+  if (event.type === 'model_event') {
+    const type = rawEventType(event.raw)
+    return type.includes('thinking') || type.includes('reasoning')
+  }
+  return false
+}
+
+function rawEventType(value: unknown): string {
+  const type = recordValue(value)?.type
+  return typeof type === 'string' ? type : ''
+}
+
+function textFromMessageLike(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  const record = recordValue(value)
+  if (!record) return undefined
+  const direct = stringField(record, 'content') ?? stringField(record, 'text') ?? stringField(record, 'reply')
+  if (direct) return direct
+  const message = recordValue(record.message)
+  if (message) {
+    return stringField(message, 'content') ?? stringField(message, 'text')
+  }
+  const content = record.content
+  if (Array.isArray(content)) {
+    const parts = content
+      .map(part => stringField(recordValue(part), 'text'))
+      .filter((part): part is string => Boolean(part))
+    if (parts.length > 0) return parts.join('\n')
+  }
+  return undefined
+}
+
+function summarizeRunOutput(output: unknown): string | undefined {
+  const artifact = recordField(output, 'artifact')
+  const artifactTitle = stringField(artifact, 'title')
+  if (artifactTitle) return `Artifact: ${artifactTitle}`
+  const direct = textFromMessageLike(output)
+  if (direct) return compactText(direct)
+  const orchestration = recordField(output, 'orchestration')
+  const childRuns = arrayField(orchestration, 'childRuns')
+  if (childRuns.length > 0) return `${String(childRuns.length)} child runs completed`
+  return undefined
+}
+
+function summarizeToolPayload(label: string, payload: unknown): string {
+  const text = textFromMessageLike(payload)
+  if (text) return `${label}: ${compactText(text)}`
+  const artifact = recordField(payload, 'artifact')
+  const artifactTitle = stringField(artifact, 'title')
+  if (artifactTitle) return `${label}: ${artifactTitle}`
+  if (isRecord(payload)) {
+    const keys = Object.keys(payload).slice(0, 3)
+    if (keys.length > 0) return `${label}: ${keys.join(', ')}`
+  }
+  return label
+}
+
+function lines(values: Array<string | undefined>): string {
+  return values.filter((value): value is string => Boolean(value)).join('\n')
+}
+
+function formatJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return ''
+  }
 }
 
 function compactText(value: string | undefined): string {
@@ -572,4 +997,22 @@ function statusError(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined
+}
+
+function arrayField(value: unknown, key: string): unknown[] {
+  const field = recordValue(value)?.[key]
+  return Array.isArray(field) ? field : []
+}
+
+function recordField(value: unknown, key: string): Record<string, unknown> | undefined {
+  return recordValue(recordValue(value)?.[key])
+}
+
+function stringField(value: unknown, key: string): string | undefined {
+  const field = recordValue(value)?.[key]
+  return typeof field === 'string' && field.length > 0 ? field : undefined
 }
