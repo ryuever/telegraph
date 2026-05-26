@@ -16,11 +16,23 @@ declare module 'react-native' {
     onPress?: () => void
   }
 
+  export interface ScrollViewProps extends BaseProps {
+    contentContainerStyle?: StyleProp | StyleProp[]
+    horizontal?: boolean
+    showsHorizontalScrollIndicator?: boolean
+  }
+
   export interface TextInputProps extends BaseProps {
     value?: string
     placeholder?: string
+    placeholderTextColor?: string
     multiline?: boolean
     onChangeText?: (value: string) => void
+  }
+
+  export interface StatusBarProps {
+    backgroundColor?: string
+    barStyle?: 'default' | 'light-content' | 'dark-content'
   }
 
   export interface ImageProps extends BaseProps {
@@ -32,7 +44,8 @@ declare module 'react-native' {
   export const Image: ComponentType<ImageProps>
   export const Pressable: ComponentType<PressableProps>
   export const SafeAreaView: ComponentType<BaseProps>
-  export const ScrollView: ComponentType<BaseProps>
+  export const ScrollView: ComponentType<ScrollViewProps>
+  export const StatusBar: ComponentType<StatusBarProps>
   export const Text: ComponentType<BaseProps>
   export const TextInput: ComponentType<TextInputProps>
   export const View: ComponentType<BaseProps>

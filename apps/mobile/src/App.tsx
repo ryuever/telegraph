@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TextInput,
   View,
@@ -28,6 +29,20 @@ export interface TelegraphMobileAppProps {
 
 type MobileTab = 'runs' | 'approvals' | 'devices' | 'artifacts' | 'slack'
 
+const TABS: Array<{ id: MobileTab; label: string; hint: string }> = [
+  { id: 'runs', label: 'Runs', hint: 'live work' },
+  { id: 'approvals', label: 'Approvals', hint: 'human gate' },
+  { id: 'devices', label: 'Devices', hint: 'bindings' },
+  { id: 'artifacts', label: 'Artifacts', hint: 'previews' },
+  { id: 'slack', label: 'Slack', hint: 'governance' },
+]
+
+const QUICK_PROMPTS = [
+  'Summarize active runs',
+  'Check pending approvals',
+  'Open the latest artifact',
+] as const
+
 const DEFAULT_ACTOR: RemoteActorSnapshot = {
   actorId: 'mobile:self',
   kind: 'mobile',
@@ -47,6 +62,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
   const [relayEndpoint, setRelayEndpoint] = useState(props.relayEndpoint ?? '')
   const [relayToken, setRelayToken] = useState(props.relayToken ?? '')
   const [deviceId, setDeviceId] = useState(actor.deviceId ?? DEFAULT_DEVICE_ID)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
     props.initialDashboard?.selectedRun?.runId,
   )
@@ -175,42 +191,83 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
 
   return (
     <SafeAreaView style={styles.shell}>
+      <StatusBar barStyle="light-content" backgroundColor="#080d17" />
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Telegraph</Text>
-          <Text style={styles.subtitle}>{connectionLabel(connection)}</Text>
+        <View style={styles.brandRow}>
+          <View style={styles.logoMark}>
+            <Text style={styles.logoText}>T</Text>
+          </View>
+          <View>
+            <Text style={styles.title}>Telegraph</Text>
+            <Text style={styles.subtitle}>Mobile cockpit</Text>
+          </View>
         </View>
-        <Pressable style={styles.iconButton} disabled={!client || busy} onPress={() => { void refresh(); }}>
-          <Text style={styles.iconButtonText}>{busy ? '...' : '↻'}</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <View style={[styles.connectionChip, connection === 'live' ? styles.connectionChipLive : styles.connectionChipIdle]}>
+            <View style={[styles.statusDot, connection === 'live' ? styles.statusDotLive : styles.statusDotIdle]} />
+            <Text style={styles.connectionChipText}>{connectionLabel(connection)}</Text>
+          </View>
+          <Pressable style={styles.iconButton} onPress={() => { setSettingsOpen(value => !value); }}>
+            <Text style={styles.iconButtonText}>Set</Text>
+          </Pressable>
+          <Pressable style={styles.iconButton} disabled={!client || busy} onPress={() => { void refresh(); }}>
+            <Text style={styles.iconButtonText}>{busy ? '...' : 'Sync'}</Text>
+          </Pressable>
+        </View>
       </View>
 
-      <View style={styles.connectionPanel}>
-        <TextInput
-          value={relayEndpoint}
-          placeholder="Remote endpoint"
-          style={styles.compactInput}
-          onChangeText={setRelayEndpoint}
-        />
-        <TextInput
-          value={relayToken}
-          placeholder="Token"
-          style={styles.compactInput}
-          onChangeText={setRelayToken}
-        />
-      </View>
+      {(settingsOpen || !client) && (
+        <View style={styles.connectionPanel}>
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelTitle}>Relay link</Text>
+            <Text style={styles.panelMeta}>{client ? 'configured' : 'required'}</Text>
+          </View>
+          <TextInput
+            value={relayEndpoint}
+            placeholder="Remote endpoint"
+            placeholderTextColor="#6f7b8b"
+            style={styles.compactInput}
+            onChangeText={setRelayEndpoint}
+          />
+          <TextInput
+            value={relayToken}
+            placeholder="Token"
+            placeholderTextColor="#6f7b8b"
+            style={styles.compactInput}
+            onChangeText={setRelayToken}
+          />
+        </View>
+      )}
 
       <View style={styles.composer}>
+        <View style={styles.panelHeader}>
+          <View>
+            <Text style={styles.panelTitle}>Command relay</Text>
+            <Text style={styles.panelMeta}>{deviceId.trim() || DEFAULT_DEVICE_ID}</Text>
+          </View>
+          <Text style={styles.schemaBadge}>v{String(REMOTE_PROTOCOL_SCHEMA_VERSION)}</Text>
+        </View>
         <TextInput
           multiline
           value={prompt}
           placeholder="Ask Telegraph"
+          placeholderTextColor="#6f7b8b"
           style={styles.input}
           onChangeText={setPrompt}
         />
-        <Pressable style={styles.primaryButton} disabled={!client || busy || !prompt.trim()} onPress={() => { void submit(); }}>
-          <Text style={styles.primaryButtonText}>Send</Text>
-        </Pressable>
+        <View style={styles.quickPromptRow}>
+          {QUICK_PROMPTS.map(item => (
+            <Pressable key={item} style={styles.quickPrompt} onPress={() => { setPrompt(item); }}>
+              <Text style={styles.quickPromptText}>{item}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.composerFooter}>
+          <Text style={styles.composerHint}>{client ? 'Ready for remote intake' : 'Connect relay to send'}</Text>
+          <Pressable style={[styles.primaryButton, !client || busy || !prompt.trim() ? styles.disabledButton : {}]} disabled={!client || busy || !prompt.trim()} onPress={() => { void submit(); }}>
+            <Text style={styles.primaryButtonText}>Send</Text>
+          </Pressable>
+        </View>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -228,55 +285,74 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
       ) : (
         <>
           <Summary model={dashboard} />
-          <Tabs current={tab} onChange={setTab} />
+          <Tabs current={tab} model={dashboard} slack={slack} onChange={setTab} />
           <ScrollView style={styles.content}>
             {tab === 'runs' ? (
-              dashboard.runs.map(run => (
-                <RunRow
-                  key={run.runId}
-                  run={run}
-                  selected={run.runId === selectedRunId}
-                  onSelect={() => {
-                    setSelectedRunId(run.runId)
-                  }}
-                />
-              ))
+              dashboard.runs.length > 0
+                ? dashboard.runs.map(run => (
+                  <RunRow
+                    key={run.runId}
+                    run={run}
+                    selected={run.runId === selectedRunId}
+                    onSelect={() => {
+                      setSelectedRunId(run.runId)
+                    }}
+                  />
+                ))
+                : <ListEmpty title="No runs yet" body="Runs will appear here when the desktop agent starts work." />
             ) : null}
-            {tab === 'approvals' ? dashboard.approvals.map(approval => (
-              <View key={approval.approvalId} style={styles.item}>
-                <Text style={styles.itemTitle}>{approval.title}</Text>
-                <Text style={styles.itemMeta}>{approval.runId} / {approval.status}</Text>
-                {approval.body ? <Text style={styles.body}>{approval.body}</Text> : null}
-                {approval.pending ? (
-                  <View style={styles.rowActions}>
-                    <Pressable style={styles.secondaryButton} onPress={() => { void decide(approval.approvalId, false); }}>
-                      <Text style={styles.secondaryButtonText}>Deny</Text>
-                    </Pressable>
-                    <Pressable style={styles.primaryButton} onPress={() => { void decide(approval.approvalId, true); }}>
-                      <Text style={styles.primaryButtonText}>Approve</Text>
-                    </Pressable>
+            {tab === 'approvals' ? (
+              dashboard.approvals.length > 0
+                ? dashboard.approvals.map(approval => (
+                  <View key={approval.approvalId} style={styles.item}>
+                    <View style={styles.itemHeader}>
+                      <Text style={styles.itemTitle}>{approval.title}</Text>
+                      <Text style={approval.pending ? styles.active : styles.muted}>{approval.status}</Text>
+                    </View>
+                    <Text style={styles.itemMeta}>{approval.runId}</Text>
+                    {approval.body ? <Text style={styles.body}>{approval.body}</Text> : null}
+                    {approval.pending ? (
+                      <View style={styles.rowActions}>
+                        <Pressable style={styles.secondaryButton} onPress={() => { void decide(approval.approvalId, false); }}>
+                          <Text style={styles.secondaryButtonText}>Deny</Text>
+                        </Pressable>
+                        <Pressable style={styles.primaryButton} onPress={() => { void decide(approval.approvalId, true); }}>
+                          <Text style={styles.primaryButtonText}>Approve</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-              </View>
-            )) : null}
-            {tab === 'devices' ? dashboard.devices.map(device => (
-              <View key={device.id} style={styles.item}>
-                <Text style={styles.itemTitle}>{device.title}</Text>
-                <Text style={styles.itemMeta}>{device.subtitle}</Text>
-                <Text style={device.active ? styles.good : styles.muted}>{device.status}</Text>
-              </View>
-            )) : null}
-            {tab === 'artifacts' ? dashboard.artifacts.map(artifact => (
-              <View key={`${artifact.artifactId}:${artifact.uri}`} style={styles.item}>
-                <Text style={styles.itemTitle}>{artifact.title}</Text>
-                <Text style={styles.itemMeta}>{artifact.mediaType ?? artifact.previewKind}</Text>
-                {artifact.previewKind === 'image' && artifact.uri.startsWith('http') ? (
-                  <Image source={{ uri: artifact.uri }} resizeMode="cover" style={styles.preview} />
-                ) : (
-                  <Text style={styles.body}>{artifact.uri}</Text>
-                )}
-              </View>
-            )) : null}
+                ))
+                : <ListEmpty title="No pending approvals" body="Human-in-the-loop decisions will collect here." />
+            ) : null}
+            {tab === 'devices' ? (
+              dashboard.devices.length > 0
+                ? dashboard.devices.map(device => (
+                  <View key={device.id} style={styles.item}>
+                    <View style={styles.itemHeader}>
+                      <Text style={styles.itemTitle}>{device.title}</Text>
+                      <Text style={device.active ? styles.good : styles.muted}>{device.status}</Text>
+                    </View>
+                    <Text style={styles.itemMeta}>{device.subtitle}</Text>
+                  </View>
+                ))
+                : <ListEmpty title="No devices" body="Device bindings appear after a mobile actor is trusted." />
+            ) : null}
+            {tab === 'artifacts' ? (
+              dashboard.artifacts.length > 0
+                ? dashboard.artifacts.map(artifact => (
+                  <View key={`${artifact.artifactId}:${artifact.uri}`} style={styles.item}>
+                    <Text style={styles.itemTitle}>{artifact.title}</Text>
+                    <Text style={styles.itemMeta}>{artifact.mediaType ?? artifact.previewKind}</Text>
+                    {artifact.previewKind === 'image' && artifact.uri.startsWith('http') ? (
+                      <Image source={{ uri: artifact.uri }} resizeMode="cover" style={styles.preview} />
+                    ) : (
+                      <Text style={styles.body}>{artifact.uri}</Text>
+                    )}
+                  </View>
+                ))
+                : <ListEmpty title="No artifacts" body="Generated previews and exports will land in this tab." />
+            ) : null}
             {tab === 'slack' ? (
               <SlackGovernancePanel
                 model={slack}
@@ -314,23 +390,43 @@ function Metric({ label, value }: { label: string; value: number }): React.JSX.E
   )
 }
 
-function Tabs(props: { current: MobileTab; onChange: (tab: MobileTab) => void }): React.JSX.Element {
-  const tabs: MobileTab[] = ['runs', 'approvals', 'devices', 'artifacts', 'slack']
+function Tabs(props: {
+  current: MobileTab
+  model: MobileDashboardModel
+  slack: MobileSlackGovernanceModel | undefined
+  onChange: (tab: MobileTab) => void
+}): React.JSX.Element {
   return (
-    <View style={styles.tabs}>
-      {tabs.map(tab => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={styles.tabsContent}>
+      {TABS.map(tab => (
         <Pressable
-          key={tab}
-          style={[styles.tab, props.current === tab ? styles.tabActive : styles.tabIdle]}
+          key={tab.id}
+          style={[styles.tab, props.current === tab.id ? styles.tabActive : styles.tabIdle]}
           onPress={() => {
-            props.onChange(tab)
+            props.onChange(tab.id)
           }}
         >
-          <Text style={props.current === tab ? styles.tabTextActive : styles.tabText}>{tab}</Text>
+          <View style={styles.tabTopLine}>
+            <Text style={props.current === tab.id ? styles.tabTextActive : styles.tabText}>{tab.label}</Text>
+            <Text style={props.current === tab.id ? styles.tabCountActive : styles.tabCount}>{String(tabCount(tab.id, props.model, props.slack))}</Text>
+          </View>
+          <Text style={props.current === tab.id ? styles.tabHintActive : styles.tabHint}>{tab.hint}</Text>
         </Pressable>
       ))}
-    </View>
+    </ScrollView>
   )
+}
+
+function tabCount(
+  tab: MobileTab,
+  model: MobileDashboardModel,
+  slack: MobileSlackGovernanceModel | undefined,
+): number {
+  if (tab === 'runs') return model.runs.length
+  if (tab === 'approvals') return model.approvals.filter(item => item.pending).length
+  if (tab === 'devices') return model.devices.length
+  if (tab === 'artifacts') return model.artifacts.length
+  return slack?.summary.activeWorkspaces ?? 0
 }
 
 function SlackGovernancePanel(props: {
@@ -341,12 +437,13 @@ function SlackGovernancePanel(props: {
 }): React.JSX.Element {
   const model = props.model
   return (
-    <View>
+    <View style={styles.slackPanel}>
       <View style={styles.item}>
         <Text style={styles.itemTitle}>Slack OAuth</Text>
         <TextInput
           value={props.oauthCode}
           placeholder="OAuth code"
+          placeholderTextColor="#6f7b8b"
           style={styles.input}
           onChangeText={props.onOAuthCodeChange}
         />
@@ -438,6 +535,9 @@ function EmptyState({
   return (
     <View style={styles.empty}>
       {busy ? <ActivityIndicator /> : null}
+      <View style={styles.emptyMark}>
+        <Text style={styles.emptyMarkText}>T</Text>
+      </View>
       <Text style={styles.emptyTitle}>{relayConfigured ? 'No mobile state loaded' : 'Relay endpoint required'}</Text>
       <Text style={styles.body}>
         {relayConfigured
@@ -449,6 +549,7 @@ function EmptyState({
         <TextInput
           value={endpoint}
           placeholder="http://192.168.2.57:8799/rpc"
+          placeholderTextColor="#6f7b8b"
           style={styles.formInput}
           onChangeText={onEndpointChange}
         />
@@ -456,6 +557,7 @@ function EmptyState({
         <TextInput
           value={token}
           placeholder="dev"
+          placeholderTextColor="#6f7b8b"
           style={styles.formInput}
           onChangeText={onTokenChange}
         />
@@ -463,10 +565,20 @@ function EmptyState({
         <TextInput
           value={deviceId}
           placeholder={DEFAULT_DEVICE_ID}
+          placeholderTextColor="#6f7b8b"
           style={styles.formInput}
           onChangeText={onDeviceIdChange}
         />
       </View>
+    </View>
+  )
+}
+
+function ListEmpty({ title, body }: { title: string; body: string }): React.JSX.Element {
+  return (
+    <View style={styles.listEmpty}>
+      <Text style={styles.listEmptyTitle}>{title}</Text>
+      <Text style={styles.listEmptyBody}>{body}</Text>
     </View>
   )
 }
@@ -479,54 +591,99 @@ function toneStyle(tone: MobileRunItem['statusTone']): Record<string, unknown> {
 }
 
 function connectionLabel(connection: string): string {
-  if (connection === 'live') return 'Remote control live'
-  if (connection === 'connecting') return 'Connecting to relay'
+  if (connection === 'live') return 'Live'
+  if (connection === 'connecting') return 'Connecting'
   return 'Offline'
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, backgroundColor: '#eef2f3', padding: 16 },
+  shell: { flex: 1, backgroundColor: '#080d17', padding: 16 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  title: { color: '#172126', fontSize: 30, fontWeight: '800' },
-  subtitle: { color: '#546065', fontSize: 13, marginTop: 2 },
-  iconButton: { alignItems: 'center', backgroundColor: '#172126', borderRadius: 8, height: 40, justifyContent: 'center', width: 40 },
-  iconButtonText: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
-  connectionPanel: { backgroundColor: '#ffffff', borderColor: '#cbd5d8', borderRadius: 8, borderWidth: 1, gap: 8, marginBottom: 10, padding: 10 },
-  composer: { backgroundColor: '#ffffff', borderColor: '#cbd5d8', borderRadius: 8, borderWidth: 1, gap: 10, padding: 10 },
-  input: { color: '#172126', minHeight: 54, padding: 0 },
-  compactInput: { color: '#172126', minHeight: 34, padding: 0 },
-  primaryButton: { alignItems: 'center', backgroundColor: '#176b5b', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  primaryButtonText: { color: '#ffffff', fontWeight: '700' },
-  secondaryButton: { alignItems: 'center', borderColor: '#b9afa0', borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
-  secondaryButtonText: { color: '#172126', fontWeight: '700' },
-  error: { color: '#9f2d20', marginTop: 10 },
+  brandRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  logoMark: {
+    alignItems: 'center',
+    backgroundColor: '#2b1113',
+    borderColor: '#ff54364d',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    shadowColor: '#ff5436',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    width: 38,
+  },
+  logoText: { color: '#ff7a5f', fontSize: 20, fontWeight: '900' },
+  title: { color: '#f0f4f8', fontSize: 25, fontWeight: '900' },
+  subtitle: { color: '#8a95a6', fontSize: 12, marginTop: 2 },
+  headerActions: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  connectionChip: { alignItems: 'center', borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 6, height: 32, paddingHorizontal: 9 },
+  connectionChipLive: { backgroundColor: '#112420', borderColor: '#38dca84d' },
+  connectionChipIdle: { backgroundColor: '#121926', borderColor: '#ffffff1f' },
+  statusDot: { borderRadius: 999, height: 6, width: 6 },
+  statusDotLive: { backgroundColor: '#38dca8' },
+  statusDotIdle: { backgroundColor: '#ffb154' },
+  connectionChipText: { color: '#dbe5ef', fontSize: 11, fontWeight: '800' },
+  iconButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, height: 32, justifyContent: 'center', paddingHorizontal: 9 },
+  iconButtonText: { color: '#dbe5ef', fontSize: 11, fontWeight: '800' },
+  connectionPanel: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, gap: 8, marginBottom: 10, padding: 12 },
+  panelHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  panelTitle: { color: '#f0f4f8', fontSize: 13, fontWeight: '900' },
+  panelMeta: { color: '#8a95a6', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  schemaBadge: { backgroundColor: '#ff54361a', borderColor: '#ff543640', borderRadius: 7, borderWidth: 1, color: '#ff9a83', fontSize: 11, fontWeight: '800', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4 },
+  composer: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, gap: 10, padding: 12 },
+  input: { color: '#f0f4f8', minHeight: 58, padding: 0 },
+  compactInput: { backgroundColor: '#080d17', borderColor: '#ffffff17', borderRadius: 8, borderWidth: 1, color: '#f0f4f8', minHeight: 38, paddingHorizontal: 10 },
+  quickPromptRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  quickPrompt: { backgroundColor: '#1a2433', borderColor: '#ffffff17', borderRadius: 7, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
+  quickPromptText: { color: '#aab5c5', fontSize: 11, fontWeight: '700' },
+  composerFooter: { alignItems: 'center', borderTopColor: '#ffffff14', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10 },
+  composerHint: { color: '#8a95a6', flex: 1, fontSize: 11, fontWeight: '700' },
+  primaryButton: { alignItems: 'center', backgroundColor: '#ff5436', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  disabledButton: { opacity: 0.45 },
+  primaryButtonText: { color: '#160d0a', fontWeight: '900' },
+  secondaryButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  secondaryButtonText: { color: '#dbe5ef', fontWeight: '800' },
+  error: { backgroundColor: '#3a1414', borderColor: '#ff54364d', borderRadius: 8, borderWidth: 1, color: '#ff9a83', marginTop: 10, padding: 10 },
   summary: { flexDirection: 'row', gap: 8, marginVertical: 14 },
-  metric: { backgroundColor: '#ffffff', borderColor: '#cbd5d8', borderRadius: 8, borderWidth: 1, flex: 1, padding: 10 },
-  metricValue: { color: '#172126', fontSize: 22, fontWeight: '800' },
-  metricLabel: { color: '#546065', fontSize: 11, marginTop: 2 },
-  tabs: { flexDirection: 'row', gap: 6, marginBottom: 10 },
-  tab: { alignItems: 'center', borderRadius: 8, flex: 1, paddingVertical: 9 },
-  tabActive: { backgroundColor: '#172126' },
-  tabIdle: { backgroundColor: '#dbe4e7' },
-  tabText: { color: '#394348', fontSize: 12, fontWeight: '700' },
-  tabTextActive: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+  metric: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, flex: 1, padding: 10 },
+  metricValue: { color: '#f0f4f8', fontSize: 22, fontWeight: '900' },
+  metricLabel: { color: '#8a95a6', fontSize: 10, fontWeight: '800', marginTop: 2, textTransform: 'uppercase' },
+  tabs: { flexGrow: 0, marginBottom: 10 },
+  tabsContent: { gap: 8, paddingRight: 2 },
+  tab: { borderRadius: 8, borderWidth: 1, minWidth: 112, paddingHorizontal: 11, paddingVertical: 10 },
+  tabActive: { backgroundColor: '#2a1518', borderColor: '#ff54365c' },
+  tabIdle: { backgroundColor: '#121926', borderColor: '#ffffff17' },
+  tabTopLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  tabText: { color: '#aab5c5', fontSize: 12, fontWeight: '900' },
+  tabTextActive: { color: '#ff8d76', fontSize: 12, fontWeight: '900' },
+  tabCount: { color: '#6f7b8b', fontSize: 12, fontWeight: '900' },
+  tabCountActive: { color: '#f0f4f8', fontSize: 12, fontWeight: '900' },
+  tabHint: { color: '#6f7b8b', fontSize: 10, fontWeight: '700', marginTop: 4 },
+  tabHintActive: { color: '#c98b7d', fontSize: 10, fontWeight: '700', marginTop: 4 },
   content: { flex: 1 },
-  item: { backgroundColor: '#ffffff', borderColor: '#cbd5d8', borderRadius: 8, borderWidth: 1, marginBottom: 10, padding: 12 },
-  selectedItem: { borderColor: '#176b5b', borderWidth: 2 },
+  item: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, marginBottom: 10, padding: 12 },
+  selectedItem: { borderColor: '#ff54365c', borderWidth: 1 },
   unselectedItem: {},
   itemHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  itemTitle: { color: '#172126', flex: 1, fontSize: 15, fontWeight: '800' },
-  itemMeta: { color: '#546065', fontSize: 12, marginTop: 4 },
-  body: { color: '#394348', fontSize: 13, marginTop: 8 },
+  itemTitle: { color: '#f0f4f8', flex: 1, fontSize: 15, fontWeight: '900' },
+  itemMeta: { color: '#8a95a6', fontSize: 12, marginTop: 4 },
+  body: { color: '#aab5c5', fontSize: 13, lineHeight: 18, marginTop: 8 },
   rowActions: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 12 },
-  active: { color: '#986700', fontSize: 12, fontWeight: '800' },
-  good: { color: '#176b5b', fontSize: 12, fontWeight: '800' },
-  bad: { color: '#9f2d20', fontSize: 12, fontWeight: '800' },
-  muted: { color: '#758086', fontSize: 12, fontWeight: '700' },
+  active: { color: '#ffb154', fontSize: 12, fontWeight: '900' },
+  good: { color: '#38dca8', fontSize: 12, fontWeight: '900' },
+  bad: { color: '#ff6b55', fontSize: 12, fontWeight: '900' },
+  muted: { color: '#8a95a6', fontSize: 12, fontWeight: '800' },
   preview: { borderRadius: 8, height: 180, marginTop: 10 },
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
+  emptyMark: { alignItems: 'center', backgroundColor: '#2b1113', borderColor: '#ff54364d', borderRadius: 8, borderWidth: 1, height: 52, justifyContent: 'center', marginBottom: 16, width: 52 },
+  emptyMarkText: { color: '#ff7a5f', fontSize: 26, fontWeight: '900' },
   emptyConnectionForm: { alignSelf: 'stretch', gap: 8, marginTop: 18 },
-  emptyTitle: { color: '#172126', fontSize: 18, fontWeight: '800', marginBottom: 8 },
-  formInput: { backgroundColor: '#ffffff', borderColor: '#9aa7ad', borderRadius: 8, borderWidth: 1, color: '#172126', minHeight: 42, paddingHorizontal: 10 },
-  formLabel: { alignSelf: 'stretch', color: '#394348', fontSize: 12, fontWeight: '800', marginTop: 4 },
+  emptyTitle: { color: '#f0f4f8', fontSize: 18, fontWeight: '900', marginBottom: 8 },
+  formInput: { backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, color: '#f0f4f8', minHeight: 42, paddingHorizontal: 10 },
+  formLabel: { alignSelf: 'stretch', color: '#aab5c5', fontSize: 12, fontWeight: '900', marginTop: 4 },
+  listEmpty: { alignItems: 'center', backgroundColor: '#12192680', borderColor: '#ffffff17', borderRadius: 8, borderWidth: 1, padding: 22 },
+  listEmptyTitle: { color: '#f0f4f8', fontSize: 15, fontWeight: '900' },
+  listEmptyBody: { color: '#8a95a6', fontSize: 12, lineHeight: 18, marginTop: 6, textAlign: 'center' },
+  slackPanel: { paddingBottom: 24 },
 })
