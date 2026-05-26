@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import type { JSX } from 'react'
+import type { ChangeEvent, JSX, KeyboardEvent, PointerEvent } from 'react'
 import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
 import type { AgentEvent } from '@/packages/agent-protocol'
 import {
@@ -95,6 +95,9 @@ export interface DesignTraceItem {
 
 const GENERIC_COMPLETION_MESSAGE = '已完成。'
 const OPERATION_CONTENT_PREVIEW_LIMIT = 320
+const DEFAULT_AGENT_LOG_PANEL_WIDTH = 392
+const MIN_AGENT_LOG_PANEL_WIDTH = 320
+const MAX_AGENT_LOG_PANEL_WIDTH = 560
 
 export function DesignWorkspace({
   initialPrompt,
@@ -114,6 +117,7 @@ export function DesignWorkspace({
   const activeControllers = useRef<Map<string, AbortController>>(new Map())
   const assistantArtifactTitles = useRef<Map<string, string>>(new Map())
   const artifactOperationBaselines = useRef<Map<string, DesignPatchFileOperation[]>>(new Map())
+  const agentLogResizeStartRef = useRef({ pointerX: 0, width: DEFAULT_AGENT_LOG_PANEL_WIDTH })
   const [messages, setMessages] = useState<Message[]>(() => initialState?.messages ?? [
     { id: initialUserMessageId, role: 'user', content: initialPrompt },
     { id: initialAssistantMessageId, role: 'assistant', content: '', runStatus: 'running' },
@@ -127,6 +131,8 @@ export function DesignWorkspace({
   const [dirtyArtifactOperations, setDirtyArtifactOperations] = useState<Map<string, DesignPatchFileOperation[]>>(() => new Map())
   const [requestedArtifactIds, setRequestedArtifactIds] = useState<Set<string>>(() => new Set())
   const [artifactApplyStates, setArtifactApplyStates] = useState<Map<string, ArtifactApplyState>>(() => new Map())
+  const [agentLogPanelWidth, setAgentLogPanelWidth] = useState(DEFAULT_AGENT_LOG_PANEL_WIDTH)
+  const [agentLogResizing, setAgentLogResizing] = useState(false)
   const headerSubagentItems = useMemo(() => flattenMessageSubagents(messages), [messages])
 
   const appendAssistantText = (text: string, messageId?: string): void => {
@@ -302,15 +308,60 @@ export function DesignWorkspace({
     }, assistantMessageId)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent): void => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>): void => {
     setInput(e.target.value)
+  }
+
+  const handleAgentLogResizePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    agentLogResizeStartRef.current = {
+      pointerX: event.clientX,
+      width: agentLogPanelWidth,
+    }
+    setAgentLogResizing(true)
+  }
+
+  const handleAgentLogResizePointerMove = (event: PointerEvent<HTMLDivElement>): void => {
+    if (!agentLogResizing) return
+    const delta = event.clientX - agentLogResizeStartRef.current.pointerX
+    setAgentLogPanelWidth(clampAgentLogPanelWidth(agentLogResizeStartRef.current.width + delta))
+  }
+
+  const handleAgentLogResizePointerEnd = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setAgentLogResizing(false)
+  }
+
+  const handleAgentLogResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      setAgentLogPanelWidth(current => clampAgentLogPanelWidth(current - (event.shiftKey ? 40 : 16)))
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      setAgentLogPanelWidth(current => clampAgentLogPanelWidth(current + (event.shiftKey ? 40 : 16)))
+      return
+    }
+    if (event.key === 'Home') {
+      event.preventDefault()
+      setAgentLogPanelWidth(MIN_AGENT_LOG_PANEL_WIDTH)
+      return
+    }
+    if (event.key === 'End') {
+      event.preventDefault()
+      setAgentLogPanelWidth(MAX_AGENT_LOG_PANEL_WIDTH)
+    }
   }
 
   const handleSelectArtifact = (artifactId: string): void => {
@@ -493,8 +544,14 @@ export function DesignWorkspace({
   }
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(300px,340px)_minmax(0,1fr)] bg-background">
-      <aside className="flex min-h-0 flex-col border-r border-border bg-card">
+    <div className="flex h-full min-h-0 bg-background">
+      <aside
+        className={cn(
+          'relative flex min-h-0 shrink-0 flex-col border-r border-border bg-card',
+          agentLogResizing ? 'transition-none' : 'transition-[width] duration-200',
+        )}
+        style={{ width: agentLogPanelWidth }}
+      >
         <div className="shrink-0 border-b border-border px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -580,9 +637,31 @@ export function DesignWorkspace({
             </div>
           </div>
         </div>
+
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize design agent log"
+          aria-valuemin={MIN_AGENT_LOG_PANEL_WIDTH}
+          aria-valuemax={MAX_AGENT_LOG_PANEL_WIDTH}
+          aria-valuenow={agentLogPanelWidth}
+          tabIndex={0}
+          onPointerDown={handleAgentLogResizePointerDown}
+          onPointerMove={handleAgentLogResizePointerMove}
+          onPointerUp={handleAgentLogResizePointerEnd}
+          onPointerCancel={handleAgentLogResizePointerEnd}
+          onDoubleClick={() => { setAgentLogPanelWidth(DEFAULT_AGENT_LOG_PANEL_WIDTH) }}
+          onKeyDown={handleAgentLogResizeKeyDown}
+          className={cn(
+            'absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize touch-none outline-none',
+            'after:absolute after:left-1/2 after:top-0 after:h-full after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors',
+            'hover:after:bg-primary/45 focus-visible:after:bg-primary/70',
+            agentLogResizing && 'after:bg-primary',
+          )}
+        />
       </aside>
 
-      <section className="flex min-h-0 min-w-0 flex-col bg-surface-soft/35">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-soft/35">
         <DesignArtifactWorkbench
           artifacts={artifacts}
           activeArtifactId={activeArtifactId}
@@ -603,6 +682,10 @@ export function DesignWorkspace({
       </section>
     </div>
   )
+}
+
+function clampAgentLogPanelWidth(width: number): number {
+  return Math.min(MAX_AGENT_LOG_PANEL_WIDTH, Math.max(MIN_AGENT_LOG_PANEL_WIDTH, Math.round(width)))
 }
 
 function changedPatchOperations(

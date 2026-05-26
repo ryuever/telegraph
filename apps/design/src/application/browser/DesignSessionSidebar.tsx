@@ -1,8 +1,13 @@
-import { useState } from 'react'
-import type { JSX } from 'react'
+import { useRef, useState } from 'react'
+import type { JSX, KeyboardEvent, PointerEvent } from 'react'
 import { FileText, PanelLeft, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/packages/ui/lib/utils'
 import type { DesignRunStatus } from './DesignWorkspace'
+
+const COLLAPSED_SESSION_SIDEBAR_WIDTH = 56
+const DEFAULT_SESSION_SIDEBAR_WIDTH = 304
+const MIN_SESSION_SIDEBAR_WIDTH = 264
+const MAX_SESSION_SIDEBAR_WIDTH = 440
 
 export interface DesignSessionListItem {
   id: string
@@ -32,12 +37,65 @@ export function DesignSessionSidebar({
   onRename,
   onToggleCollapse,
 }: DesignSessionSidebarProps): JSX.Element {
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SESSION_SIDEBAR_WIDTH)
+  const [resizing, setResizing] = useState(false)
+  const resizeStartRef = useRef({ pointerX: 0, width: DEFAULT_SESSION_SIDEBAR_WIDTH })
+  const renderedWidth = collapsed ? COLLAPSED_SESSION_SIDEBAR_WIDTH : sidebarWidth
+
+  const handleResizePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    if (collapsed) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    resizeStartRef.current = {
+      pointerX: event.clientX,
+      width: sidebarWidth,
+    }
+    setResizing(true)
+  }
+
+  const handleResizePointerMove = (event: PointerEvent<HTMLDivElement>): void => {
+    if (!resizing) return
+    const delta = event.clientX - resizeStartRef.current.pointerX
+    setSidebarWidth(clampSessionSidebarWidth(resizeStartRef.current.width + delta))
+  }
+
+  const handleResizePointerEnd = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setResizing(false)
+  }
+
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (collapsed) return
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      setSidebarWidth(current => clampSessionSidebarWidth(current - (event.shiftKey ? 32 : 12)))
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      setSidebarWidth(current => clampSessionSidebarWidth(current + (event.shiftKey ? 32 : 12)))
+      return
+    }
+    if (event.key === 'Home') {
+      event.preventDefault()
+      setSidebarWidth(MIN_SESSION_SIDEBAR_WIDTH)
+      return
+    }
+    if (event.key === 'End') {
+      event.preventDefault()
+      setSidebarWidth(MAX_SESSION_SIDEBAR_WIDTH)
+    }
+  }
+
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-border bg-card/80 transition-[width] duration-200',
-        collapsed ? 'w-14' : 'w-60',
+        'relative flex h-full shrink-0 flex-col border-r border-border bg-card/80',
+        resizing ? 'transition-none' : 'transition-[width] duration-200',
       )}
+      style={{ width: renderedWidth }}
     >
       <div className="flex items-center gap-1 px-2 py-2">
         <button
@@ -89,8 +147,36 @@ export function DesignSessionSidebar({
           Telegraph · Design
         </div>
       )}
+
+      {!collapsed && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize design session list"
+          aria-valuemin={MIN_SESSION_SIDEBAR_WIDTH}
+          aria-valuemax={MAX_SESSION_SIDEBAR_WIDTH}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerEnd}
+          onPointerCancel={handleResizePointerEnd}
+          onDoubleClick={() => { setSidebarWidth(DEFAULT_SESSION_SIDEBAR_WIDTH) }}
+          onKeyDown={handleResizeKeyDown}
+          className={cn(
+            'absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize touch-none outline-none',
+            'after:absolute after:left-1/2 after:top-0 after:h-full after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors',
+            'hover:after:bg-primary/45 focus-visible:after:bg-primary/70',
+            resizing && 'after:bg-primary',
+          )}
+        />
+      )}
     </aside>
   )
+}
+
+function clampSessionSidebarWidth(width: number): number {
+  return Math.min(MAX_SESSION_SIDEBAR_WIDTH, Math.max(MIN_SESSION_SIDEBAR_WIDTH, Math.round(width)))
 }
 
 function DesignSessionRow({
