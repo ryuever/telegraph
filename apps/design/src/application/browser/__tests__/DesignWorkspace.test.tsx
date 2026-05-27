@@ -362,6 +362,7 @@ describe('DesignWorkspace', () => {
     expect(operationSummary).toMatchObject({
       kind: 'update',
       path: 'apps/design/src/Hero.tsx',
+      content: 'export function Hero() { return <button className="bg-green-600">Go</button> }',
     })
     expect(stringField(operationSummary, 'contentPreview')).toContain('bg-green-600')
     expect(numberField(operationSummary, 'contentLength')).toBeGreaterThan(0)

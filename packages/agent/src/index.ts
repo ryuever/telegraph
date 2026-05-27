@@ -123,6 +123,11 @@ export {
   type RuntimeRegistration,
 } from '@/packages/agent/harness'
 export {
+  InMemoryAgentSessionStore,
+  type AgentSessionStore,
+  type InMemoryAgentSessionStoreOptions,
+} from '@/packages/agent/harness'
+export {
   CapabilityHost,
   HookBus,
   HookExecutionError,

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { createAgentHarness, selectRuntimeId } from '../AgentHarness'
 import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
 import type { AgentCapability } from '../CapabilityHost'
+import { InMemoryAgentSessionStore } from '../AgentSessionStore'
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   const result: T[] = []
@@ -123,6 +124,39 @@ describe('AgentHarness', () => {
     expect(events.find(event => event.type === 'assistant_delta')).toMatchObject({
       text: 'hello transformed',
     })
+  })
+
+  it('continues same-session runs with transcript messages', async () => {
+    const runtime = new FakeRuntime()
+    const sessionStore = new InMemoryAgentSessionStore()
+    const harness = createAgentHarness({
+      runtimes: [{ id: 'fake', create: () => runtime }],
+      sessionStore,
+    })
+
+    await collect(harness.run({
+      ...baseRequest,
+      runId: 'run-session-first',
+      messages: [{ id: 'm-first', role: 'user', content: 'first prompt' }],
+    }))
+    await collect(harness.run({
+      ...baseRequest,
+      runId: 'run-session-second',
+      messages: [{ id: 'm-second', role: 'user', content: 'second prompt' }],
+    }))
+
+    expect(runtime.lastInput?.message).toBe('second prompt')
+    expect(runtime.lastInput?.messages?.map(message => [message.role, message.content])).toEqual([
+      ['user', 'first prompt'],
+      ['assistant', 'first prompt'],
+      ['user', 'second prompt'],
+    ])
+    expect(sessionStore.getMessages(baseRequest.sessionId).map(message => [message.role, message.content])).toEqual([
+      ['user', 'first prompt'],
+      ['assistant', 'first prompt'],
+      ['user', 'second prompt'],
+      ['assistant', 'second prompt'],
+    ])
   })
 
   it('lets capabilities register input hooks and feedback adapters', async () => {

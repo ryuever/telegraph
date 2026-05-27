@@ -50,6 +50,7 @@ export class PiAiRuntime extends BaseAgentRuntime {
         runId,
         settings: settings as any, // TODO: type alignment between RuntimeSettings and AgentRuntimeSettings
         message,
+        messages: input.messages,
         signal,
         tools: input.tools?.map(toPiAiExecutableTool),
       })) {

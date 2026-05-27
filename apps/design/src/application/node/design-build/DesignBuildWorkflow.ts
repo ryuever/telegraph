@@ -190,6 +190,7 @@ export class DesignBuildWorkflow {
       input: { brief: result.brief },
       modelInput: {
         prompt: input.message,
+        conversation: conversationFromInput(input),
         brief: result.brief,
         designSystem: result.context.designSystem,
         componentEdit: result.context.revision?.componentEdit,
@@ -224,6 +225,7 @@ export class DesignBuildWorkflow {
       },
       modelInput: {
         prompt: input.message,
+        conversation: conversationFromInput(input),
         brief,
         context: result.context,
         designSystem: result.context.designSystem,
@@ -279,6 +281,7 @@ export class DesignBuildWorkflow {
       input: createArtifactSummary(artifact),
       modelInput: {
         prompt: input.message,
+        conversation: conversationFromInput(input),
         brief: result.brief,
         context: result.context,
         designSystem: result.context.designSystem,
@@ -322,6 +325,7 @@ export class DesignBuildWorkflow {
       input: { review: policyReview },
       modelInput: {
         artifact,
+        conversation: conversationFromInput(input),
         review: policyReview,
         sandboxProject: context.sandboxProject,
         designSystem: context.designSystem,
@@ -363,6 +367,17 @@ function createDesignBuildFeatureRunner(input: RuntimeInput): FeatureWorkflowRun
     stepCompleted: (stepId, output) => stepCompleted(input.runId, stepId, output),
     runCancelled: () => runCancelled(input.runId),
   })
+}
+
+function conversationFromInput(input: RuntimeInput): Array<{ role: string; content: string }> | undefined {
+  const messages = input.messages
+    ?.filter(message => message.content.trim().length > 0)
+    .slice(-12)
+    .map(message => ({
+      role: message.role,
+      content: message.content,
+    }))
+  return messages && messages.length > 1 ? messages : undefined
 }
 
 function childRunId(parentRunId: string, profileId: string): string {

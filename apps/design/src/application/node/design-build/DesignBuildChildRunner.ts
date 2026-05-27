@@ -333,10 +333,32 @@ function stageInstruction(request: DesignBuildChildRunRequest): string {
     case 'component-retrieval':
       return 'For component-retrieval, return {"query": string, "components": [...], "summary": string, "ledger": ComponentRetrievalLedger}; ledger must be the object returned by select_shadcn_components.'
     case 'code-artifact':
-      return 'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. The main composition source, usually src/App.tsx, must import and render each selected shadcn component from componentLedger.selected using the usage docs returned to this worker. The artifact should include the composition source update, not only installed primitive files. Return the input summary object only if no source changes are possible.'
+      return [
+        'For code-artifact, return {"artifact": <DesignBuildArtifact>} when producing source. The main composition source, usually src/App.tsx, must import and render each selected shadcn component from componentLedger.selected using the usage docs returned to this worker. The artifact should include the composition source update, not only installed primitive files. Return the input summary object only if no source changes are possible.',
+        revisionCodeArtifactInstruction(request),
+      ].filter(Boolean).join('\n')
     case 'review':
       return 'For review, return {"review": {"verdict": "pass" | "repair_required" | "blocked", "checks": [{"id": string, "passed": boolean, "summary": string}]}}.'
   }
+}
+
+function revisionCodeArtifactInstruction(request: DesignBuildChildRunRequest): string {
+  if (!hasRevisionContext(request.modelInput)) return ''
+  return [
+    'Revision contract:',
+    '- This run is a follow-up revision of the existing design-patch artifact.',
+    '- Treat the prompt as an incremental change request, not as a new page topic.',
+    '- Preserve the existing project root and operations from input.artifact; update only files needed for the requested change.',
+    '- For dependency-only requests such as package.json or npm package changes, update the existing package.json operation and leave UI source files unchanged unless the prompt explicitly asks to use the dependency.',
+  ].join('\n')
+}
+
+function hasRevisionContext(modelInput: unknown): boolean {
+  if (!isRecord(modelInput)) return false
+  const context = isRecord(modelInput.context) ? modelInput.context : undefined
+  if (context && isRecord(context.revision)) return true
+  const artifact = isRecord(modelInput.artifact) ? modelInput.artifact : undefined
+  return typeof artifact?.parentArtifactId === 'string'
 }
 
 function standaloneProjectInstruction(stage: DesignBuildChildStage): string {

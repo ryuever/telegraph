@@ -132,6 +132,59 @@ describe('streamPiAiRuntimeEvents tool loop', () => {
     }
   })
 
+  it('uses transcript messages for the first model request when provided', async () => {
+    vi.resetModules()
+    const faux = registerFauxProvider({
+      provider: 'telegraph-faux-transcript',
+      models: [{ id: 'transcript-test-model' }],
+      tokensPerSecond: 10_000,
+    })
+    faux.setResponses([
+      fauxAssistantMessage('continued answer'),
+    ])
+
+    try {
+      vi.doMock('@/packages/agent/providers/index', () => ({
+        resolveModel: () => {
+          const model = faux.getModel('transcript-test-model')
+          if (!model) throw new Error('Missing faux transcript model')
+          return model
+        },
+      }))
+      const { streamPiAiRuntimeEvents } = await import('../streamPiAiRuntime')
+
+      const events = await collect(streamPiAiRuntimeEvents({
+        runId: 'run-transcript',
+        message: 'second prompt',
+        messages: [
+          { id: 'm-first', role: 'user', content: 'first prompt' },
+          { id: 'm-assistant', role: 'assistant', content: 'first answer' },
+          { id: 'm-second', role: 'user', content: 'second prompt' },
+        ],
+        settings: {
+          provider: 'telegraph-faux-transcript',
+          modelId: 'transcript-test-model',
+          apiKey: 'test-key',
+        },
+      }))
+
+      const firstRequest = events.find(event => event.type === 'model_request')
+      expect(firstRequest?.raw).toMatchObject({
+        context: {
+          messages: [
+            expect.objectContaining({ role: 'user', content: 'first prompt' }),
+            expect.objectContaining({ role: 'assistant' }),
+            expect.objectContaining({ role: 'user', content: 'second prompt' }),
+          ],
+        },
+      })
+    } finally {
+      faux.unregister()
+      vi.doUnmock('@/packages/agent/providers/index')
+      vi.resetModules()
+    }
+  })
+
   it('fails clearly when model settings are incomplete', async () => {
     const { streamPiAiRuntimeEvents } = await import('../streamPiAiRuntime')
 

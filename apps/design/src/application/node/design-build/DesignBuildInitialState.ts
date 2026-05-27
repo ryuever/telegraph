@@ -2,6 +2,8 @@ import {
   createTemplateDesignPatchArtifact,
   type DesignBrief,
   type DesignBuildArtifact,
+  type DesignPatchArtifact,
+  type DesignPatchOperation,
 } from './DesignBuildArtifacts'
 import {
   createDefaultComponentAssetRegistry,
@@ -16,6 +18,7 @@ import {
   isComponentEditContext,
   type ComponentEditContext,
 } from '@/apps/design/application/common/component-edit-contract'
+import { mergeGeneratedPackageJsonContent } from '@/apps/design/application/common/design-package-json'
 
 export interface DesignBuildInitialStateInput {
   runId: string
@@ -39,6 +42,7 @@ export interface DesignBuildContextSnapshot {
 export interface DesignBuildRevisionContext {
   parentArtifactId: string
   parentArtifactKind?: string
+  parentArtifactTitle?: string
   revision: number
   changeKind: 'natural-language' | 'component-edit'
   changeSummary: string
@@ -51,8 +55,10 @@ export interface DesignBuildRevisionContext {
 export interface DesignBuildOperationContext {
   kind: 'add' | 'update' | 'delete'
   path: string
+  content?: string
   contentPreview?: string
   contentLength?: number
+  expectedOriginal?: string
   expectedOriginalLength?: number
 }
 
@@ -106,13 +112,14 @@ export function createDesignBuildInitialState(
   const brief = createDesignIntentBrief(input.prompt, revision)
   const components = createDefaultComponentAssetRegistry().searchComponents(input.prompt, { limit: 5 })
   const designSystem = resolveDesignSystemPolicy(input.metadata)
-  const artifact = createTemplateDesignPatchArtifact({
-    runId: input.runId,
-    prompt: input.prompt,
-    parentArtifactId: revision?.parentArtifactId,
-    revision: revision?.revision,
-    changeSummary: revision?.changeSummary,
-  })
+  const artifact = createRevisionSeedPatchArtifact(input.runId, input.prompt, revision) ??
+    createTemplateDesignPatchArtifact({
+      runId: input.runId,
+      prompt: input.prompt,
+      parentArtifactId: revision?.parentArtifactId,
+      revision: revision?.revision,
+      changeSummary: revision?.changeSummary,
+    })
   const context = createDesignBuildContext(revision, projectRootFromArtifact(artifact), designSystem)
   const plan = createPagePlan(artifact)
   const review = evaluateDesignBuildArtifact(artifact, { designSystemPolicy: context.designSystem })
@@ -239,6 +246,7 @@ function extractRevisionContext(metadata: Record<string, unknown> | undefined): 
   return {
     parentArtifactId: id,
     parentArtifactKind: stringField(activeArtifact, 'kind') ?? stringField(designContext, 'artifactKind'),
+    parentArtifactTitle: stringField(activeArtifact, 'title'),
     revision: previousRevision + 1,
     changeKind: componentEdit ? 'component-edit' : 'natural-language',
     changeSummary: [
@@ -265,15 +273,120 @@ function extractOperationSummaries(values: unknown[]): DesignBuildOperationConte
       continue
     }
     const summary: DesignBuildOperationContext = { kind, path }
+    const content = stringField(record, 'content')
     const contentPreview = stringField(record, 'contentPreview')
     const contentLength = numberField(record, 'contentLength')
+    const expectedOriginal = stringField(record, 'expectedOriginal')
     const expectedOriginalLength = numberField(record, 'expectedOriginalLength')
+    if (content !== undefined) summary.content = content
     if (contentPreview !== undefined) summary.contentPreview = contentPreview
     if (contentLength !== undefined) summary.contentLength = contentLength
+    if (expectedOriginal !== undefined) summary.expectedOriginal = expectedOriginal
     if (expectedOriginalLength !== undefined) summary.expectedOriginalLength = expectedOriginalLength
     summaries.push(summary)
   }
   return summaries
+}
+
+function createRevisionSeedPatchArtifact(
+  runId: string,
+  prompt: string,
+  revision: DesignBuildRevisionContext | undefined,
+): DesignPatchArtifact | undefined {
+  if (!revision) return undefined
+  const operations = applyPackageDependencyRequest(
+    revision.operationSummaries.map(operationFromRevisionContext),
+    prompt,
+  )
+  if (operations.length === 0 || operations.some(operationNeedsSourceContent)) return undefined
+
+  return {
+    id: `${runId}-patch`,
+    kind: 'design-patch',
+    title: revision.parentArtifactTitle
+      ? `${revision.parentArtifactTitle} revision`
+      : `${revisionTitleFromPrompt(prompt)} revision`,
+    parentArtifactId: revision.parentArtifactId,
+    revision: revision.revision,
+    changeSummary: revision.changeSummary,
+    operations,
+  }
+}
+
+function operationFromRevisionContext(operation: DesignBuildOperationContext): DesignPatchOperation {
+  return {
+    kind: operation.kind,
+    path: operation.path,
+    content: operation.content,
+    expectedOriginal: operation.expectedOriginal,
+  }
+}
+
+function applyPackageDependencyRequest(
+  operations: DesignPatchOperation[],
+  prompt: string,
+): DesignPatchOperation[] {
+  const dependency = extractPackageDependencyRequest(prompt)
+  if (!dependency) return operations
+
+  return operations.map(operation => {
+    if (operation.kind === 'delete' || !operation.path.endsWith('/package.json')) return operation
+    const incoming = JSON.stringify({
+      [dependency.target]: {
+        [dependency.name]: dependency.version,
+      },
+    }, null, 2)
+    return {
+      ...operation,
+      content: mergeGeneratedPackageJsonContent(operation.content, incoming) ?? operation.content,
+    }
+  })
+}
+
+function extractPackageDependencyRequest(prompt: string): {
+  name: string
+  version: string
+  target: 'dependencies' | 'devDependencies'
+} | undefined {
+  if (!/(package\.json|dependenc|依赖|npm|pnpm|yarn)/i.test(prompt)) return undefined
+  if (!/(add|install|增加|添加|加入|引入)/i.test(prompt)) return undefined
+
+  const normalized = prompt.replace(/package\.json/gi, ' ')
+  const candidates = normalized.matchAll(/(@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)(?:@([^\s,，。]+))?/gi)
+  for (const match of candidates) {
+    const name = match[1]
+    if (PACKAGE_DEPENDENCY_TOKEN_STOPWORDS.has(name.toLowerCase())) continue
+    return {
+      name,
+      version: match.at(2) || 'latest',
+      target: /(devDependencies|dev dependency|开发依赖)/i.test(prompt) ? 'devDependencies' : 'dependencies',
+    }
+  }
+  return undefined
+}
+
+const PACKAGE_DEPENDENCY_TOKEN_STOPWORDS = new Set([
+  'add',
+  'dependency',
+  'dependencies',
+  'dev',
+  'devdependencies',
+  'install',
+  'json',
+  'npm',
+  'package-json',
+  'pnpm',
+  'yarn',
+])
+
+function operationNeedsSourceContent(operation: DesignPatchOperation): boolean {
+  return operation.kind !== 'delete' && !operation.content?.trim()
+}
+
+function revisionTitleFromPrompt(prompt: string): string {
+  const title = prompt.trim().replace(/\s+/g, ' ')
+  if (!title) return 'Design'
+  return title.length > 42 ? `${title.slice(0, 42)}...` : title
 }
 
 function operationContextSummary(operation: DesignBuildOperationContext): string {

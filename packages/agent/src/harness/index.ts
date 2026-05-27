@@ -15,6 +15,11 @@ export {
   type RuntimeRegistration,
 } from './AgentHarness'
 export {
+  InMemoryAgentSessionStore,
+  type AgentSessionStore,
+  type InMemoryAgentSessionStoreOptions,
+} from './AgentSessionStore'
+export {
   AgentRunControl,
   type AgentRunControlHandle,
   type AgentRunControlStartInput,

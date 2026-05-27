@@ -5,6 +5,7 @@ import type {
   HookName,
   HookPayload,
   InputHookEvent,
+  RuntimeMessage,
   RuntimeSettings,
 } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
@@ -22,6 +23,7 @@ import {
   HookExecutionError,
   InputHookBlockedError,
 } from './HookBus'
+import type { AgentSessionStore } from './AgentSessionStore'
 
 export type AgentRuntimeFactory = (request: AgentRunRequest) => RuntimeExecutor
 
@@ -41,6 +43,7 @@ export interface AgentHarnessOptions {
   traceSink?: AgentTraceSink
   hooks?: AgentHarnessHooks
   capabilities?: AgentCapability[]
+  sessionStore?: AgentSessionStore
 }
 
 export interface AgentRunOptions {
@@ -119,6 +122,7 @@ class DefaultAgentHarness implements AgentHarness {
   private readonly registry: RuntimeRegistry
   private readonly defaultRuntimeId: string
   private readonly traceSink?: AgentTraceSink
+  private readonly sessionStore?: AgentSessionStore
   private readonly hookBus = new HookBus()
   private readonly capabilitiesReady: Promise<void>
   readonly capabilities: CapabilityHost
@@ -127,6 +131,7 @@ class DefaultAgentHarness implements AgentHarness {
     this.registry = new RuntimeRegistry(options.runtimes)
     this.defaultRuntimeId = options.defaultRuntimeId ?? 'pi-ai'
     this.traceSink = options.traceSink
+    this.sessionStore = options.sessionStore
     this.capabilities = new CapabilityHost(this.hookBus)
     this.registerHooks(options.hooks)
     this.capabilitiesReady = this.registerCapabilities(options.capabilities ?? [])
@@ -145,6 +150,7 @@ class DefaultAgentHarness implements AgentHarness {
     const runtimeId = selectRuntimeId(preparedRequest.settings, this.defaultRuntimeId)
     const runtime = this.registry.create(runtimeId, preparedRequest)
     const input = toRuntimeInput(preparedRequest, this.capabilities, options.signal)
+    const assistantRecorder = new AssistantMessageRecorder(preparedRequest.runId)
     let sawTerminal = false
     let lastEvent: AgentEvent | undefined
 
@@ -157,6 +163,7 @@ class DefaultAgentHarness implements AgentHarness {
         if (isTerminalAgentEvent(event)) {
           sawTerminal = true
         }
+        assistantRecorder.capture(event)
         this.pushTrace(event, preparedRequest)
         this.dispatchHook('onRuntimeEvent', { event, request: preparedRequest, runtimeId })
         yield event
@@ -184,6 +191,9 @@ class DefaultAgentHarness implements AgentHarness {
       yield event
     }
 
+    if (lastEvent?.type === 'run_completed') {
+      await this.commitMessages(preparedRequest, assistantRecorder.messages(), runtimeId)
+    }
     this.dispatchHook('afterRun', { request: preparedRequest, runtimeId, terminalEvent: lastEvent })
   }
 
@@ -206,19 +216,34 @@ class DefaultAgentHarness implements AgentHarness {
   }
 
   private async prepareRequest(request: AgentRunRequest): Promise<AgentRunRequest> {
+    const history = await this.loadSessionHistory(request)
+    const historyIds = new Set(history.map(message => message.id))
+    const requestWithHistory = history.length > 0
+      ? { ...request, messages: mergeRuntimeMessages(history, request.messages) }
+      : request
+
     if (this.hookBus.listenerCount('input') === 0) {
-      return request
+      await this.commitMessages(
+        requestWithHistory,
+        requestWithHistory.messages.filter(message => !historyIds.has(message.id)),
+      )
+      return requestWithHistory
     }
 
-    const result = await this.hookBus.runInputHooks(toInputHookEvent(request))
-    return {
-      ...request,
+    const result = await this.hookBus.runInputHooks(toInputHookEvent(requestWithHistory))
+    const preparedRequest = {
+      ...requestWithHistory,
       messages: result.messages,
       metadata: {
-        ...request.metadata,
+        ...requestWithHistory.metadata,
         ...result.metadata,
       },
     }
+    await this.commitMessages(
+      preparedRequest,
+      preparedRequest.messages.filter(message => !historyIds.has(message.id)),
+    )
+    return preparedRequest
   }
 
   private pushTrace(event: AgentEvent, request: AgentRunRequest): void {
@@ -234,6 +259,23 @@ class DefaultAgentHarness implements AgentHarness {
     void this.hookBus
       .emit(name, payload)
       .catch(() => {})
+  }
+
+  private async loadSessionHistory(request: AgentRunRequest): Promise<RuntimeMessage[]> {
+    if (!this.sessionStore) return []
+    return this.sessionStore.getMessages(request.sessionId)
+  }
+
+  private async commitMessages(
+    request: AgentRunRequest,
+    messages: RuntimeMessage[],
+    runtimeId = selectRuntimeId(request.settings, this.defaultRuntimeId),
+  ): Promise<void> {
+    if (!this.sessionStore || messages.length === 0) return
+    await this.sessionStore.appendMessages(request.sessionId, messages)
+    for (const message of messages) {
+      this.dispatchHook('onMessageCommitted', { request, runtimeId, message })
+    }
   }
 }
 
@@ -271,6 +313,7 @@ function toRuntimeInput(request: AgentRunRequest, capabilities: CapabilityHost, 
     runId: request.runId,
     sessionId: request.sessionId,
     message: lastMessage?.content ?? '',
+    messages: request.messages,
     settings: request.settings,
     metadata: request.metadata,
     tools: tools.map(tool => ({
@@ -278,6 +321,56 @@ function toRuntimeInput(request: AgentRunRequest, capabilities: CapabilityHost, 
       execute: input => tool.execute(input),
     })),
     signal,
+  }
+}
+
+function mergeRuntimeMessages(
+  history: RuntimeMessage[],
+  incoming: RuntimeMessage[],
+): RuntimeMessage[] {
+  const seen = new Set<string>()
+  const result: RuntimeMessage[] = []
+
+  for (const message of [...history, ...incoming]) {
+    if (seen.has(message.id)) {
+      const index = result.findIndex(item => item.id === message.id)
+      if (index >= 0) result[index] = message
+      continue
+    }
+    seen.add(message.id)
+    result.push(message)
+  }
+
+  return result
+}
+
+class AssistantMessageRecorder {
+  private readonly explicitMessages: RuntimeMessage[] = []
+  private readonly deltas = new Map<string, string>()
+
+  constructor(private readonly runId: string) {}
+
+  capture(event: AgentEvent): void {
+    if (event.type === 'assistant_message') {
+      this.explicitMessages.push(event.message)
+      return
+    }
+    if (event.type !== 'assistant_delta') return
+    const requestId = event.requestId || this.runId
+    this.deltas.set(requestId, `${this.deltas.get(requestId) ?? ''}${event.text}`)
+  }
+
+  messages(): RuntimeMessage[] {
+    if (this.explicitMessages.length > 0) return this.explicitMessages
+    return [...this.deltas.entries()].flatMap(([requestId, content]) => {
+      const text = content.trim()
+      if (!text) return []
+      return [{
+        id: `${this.runId}:${requestId}:assistant`,
+        role: 'assistant' as const,
+        content: text,
+      }]
+    })
   }
 }
 

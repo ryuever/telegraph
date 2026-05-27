@@ -15,6 +15,7 @@ import type {
   DesignBuildChildRunResult,
   DesignBuildChildRunner,
 } from '../DesignBuildChildRunner'
+import { createTemplateDesignPatchArtifact } from '../DesignBuildArtifacts'
 
 describe('DesignBuildRuntime', () => {
   it('emits a design preview artifact as a RuntimeEvent stream', async () => {
@@ -354,6 +355,82 @@ describe('DesignBuildRuntime', () => {
     })
     expect(stringField(artifact, 'changeSummary')).toContain('Target selected component: Hero.')
     expect(stringField(artifact, 'changeSummary')).toContain('Current artifact operations: update apps/design/src/generated/page.tsx')
+  })
+
+  it('seeds follow-up revisions from the active artifact instead of the follow-up prompt slug', async () => {
+    const requests: DesignBuildChildRunRequest[] = []
+    const runtime = createTestRuntime(request => {
+      requests.push(request)
+      return undefined
+    })
+    const projectRoot = 'apps/design/src/generated/original-dashboard-page'
+    const activeOperations = createTemplateDesignPatchArtifact({
+      runId: 'seed-original-dashboard',
+      prompt: 'Original dashboard',
+    }).operations
+
+    const events = await collect(runtime.run({
+      runId: 'run-follow-up-package',
+      message: '帮我在 package.json 中增加 lucide-react 依赖。',
+      messages: [
+        { id: 'm-original', role: 'user', content: '帮我做一个 Original dashboard。' },
+        { id: 'm-original-assistant', role: 'assistant', content: '已生成「Original dashboard source」预览。' },
+        { id: 'm-follow-up', role: 'user', content: '帮我在 package.json 中增加 lucide-react 依赖。' },
+      ],
+      settings: {},
+      metadata: {
+        designContext: {
+          prompt: '帮我在 package.json 中增加 lucide-react 依赖。',
+          activeArtifact: {
+            id: 'artifact-original',
+            kind: 'design-patch',
+            title: 'Original dashboard source',
+            revision: 1,
+            operationPaths: activeOperations.map(operation => operation.path),
+            operationSummaries: activeOperations.map(operation => ({
+              ...operation,
+              contentPreview: operation.content,
+              contentLength: operation.content?.length ?? 0,
+            })),
+          },
+        },
+      },
+    }))
+
+    const workerRequest = requests.find(request => request.profileId === DESIGN_BUILD_CHILD_PROFILES.worker)
+    expect(arrayField(workerRequest?.modelInput, 'conversation')
+      .map(message => stringField(message, 'content'))).toEqual([
+      '帮我做一个 Original dashboard。',
+      '已生成「Original dashboard source」预览。',
+      '帮我在 package.json 中增加 lucide-react 依赖。',
+    ])
+    const workerArtifact = recordField(workerRequest?.modelInput, 'artifact')
+    const workerOperationPaths = arrayField(workerArtifact, 'operations')
+      .map(operation => stringField(operation, 'path'))
+    expect(workerOperationPaths).toContain(`${projectRoot}/package.json`)
+    expect(workerOperationPaths).toContain(`${projectRoot}/src/App.tsx`)
+    expect(workerOperationPaths.some(path => path?.includes('package-json-lucide-react-page'))).toBe(false)
+    expect(stringField(workerArtifact, 'title')).toBe('Original dashboard source revision')
+
+    const packageOperation = arrayField(workerArtifact, 'operations')
+      .find(operation => stringField(operation, 'path') === `${projectRoot}/package.json`)
+    expect(stringField(packageOperation, 'content')).toContain('"react": "19.1.0"')
+    expect(stringField(packageOperation, 'content')).toContain('"lucide-react": "latest"')
+
+    const terminal = events.at(-1)
+    expect(terminal?.type).toBe('run_completed')
+    const artifact = terminal?.type === 'run_completed'
+      ? recordField(terminal.output, 'artifact')
+      : undefined
+    expect(artifact).toMatchObject({
+      kind: 'design-patch',
+      parentArtifactId: 'artifact-original',
+      revision: 2,
+    })
+    const terminalOperationPaths = arrayField(artifact, 'operations')
+      .map(operation => stringField(operation, 'path'))
+    expect(terminalOperationPaths).toContain(`${projectRoot}/package.json`)
+    expect(terminalOperationPaths.some(path => path?.includes('package-json-lucide-react-page'))).toBe(false)
   })
 
   it('does not run a follow-up worker when reviewer requests changes', async () => {

@@ -1,6 +1,6 @@
 import { stream } from '@mariozechner/pi-ai'
 import type { Context, Message, Tool, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai'
-import type { RuntimeEvent } from '@/packages/agent-protocol'
+import type { RuntimeEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { resolveModel } from '@/packages/agent/providers/index'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
@@ -25,6 +25,87 @@ function now() {
   return Date.now()
 }
 
+function toPiAiMessages(
+  messages: RuntimeMessage[] | undefined,
+  fallbackMessage: string,
+  settings: AgentRuntimeSettings,
+): Context['messages'] {
+  const mapped = (messages ?? []).flatMap(message => toPiAiMessage(message, settings))
+  if (mapped.length > 0) return mapped
+
+  return [{
+    role: 'user',
+    content: fallbackMessage,
+    timestamp: now(),
+  } as Context['messages'][number]]
+}
+
+function toPiAiMessage(
+  message: RuntimeMessage,
+  settings: AgentRuntimeSettings,
+): Message[] {
+  if (!message.content.trim()) return []
+  const timestamp = messageTimestamp(message)
+
+  switch (message.role) {
+    case 'user':
+      return [{
+        role: 'user',
+        content: message.content,
+        timestamp,
+      }]
+    case 'assistant':
+      return [{
+        role: 'assistant',
+        content: [{ type: 'text', text: message.content }],
+        api: 'telegraph',
+        provider: settings.provider ?? 'telegraph',
+        model: settings.modelId ?? 'unknown',
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            total: 0,
+          },
+        },
+        stopReason: 'stop',
+        timestamp,
+      } as Message]
+    case 'tool':
+      return [{
+        role: 'toolResult',
+        toolCallId: stringMetadata(message, 'toolCallId') ?? message.id,
+        toolName: stringMetadata(message, 'toolName') ?? 'tool',
+        content: [{ type: 'text', text: message.content }],
+        isError: message.status === 'error',
+        timestamp,
+      }]
+    case 'system':
+      return [{
+        role: 'user',
+        content: `System context: ${message.content}`,
+        timestamp,
+      }]
+  }
+}
+
+function messageTimestamp(message: RuntimeMessage): number {
+  const value = message.metadata?.ts
+  return typeof value === 'number' ? value : now()
+}
+
+function stringMetadata(message: RuntimeMessage, key: string): string | undefined {
+  const value = message.metadata?.[key]
+  return typeof value === 'string' ? value : undefined
+}
+
 /**
  * Pi-ai backend as a versioned `RuntimeEvent` stream (Phase 1 adapter).
  * Mirrors `PiAiBackend` stream handling; callers map legacy `text_delta` from `assistant_delta`.
@@ -33,6 +114,7 @@ export async function* streamPiAiRuntimeEvents(opts: {
   runId: string
   settings: AgentRuntimeSettings
   message: string
+  messages?: RuntimeMessage[]
   signal?: AbortSignal
   tools?: PiAiExecutableTool[]
   maxToolIterations?: number
@@ -55,11 +137,7 @@ export async function* streamPiAiRuntimeEvents(opts: {
   const toolsByName = new Map(tools.map(tool => [tool.name, tool]))
   const context: Context = {
     systemPrompt: opts.systemPrompt ?? PI_AI_DEFAULT_SYSTEM,
-    messages: [{
-      role: 'user',
-      content: message,
-      timestamp: now(),
-    } as Context['messages'][number]],
+    messages: toPiAiMessages(opts.messages, message, settings),
     tools: tools.map(toPiAiToolDescriptor),
   } as Context
 

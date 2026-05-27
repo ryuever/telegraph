@@ -779,6 +779,14 @@ type DesignSessionActivityEntry =
     result?: DesignSessionLogItem
     error?: DesignSessionLogItem
   }
+  | {
+    type: 'diagnostic'
+    id: string
+    runId?: string
+    status: AgentActivityStatus
+    count: number
+    detail?: string
+  }
 
 function DesignSessionActivityItem({ item }: { item: DesignSessionActivityEntry }): JSX.Element {
   if (item.type === 'tool') {
@@ -804,6 +812,21 @@ function DesignSessionActivityItem({ item }: { item: DesignSessionActivityEntry 
           <SessionActivityDetail detail={detail} />
         ) : undefined}
       </AgentToolCall>
+    )
+  }
+
+  if (item.type === 'diagnostic') {
+    return (
+      <AgentActivityItem
+        title="Runtime activity"
+        subtitle={`${String(item.count)} events`}
+        tone="model"
+        status={item.status}
+        meta={item.runId ? [{ label: 'run', value: shortId(item.runId) }] : undefined}
+        defaultOpen={item.status === 'error' || item.status === 'cancelled'}
+      >
+        {item.detail ? <SessionActivityDetail detail={item.detail} /> : undefined}
+      </AgentActivityItem>
     )
   }
 
@@ -863,13 +886,39 @@ function SessionActivityDetail({ detail }: { detail: string }): JSX.Element {
   )
 }
 
+const MAX_DIAGNOSTIC_DETAIL_LINES = 10
+
 function coalesceSessionLogItems(items: DesignSessionLogItem[]): DesignSessionActivityEntry[] {
   const toolEntries = new Map<string, Extract<DesignSessionActivityEntry, { type: 'tool' }>>()
+  const diagnosticEntries = new Map<string, Extract<DesignSessionActivityEntry, { type: 'diagnostic' }>>()
+  const subagentEntryIndexes = new Map<string, number>()
   const entries: DesignSessionActivityEntry[] = []
 
   for (const item of items) {
+    const diagnostic = diagnosticEntryFromSessionLogItem(item, diagnosticEntries.get(diagnosticKeyFromSessionLogItem(item)))
+    if (diagnostic) {
+      const existing = diagnosticEntries.get(diagnostic.id)
+      diagnosticEntries.set(diagnostic.id, diagnostic)
+      if (existing) {
+        const entryIndex = entries.findIndex(entry => entry.id === diagnostic.id)
+        if (entryIndex >= 0) entries[entryIndex] = diagnostic
+      } else {
+        entries.push(diagnostic)
+      }
+      continue
+    }
+
     const tool = toolEntryFromSessionLogItem(item)
     if (!tool) {
+      const subagentKey = subagentMergeKey(item)
+      if (subagentKey) {
+        const existingIndex = subagentEntryIndexes.get(subagentKey)
+        if (existingIndex !== undefined) {
+          entries[existingIndex] = mergeSubagentEntry(entries[existingIndex], item)
+          continue
+        }
+        subagentEntryIndexes.set(subagentKey, entries.length)
+      }
       entries.push({ type: 'single', id: item.id, item })
       continue
     }
@@ -888,6 +937,93 @@ function coalesceSessionLogItems(items: DesignSessionLogItem[]): DesignSessionAc
   }
 
   return entries
+}
+
+function diagnosticKeyFromSessionLogItem(item: DesignSessionLogItem): string {
+  return `${item.runId ?? 'run'}:diagnostic`
+}
+
+function diagnosticEntryFromSessionLogItem(
+  item: DesignSessionLogItem,
+  previous: Extract<DesignSessionActivityEntry, { type: 'diagnostic' }> | undefined,
+): Extract<DesignSessionActivityEntry, { type: 'diagnostic' }> | null {
+  if (!isDiagnosticSessionLogItem(item)) return null
+  const runId = item.runId ?? previous?.runId
+  return {
+    type: 'diagnostic',
+    id: diagnosticKeyFromSessionLogItem(item),
+    runId,
+    status: aggregateDiagnosticStatus(previous?.status, item),
+    count: (previous?.count ?? 0) + 1,
+    detail: compactDiagnosticDetail(previous?.detail, item),
+  }
+}
+
+function isDiagnosticSessionLogItem(item: DesignSessionLogItem): boolean {
+  if (item.kind === 'run' || item.kind === 'snapshot') return true
+  return item.kind === 'model' && item.label !== 'Thinking'
+}
+
+function compactSessionLogLine(item: DesignSessionLogItem): string {
+  return [item.label, item.detail].filter(Boolean).join(': ')
+}
+
+function compactDiagnosticDetail(previousDetail: string | undefined, item: DesignSessionLogItem): string {
+  return [
+    ...(previousDetail ? previousDetail.split('\n') : []),
+    compactSessionLogLine(item),
+  ]
+    .filter(Boolean)
+    .slice(-MAX_DIAGNOSTIC_DETAIL_LINES)
+    .join('\n')
+}
+
+function aggregateDiagnosticStatus(
+  current: AgentActivityStatus | undefined,
+  item: DesignSessionLogItem,
+): AgentActivityStatus {
+  const next = agentStatusFromSessionLog(item.status)
+  if (current === 'error' || next === 'error') return 'error'
+  if (current === 'cancelled' || next === 'cancelled') return 'cancelled'
+  if (item.kind === 'run') return next
+  if (item.kind === 'snapshot') return 'complete'
+  return current ?? 'complete'
+}
+
+function subagentMergeKey(item: DesignSessionLogItem): string | undefined {
+  if (!item.childRunId) return undefined
+  if (item.kind !== 'subagent' && item.kind !== 'review') return undefined
+  return item.childRunId
+}
+
+function mergeSubagentEntry(entry: DesignSessionActivityEntry, item: DesignSessionLogItem): DesignSessionActivityEntry {
+  if (entry.type !== 'single') return entry
+  const previous = entry.item
+  const preferred = preferSubagentDisplayItem(previous, item)
+  const fallback = preferred === item ? previous : item
+  return {
+    type: 'single',
+    id: preferred.id,
+    item: {
+      ...preferred,
+      detail: preferred.detail ?? fallback.detail,
+      fullDetail: preferred.fullDetail ?? fallback.fullDetail,
+    },
+  }
+}
+
+function preferSubagentDisplayItem(previous: DesignSessionLogItem, next: DesignSessionLogItem): DesignSessionLogItem {
+  if (isSubagentSnapshotLogItem(next) && !isSubagentSnapshotLogItem(previous)) return previous
+  if (!isSubagentSnapshotLogItem(next) && isSubagentSnapshotLogItem(previous)) return next
+  return isTerminalSessionLogStatus(next.status) ? next : previous
+}
+
+function isSubagentSnapshotLogItem(item: DesignSessionLogItem): boolean {
+  return item.id.startsWith('subagent:')
+}
+
+function isTerminalSessionLogStatus(status: DesignSessionLogItem['status']): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled'
 }
 
 function toolEntryFromSessionLogItem(
@@ -1319,8 +1455,10 @@ function summarizePatchOperations(
     .map(operation => ({
       kind: operation.kind,
       path: operation.path,
+      content: operation.content,
       contentLength: operation.content?.length,
       contentPreview: truncateOperationContent(operation.content),
+      expectedOriginal: operation.expectedOriginal,
       expectedOriginalLength: operation.expectedOriginal?.length,
     }))
 }

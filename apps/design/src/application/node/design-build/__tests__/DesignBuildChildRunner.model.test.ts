@@ -77,6 +77,50 @@ describe('ModelBackedDesignBuildChildRunner model path', () => {
     }))
   })
 
+  it('labels code-artifact model prompts as incremental revisions when revision context is present', async () => {
+    streamPiAiRuntimeEvents.mockImplementation(async function* () {
+      await Promise.resolve()
+      yield* submitToolEvents({
+        artifactId: 'model-artifact',
+        kind: 'design-patch',
+        title: 'Model artifact',
+      })
+    })
+
+    const { ModelBackedDesignBuildChildRunner } = await import('../DesignBuildChildRunner')
+    const runner = new ModelBackedDesignBuildChildRunner()
+
+    await runner.runChild({
+      parentRunId: 'run-1',
+      childRunId: 'run-1:worker',
+      profileId: DESIGN_BUILD_CHILD_PROFILES.worker,
+      stage: 'code-artifact',
+      label: 'Design Worker',
+      input: { artifactId: 'artifact-1' },
+      modelInput: {
+        prompt: 'Add lucide-react to package.json',
+        context: {
+          revision: {
+            parentArtifactId: 'artifact-1',
+          },
+        },
+        artifact: {
+          parentArtifactId: 'artifact-1',
+        },
+      },
+      settings: {
+        provider: 'openai',
+        modelId: 'gpt-test',
+        apiKey: 'test-key',
+      },
+    })
+
+    const request = streamPiAiRuntimeEvents.mock.calls[0][0]
+    expect(request.systemPrompt).toContain('follow-up revision')
+    expect(request.systemPrompt).toContain('incremental change request')
+    expect(request.systemPrompt).toContain('package.json')
+  })
+
   it('fails when the model answers with text instead of the submit tool', async () => {
     streamPiAiRuntimeEvents.mockImplementation(async function* () {
       await Promise.resolve()

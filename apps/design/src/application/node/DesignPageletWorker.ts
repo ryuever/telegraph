@@ -20,7 +20,7 @@ import {
   type DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
-import { createAgentHarness } from '@/packages/agent/harness';
+import { createAgentHarness, InMemoryAgentSessionStore } from '@/packages/agent/harness';
 import { PermissionBroker } from '@/packages/agent/harness/PermissionBroker';
 import {
   createPageletRunCapabilities,
@@ -57,6 +57,7 @@ export const DesignPageletWorkerId = createId('DesignPageletWorker');
 @injectable()
 export class DesignPageletWorker extends PageletWorker<ISharedService> {
   private readonly runControl = new DesignHarnessRunController();
+  private readonly agentSessions = new InMemoryAgentSessionStore();
   private readonly runs = new FileAgentRunRepository(join(process.cwd(), '.telegraph', 'design-runs'));
   private readonly runEvents = new BufferedAgentRunEventWriter(this.runs, {
     onFlush: async (_runId, records) => {
@@ -181,6 +182,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     };
     const agentHarness = createAgentHarness({
       defaultRuntimeId: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+      sessionStore: this.agentSessions,
       runtimes: [
         { id: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID, create: () => new DesignBuildRuntime() },
         { id: 'pi-ai', create: () => new PiAiRuntime() },

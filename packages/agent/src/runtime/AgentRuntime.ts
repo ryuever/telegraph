@@ -1,4 +1,9 @@
-import type { RuntimeEvent, RuntimeSettings, ToolDefinition } from '@/packages/agent-protocol'
+import type {
+  RuntimeEvent,
+  RuntimeMessage,
+  RuntimeSettings,
+  ToolDefinition,
+} from '@/packages/agent-protocol'
 
 export interface RuntimeToolExecutionContext {
   runId: string
@@ -21,6 +26,7 @@ export interface RuntimeInput {
   runId: string
   sessionId?: string
   message: string
+  messages?: RuntimeMessage[]
   settings: RuntimeSettings
   metadata?: Record<string, unknown>
   tools?: RuntimeExecutableTool[]
