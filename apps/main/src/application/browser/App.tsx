@@ -4,6 +4,7 @@ import { Activity, Cable, ListTree, MessageCircle, Palette, Settings } from 'luc
 import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
 import { PageletHost } from '@/apps/main/application/browser/PageletHost';
 import { cn } from '@/packages/ui/lib/utils';
+import { useTelegraphTheme } from '@/packages/ui/theme';
 import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common';
 import telegraphIconUrl from '@/docs/assets/telegraph-icon.svg';
 
@@ -47,6 +48,8 @@ function persistActivePage(page: PageConfig): void {
 }
 
 function App(): React.JSX.Element {
+  useTelegraphTheme();
+
   const [activePage, setActivePage] = useState<PageConfig>(loadInitialPage);
   const [runConsoleFocus, setRunConsoleFocus] = useState<MainSwitchPagePayload | undefined>();
   const selectPage = useCallback((page: PageConfig) => {

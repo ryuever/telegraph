@@ -39,8 +39,53 @@ class MemoryStorage implements Storage {
   }
 }
 
+type BroadcastListener = (event: MessageEvent<unknown>) => void
+
+class MockBroadcastChannel {
+  private static readonly channels = new Set<MockBroadcastChannel>()
+  private readonly listeners = new Set<BroadcastListener>()
+
+  constructor(readonly name: string) {
+    MockBroadcastChannel.channels.add(this)
+  }
+
+  postMessage(message: unknown): void {
+    for (const channel of MockBroadcastChannel.channels) {
+      if (channel === this || channel.name !== this.name) continue
+      channel.emit(message)
+    }
+  }
+
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+    if (type !== 'message' || typeof listener !== 'function') return
+    this.listeners.add(listener)
+  }
+
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+    if (type !== 'message' || typeof listener !== 'function') return
+    this.listeners.delete(listener)
+  }
+
+  close(): void {
+    MockBroadcastChannel.channels.delete(this)
+    this.listeners.clear()
+  }
+
+  private emit(message: unknown): void {
+    const event = new MessageEvent('message', { data: message })
+    for (const listener of this.listeners) {
+      listener(event)
+    }
+  }
+
+  static reset(): void {
+    MockBroadcastChannel.channels.clear()
+  }
+}
+
 describe('Telegraph theme manager', () => {
   let testStorage = new MemoryStorage()
+  const originalBroadcastChannel = globalThis.BroadcastChannel
 
   beforeEach(() => {
     testStorage = new MemoryStorage()
@@ -52,6 +97,11 @@ describe('Telegraph theme manager', () => {
 
   afterEach(() => {
     testStorage.clear()
+    MockBroadcastChannel.reset()
+    Object.defineProperty(globalThis, 'BroadcastChannel', {
+      configurable: true,
+      value: originalBroadcastChannel,
+    })
     document.documentElement.removeAttribute('data-telegraph-theme')
     document.documentElement.className = ''
     document.documentElement.style.colorScheme = ''
@@ -96,5 +146,26 @@ describe('Telegraph theme manager', () => {
 
     unsubscribe()
     expect(received).toEqual([])
+  })
+
+  it('applies theme changes broadcast from another window', () => {
+    Object.defineProperty(globalThis, 'BroadcastChannel', {
+      configurable: true,
+      value: MockBroadcastChannel,
+    })
+
+    const received: string[] = []
+    const unsubscribe = subscribeToTelegraphThemeChange(themeId => {
+      received.push(themeId)
+    })
+
+    const sender = new BroadcastChannel('telegraph-theme')
+    sender.postMessage({ type: 'theme-change', themeId: 'nord-frost' })
+    sender.close()
+
+    unsubscribe()
+    expect(document.documentElement.dataset.telegraphTheme).toBe('nord-frost')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(received).toEqual(['nord-frost'])
   })
 })
