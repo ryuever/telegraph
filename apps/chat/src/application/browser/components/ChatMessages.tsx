@@ -51,8 +51,25 @@ function MessageRow({ message }: { message: ChatMessage }) {
 function UserMessage({ message }: { message: ChatMessage }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[80%] whitespace-pre-wrap rounded-md bg-primary px-4 py-2.5 text-[13.5px] leading-relaxed text-primary-foreground shadow-sm">
-        {message.content}
+      <div className="max-w-[80%] rounded-md bg-primary px-4 py-2.5 text-primary-foreground shadow-sm">
+        <MarkdownMessage
+          content={message.content}
+          compact
+          className="
+            text-primary-foreground
+            [&_*]:text-primary-foreground
+            [&_a]:decoration-primary-foreground/35
+            [&_a:hover]:decoration-primary-foreground
+            [&_blockquote]:border-primary-foreground/35
+            [&_blockquote]:bg-primary-foreground/10
+            [&_code]:bg-primary-foreground/15
+            [&_hr]:border-primary-foreground/25
+            [&_table]:border-primary-foreground/25
+            [&_td]:border-primary-foreground/25
+            [&_th]:border-primary-foreground/25
+            [&_thead]:bg-primary-foreground/10
+          "
+        />
       </div>
     </div>
   )

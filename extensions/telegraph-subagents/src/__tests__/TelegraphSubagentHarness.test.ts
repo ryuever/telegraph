@@ -448,6 +448,54 @@ describe('TelegraphSubagentHarness', () => {
     })
   })
 
+  it('passes the chat transcript through router, child, and final synthesis model calls', async () => {
+    mockRouterSelectionAndChildRuns({
+      agent: 'scout',
+      task: 'Use the previous answer as context for the follow-up.',
+    })
+
+    const transcript = [
+      { id: 'm-user-1', role: 'user' as const, content: 'Explain the chat pagelet.' },
+      { id: 'm-assistant-1', role: 'assistant' as const, content: 'The chat pagelet owns agent runs.' },
+      { id: 'm-user-2', role: 'user' as const, content: 'Can you expand it?' },
+    ]
+    const runtime = new TelegraphSubagentHarness()
+    await collect(runtime.run(runtimeInput({
+      message: 'Can you expand it?',
+      messages: transcript,
+    })))
+
+    const routerMessages = streamMock.mock.calls[0]?.[0].messages
+    const childMessages = streamMock.mock.calls[1]?.[0].messages
+    const finalMessages = streamMock.mock.calls[2]?.[0].messages
+
+    expect(routerMessages?.map(message => [message.role, message.content])).toEqual([
+      ['user', 'Explain the chat pagelet.'],
+      ['assistant', 'The chat pagelet owns agent runs.'],
+      ['user', 'Can you expand it?'],
+    ])
+    expect(childMessages?.slice(0, transcript.length).map(message => [message.role, message.content])).toEqual([
+      ['user', 'Explain the chat pagelet.'],
+      ['assistant', 'The chat pagelet owns agent runs.'],
+      ['user', 'Can you expand it?'],
+    ])
+    expect(childMessages?.at(-1)).toMatchObject({
+      id: 'run-subagents-test-scout:task',
+      role: 'user',
+      content: expect.stringContaining('Use the previous answer as context'),
+    })
+    expect(finalMessages?.slice(0, transcript.length).map(message => [message.role, message.content])).toEqual([
+      ['user', 'Explain the chat pagelet.'],
+      ['assistant', 'The chat pagelet owns agent runs.'],
+      ['user', 'Can you expand it?'],
+    ])
+    expect(finalMessages?.at(-1)).toMatchObject({
+      id: 'run-subagents-test:final-synthesis',
+      role: 'user',
+      content: expect.stringContaining('Original user request:\nCan you expand it?'),
+    })
+  })
+
   it('converts child run failure into a parent terminal run_failed event', async () => {
     mockRouterSelectionAndChildRuns({}, childFailure)
 

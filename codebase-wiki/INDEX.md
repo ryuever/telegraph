@@ -93,6 +93,7 @@ features:
 | I-006 | [20260522-design-build-child-structured-output-contract.md](./issue/20260522-design-build-child-structured-output-contract.md) | DesignBuild Child 输出不应依赖自然语言 JSON 文本解析 | 记录 DesignBuild child agent 因非严格 JSON、连续 JSON、漏逗号、未输出 JSON object 导致 run 失败的根因；结论是改用 tool calling 结构化提交与 stage schema 校验。 |
 | I-007 | [20260525-design-build-submit-tool-not-called.md](./issue/20260525-design-build-submit-tool-not-called.md) | DesignBuild Worker 未调用 submit_design_child_output 导致 run failed | 记录 Design Worker 未调用最终提交工具时的协议失败路径，区分 submit tool 缺失、schema 错误与 preview 编译错误，并沉淀后续 degraded artifact 兜底方向。 |
 | I-008 | [20260526-design-preview-react-singleton-esm-sh.md](./issue/20260526-design-preview-react-singleton-esm-sh.md) | Design Preview 中 React singleton 被 esm.sh 依赖解析打散 | 记录 Design Page preview 在 Radix / Recharts / lucide-react 依赖下触发 useContext null 的排查过程、根因分层、本地 Sandpacker worker patch，以及适合沉淀到 Sandpacker 源码的 resolver 修复建议。 |
+| I-009 | [20260528-chat-session-follow-up-turn-context.md](./issue/20260528-chat-session-follow-up-turn-context.md) | Chat session 追问 turn 丢失历史上下文 | 记录 Chat session 追问新 turn 只带当前 prompt 的问题，归档 renderer transcript、pagelet durable session history、pi-embedded 与 telegraph-subagents 多段 model request 的修复和回归验证。 |
 
 ### reference/ — 参考手册
 

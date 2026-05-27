@@ -7,7 +7,7 @@
  * controls without turning the runtime into a natural-language parser.
  */
 
-import type { RuntimeEvent } from '@/packages/agent-protocol'
+import type { RuntimeEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import type {
@@ -39,6 +39,7 @@ export interface OrchestratorOptions {
   agents?: Map<string, SubagentDefinition>
   /** Stateful child-run manager. Defaults to a fresh manager for this orchestration. */
   manager?: SubagentManager
+  conversationMessages?: RuntimeMessage[]
 }
 
 type ManagedOptions = OrchestratorOptions & { manager: SubagentManager }
@@ -110,6 +111,7 @@ async function* runSingleAgent(
     settings: opts.settings,
     sessionId: opts.sessionId,
     signal: opts.signal,
+    conversationMessages: opts.conversationMessages,
   })
 }
 
@@ -177,6 +179,7 @@ async function* runChain(
       signal: opts.signal,
       skills: step.skills,
       modelOverride: step.model,
+      conversationMessages: opts.conversationMessages,
     })) {
       if (ev.type === 'assistant_delta' && ev.runId === childRunId) {
         childText += ev.text
@@ -242,6 +245,7 @@ async function* runParallel(
       signal: opts.signal,
       modelOverride: t.model,
       skills: t.skills,
+      conversationMessages: opts.conversationMessages,
     })) {
       allChildEvents[idx].push(ev)
     }

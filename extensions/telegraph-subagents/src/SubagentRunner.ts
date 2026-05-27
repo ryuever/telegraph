@@ -1,6 +1,7 @@
-import type { RuntimeEvent } from '@/packages/agent-protocol'
+import type { RuntimeEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { streamPiAiRuntimeEvents } from '@/packages/agent/runtime/streamPiAiRuntime'
+import { appendSyntheticUserRuntimeMessage } from '@/packages/agent/runtime/runtimeMessages'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import {
   formatSelectedSkillBodiesForPrompt,
@@ -26,6 +27,7 @@ export interface SubagentRunRequest {
   signal?: AbortSignal
   modelOverride?: string
   skills?: string[]
+  conversationMessages?: RuntimeMessage[]
 }
 
 export interface SubagentRunner {
@@ -55,6 +57,13 @@ export class StreamingSubagentRunner implements SubagentRunner {
         runId: childRunId,
         settings: childSettings,
         message: prompt,
+        messages: appendSyntheticUserRuntimeMessage(request.conversationMessages, {
+          id: `${childRunId}:task`,
+          content: prompt,
+          source: 'telegraph-subagents-child-task',
+          runId: childRunId,
+          metadata: { parentRunId },
+        }),
         signal,
         tools,
       })) {

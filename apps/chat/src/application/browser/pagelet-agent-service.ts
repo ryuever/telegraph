@@ -1,5 +1,7 @@
 import type { AgentSendOptions, AgentService } from './types'
+import type { RuntimeMessage } from '@/packages/agent-protocol'
 import {
+  type ChatMessage,
   type ChatSendRequest,
   type ChatStreamEvent,
   type ChatAgentRunEventRecordSnapshot,
@@ -161,6 +163,8 @@ export class PageletAgentService implements AgentService {
 
       const request: ChatSendRequest = {
         message: lastMessage.content,
+        currentMessageId: lastMessage.id,
+        messages: toRuntimeMessages(conversation.messages),
         settings,
         runId,
         sessionId: conversation.id,
@@ -286,4 +290,22 @@ export class PageletAgentService implements AgentService {
   private getSettings(): ChatSendRequest['settings'] {
     return readRuntimeSettingsFromStorage(localStorage) as ChatSendRequest['settings']
   }
+}
+
+function toRuntimeMessages(messages: ChatMessage[]): RuntimeMessage[] {
+  return messages.flatMap(message => {
+    const content = message.content.trim()
+    if (!content) return []
+    if (message.role === 'assistant' && (message.status === 'pending' || message.status === 'streaming')) return []
+    return [{
+      id: message.id,
+      role: message.role,
+      content,
+      status: message.status,
+      metadata: {
+        createdAt: message.createdAt,
+        source: 'chat-renderer',
+      },
+    }]
+  })
 }

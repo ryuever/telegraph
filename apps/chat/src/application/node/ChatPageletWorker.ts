@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
 import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
@@ -27,8 +28,9 @@ import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types'
 import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { createAgentHarness, selectRuntimeId } from '@/packages/agent/harness';
-import { createPageletRunCapabilities } from '@/packages/agent/harness/node';
-import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest, type PermissionRequest } from '@/packages/agent-protocol';
+import type { AgentSessionStore } from '@/packages/agent/harness';
+import { createPageletRunCapabilities, FileAgentSessionStore } from '@/packages/agent/harness/node';
+import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest, type PermissionRequest, type RuntimeMessage } from '@/packages/agent-protocol';
 import type { PermissionDecision, PermissionPrompt } from '@/packages/agent/harness/PermissionBroker';
 import { BufferedAgentRunEventWriter } from '@/packages/agent/persistence/BufferedAgentRunEventWriter';
 import { FileAgentRunRepository } from '@/packages/agent/persistence/AgentRunRepository';
@@ -49,6 +51,7 @@ import type {
   RunProjectionStatus,
 } from '@/packages/run-protocol';
 import type { RemoteArtifactRef } from '@/packages/remote-protocol';
+import { resolveChatRunMessages } from './chat-session-messages';
 
 export const ChatPageletWorkerId = createId('ChatPageletWorker');
 
@@ -76,6 +79,7 @@ interface ChatRunBrokerService {
 export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   private streamListeners = new Set<(event: ChatStreamEvent) => void>();
   private readonly subagents = new SubagentManager();
+  private readonly agentSessions = new FileAgentSessionStore(join(process.cwd(), '.telegraph', 'chat-sessions'));
   private readonly runs = new FileAgentRunRepository();
   private readonly runEvents = new BufferedAgentRunEventWriter(this.runs, {
     onFlush: async (_runId, records) => {
@@ -260,22 +264,15 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
         this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event });
       }
 
-      this.emitStreamEvent({ type: 'run_started', runId });
-
       const agentRequest: AgentRunRequest = {
         runId,
         sessionId,
-        messages: [
-          {
-            id: `${runId}-user`,
-            role: 'user',
-            content: message,
-          },
-        ],
+        messages: this.messagesForRun(req),
         settings,
       };
       const agentHarness = createAgentHarness({
         defaultRuntimeId: 'pi-ai',
+        sessionStore: this.sessionStoreForRun(req),
         runtimes: [
           { id: 'pi-ai', create: () => new PiAiRuntime() },
           { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
@@ -340,6 +337,16 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       this.resolvePendingPermissionsForRun(runId, denyDecision('Run failed before permission was resolved'));
       return { runId, status: 'failed', error: errorMsg };
     }
+  }
+
+  private messagesForRun(req: ChatSendRequest): RuntimeMessage[] {
+    return resolveChatRunMessages(req);
+  }
+
+  private sessionStoreForRun(req: ChatSendRequest): AgentSessionStore {
+    return hasAuthoritativeRendererTranscript(req)
+      ? new RendererTranscriptSessionStore(this.agentSessions)
+      : this.agentSessions;
   }
 
   private promptForPermission(prompt: PermissionPrompt): Promise<PermissionDecision> {
@@ -504,7 +511,7 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   ): ChatStreamEvent | null {
     switch (ev.type) {
       case 'run_started':
-        return null; // already emitted before the loop
+        return null;
 
       case 'assistant_delta': {
         const text = 'text' in ev ? (ev as { text: string }).text : ''
@@ -662,6 +669,27 @@ function settingsFromIntent(intent: RunIntentRecord): ChatSendRequest['settings'
     extensionBlocklist: metadataSettings.extensionBlocklist,
     taskCapabilityProfile: metadataSettings.taskCapabilityProfile,
   };
+}
+
+class RendererTranscriptSessionStore implements AgentSessionStore {
+  constructor(private readonly delegate: AgentSessionStore) {}
+
+  getMessages(): RuntimeMessage[] {
+    return [];
+  }
+
+  appendMessages(sessionId: string, messages: RuntimeMessage[]): void | Promise<void> {
+    return this.delegate.appendMessages(sessionId, messages.filter(shouldPersistChatSessionMessage));
+  }
+}
+
+function shouldPersistChatSessionMessage(message: RuntimeMessage): boolean {
+  return !(message.role === 'assistant' && message.metadata?.source === 'chat-renderer');
+}
+
+function hasAuthoritativeRendererTranscript(req: ChatSendRequest): boolean {
+  return Array.isArray(req.messages) &&
+    req.messages.some(message => message.role === 'assistant' && message.content.trim().length > 0);
 }
 
 function metadataChatSettings(metadata: Record<string, unknown> | undefined): Partial<ChatSendRequest['settings']> {

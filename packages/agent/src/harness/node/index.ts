@@ -23,3 +23,7 @@ export {
   createPageletRunCapabilities,
   type PageletRunCapabilityOptions,
 } from './PageletRunCapabilities'
+export {
+  FileAgentSessionStore,
+  type FileAgentSessionStoreOptions,
+} from './FileAgentSessionStore'

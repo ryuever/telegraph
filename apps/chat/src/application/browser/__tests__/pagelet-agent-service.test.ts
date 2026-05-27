@@ -115,6 +115,46 @@ describe('PageletAgentService', () => {
     expect(unsubscribe).toHaveBeenCalled()
   })
 
+  it('forwards the restored conversation transcript to the pagelet', async () => {
+    sendMock.mockResolvedValueOnce({ runId: 'run-history', status: 'completed' })
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await service.send({
+      conversation: conversationWithHistoryFixture(),
+      onChunk: vi.fn(),
+    })
+
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'second question',
+      currentMessageId: 'msg-user-2',
+      sessionId: 'session-history',
+      messages: [
+        {
+          id: 'msg-user-1',
+          role: 'user',
+          content: 'first question',
+          status: 'done',
+          metadata: { createdAt: 1, source: 'chat-renderer' },
+        },
+        {
+          id: 'msg-assistant-1',
+          role: 'assistant',
+          content: 'first answer',
+          status: 'done',
+          metadata: { createdAt: 2, source: 'chat-renderer' },
+        },
+        {
+          id: 'msg-user-2',
+          role: 'user',
+          content: 'second question',
+          status: 'done',
+          metadata: { createdAt: 4, source: 'chat-renderer' },
+        },
+      ],
+    }))
+  })
+
   it('forwards pending permission requests from the pagelet stream', async () => {
     sendMock.mockImplementationOnce((request) => {
       streamCallback?.({
@@ -269,6 +309,45 @@ function conversationFixture(): ChatConversation {
         role: 'user',
         content: 'hello',
         createdAt: 1,
+        status: 'done',
+      },
+    ],
+  }
+}
+
+function conversationWithHistoryFixture(): ChatConversation {
+  return {
+    id: 'session-history',
+    title: 'History',
+    createdAt: 1,
+    updatedAt: 4,
+    messages: [
+      {
+        id: 'msg-user-1',
+        role: 'user',
+        content: 'first question',
+        createdAt: 1,
+        status: 'done',
+      },
+      {
+        id: 'msg-assistant-1',
+        role: 'assistant',
+        content: 'first answer',
+        createdAt: 2,
+        status: 'done',
+      },
+      {
+        id: 'msg-assistant-streaming',
+        role: 'assistant',
+        content: 'draft answer',
+        createdAt: 3,
+        status: 'streaming',
+      },
+      {
+        id: 'msg-user-2',
+        role: 'user',
+        content: 'second question',
+        createdAt: 4,
         status: 'done',
       },
     ],

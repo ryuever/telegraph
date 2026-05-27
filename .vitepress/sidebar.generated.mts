@@ -185,6 +185,10 @@ export const wikiSidebar = {
         {
           "text": "I-008 Design Preview 中 React singleton 被 esm.sh 依赖解析打散",
           "link": "/issue/20260526-design-preview-react-singleton-esm-sh"
+        },
+        {
+          "text": "I-009 Chat session 追问 turn 丢失历史上下文",
+          "link": "/issue/20260528-chat-session-follow-up-turn-context"
         }
       ]
     }

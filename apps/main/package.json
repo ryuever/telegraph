@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.0",
+    "@monaco-editor/react": "^4.7.0",
     "@telegraph/ui": "workspace:*",
     "@x-oasis/async-call-rpc": "^0.17.0",
     "@x-oasis/async-call-rpc-electron": "^0.14.0",

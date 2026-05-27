@@ -1,5 +1,5 @@
 import { createId } from '@x-oasis/di'
-import type { AgentEvent, RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
+import type { AgentEvent, RuntimeMessage, RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 import type { PermissionRequest } from '@/packages/agent-protocol'
 import type {
   PermissionBrokerRequestContext,
@@ -60,6 +60,8 @@ export interface EventSubscription {
 
 export interface ChatSendRequest {
   message: string
+  currentMessageId?: string
+  messages?: RuntimeMessage[]
   settings: AgentRuntimeSettings
   runId: string
   sessionId: string

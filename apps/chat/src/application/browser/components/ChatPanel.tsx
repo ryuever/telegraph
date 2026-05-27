@@ -19,6 +19,7 @@ import { PageletAgentService } from '../pagelet-agent-service'
 import { createChatAgentEventProjectionState, projectAgentEventToChat } from '../agent-event-projector'
 import { upsertToolCall } from '../chat-tool-calls'
 import { upsertSubagentUpdate } from '../chat-subagents'
+import { groupPersistedRuns, sortRunsForSessionTimeline } from '../persisted-run-groups'
 import {
   loadSettings,
   saveSettings,
@@ -66,7 +67,7 @@ export function ChatPanel({ agent }: Props) {
   const [_isLoadingEnv, setIsLoadingEnv] = useState(true)
   const [tracePanelOpen, setTracePanelOpenInner] = useState(readLlmTraceOpenFromStorage)
   const [persistedRuns, setPersistedRuns] = useState<ChatAgentRunRecordSnapshot[]>([])
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [selectedPersistedSessionId, setSelectedPersistedSessionId] = useState<string | null>(null)
   const [selectedRunRows, setSelectedRunRows] = useState<LlmTraceRow[]>([])
   const [runConsoleLoading, setRunConsoleLoading] = useState(false)
   const [pendingPermissions, setPendingPermissions] = useState<ChatPermissionRequestSnapshot[]>([])
@@ -446,7 +447,7 @@ export function ChatPanel({ agent }: Props) {
   )
 
   const loadPersistedRuns = useCallback(async () => {
-    if (!agentService.listRuns) return
+    if (!agentService.listRuns) return []
     setRunConsoleLoading(true)
     try {
       const runs = await agentService.listRuns({
@@ -454,35 +455,47 @@ export function ChatPanel({ agent }: Props) {
         limit: 80,
       })
       setPersistedRuns(runs)
-      if (selectedRunId && !runs.some(run => run.runId === selectedRunId)) {
-        setSelectedRunId(null)
+      const groups = groupPersistedRuns(runs)
+      if (selectedPersistedSessionId && !groups.some(group => group.sessionId === selectedPersistedSessionId)) {
+        setSelectedPersistedSessionId(null)
         setSelectedRunRows([])
       }
+      return runs
     } finally {
       setRunConsoleLoading(false)
     }
-  }, [activeId, agentService, selectedRunId, traceScopeAllChats])
+  }, [activeId, agentService, selectedPersistedSessionId, traceScopeAllChats])
 
   useEffect(() => {
     if (!tracePanelOpen) return
     void loadPersistedRuns()
   }, [loadPersistedRuns, tracePanelOpen, traceRows.length])
 
-  const selectPersistedRun = useCallback(async (runId: string | null) => {
-    setSelectedRunId(runId)
-    if (!runId) {
+  const selectPersistedRunGroup = useCallback(async (
+    sessionId: string | null,
+    sourceRuns = persistedRuns,
+  ) => {
+    setSelectedPersistedSessionId(sessionId)
+    if (!sessionId) {
       setSelectedRunRows([])
       return
     }
     if (!agentService.listRunEvents) return
     setRunConsoleLoading(true)
     try {
-      const events = await agentService.listRunEvents(runId)
-      setSelectedRunRows(runEventsToTraceRows(events))
+      const sessionRuns = sortRunsForSessionTimeline(
+        sourceRuns.filter(run => run.sessionId === sessionId)
+      )
+      const rows: LlmTraceRow[] = []
+      for (const run of sessionRuns) {
+        const events = await agentService.listRunEvents(run.runId)
+        rows.push(...runEventsToTraceRows(events))
+      }
+      setSelectedRunRows(rows)
     } finally {
       setRunConsoleLoading(false)
     }
-  }, [agentService])
+  }, [agentService, persistedRuns])
 
   const replayPersistedRun = useCallback(async (
     runId: string,
@@ -530,29 +543,15 @@ export function ChatPanel({ agent }: Props) {
     void replayPersistedRun(source.sourceRunId, 'fork', source)
   }, [replayPersistedRun])
 
-  const exportPersistedRun = useCallback(async (runId: string) => {
-    if (!agentService.exportRunTraceBundle) return
-    const bundle = await agentService.exportRunTraceBundle(runId)
-    if (!bundle) return
-
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    try {
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `telegraph-run-${shortRunId(runId)}.trace.json`
-      anchor.click()
-    } finally {
-      URL.revokeObjectURL(url)
-    }
-  }, [agentService])
-
   const importTraceBundle = useCallback(async (bundle: ChatRunTraceBundle) => {
     if (!agentService.importRunTraceBundle) return
     const result = await agentService.importRunTraceBundle(bundle)
-    await loadPersistedRuns()
-    await selectPersistedRun(result.record.runId)
-  }, [agentService, loadPersistedRuns, selectPersistedRun])
+    const runs = await loadPersistedRuns()
+    const nextRuns = runs.some(run => run.runId === result.record.runId)
+      ? runs
+      : [result.record, ...runs]
+    await selectPersistedRunGroup(result.record.sessionId, nextRuns)
+  }, [agentService, loadPersistedRuns, selectPersistedRunGroup])
 
   const clearVisibleTraces = useCallback(() => {
     clearLlmTraceRowsForSession(activeId)
@@ -645,16 +644,14 @@ export function ChatPanel({ agent }: Props) {
             rows={displayedTraceRows}
             storedTraceRowCount={traceRows.length}
             persistedRuns={persistedRuns}
-            selectedRunId={selectedRunId}
+            selectedPersistedSessionId={selectedPersistedSessionId}
             selectedRunRows={selectedRunRows}
             runConsoleLoading={runConsoleLoading}
             scopeAllChats={traceScopeAllChats}
             onScopeAllChatsChange={setTraceScopeAllChats}
-            onSelectPersistedRun={runId => { void selectPersistedRun(runId); }}
+            onSelectPersistedRunGroup={sessionId => { void selectPersistedRunGroup(sessionId); }}
             onRefreshPersistedRuns={() => { void loadPersistedRuns(); }}
-            onReplayPersistedRun={(runId, mode) => { void replayPersistedRun(runId, mode); }}
             onForkPersistedNode={source => { forkPersistedNode(source); }}
-            onExportPersistedRun={runId => { void exportPersistedRun(runId); }}
             onImportTraceBundle={bundle => { void importTraceBundle(bundle); }}
             onClear={clearVisibleTraces}
             onClose={() => { setTracePanelOpen(false); }}

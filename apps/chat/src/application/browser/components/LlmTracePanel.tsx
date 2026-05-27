@@ -2,10 +2,9 @@ import React, { useEffect, useMemo, useRef } from 'react'
 import { cn } from '@/packages/ui/lib/utils'
 import type { LlmTraceRow } from '../llm-trace-store'
 import type { ChatAgentRunRecordSnapshot, ChatRunTraceBundle } from '@/apps/chat/application/common'
-import type { AgentRunReplayMode } from '@/packages/agent/persistence/AgentRunRepository'
+import { groupPersistedRuns } from '../persisted-run-groups'
 import {
   assertChatRunTraceBundle,
-  taskCapabilityProfileSummary,
 } from '@/apps/chat/application/common/trace-bundle'
 import {
   buildTraceTimeline,
@@ -150,16 +149,14 @@ export function LlmTracePanel({
   rows,
   storedTraceRowCount,
   persistedRuns,
-  selectedRunId,
+  selectedPersistedSessionId,
   selectedRunRows,
   runConsoleLoading,
   scopeAllChats,
   onScopeAllChatsChange,
-  onSelectPersistedRun,
+  onSelectPersistedRunGroup,
   onRefreshPersistedRuns,
-  onReplayPersistedRun,
   onForkPersistedNode,
-  onExportPersistedRun,
   onImportTraceBundle,
   onClear,
   onClose,
@@ -168,27 +165,29 @@ export function LlmTracePanel({
   rows: LlmTraceRow[]
   storedTraceRowCount: number
   persistedRuns: ChatAgentRunRecordSnapshot[]
-  selectedRunId: string | null
+  selectedPersistedSessionId: string | null
   selectedRunRows: LlmTraceRow[]
   runConsoleLoading: boolean
   scopeAllChats: boolean
   onScopeAllChatsChange: (value: boolean) => void
-  onSelectPersistedRun: (runId: string | null) => void
+  onSelectPersistedRunGroup: (sessionId: string | null) => void
   onRefreshPersistedRuns: () => void
-  onReplayPersistedRun: (runId: string, mode: AgentRunReplayMode) => void
   onForkPersistedNode: (source: {
     sourceRunId: string
     sourceEventSeq?: number
     sourceChildRunId?: string
   }) => void
-  onExportPersistedRun: (runId: string) => void
   onImportTraceBundle: (bundle: ChatRunTraceBundle) => void
   onClear: () => void
   onClose: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
-  const visibleRows = selectedRunId ? selectedRunRows : rows
+  const visibleRows = selectedPersistedSessionId ? selectedRunRows : rows
+  const persistedRunGroups = useMemo(() => groupPersistedRuns(persistedRuns), [persistedRuns])
+  const selectedGroup = selectedPersistedSessionId
+    ? persistedRunGroups.find(group => group.sessionId === selectedPersistedSessionId)
+    : null
   useEffect(() => {
     if (!open) return
     const el = scrollRef.current
@@ -197,12 +196,6 @@ export function LlmTracePanel({
   }, [visibleRows.length, open])
 
   const timelineRuns = useMemo(() => buildTraceTimeline(visibleRows), [visibleRows])
-  const selectedRun = selectedRunId
-    ? persistedRuns.find(run => run.runId === selectedRunId)
-    : null
-  const compareRun = selectedRun
-    ? findCompareRun(selectedRun, persistedRuns)
-    : null
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -229,8 +222,8 @@ export function LlmTracePanel({
         <div className="min-w-0">
           <div className="text-[12px] font-semibold text-foreground">LLM trace</div>
           <div className="truncate text-[10px] text-muted-foreground">
-            {selectedRun
-              ? `Persisted run · ${selectedRun.status} · ${String(selectedRun.eventCount)} events`
+            {selectedGroup
+              ? `Persisted session · ${String(selectedGroup.eventCount)} events`
               : scopeAllChats
                 ? 'All chats · live trace + persisted runs'
                 : 'Active chat · live trace + persisted runs'}
@@ -274,10 +267,10 @@ export function LlmTracePanel({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => { onSelectPersistedRun(null); }}
+              onClick={() => { onSelectPersistedRunGroup(null); }}
               className={cn(
                 'rounded px-2 py-1 text-[10.5px]',
-                selectedRunId
+                selectedPersistedSessionId
                   ? 'text-muted-foreground hover:bg-accent hover:text-foreground'
                   : 'bg-accent text-foreground'
               )}
@@ -307,52 +300,35 @@ export function LlmTracePanel({
             />
           </div>
         </div>
-        {selectedRun && (
-          <>
-            <div className="mb-2 grid grid-cols-4 gap-1">
-              <RunActionButton onClick={() => { onReplayPersistedRun(selectedRun.runId, 'manual_rerun'); }}>
-                Rerun
-              </RunActionButton>
-              <RunActionButton onClick={() => { onReplayPersistedRun(selectedRun.runId, 'retry'); }}>
-                Retry
-              </RunActionButton>
-              <RunActionButton onClick={() => { onReplayPersistedRun(selectedRun.runId, 'fork'); }}>
-                Fork
-              </RunActionButton>
-              <RunActionButton onClick={() => { onExportPersistedRun(selectedRun.runId); }}>
-                Export
-              </RunActionButton>
-            </div>
-            <RunComparePanel primary={selectedRun} compare={compareRun} />
-          </>
-        )}
-        {persistedRuns.length === 0 ? (
+        {persistedRunGroups.length === 0 ? (
           <div className="rounded-md border border-border bg-muted px-2 py-2 text-[11px] text-muted-foreground">
             No persisted runs yet.
           </div>
         ) : (
           <ul className="max-h-40 space-y-1 overflow-y-auto pr-1">
-            {persistedRuns.map(run => (
-              <li key={run.runId}>
+            {persistedRunGroups.map(group => (
+              <li key={group.id}>
                 <button
                   type="button"
-                  onClick={() => { onSelectPersistedRun(run.runId); }}
+                  onClick={() => { onSelectPersistedRunGroup(group.sessionId); }}
                   className={cn(
                     'w-full rounded-md border px-2 py-1.5 text-left transition-colors',
-                    selectedRunId === run.runId
+                    selectedPersistedSessionId === group.sessionId
                       ? 'border-primary/35 bg-accent'
                       : 'border-border bg-background hover:border-primary/25 hover:bg-accent/70'
                   )}
                 >
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-foreground">{shortId(run.runId)}</span>
-                    <span className={cn('rounded px-1.5 py-0.5 text-[9px] uppercase', statusClass(runStatus(run.status)))}>
-                      {run.status}
+                    <span className="font-mono text-[10px] text-foreground">{shortId(group.sessionId)}</span>
+                    <span className={cn('rounded px-1.5 py-0.5 text-[9px] uppercase', statusClass(runStatus(group.status)))}>
+                      {group.status}
                     </span>
-                    <span className="ml-auto text-[9.5px] text-muted-foreground">{run.eventCount} ev</span>
+                    <span className="ml-auto text-[9.5px] text-muted-foreground">
+                      {group.eventCount} ev
+                    </span>
                   </div>
                   <div className="truncate text-[10.5px] text-muted-foreground">
-                    {run.inputPreview ?? `${run.settings.backend ?? run.runtimeId} · ${run.settings.modelId ?? 'model'}`}
+                    {group.title}
                   </div>
                 </button>
               </li>
@@ -364,8 +340,8 @@ export function LlmTracePanel({
         {visibleRows.length === 0 ? (
           storedTraceRowCount > 0 ? (
             <p className="px-2 py-6 text-center text-[12px] leading-relaxed text-muted-foreground">
-              {selectedRunId
-                ? 'No persisted events were found for this run.'
+              {selectedPersistedSessionId
+                ? 'No persisted events were found for this session.'
                 : (
                   <>
                     No traces for{' '}
@@ -377,11 +353,22 @@ export function LlmTracePanel({
             </p>
           ) : (
             <p className="px-2 py-6 text-center text-[12px] text-muted-foreground">
-              {selectedRunId
-                ? 'No persisted events were found for this run.'
+              {selectedPersistedSessionId
+                ? 'No persisted events were found for this session.'
                 : 'Send a message to capture turn context and backend LLM payloads for this chat.'}
             </p>
           )
+        ) : selectedPersistedSessionId ? (
+          <section className="rounded-md border border-border bg-background p-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-border pb-1.5">
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">Session</span>
+              <span className="font-mono text-[11px] text-foreground">{shortId(selectedPersistedSessionId)}</span>
+              <span className="text-[10px] text-muted-foreground">
+                {visibleRows.length} event{visibleRows.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <TraceEventList rows={visibleRows} scopeAllChats={scopeAllChats} />
+          </section>
         ) : (
           <ul className="flex flex-col gap-4">
             {timelineRuns.map(run => (
@@ -412,7 +399,7 @@ export function LlmTracePanel({
                       status={childRun.status}
                       rows={childRun.rows}
                       scopeAllChats={scopeAllChats}
-                      onFork={selectedRunId ? () => {
+                      onFork={selectedPersistedSessionId ? () => {
                         onForkPersistedNode({
                           sourceRunId: run.id,
                           sourceChildRunId: childRun.id,
@@ -428,7 +415,7 @@ export function LlmTracePanel({
                       status={step.status}
                       rows={step.rows}
                       scopeAllChats={scopeAllChats}
-                      onFork={selectedRunId ? () => {
+                      onFork={selectedPersistedSessionId ? () => {
                         onForkPersistedNode({
                           sourceRunId: run.id,
                           sourceEventSeq: firstSeq(step.rows),
@@ -444,89 +431,6 @@ export function LlmTracePanel({
       </div>
     </aside>
   )
-}
-
-function RunActionButton({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded border border-border bg-background px-2 py-1 text-[10px] text-foreground hover:border-primary/35 hover:bg-accent"
-    >
-      {children}
-    </button>
-  )
-}
-
-function RunComparePanel({
-  primary,
-  compare,
-}: {
-  primary: ChatAgentRunRecordSnapshot
-  compare: ChatAgentRunRecordSnapshot | null
-}) {
-  if (!compare) {
-    return (
-      <div className="mb-2 rounded-md border border-border bg-muted px-2 py-2 text-[10.5px] text-muted-foreground">
-        No comparable run found.
-      </div>
-    )
-  }
-
-  return (
-    <div className="mb-2 rounded-md border border-border bg-muted p-2">
-      <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
-        Compare
-      </div>
-      <div className="grid grid-cols-[5rem_1fr_1fr] gap-x-2 gap-y-1 text-[10.5px]">
-        <CompareRow label="run" primary={shortId(primary.runId)} compare={shortId(compare.runId)} />
-        <CompareRow label="status" primary={primary.status} compare={compare.status} />
-        <CompareRow label="runtime" primary={primary.runtimeId} compare={compare.runtimeId} />
-        <CompareRow label="model" primary={primary.settings.modelId ?? '-'} compare={compare.settings.modelId ?? '-'} />
-        <CompareRow label="team" primary={primary.teamId ?? primary.settings.orchestration ?? '-'} compare={compare.teamId ?? compare.settings.orchestration ?? '-'} />
-        <CompareRow label="profile" primary={taskCapabilityProfileSummary(primary)} compare={taskCapabilityProfileSummary(compare)} />
-        <CompareRow label="events" primary={String(primary.eventCount)} compare={String(compare.eventCount)} />
-      </div>
-    </div>
-  )
-}
-
-function CompareRow({
-  label,
-  primary,
-  compare,
-}: {
-  label: string
-  primary: string
-  compare: string
-}) {
-  const changed = primary !== compare
-  return (
-    <>
-      <div className="text-muted-foreground">{label}</div>
-      <div className={cn('truncate font-mono', changed ? 'text-amber-700' : 'text-foreground')}>{primary}</div>
-      <div className="truncate font-mono text-muted-foreground">{compare}</div>
-    </>
-  )
-}
-
-function findCompareRun(
-  selectedRun: ChatAgentRunRecordSnapshot,
-  runs: ChatAgentRunRecordSnapshot[],
-): ChatAgentRunRecordSnapshot | null {
-  const candidates = runs.filter(run => run.runId !== selectedRun.runId)
-  const sameParent = selectedRun.parentRunId
-    ? candidates.find(run => run.parentRunId === selectedRun.parentRunId)
-    : undefined
-  if (sameParent) return sameParent
-  return candidates.find(run => run.inputPreview === selectedRun.inputPreview) ??
-    (candidates.length > 0 ? candidates[0] : null)
 }
 
 function firstSeq(rows: LlmTraceRow[]): number | undefined {

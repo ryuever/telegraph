@@ -9,10 +9,14 @@
  * This runtime is selected only by `telegraph-subagents`.
  */
 
-import type { RuntimeEvent } from '@/packages/agent-protocol'
+import type { RuntimeEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { BaseAgentRuntime, type RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
 import { streamPiAiRuntimeEvents, type PiAiExecutableTool } from '@/packages/agent/runtime/streamPiAiRuntime'
+import {
+  appendSyntheticUserRuntimeMessage,
+  runtimeMessagesForCurrentTurn,
+} from '@/packages/agent/runtime/runtimeMessages'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import {
   agentAliasList,
@@ -54,6 +58,7 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
 
   async *run(input: RuntimeInput): AsyncIterable<RuntimeEvent> {
     const { runId, sessionId, message, settings, signal } = input
+    const messages = runtimeMessagesForCurrentTurn({ runId, message, messages: input.messages })
 
     // Determine orchestration pattern from settings
     const agentSettings = settings as AgentRuntimeSettings
@@ -100,6 +105,7 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         settings: agentSettings,
         signal,
         pattern,
+        messages,
         snapshot,
         team,
       })
@@ -144,6 +150,7 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         signal,
         agents,
         manager: this.subagents,
+        conversationMessages: messages,
       })) {
         yield ev
 
@@ -190,6 +197,7 @@ export class TelegraphSubagentHarness extends BaseAgentRuntime {
         signal,
         mode: orchInput.mode,
         subagents: this.subagents,
+        messages,
       })
 
       const finalText = synthesized ? '' : formatFinalOutput(orchInput.mode, childOutputs)
@@ -267,6 +275,7 @@ function formatFinalOutput(mode: SubagentOrchestratorInput['mode'], childOutputs
 async function* synthesizeFinalAnswerWithModel(options: {
   runId: string
   message: string
+  messages?: RuntimeMessage[]
   settings: AgentRuntimeSettings
   signal?: AbortSignal
   mode: SubagentOrchestratorInput['mode']
@@ -285,12 +294,19 @@ async function* synthesizeFinalAnswerWithModel(options: {
       subagents: options.subagents,
     }),
   ]
+  const synthesisPrompt = buildFinalSynthesisUserMessage(options.message, options.mode, records)
 
   try {
     for await (const event of streamPiAiRuntimeEvents({
       runId: options.runId,
       settings: options.settings,
-      message: buildFinalSynthesisUserMessage(options.message, options.mode, records),
+      message: synthesisPrompt,
+      messages: appendSyntheticUserRuntimeMessage(options.messages, {
+        id: `${options.runId}:final-synthesis`,
+        content: synthesisPrompt,
+        source: 'telegraph-subagents-final-synthesis',
+        runId: options.runId,
+      }),
       signal: options.signal,
       tools,
       maxToolIterations: Math.max(2, records.length + 1),
@@ -467,6 +483,7 @@ function teamRouteCompleted(runId: string, team: TeamSpec, route: TeamRouteDecis
 async function* selectTeamRouteWithModel(options: {
   runId: string
   message: string
+  messages?: RuntimeMessage[]
   settings: AgentRuntimeSettings
   signal?: AbortSignal
   pattern: 'chain' | 'parallel'
@@ -492,6 +509,7 @@ async function* selectTeamRouteWithModel(options: {
     runId: options.runId,
     settings: options.settings,
     message: options.message,
+    messages: options.messages,
     signal: options.signal,
     tools: [subagentTool],
     maxToolIterations: 1,

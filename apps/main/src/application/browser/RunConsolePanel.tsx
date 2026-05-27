@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type React from 'react'
+import Editor from '@monaco-editor/react'
+import type { OnMount } from '@monaco-editor/react'
 import {
   AlertCircle,
   CheckCircle2,
   Clock3,
+  Copy,
   Database,
   File,
   FileJson,
@@ -20,6 +23,7 @@ import { PageletDesignAgentService } from '@/apps/design/application/browser/pag
 import type { DesignAgentRunRecordSnapshot } from '@/apps/design/application/common'
 import type { AgentEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common'
+import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { cn } from '@/packages/ui/lib/utils'
 
 const designAgentService = new PageletDesignAgentService()
@@ -63,6 +67,11 @@ interface ConsoleLogMessage {
   title: string
   content: string
 }
+
+type MessageContentView =
+  | { kind: 'json'; content: string }
+  | { kind: 'mixed-json'; prefix: string; content: string }
+  | { kind: 'text' }
 
 interface ConsoleRunEventRecord {
   runId: string
@@ -422,7 +431,7 @@ function RunLogInspector({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className="grid gap-3">
+          <div className="flex h-full min-h-0 flex-col gap-3">
             {selected.messages.map(message => (
               <MessageBlock key={message.key} message={message} />
             ))}
@@ -441,8 +450,47 @@ function RunLogInspector({
 }
 
 function MessageBlock({ message }: { message: ConsoleLogMessage }): React.JSX.Element {
+  const contentView = parseMessageContentView(message.content)
+  const jsonContent = contentView.kind === 'text' ? undefined : contentView.content
+  const [copied, setCopied] = useState(false)
+  const handleJsonEditorMount = useCallback<OnMount>((editor) => {
+    window.requestAnimationFrame(() => {
+      editor.layout()
+    })
+
+    const parent = editor.getDomNode()?.parentElement
+    if (!parent || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(() => {
+      editor.layout()
+    })
+    observer.observe(parent)
+    editor.onDidDispose(() => {
+      observer.disconnect()
+    })
+  }, [])
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(message.content)
+      .then(() => {
+        setCopied(true)
+      })
+      .catch(() => {
+        // Clipboard permission can be unavailable in test or restricted renderer contexts.
+      })
+  }, [message.content])
+
+  useEffect(() => {
+    if (!copied) return undefined
+    const timeout = window.setTimeout(() => {
+      setCopied(false)
+    }, 1200)
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [copied])
+
   return (
-    <section className="overflow-hidden rounded-md border border-border bg-card">
+    <section className="flex h-full min-h-[220px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-card">
       <div className="flex min-h-8 items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
         <span className={cn(
           'rounded px-1.5 py-0.5 text-[11px] font-medium',
@@ -451,10 +499,61 @@ function MessageBlock({ message }: { message: ConsoleLogMessage }): React.JSX.El
         >
           {message.title}
         </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+          title={copied ? 'Copied' : 'Copy'}
+          aria-label={copied ? 'Copied log content' : 'Copy log content'}
+        >
+          {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+        </button>
       </div>
-      <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-3 py-2 text-xs leading-5 text-foreground">
-        {message.content}
-      </pre>
+      {jsonContent ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {contentView.kind === 'mixed-json' ? (
+            <pre className="shrink-0 whitespace-pre-wrap break-words border-b border-border px-3 py-2 text-xs leading-5 text-foreground">
+              {contentView.prefix}
+            </pre>
+          ) : null}
+          <div className="h-full min-h-0 flex-1 overflow-hidden">
+            <Editor
+              height="100%"
+              language="json"
+              value={jsonContent}
+              theme="vs-dark"
+              onMount={handleJsonEditorMount}
+              options={{
+                readOnly: true,
+                domReadOnly: true,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                fontSize: 12,
+                lineNumbers: 'on',
+                renderLineHighlight: 'line',
+                padding: { top: 8, bottom: 8 },
+                overviewRulerBorder: false,
+                hideCursorInOverviewRuler: true,
+                overviewRulerLanes: 0,
+                scrollbar: {
+                  verticalScrollbarSize: 8,
+                  horizontalScrollbarSize: 8,
+                },
+                wordWrap: 'on',
+                automaticLayout: true,
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="min-h-[120px] flex-1 overflow-auto px-3 py-2">
+          <MarkdownMessage
+            content={message.content}
+            compact
+            className="text-xs leading-5 [&_pre]:text-[11px]"
+          />
+        </div>
+      )}
     </section>
   )
 }
@@ -973,6 +1072,49 @@ function formatJson(value: unknown): string {
   } catch {
     return ''
   }
+}
+
+function parseMessageContentView(content: string): MessageContentView {
+  const trimmed = content.trim()
+  if (!trimmed) return { kind: 'text' }
+
+  const wholeJson = parseJsonContent(trimmed)
+  if (wholeJson) return { kind: 'json', content: wholeJson }
+
+  const jsonBlock = parseTrailingJsonBlock(trimmed)
+  if (jsonBlock) {
+    return {
+      kind: 'mixed-json',
+      prefix: jsonBlock.prefix,
+      content: jsonBlock.content,
+    }
+  }
+
+  return { kind: 'text' }
+}
+
+function parseJsonContent(content: string): string | undefined {
+  try {
+    return JSON.stringify(JSON.parse(content) as unknown, null, 2)
+  } catch {
+    return undefined
+  }
+}
+
+function parseTrailingJsonBlock(content: string): { prefix: string; content: string } | undefined {
+  for (let index = 0; index < content.length; index++) {
+    const char = content[index]
+    if (char !== '{' && char !== '[') continue
+
+    const json = parseJsonContent(content.slice(index).trim())
+    if (!json) continue
+
+    const prefix = content.slice(0, index).trimEnd()
+    if (!prefix) return { prefix: '', content: json }
+    return { prefix, content: json }
+  }
+
+  return undefined
 }
 
 function compactText(value: string | undefined): string {

@@ -38,6 +38,21 @@ vi.mock('@/apps/design/application/browser/pagelet-design-agent-service', () => 
   },
 }))
 
+vi.mock('@monaco-editor/react', () => ({
+  default: (props: { value?: string; language?: string; options?: Record<string, unknown> }) => {
+    const readOnly = props.options?.readOnly
+    return (
+      <div
+        data-testid="run-log-editor"
+        data-language={props.language}
+        data-readonly={typeof readOnly === 'boolean' ? String(readOnly) : 'false'}
+      >
+        {props.value}
+      </div>
+    )
+  },
+}))
+
 async function flushPromises(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
@@ -325,6 +340,9 @@ describe('RunConsolePanel interaction', () => {
     expect(panel.textContent).toContain('Stay concise.')
     expect(panel.textContent).toContain('What changed?')
     expect(panel.textContent).toContain('I grouped the request.')
+    const jsonEditor = panel.querySelector('[data-testid="run-log-editor"]')
+    expect(jsonEditor?.getAttribute('data-language')).toBe('json')
+    expect(jsonEditor?.getAttribute('data-readonly')).toBe('true')
 
     const toolButton = Array.from(panel.querySelectorAll('button'))
       .find(button => button.textContent.includes('Tool call: read_file'))
@@ -337,5 +355,50 @@ describe('RunConsolePanel interaction', () => {
 
     expect(panel.textContent).toContain('Tool call: read_file')
     expect(panel.textContent).toContain('read_file')
+  })
+
+  it('renders trailing JSON details in the log editor when the message has a text prefix', async () => {
+    const runtimeLog: AgentEvent = {
+      type: 'runtime_log',
+      schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+      runId: 'run-runtime-log',
+      level: 'info',
+      message: 'Router selected child agents',
+      raw: {
+        selected: ['scout', 'reviewer'],
+        mode: 'parallel',
+      },
+      ts: 10,
+    }
+
+    serviceMocks.listRuns.mockResolvedValue([{
+      runId: 'run-runtime-log',
+      sessionId: 'session-runtime-log',
+      status: 'completed',
+      runtimeId: 'telegraph-subagents',
+      artifactRefs: [],
+      settings: {},
+      input: { message: 'inspect routing' },
+      inputPreview: 'inspect routing',
+      eventCount: 1,
+      createdAt: 1,
+      startedAt: 1,
+      completedAt: 30,
+      lastEventAt: 30,
+    }])
+    serviceMocks.listRunEvents.mockResolvedValue([
+      { runId: 'run-runtime-log', sessionId: 'session-runtime-log', seq: 1, ts: 10, event: runtimeLog },
+    ])
+
+    const panel = await renderPanel()
+    await act(async () => {
+      await flushPromises()
+    })
+
+    expect(panel.textContent).toContain('Router selected child agents')
+    const jsonEditor = panel.querySelector('[data-testid="run-log-editor"]')
+    expect(jsonEditor?.getAttribute('data-language')).toBe('json')
+    expect(jsonEditor?.textContent).toContain('"selected"')
+    expect(jsonEditor?.textContent).toContain('"parallel"')
   })
 })
