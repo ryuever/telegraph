@@ -8,6 +8,7 @@ import type {
   DesignArtifactExportRequest,
   DesignAgentRunEventRecordSnapshot,
   DesignAgentStreamEvent,
+  DesignDeleteSessionRunsResult,
   IDesignPageletService,
 } from '@/apps/design/application/common'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
@@ -22,6 +23,8 @@ const sendAgentMock = vi.fn(
 )
 const cancelAgentMock = vi.fn(() => Promise.resolve(true))
 const listAgentRunsMock = vi.fn(() => Promise.resolve([]))
+const deleteAgentSessionRunsMock = vi.fn((sessionId: string): Promise<DesignDeleteSessionRunsResult> =>
+  Promise.resolve({ sessionId, deletedRunIds: [] }))
 const getAgentRunMock = vi.fn(() => Promise.resolve(null))
 const listAgentRunEventsMock = vi.fn((): Promise<DesignAgentRunEventRecordSnapshot[]> => Promise.resolve([]))
 const listSubagentsMock = vi.fn(() => Promise.resolve([]))
@@ -71,6 +74,7 @@ const client: IDesignPageletService = {
   sendAgent: sendAgentMock,
   cancelAgent: cancelAgentMock,
   listAgentRuns: listAgentRunsMock,
+  deleteAgentSessionRuns: deleteAgentSessionRunsMock,
   getAgentRun: getAgentRunMock,
   listAgentRunEvents: listAgentRunEventsMock,
   listSubagents: listSubagentsMock,
@@ -410,6 +414,7 @@ describe('PageletDesignAgentService', () => {
     ])
 
     await expect(service.listAgentRuns()).resolves.toEqual([])
+    await expect(service.deleteAgentSessionRuns('session-1')).resolves.toEqual({ sessionId: 'session-1', deletedRunIds: [] })
     await expect(service.getAgentRun('run-1')).resolves.toBeNull()
     await expect(service.getAgentRunProjection('run-1')).resolves.toMatchObject({
       assistantText: 'Hi',
@@ -419,6 +424,7 @@ describe('PageletDesignAgentService', () => {
     })
 
     expect(listAgentRunsMock).toHaveBeenCalled()
+    expect(deleteAgentSessionRunsMock).toHaveBeenCalledWith('session-1')
     expect(getAgentRunMock).toHaveBeenCalledWith('run-1')
     expect(listAgentRunEventsMock).toHaveBeenCalledWith('run-1')
   })

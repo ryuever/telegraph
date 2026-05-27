@@ -16,6 +16,12 @@ import {
   type DesignWorkspaceSummary,
 } from './DesignWorkspace'
 import { initialDesignSessionLogItemsFromEvents } from './design-session-log-projector'
+import {
+  clearDeletedDesignSession,
+  isDesignSessionDeleted,
+  loadDeletedDesignSessionIds,
+  markDesignSessionDeleted,
+} from './design-session-deletions'
 
 interface DesignViewProps {
   onOpenSettings?: () => void
@@ -57,10 +63,22 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
     }
   }, [agent])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    for (const sessionId of loadDeletedDesignSessionIds()) {
+      void agent.deleteAgentSessionRuns(sessionId, controller.signal).catch(() => {
+        // Cleanup is retried on the next DesignView mount.
+      })
+    }
+    return () => { controller.abort() }
+  }, [agent])
+
   const startWorkspace = (nextPrompt: string): void => {
     const now = Date.now()
+    const id = globalThis.crypto.randomUUID()
+    clearDeletedDesignSession(id)
     const session: DesignSession = {
-      id: globalThis.crypto.randomUUID(),
+      id,
       title: deriveSessionTitle(nextPrompt),
       prompt: nextPrompt,
       status: 'running',
@@ -107,6 +125,10 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
   }
 
   const deleteSession = (sessionId: string): void => {
+    markDesignSessionDeleted(sessionId)
+    void agent.deleteAgentSessionRuns(sessionId).catch(() => {
+      // The sidebar update is local and immediate; ledger cleanup is retried on mount.
+    })
     setSessions(current => current.filter(session => session.id !== sessionId))
     setOpenedSessionIds(current => {
       const next = new Set(current)
@@ -219,6 +241,7 @@ async function hydrateDesignSessions(
   const groups = new Map<string, DesignAgentRunRecordSnapshot[]>()
   for (const run of runs) {
     const sessionId = run.sessionId ?? run.runId
+    if (isDesignSessionDeleted(sessionId)) continue
     groups.set(sessionId, [...(groups.get(sessionId) ?? []), run])
   }
 
@@ -316,7 +339,7 @@ function mergeHydratedSessions(current: DesignSession[], hydrated: DesignSession
   const currentIds = new Set(current.map(session => session.id))
   return [
     ...current,
-    ...hydrated.filter(session => !currentIds.has(session.id)),
+    ...hydrated.filter(session => !currentIds.has(session.id) && !isDesignSessionDeleted(session.id)),
   ]
 }
 

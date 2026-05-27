@@ -10,12 +10,14 @@ const workspaceLifecycle = vi.hoisted(() => ({
 
 const serviceMocks = vi.hoisted(() => ({
   listAgentRuns: vi.fn(),
+  deleteAgentSessionRuns: vi.fn(),
   getAgentRunProjection: vi.fn(),
 }))
 
 vi.mock('../pagelet-design-agent-service', () => ({
   PageletDesignAgentService: class {
     listAgentRuns = serviceMocks.listAgentRuns
+    deleteAgentSessionRuns = serviceMocks.deleteAgentSessionRuns
     getAgentRunProjection = serviceMocks.getAgentRunProjection
   },
 }))
@@ -68,6 +70,34 @@ vi.mock('../DesignWorkspace', () => ({
   },
 }))
 
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>()
+
+  get length(): number {
+    return this.values.size
+  }
+
+  clear(): void {
+    this.values.clear()
+  }
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null
+  }
+
+  key(index: number): string | null {
+    return Array.from(this.values.keys())[index] ?? null
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key)
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value)
+  }
+}
+
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
 
@@ -79,7 +109,12 @@ describe('DesignView', () => {
     workspaceLifecycle.mounts = 0
     workspaceLifecycle.unmounts = 0
     vi.clearAllMocks()
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: new MemoryStorage(),
+    })
     serviceMocks.listAgentRuns.mockResolvedValue([])
+    serviceMocks.deleteAgentSessionRuns.mockResolvedValue({ sessionId: 'session-1', deletedRunIds: [] })
     serviceMocks.getAgentRunProjection.mockResolvedValue({
       assistantText: '',
       artifacts: [],
@@ -251,6 +286,59 @@ describe('DesignView', () => {
 
     expect(activeWorkspaceText(container)).toContain('Restored: restore this design / Restored assistant text')
     expect(serviceMocks.getAgentRunProjection).toHaveBeenCalledWith('run-history')
+  })
+
+  it('does not resurrect a deleted historical design session from the ledger', async () => {
+    serviceMocks.listAgentRuns.mockResolvedValue([
+      {
+        runId: 'run-delete',
+        sessionId: 'session-delete',
+        prompt: 'delete this design',
+        status: 'completed',
+        startedAt: 100,
+        updatedAt: 200,
+        completedAt: 200,
+        artifactCount: 1,
+        events: [],
+      },
+    ])
+    serviceMocks.deleteAgentSessionRuns.mockResolvedValue({
+      sessionId: 'session-delete',
+      deletedRunIds: ['run-delete'],
+    })
+
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignView />)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('delete this design')
+
+    await act(async () => {
+      findButtonByLabelText(container, 'Delete design session')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).not.toContain('delete this design')
+    expect(serviceMocks.deleteAgentSessionRuns).toHaveBeenCalledWith('session-delete')
+
+    act(() => {
+      root?.unmount()
+    })
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(<DesignView />)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).not.toContain('delete this design')
   })
 })
 

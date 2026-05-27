@@ -11,6 +11,7 @@ import {
   type DesignAgentRunEventRecordSnapshot,
   type DesignAgentStreamEvent,
   type DesignAgentRunRecordSnapshot,
+  type DesignDeleteSessionRunsResult,
   type DesignArtifactPatchApplyResult,
   type DesignArtifactExportRequest,
   type DesignArtifactExportResult,
@@ -95,6 +96,9 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
           await this.runEvents.flushAll();
           const records = await this.runs.listRuns();
           return records.map(record => designRunSnapshotFromRecord(record));
+        },
+        deleteAgentSessionRuns: async (sessionId: string): Promise<DesignDeleteSessionRunsResult> => {
+          return this.deleteAgentSessionRuns(sessionId);
         },
         getAgentRun: async (runId: string): Promise<DesignAgentRunRecordSnapshot | null> => {
           await this.recoveredRunsReady;
@@ -266,6 +270,26 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     } catch {
       // Ledger persistence must not break live agent streaming.
     }
+  }
+
+  private async deleteAgentSessionRuns(sessionId: string): Promise<DesignDeleteSessionRunsResult> {
+    await this.recoveredRunsReady;
+    await this.runEvents.flushAll();
+
+    const records = await this.runs.listRuns({ sessionId, limit: Number.MAX_SAFE_INTEGER });
+    for (const record of records) {
+      this.runControl.cancelRun(record.runId);
+      this.sourceIntentIds.delete(record.runId);
+    }
+
+    const deletedRunIds = await this.runs.deleteRunsForSession(sessionId);
+    try {
+      await this.shared.deleteRunProjectionsForSession({ sessionId, pageletId: 'design' });
+    } catch {
+      // Shared projections are a cache; the pagelet ledger deletion is authoritative.
+    }
+
+    return { sessionId, deletedRunIds };
   }
 
   private async publishRunProjection(record: AgentRunRecord, event?: AgentRunEventRecord): Promise<void> {

@@ -3,6 +3,7 @@ import type {
   DesignAgentStreamEvent,
   DesignAgentRunEventRecordSnapshot,
   DesignAgentRunRecordSnapshot,
+  DesignDeleteSessionRunsResult,
   DesignArtifactPatchApplyResult,
   DesignArtifactExportResult,
   DesignExportFormat,
@@ -134,6 +135,12 @@ export class PageletDesignAgentService {
     await waitForDesignPageletReady(signal)
     throwIfAborted(signal)
     return getDesignPageletClient().listAgentRuns()
+  }
+
+  async deleteAgentSessionRuns(sessionId: string, signal?: AbortSignal): Promise<DesignDeleteSessionRunsResult> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().deleteAgentSessionRuns(sessionId)
   }
 
   async getAgentRun(runId: string, signal?: AbortSignal): Promise<DesignAgentRunRecordSnapshot | null> {

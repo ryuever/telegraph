@@ -18,6 +18,7 @@ export interface IDesignPageletService {
   sendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult>;
   cancelAgent(runId: string): Promise<boolean>;
   listAgentRuns(): Promise<DesignAgentRunRecordSnapshot[]>;
+  deleteAgentSessionRuns(sessionId: string): Promise<DesignDeleteSessionRunsResult>;
   getAgentRun(runId: string): Promise<DesignAgentRunRecordSnapshot | null>;
   listAgentRunEvents(runId: string): Promise<DesignAgentRunEventRecordSnapshot[]>;
   listSubagents(): Promise<DesignSubagentRecordSnapshot[]>;
@@ -45,6 +46,11 @@ export interface DesignAgentSendResult {
   runId: string;
   status: 'completed' | 'failed' | 'cancelled';
   error?: string;
+}
+
+export interface DesignDeleteSessionRunsResult {
+  sessionId: string;
+  deletedRunIds: string[];
 }
 
 export interface DesignAgentRunRecordSnapshot {
