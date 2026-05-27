@@ -10,7 +10,14 @@
     "./components/ui/*": "./src/components/ui/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
+    "./theme": "./src/theme/index.ts",
+    "./theme/*": "./src/theme/*.ts",
     "./useOrchestratorDashboard": "./src/hooks/useOrchestratorDashboard.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

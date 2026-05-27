@@ -9,4 +9,5 @@ export default [
   'packages/agent-protocol',
   'packages/orchestrator-core',
   'packages/services',
+  'packages/ui',
 ];

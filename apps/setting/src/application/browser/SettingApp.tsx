@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/browser';
+import { Check, Palette } from 'lucide-react';
 import type {
   StateChangeEvent,
   ConnectionStats,
@@ -8,6 +9,12 @@ import {
   SETTING_PAGELET_SERVICE_PATH,
   ISettingPageletService,
 } from '@/apps/setting/application/common';
+import {
+  TELEGRAPH_THEME_PACKS,
+  type TelegraphThemeId,
+  type TelegraphThemePack,
+  useTelegraphTheme,
+} from '@/packages/ui/theme';
 
 const client = createOrchestratorClient({
   directChannelDescription: 'setting-page↔preload',
@@ -55,6 +62,7 @@ function SettingApp() {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('IDLE');
   const [statusInfo, setStatusInfo] = useState<StatusInfo | null>(null);
+  const { themeId, themePack, setThemeId } = useTelegraphTheme();
 
   const isReady = connectionState === 'READY';
 
@@ -165,6 +173,10 @@ function SettingApp() {
     client.simulateLost();
   }, []);
 
+  const handleThemeChange = useCallback((nextThemeId: TelegraphThemeId) => {
+    setThemeId(nextThemeId);
+  }, [setThemeId]);
+
   const callMethod = useCallback(
     async (method: string, ...args: unknown[]) => {
       if (!isReady) return;
@@ -193,14 +205,14 @@ function SettingApp() {
   );
 
   const stateColor: Record<string, string> = {
-    IDLE: '#6b7280',
-    CONNECTING: '#f59e0b',
-    READY: '#10b981',
-    TRANSIENT_FAILURE: '#ef4444',
-    DISCONNECTING: '#8b5cf6',
-    CLOSED: '#374151',
+    IDLE: 'var(--muted-foreground)',
+    CONNECTING: 'var(--chart-4)',
+    READY: 'var(--accent-mint)',
+    TRANSIENT_FAILURE: 'var(--destructive)',
+    DISCONNECTING: 'var(--accent-lilac)',
+    CLOSED: 'var(--foreground)',
   };
-  const sc = stateColor[connectionState] || '#6b7280';
+  const sc = stateColor[connectionState] || 'var(--muted-foreground)';
 
   const stats = statusInfo?.stats;
 
@@ -276,6 +288,12 @@ function SettingApp() {
           gap: 12,
         }}
       >
+        <ThemeSection
+          currentThemeId={themeId}
+          currentThemeLabel={themePack.label}
+          onThemeChange={handleThemeChange}
+        />
+
         <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
           <div
             style={{
@@ -317,7 +335,7 @@ function SettingApp() {
                 style={{
                   marginTop: 8,
                   fontSize: 11,
-                  color: '#94a3b8',
+                  color: 'var(--muted-foreground)',
                   display: 'grid',
                   gridTemplateColumns: 'auto 1fr',
                   gap: '2px 8px',
@@ -438,8 +456,8 @@ function SettingApp() {
                 fontWeight: 600,
                 border: 'none',
                 borderRadius: 6,
-                backgroundColor: isReady ? '#d1d5db' : '#3b82f6',
-                color: '#fff',
+                backgroundColor: isReady ? 'var(--muted)' : 'var(--primary)',
+                color: isReady ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
                 cursor: isReady ? 'not-allowed' : 'pointer',
               }}
             >
@@ -454,8 +472,8 @@ function SettingApp() {
                 fontWeight: 600,
                 border: 'none',
                 borderRadius: 6,
-                backgroundColor: isReady ? '#ef4444' : '#d1d5db',
-                color: '#fff',
+                backgroundColor: isReady ? 'var(--destructive)' : 'var(--muted)',
+                color: isReady ? 'var(--destructive-foreground)' : 'var(--muted-foreground)',
                 cursor: isReady ? 'pointer' : 'not-allowed',
               }}
             >
@@ -468,10 +486,10 @@ function SettingApp() {
                 padding: '5px 14px',
                 fontSize: 12,
                 fontWeight: 600,
-                border: isReady ? '1px solid #f59e0b' : '1px solid #d1d5db',
+                border: isReady ? '1px solid var(--chart-4)' : '1px solid var(--border)',
                 borderRadius: 6,
-                backgroundColor: isReady ? '#fffbeb' : '#f9fafb',
-                color: isReady ? '#b45309' : '#9ca3af',
+                backgroundColor: isReady ? 'var(--surface-tint)' : 'var(--muted)',
+                color: isReady ? 'var(--foreground)' : 'var(--muted-foreground)',
                 cursor: isReady ? 'pointer' : 'not-allowed',
               }}
             >
@@ -509,7 +527,7 @@ function SettingApp() {
               label="Set Config"
               loading={loading === 'callSharedSetConfig'}
               disabled={!isReady}
-              onClick={() => { void callMethod('callSharedSetConfig', 'theme', 'dark'); }}
+              onClick={() => { void callMethod('callSharedSetConfig', 'theme', themeId); }}
             />
             <ActionBtn
               label="Echo Shared"
@@ -590,7 +608,8 @@ function SettingApp() {
 
         <div
           style={{
-            backgroundColor: '#0f172a',
+            backgroundColor: 'var(--surface-soft)',
+            border: '1px solid var(--border)',
             borderRadius: 8,
             padding: 12,
             flex: 1,
@@ -605,17 +624,17 @@ function SettingApp() {
               marginBottom: 8,
             }}
           >
-            <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
+            <span style={{ fontSize: 11, color: 'var(--muted-foreground)', fontWeight: 600 }}>
               Call Log ({logs.length})
             </span>
             <button
               onClick={() => { setLogs([]); }}
               style={{
                 fontSize: 10,
-                border: '1px solid #374151',
+                border: '1px solid var(--border)',
                 borderRadius: 3,
                 backgroundColor: 'transparent',
-                color: '#6b7280',
+                color: 'var(--muted-foreground)',
                 cursor: 'pointer',
                 padding: '0 6px',
               }}
@@ -626,7 +645,7 @@ function SettingApp() {
           {logs.length === 0 && (
             <div
               style={{
-                color: '#4b5563',
+                color: 'var(--muted-foreground)',
                 textAlign: 'center',
                 padding: 12,
                 fontSize: 12,
@@ -643,20 +662,20 @@ function SettingApp() {
                 gap: 6,
                 fontSize: 11,
                 fontFamily: 'monospace',
-                color: '#d1d5db',
+                color: 'var(--foreground)',
                 padding: '3px 0',
-                borderBottom: '1px solid #1f2937',
+                borderBottom: '1px solid var(--border)',
               }}
             >
               <span
                 style={{
-                  color: l.error ? '#ef4444' : '#10b981',
+                  color: l.error ? 'var(--destructive)' : 'var(--accent-mint)',
                   flexShrink: 0,
                 }}
               >
                 {l.error ? '✗' : '✓'}
               </span>
-              <span style={{ color: '#a78bfa', width: 180, flexShrink: 0 }}>
+              <span style={{ color: 'var(--primary)', width: 180, flexShrink: 0 }}>
                 {l.method}()
               </span>
               <span
@@ -665,12 +684,12 @@ function SettingApp() {
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                  color: l.error ? '#ef4444' : '#94a3b8',
+                  color: l.error ? 'var(--destructive)' : 'var(--muted-foreground)',
                 }}
               >
                 {l.error || l.result}
               </span>
-              <span style={{ color: '#4b5563', flexShrink: 0 }}>
+              <span style={{ color: 'var(--muted-foreground)', flexShrink: 0 }}>
                 {l.latencyMs}ms
               </span>
             </div>
@@ -678,6 +697,216 @@ function SettingApp() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ThemeSection({
+  currentThemeId,
+  currentThemeLabel,
+  onThemeChange,
+}: {
+  currentThemeId: TelegraphThemeId;
+  currentThemeLabel: string;
+  onThemeChange: (themeId: TelegraphThemeId) => void;
+}) {
+  return (
+    <section
+      style={{
+        backgroundColor: 'var(--card)',
+        borderRadius: 'var(--radius)',
+        border: '1px solid var(--border)',
+        padding: 16,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--primary)',
+              backgroundColor: 'var(--primary)',
+              boxShadow: 'var(--shadow-primary-soft)',
+            }}
+          >
+            <Palette size={15} color="var(--primary-foreground)" />
+          </span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>
+              Theme
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 2 }}>
+              {currentThemeLabel}
+            </div>
+          </div>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            border: '1px solid var(--border)',
+            backgroundColor: 'var(--surface-soft)',
+            borderRadius: 999,
+            color: 'var(--muted-foreground)',
+            fontSize: 11,
+            padding: '5px 9px',
+          }}
+        >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: 999,
+              backgroundColor: 'var(--primary)',
+              boxShadow: 'var(--shadow-primary-soft)',
+            }}
+          />
+          Synced
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+          gap: 10,
+        }}
+      >
+        {TELEGRAPH_THEME_PACKS.map(pack => (
+          <ThemeOption
+            key={pack.id}
+            pack={pack}
+            selected={pack.id === currentThemeId}
+            onSelect={onThemeChange}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ThemeOption({
+  pack,
+  selected,
+  onSelect,
+}: {
+  pack: TelegraphThemePack;
+  selected: boolean;
+  onSelect: (themeId: TelegraphThemeId) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-label={`Use ${pack.label} theme`}
+      onClick={() => { onSelect(pack.id); }}
+      style={{
+        display: 'flex',
+        minHeight: 96,
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        justifyContent: 'space-between',
+        gap: 10,
+        textAlign: 'left',
+        borderRadius: 'var(--radius)',
+        border: selected ? '1px solid var(--primary)' : '1px solid var(--border)',
+        backgroundColor: selected ? 'var(--accent)' : 'var(--card)',
+        color: 'var(--foreground)',
+        padding: 11,
+        cursor: 'pointer',
+        boxShadow: selected ? 'var(--shadow-primary-soft)' : 'none',
+      }}
+    >
+      <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ minWidth: 0 }}>
+          <span
+            style={{
+              display: 'block',
+              fontSize: 12,
+              fontWeight: 700,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {pack.label}
+          </span>
+          <span
+            style={{
+              display: 'block',
+              color: 'var(--muted-foreground)',
+              fontSize: 10,
+              marginTop: 2,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {pack.source}
+          </span>
+        </span>
+        {selected && (
+          <span
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: 999,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              backgroundColor: 'var(--primary)',
+              color: 'var(--primary-foreground)',
+            }}
+          >
+            <Check size={13} />
+          </span>
+        )}
+      </span>
+
+      <span
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${String(pack.swatches.length)}, minmax(0, 1fr))`,
+          gap: 4,
+        }}
+      >
+        {pack.swatches.map((swatch, index) => (
+          <span
+            key={`${pack.id}-${swatch}-${String(index)}`}
+            style={{
+              height: 22,
+              borderRadius: 5,
+              backgroundColor: swatch,
+              border: '1px solid var(--border)',
+            }}
+          />
+        ))}
+      </span>
+      <span
+        style={{
+          color: 'var(--muted-foreground)',
+          fontSize: 10.5,
+          lineHeight: 1.35,
+        }}
+      >
+        {pack.description}
+      </span>
+    </button>
   );
 }
 

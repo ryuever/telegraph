@@ -66,10 +66,10 @@ function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside className="flex w-[60px] shrink-0 flex-col items-center border-r border-border bg-card/95">
+      <aside className="flex w-[60px] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar/95 text-sidebar-foreground">
         <div className="flex h-12 w-full items-center justify-center border-b border-border">
           <div
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[0_0_24px_rgba(255,84,54,0.18)]"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-primary/30 bg-primary/10 shadow-[var(--shadow-primary-glow)]"
             title="Telegraph"
           >
             <img src={telegraphIconUrl} alt="Telegraph" className="h-7 w-7 rounded-[5px]" />
@@ -142,11 +142,11 @@ function AppContextBar({
 
   return (
     <header
-      className="relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 shadow-[inset_0_-1px_0_rgba(255,255,255,0.035)]"
+      className="relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 shadow-[inset_0_-1px_0_var(--border)]"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary shadow-[0_0_18px_rgba(255,84,54,0.12)]">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary shadow-[var(--shadow-primary-soft)]">
           <Icon size={15} />
         </div>
         <div className="min-w-0">
