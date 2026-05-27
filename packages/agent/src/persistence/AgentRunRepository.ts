@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
-import { appendFile, readFile, rename, writeFile } from 'node:fs/promises'
+import { appendFile, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentEvent, RuntimeSettings } from '@/packages/agent-protocol'
 
@@ -114,6 +114,8 @@ export interface AgentRunRepository {
   getRun(runId: string): Promise<AgentRunRecord | null>
   listRuns(options?: ListAgentRunsOptions): Promise<AgentRunRecord[]>
   listRunEvents(runId: string): Promise<AgentRunEventRecord[]>
+  deleteRun(runId: string): Promise<boolean>
+  deleteRunsForSession(sessionId: string): Promise<string[]>
   importRunBundle(input: ImportAgentRunBundleInput): Promise<ImportAgentRunBundleResult>
   markRunningRunsRecovered(now?: number): Promise<AgentRunRecord[]>
 }
@@ -231,6 +233,26 @@ export class FileAgentRunRepository implements AgentRunRepository {
       .filter(Boolean)
       .map(line => JSON.parse(line) as AgentRunEventRecord)
       .sort((a, b) => a.seq - b.seq)
+  }
+
+  async deleteRun(runId: string): Promise<boolean> {
+    return this.enqueueRunWrite(runId, async () => {
+      const path = this.runDir(runId)
+      if (!existsSync(path)) return false
+      await rm(path, { recursive: true, force: true })
+      return true
+    })
+  }
+
+  async deleteRunsForSession(sessionId: string): Promise<string[]> {
+    const records = await this.listRuns({ sessionId, limit: Number.MAX_SAFE_INTEGER })
+    const deletedRunIds: string[] = []
+    for (const record of records) {
+      if (await this.deleteRun(record.runId)) {
+        deletedRunIds.push(record.runId)
+      }
+    }
+    return deletedRunIds
   }
 
   async importRunBundle(input: ImportAgentRunBundleInput): Promise<ImportAgentRunBundleResult> {

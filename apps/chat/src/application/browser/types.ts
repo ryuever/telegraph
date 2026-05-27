@@ -4,6 +4,7 @@ import type {
   ChatAgentRunRecordSnapshot,
   ChatAgentRunStatus,
   ChatConversation,
+  ChatDeleteSessionRunsResult,
   ChatPermissionRequestSnapshot,
   ChatPermissionResolution,
   ChatRunTraceBundle,
@@ -18,6 +19,7 @@ import type { AgentRunReplaySource } from '@/packages/agent/persistence/AgentRun
 export type { LlmTracePayload, ChatMessage, ChatConversation, ChatToolCall, ChatRole, ChatMessageStatus } from '@/apps/chat/application/common'
 export type { ChatSubagent, ChatSubagentGroup, ChatSubagentRecordSnapshot, ChatSubagentStatus, ChatSubagentUpdate } from '@/apps/chat/application/common'
 export type { ChatAgentRunEventRecordSnapshot, ChatAgentRunRecordSnapshot, ChatAgentRunStatus } from '@/apps/chat/application/common'
+export type { ChatDeleteSessionRunsResult } from '@/apps/chat/application/common'
 export type { ChatRuntimeCapabilityDescriptorSnapshot } from '@/apps/chat/application/common'
 export type { ChatRunTraceBundle, ChatRunTraceImportResult } from '@/apps/chat/application/common'
 export type { ChatPermissionRequestSnapshot, ChatPermissionResolution } from '@/apps/chat/application/common'
@@ -38,6 +40,7 @@ export type AgentSendOptions = {
 export interface AgentService {
   send(opts: AgentSendOptions): Promise<void>
   listRuns?(options?: { sessionId?: string; status?: ChatAgentRunStatus; limit?: number; offset?: number; signal?: AbortSignal }): Promise<ChatAgentRunRecordSnapshot[]>
+  deleteSessionRuns?(sessionId: string, signal?: AbortSignal): Promise<ChatDeleteSessionRunsResult>
   getRun?(runId: string, signal?: AbortSignal): Promise<ChatAgentRunRecordSnapshot | null>
   listRunEvents?(runId: string, signal?: AbortSignal): Promise<ChatAgentRunEventRecordSnapshot[]>
   listRuntimeCapabilities?(signal?: AbortSignal): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>

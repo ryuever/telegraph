@@ -77,6 +77,41 @@ describe('FileAgentRunRepository', () => {
     }
   })
 
+  it('deletes all run records and events for a session', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'telegraph-runs-'))
+    try {
+      const repo = new FileAgentRunRepository(dir)
+      await repo.createRun({
+        runId: 'run-delete-1',
+        sessionId: 'session-delete',
+        runtimeId: 'pi-ai',
+        now: 100,
+      })
+      await repo.createRun({
+        runId: 'run-delete-2',
+        sessionId: 'session-delete',
+        runtimeId: 'pi-ai',
+        now: 101,
+      })
+      await repo.createRun({
+        runId: 'run-keep',
+        sessionId: 'session-keep',
+        runtimeId: 'pi-ai',
+        now: 102,
+      })
+      await repo.appendEvent('run-delete-1', assistantDelta('run-delete-1', 'bye', 110))
+
+      await expect(repo.deleteRunsForSession('session-delete')).resolves.toEqual(['run-delete-2', 'run-delete-1'])
+
+      expect(await repo.listRuns({ sessionId: 'session-delete' })).toEqual([])
+      expect(await repo.getRun('run-delete-1')).toBeNull()
+      expect(await repo.listRunEvents('run-delete-1')).toEqual([])
+      expect((await repo.listRuns({ sessionId: 'session-keep' })).map(run => run.runId)).toEqual(['run-keep'])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('serializes concurrent event appends for one run', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'telegraph-runs-'))
     try {

@@ -83,6 +83,7 @@ export class SharedWorker implements ISharedWorker {
       registerRunProjection: this.runBroker.registerRunProjection.bind(this.runBroker),
       listRunProjections: this.runBroker.listRunProjections.bind(this.runBroker),
       getRunProjection: this.runBroker.getRunProjection.bind(this.runBroker),
+      deleteRunProjectionsForSession: this.runBroker.deleteRunProjectionsForSession.bind(this.runBroker),
       listRunProjectionChanges: this.runBroker.listRunProjectionChanges.bind(this.runBroker),
       subscribeRunProjections: this.runBroker.subscribeRunProjections.bind(this.runBroker),
       requestApproval: this.runBroker.requestApproval.bind(this.runBroker),

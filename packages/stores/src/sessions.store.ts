@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { SessionsStore, SessionsState } from './types'
-import { persistSessions, loadPersistentSessions } from './persistence'
+import { clearDeletedSession, isSessionDeleted, markSessionDeleted, persistSessions, loadPersistentSessions } from './persistence'
 import { removeSessionStore } from './session.store'
 
 function uid(prefix = '') {
@@ -11,11 +11,11 @@ const persistent = loadPersistentSessions()
 
 function getInitialState(): SessionsState {
   // If we have persistent data, use it
-  if (persistent?.sessions && persistent.sessions.length > 0) {
+  if (persistent?.sessions && Array.isArray(persistent.sessions)) {
     const ids = new Set(persistent.sessions.map((s) => s.id))
-    let active = persistent.activeSessionId ?? persistent.sessions[0].id
-    if (!ids.has(active)) {
-      active = persistent.sessions[0].id
+    let active = persistent.activeSessionId ?? persistent.sessions[0]?.id ?? null
+    if (active && !ids.has(active)) {
+      active = persistent.sessions[0]?.id ?? null
     }
     return {
       sessions: persistent.sessions,
@@ -43,6 +43,7 @@ export const useSessionsStore = create<SessionsStore>((set) => {
     createSession: () => {
       const id = uid('s_')
       const now = Date.now()
+      clearDeletedSession(id)
 
       set((state) => {
         const next: SessionsState = {
@@ -58,6 +59,8 @@ export const useSessionsStore = create<SessionsStore>((set) => {
 
     upsertSession: (id: string, title: string) =>
       set((state) => {
+        if (isSessionDeleted(id)) return state
+
         const now = Date.now()
         const existing = state.sessions.find(session => session.id === id)
         const sessions = existing
@@ -73,6 +76,7 @@ export const useSessionsStore = create<SessionsStore>((set) => {
 
     deleteSession: (id: string) =>
       set((state) => {
+        markSessionDeleted(id)
         removeSessionStore(id)
 
         const next = state.sessions.filter((s) => s.id !== id)
@@ -110,6 +114,9 @@ export const useSessionsStore = create<SessionsStore>((set) => {
 
     loadSessions: (sessions) =>
       set((state) => {
+        for (const session of sessions) {
+          clearDeletedSession(session.id)
+        }
         const result: SessionsState = { ...state, sessions }
         persistSessions(result)
         return result

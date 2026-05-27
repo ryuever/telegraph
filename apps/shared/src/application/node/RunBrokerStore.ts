@@ -7,6 +7,7 @@ import {
   type CreateRunControlCommandInput,
   type CreateRunIntentInput,
   type DecideApprovalInput,
+  type DeleteRunProjectionsForSessionInput,
   type ListApprovalChangesOptions,
   type ListApprovalRequestsOptions,
   type ListRunControlCommandsOptions,
@@ -140,6 +141,42 @@ export class RunBrokerStore {
   getRunProjection(runId: string): RunProjectionRecord | null {
     const record = this.projections.get(runId);
     return record ? clone(record) : null;
+  }
+
+  deleteRunProjection(runId: string): RunProjectionRecord | null {
+    const record = this.projections.get(runId);
+    if (!record) return null;
+    this.projections.delete(runId);
+    this.projectionHistory.delete(runId);
+    for (const [approvalId, approval] of this.approvals) {
+      if (approval.runId === runId) this.approvals.delete(approvalId);
+    }
+    this.approvalHistory.splice(
+      0,
+      this.approvalHistory.length,
+      ...this.approvalHistory.filter(event => event.runId !== runId),
+    );
+    for (const [commandId, command] of this.runControlCommands) {
+      if (command.runId === runId) this.runControlCommands.delete(commandId);
+    }
+    this.runControlHistory.splice(
+      0,
+      this.runControlHistory.length,
+      ...this.runControlHistory.filter(event => event.runId !== runId),
+    );
+    this.persist();
+    return clone(record);
+  }
+
+  deleteRunProjectionsForSession(input: DeleteRunProjectionsForSessionInput): RunProjectionRecord[] {
+    const deleted: RunProjectionRecord[] = [];
+    for (const record of Array.from(this.projections.values())) {
+      if (record.sessionId !== input.sessionId) continue;
+      if (input.pageletId && record.pageletId !== input.pageletId) continue;
+      const removed = this.deleteRunProjection(record.runId);
+      if (removed) deleted.push(removed);
+    }
+    return deleted;
   }
 
   listRunProjectionChanges(options: ListRunProjectionChangesOptions = {}): RunProjectionChangeEvent[] {

@@ -30,6 +30,7 @@ export type {
 export type {
   ClaimRunIntentInput,
   CreateRunIntentInput,
+  DeleteRunProjectionsForSessionInput,
   ListRunIntentsOptions,
   ListRunProjectionChangesOptions,
   ListRunProjectionsOptions,

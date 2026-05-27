@@ -14,6 +14,7 @@ const unsubscribe = vi.fn()
 const sendMock = vi.fn((_: ChatSendRequest): Promise<ChatSendResult> => new Promise<ChatSendResult>(() => {}))
 const cancelMock = vi.fn(() => Promise.resolve(true))
 const listRunsMock = vi.fn(() => Promise.resolve([]))
+const deleteSessionRunsMock = vi.fn((sessionId: string) => Promise.resolve({ sessionId, deletedRunIds: [] }))
 const getRunMock = vi.fn(() => Promise.resolve(null))
 const listRunEventsMock = vi.fn(() => Promise.resolve([]))
 const listRuntimeCapabilitiesMock = vi.fn(() => Promise.resolve([]))
@@ -32,6 +33,7 @@ const client: IChatPageletService = {
   send: sendMock,
   cancel: cancelMock,
   listRuns: listRunsMock,
+  deleteSessionRuns: deleteSessionRunsMock,
   getRun: getRunMock,
   listRunEvents: listRunEventsMock,
   listRuntimeCapabilities: listRuntimeCapabilitiesMock,
@@ -215,6 +217,7 @@ describe('PageletAgentService', () => {
     const service = new PageletAgentService()
 
     await expect(service.listRuns({ sessionId: 'session-1', limit: 10 })).resolves.toEqual([])
+    await expect(service.deleteSessionRuns('session-1')).resolves.toEqual({ sessionId: 'session-1', deletedRunIds: [] })
     await expect(service.getRun('run-1')).resolves.toBeNull()
     await expect(service.listRunEvents('run-1')).resolves.toEqual([])
 
@@ -224,6 +227,7 @@ describe('PageletAgentService', () => {
       limit: 10,
       offset: undefined,
     })
+    expect(deleteSessionRunsMock).toHaveBeenCalledWith('session-1')
     expect(getRunMock).toHaveBeenCalledWith('run-1')
     expect(listRunEventsMock).toHaveBeenCalledWith('run-1')
   })

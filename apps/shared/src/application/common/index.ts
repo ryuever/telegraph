@@ -9,6 +9,7 @@ import type {
   CreateRunControlCommandInput,
   CreateRunIntentInput,
   DecideApprovalInput,
+  DeleteRunProjectionsForSessionInput,
   ListApprovalChangesOptions,
   ListApprovalRequestsOptions,
   ListRunControlCommandsOptions,
@@ -33,6 +34,7 @@ export type {
   CreateApprovalRequestInput,
   CreateRunControlCommandInput,
   CreateRunIntentInput,
+  DeleteRunProjectionsForSessionInput,
   DecideApprovalInput,
   EventCursor,
   ListApprovalChangesOptions,
@@ -77,6 +79,7 @@ export interface ISharedService {
   registerRunProjection(input: RegisterRunProjectionInput): Promise<RunProjectionRecord>;
   listRunProjections(options?: ListRunProjectionsOptions): Promise<RunProjectionRecord[]>;
   getRunProjection(runId: string): Promise<RunProjectionRecord | null>;
+  deleteRunProjectionsForSession(input: DeleteRunProjectionsForSessionInput): Promise<RunProjectionRecord[]>;
   listRunProjectionChanges(options?: ListRunProjectionChangesOptions): Promise<RunProjectionChangeEvent[]>;
   subscribeRunProjections(callback: (event: RunProjectionChangeEvent) => void): EventSubscription;
   requestApproval(input: CreateApprovalRequestInput): Promise<ApprovalRequestRecord>;

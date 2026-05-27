@@ -94,6 +94,11 @@ export interface ChatRunTraceBundle {
 
 export type ChatRunTraceImportResult = ImportAgentRunBundleResult
 
+export interface ChatDeleteSessionRunsResult {
+  sessionId: string
+  deletedRunIds: string[]
+}
+
 export interface ChatPermissionRequestSnapshot {
   id: string
   runId: string
@@ -186,6 +191,7 @@ export interface IChatPageletService {
     limit?: number
     offset?: number
   }): Promise<ChatAgentRunRecordSnapshot[]>
+  deleteSessionRuns(sessionId: string): Promise<ChatDeleteSessionRunsResult>
   getRun(runId: string): Promise<ChatAgentRunRecordSnapshot | null>
   listRunEvents(runId: string): Promise<ChatAgentRunEventRecordSnapshot[]>
   listRuntimeCapabilities(): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>

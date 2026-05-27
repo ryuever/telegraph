@@ -11,6 +11,7 @@ import {
   type ChatPermissionRequestSnapshot,
   type ChatPermissionResolution,
   type ChatRuntimeCapabilityDescriptorSnapshot,
+  type ChatDeleteSessionRunsResult,
   type ChatSendRequest,
   type ChatSendResult,
   type ChatRunTraceBundle,
@@ -73,6 +74,7 @@ interface ChatRunBrokerService {
   subscribeApprovals(callback: (event: ApprovalRequestChangeEvent) => void): { unsubscribe(): void };
   subscribeRunControlCommands(callback: (event: RunControlCommandChangeEvent) => void): { unsubscribe(): void };
   markRunControlCommandApplied(commandId: string, now?: number): Promise<unknown>;
+  deleteRunProjectionsForSession(input: { sessionId: string; pageletId?: string }): Promise<unknown>;
 }
 
 @injectable()
@@ -128,6 +130,10 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
           await this.recoveredRunsReady;
           await this.runEvents.flushAll();
           return this.runs.listRuns(options);
+        },
+
+        deleteSessionRuns: async (sessionId: string): Promise<ChatDeleteSessionRunsResult> => {
+          return this.deleteSessionRuns(sessionId);
         },
 
         getRun: async (runId: string): Promise<ChatAgentRunRecordSnapshot | null> => {
@@ -337,6 +343,31 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       this.resolvePendingPermissionsForRun(runId, denyDecision('Run failed before permission was resolved'));
       return { runId, status: 'failed', error: errorMsg };
     }
+  }
+
+  private async deleteSessionRuns(sessionId: string): Promise<ChatDeleteSessionRunsResult> {
+    await this.recoveredRunsReady;
+    await this.runEvents.flushAll();
+
+    const runs = await this.runs.listRuns({ sessionId, limit: Number.MAX_SAFE_INTEGER });
+    for (const run of runs) {
+      const controller = activeRuns.get(run.runId);
+      if (controller) {
+        controller.abort();
+        activeRuns.delete(run.runId);
+      }
+      this.sourceIntentIds.delete(run.runId);
+      this.resolvePendingPermissionsForRun(run.runId, denyDecision('Chat session was deleted'));
+    }
+
+    const deletedRunIds = await this.runs.deleteRunsForSession(sessionId);
+    try {
+      await this.shared.deleteRunProjectionsForSession({ sessionId, pageletId: 'chat' });
+    } catch {
+      // Shared projections are a cache; the pagelet ledger deletion is authoritative.
+    }
+
+    return { sessionId, deletedRunIds };
   }
 
   private messagesForRun(req: ChatSendRequest): RuntimeMessage[] {

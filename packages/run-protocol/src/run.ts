@@ -78,6 +78,11 @@ export interface ListRunProjectionChangesOptions {
   limit?: number;
 }
 
+export interface DeleteRunProjectionsForSessionInput {
+  sessionId: string;
+  pageletId?: string;
+}
+
 export interface RunProjectionRecord {
   runId: string;
   sessionId?: string;

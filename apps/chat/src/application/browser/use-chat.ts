@@ -242,6 +242,9 @@ export function useChat({ agent, onLlmTrace, onPermissionRequest }: UseChatOptio
     (id: string) => {
       sendChainsRef.current.delete(id)
       deleteSession(id)
+      void agentRef.current.deleteSessionRuns?.(id).catch(() => {
+        // Session deletion is local and immediate; run-log cleanup is best effort.
+      })
     },
     [deleteSession]
   )

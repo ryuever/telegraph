@@ -14,7 +14,7 @@ import {
   type LlmTraceRow,
 } from '../llm-trace-store'
 import { useChat } from '../use-chat'
-import { getSessionStore, useSessionsStore } from '@/packages/stores'
+import { getSessionStore, isSessionDeleted, loadDeletedSessionIds, useSessionsStore } from '@/packages/stores'
 import { PageletAgentService } from '../pagelet-agent-service'
 import { createChatAgentEventProjectionState, projectAgentEventToChat } from '../agent-event-projector'
 import { upsertToolCall } from '../chat-tool-calls'
@@ -149,6 +149,17 @@ export function ChatPanel({ agent }: Props) {
     return () => { controller.abort(); }
   }, [agentService, settingsOpen])
 
+  useEffect(() => {
+    if (!agentService.deleteSessionRuns) return
+    const controller = new AbortController()
+    for (const sessionId of loadDeletedSessionIds()) {
+      void agentService.deleteSessionRuns(sessionId, controller.signal).catch(() => {
+        // Cleanup is retried on the next ChatPanel mount.
+      })
+    }
+    return () => { controller.abort(); }
+  }, [agentService])
+
   const rememberPermissionRequest = useCallback((request: ChatPermissionRequestSnapshot) => {
     setPendingPermissions(prev => {
       const next = prev.filter(item => item.id !== request.id)
@@ -212,6 +223,7 @@ export function ChatPanel({ agent }: Props) {
 
     const ensureRemoteRun = (event: ChatStreamEvent) => {
       if (!event.sourceIntentId || !event.sessionId || !event.message) return undefined
+      if (isSessionDeleted(event.sessionId)) return undefined
       const existing = remoteRuns.get(event.runId)
       if (existing) return existing
 
@@ -358,6 +370,7 @@ export function ChatPanel({ agent }: Props) {
       for (const run of runs.filter(isRemoteChatRun)) {
         const message = run.input?.message ?? run.inputPreview
         if (!message) continue
+        if (isSessionDeleted(run.sessionId)) continue
 
         const title = deriveRemoteTitle(message)
         useSessionsStore.getState().upsertSession(run.sessionId, title)
@@ -557,6 +570,16 @@ export function ChatPanel({ agent }: Props) {
     clearLlmTraceRowsForSession(activeId)
   }, [activeId])
 
+  const handleDeleteConversation = useCallback((id: string) => {
+    deleteConversation(id)
+    clearLlmTraceRowsForSession(id)
+    setPersistedRuns(prev => prev.filter(run => run.sessionId !== id))
+    if (selectedPersistedSessionId === id) {
+      setSelectedPersistedSessionId(null)
+      setSelectedRunRows([])
+    }
+  }, [deleteConversation, selectedPersistedSessionId])
+
   const composerSessionId = useSessionsStore((s: { activeSessionId: string | null }) => s.activeSessionId)
   const composerKey = composerSessionId ?? ''
 
@@ -590,7 +613,7 @@ export function ChatPanel({ agent }: Props) {
           collapsed={collapsed}
           onSelect={setActiveId}
           onCreate={createConversation}
-          onDelete={deleteConversation}
+          onDelete={handleDeleteConversation}
           onRename={renameConversation}
           onToggleCollapse={() => { setCollapsed(c => !c); }}
         />

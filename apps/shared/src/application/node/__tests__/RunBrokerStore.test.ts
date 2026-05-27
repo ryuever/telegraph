@@ -151,6 +151,58 @@ describe('RunBrokerStore', () => {
     ]);
   });
 
+  it('deletes run projections for one session and pagelet', () => {
+    const store = new RunBrokerStore();
+    store.registerRunProjection({
+      runId: 'chat-run-delete',
+      sessionId: 'session-delete',
+      pageletId: 'chat',
+      status: 'completed',
+      updatedAt: 100,
+    });
+    store.registerRunProjection({
+      runId: 'design-run-keep',
+      sessionId: 'session-delete',
+      pageletId: 'design',
+      status: 'completed',
+      updatedAt: 101,
+    });
+    store.registerRunProjection({
+      runId: 'chat-run-keep',
+      sessionId: 'session-keep',
+      pageletId: 'chat',
+      status: 'completed',
+      updatedAt: 102,
+    });
+    store.requestApproval({
+      approvalId: 'approval-delete',
+      runId: 'chat-run-delete',
+      source: desktopActor,
+      kind: 'tool',
+      title: 'Delete me too',
+      now: 103,
+    });
+    store.requestRunControlCommand({
+      commandId: 'command-delete',
+      runId: 'chat-run-delete',
+      kind: 'stop',
+      requestedBy: desktopActor,
+      now: 104,
+    });
+
+    const deleted = store.deleteRunProjectionsForSession({ sessionId: 'session-delete', pageletId: 'chat' });
+
+    expect(deleted.map(run => run.runId)).toEqual(['chat-run-delete']);
+    expect(store.getRunProjection('chat-run-delete')).toBeNull();
+    expect(store.listRunProjectionChanges({ runId: 'chat-run-delete' })).toEqual([]);
+    expect(store.listApprovals({ runId: 'chat-run-delete' })).toEqual([]);
+    expect(store.listApprovalChanges({ runId: 'chat-run-delete' })).toEqual([]);
+    expect(store.listRunControlCommands({ runId: 'chat-run-delete' })).toEqual([]);
+    expect(store.listRunControlChanges({ runId: 'chat-run-delete' })).toEqual([]);
+    expect(store.listRunProjections({ sessionId: 'session-delete' }).map(run => run.runId)).toEqual(['design-run-keep']);
+    expect(store.listRunProjections({ pageletId: 'chat' }).map(run => run.runId)).toEqual(['chat-run-keep']);
+  });
+
   it('tracks approval requests and decisions', () => {
     const store = new RunBrokerStore();
     const events: string[] = [];

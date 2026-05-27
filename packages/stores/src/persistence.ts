@@ -3,6 +3,7 @@ import type { ChatMessage, SessionsState } from './types'
 const SESSIONS_KEY = 'telegraph:sessions'
 const ACTIVE_SESSION_KEY = 'telegraph:activeSessionId'
 const MESSAGES_KEY_PREFIX = 'telegraph:messages:'
+const DELETED_SESSION_IDS_KEY = 'telegraph:deletedSessionIds'
 
 /**
  * Persisted threads are always loaded cold: `pending` / `streaming` assistant rows are stale
@@ -40,6 +41,42 @@ export function loadPersistentSessions(): SessionsState | null {
   } catch (err) {
     console.error('Failed to load persistent sessions:', err)
     return null
+  }
+}
+
+export function loadDeletedSessionIds(): string[] {
+  try {
+    const data = localStorage.getItem(DELETED_SESSION_IDS_KEY)
+    if (!data) return []
+    const ids = JSON.parse(data) as unknown
+    if (!Array.isArray(ids)) return []
+    return ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+  } catch (err) {
+    console.error('Failed to load deleted session ids:', err)
+    return []
+  }
+}
+
+export function isSessionDeleted(sessionId: string): boolean {
+  return loadDeletedSessionIds().includes(sessionId)
+}
+
+export function markSessionDeleted(sessionId: string) {
+  try {
+    const ids = new Set(loadDeletedSessionIds())
+    ids.add(sessionId)
+    localStorage.setItem(DELETED_SESSION_IDS_KEY, JSON.stringify([...ids]))
+  } catch (err) {
+    console.error(`Failed to mark session ${sessionId} deleted:`, err)
+  }
+}
+
+export function clearDeletedSession(sessionId: string) {
+  try {
+    const ids = loadDeletedSessionIds().filter(id => id !== sessionId)
+    localStorage.setItem(DELETED_SESSION_IDS_KEY, JSON.stringify(ids))
+  } catch (err) {
+    console.error(`Failed to clear deleted marker for session ${sessionId}:`, err)
   }
 }
 

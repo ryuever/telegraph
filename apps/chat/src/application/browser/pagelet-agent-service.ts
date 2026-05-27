@@ -13,6 +13,7 @@ import {
   type ChatRuntimeCapabilityDescriptorSnapshot,
   type ChatAgentRunStatus,
   type ChatSubagentRecordSnapshot,
+  type ChatDeleteSessionRunsResult,
 } from '@/apps/chat/application/common'
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
@@ -215,6 +216,12 @@ export class PageletAgentService implements AgentService {
       limit: options.limit,
       offset: options.offset,
     })
+  }
+
+  async deleteSessionRuns(sessionId: string, signal?: AbortSignal): Promise<ChatDeleteSessionRunsResult> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().deleteSessionRuns(sessionId)
   }
 
   async getRun(runId: string, signal?: AbortSignal): Promise<ChatAgentRunRecordSnapshot | null> {
