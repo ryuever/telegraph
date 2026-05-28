@@ -12,6 +12,11 @@ export { WindowManagerId };
 const WINDOW_BACKGROUND_COLOR = '#080d17';
 const WINDOW_ACCENT_COLOR = '#ff5436';
 const APP_ICON_PATH = join(app.getAppPath(), 'assets/icons/icon.png');
+const DEFAULT_WINDOW_THEME: MainWindowThemePayload = {
+  mode: 'dark',
+  backgroundColor: WINDOW_BACKGROUND_COLOR,
+  accentColor: WINDOW_ACCENT_COLOR,
+};
 
 @injectable()
 export class WindowManager implements IWindowManager {
@@ -19,6 +24,7 @@ export class WindowManager implements IWindowManager {
   private settingWindow: BrowserWindow | null = null;
   private settingWindowCallbacks: ((win: BrowserWindow) => void)[] = [];
   private switchPageCallback: ((pageId: string, payload?: MainSwitchPagePayload) => void) | null = null;
+  private currentWindowTheme = DEFAULT_WINDOW_THEME;
 
   openMainWindow(): BrowserWindow {
     this.applyNativeWindowTheme();
@@ -28,9 +34,9 @@ export class WindowManager implements IWindowManager {
       height: 750,
       title: 'Telegraph',
       icon: APP_ICON_PATH,
-      backgroundColor: WINDOW_BACKGROUND_COLOR,
-      accentColor: WINDOW_ACCENT_COLOR,
-      darkTheme: true,
+      backgroundColor: this.currentWindowTheme.backgroundColor,
+      accentColor: this.currentWindowTheme.accentColor,
+      darkTheme: this.currentWindowTheme.mode === 'dark',
       webPreferences: {
         preload: join(__dirname, '../preload/preload.js'),
         contextIsolation: true,
@@ -97,9 +103,9 @@ export class WindowManager implements IWindowManager {
       parent: this.mainWindow || undefined,
       title: 'Settings',
       icon: APP_ICON_PATH,
-      backgroundColor: WINDOW_BACKGROUND_COLOR,
-      accentColor: WINDOW_ACCENT_COLOR,
-      darkTheme: true,
+      backgroundColor: this.currentWindowTheme.backgroundColor,
+      accentColor: this.currentWindowTheme.accentColor,
+      darkTheme: this.currentWindowTheme.mode === 'dark',
       webPreferences: {
         preload: join(__dirname, '../preload/setting-preload.js'),
         contextIsolation: true,
@@ -126,6 +132,7 @@ export class WindowManager implements IWindowManager {
   }
 
   applyWindowTheme(theme: MainWindowThemePayload): void {
+    this.currentWindowTheme = theme;
     try {
       nativeTheme.themeSource = theme.mode;
       this.applyBrowserWindowTheme(this.mainWindow, theme);
@@ -148,7 +155,7 @@ export class WindowManager implements IWindowManager {
   }
 
   private applyNativeWindowTheme(): void {
-    nativeTheme.themeSource = 'dark';
+    nativeTheme.themeSource = this.currentWindowTheme.mode;
     if (process.platform === 'darwin') {
       const appIcon = nativeImage.createFromPath(APP_ICON_PATH);
       if (!appIcon.isEmpty()) {
