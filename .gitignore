@@ -12,5 +12,8 @@ out/
 .vitepress/cache/
 .vitepress/dist/
 apps/mobile/.expo/
+# Expo CNG output; regenerate with `pnpm generate:mobile`.
+apps/mobile/android/
+apps/mobile/ios/
 apps/telegraph/resources/pi-runtime/bin/pi
 apps/telegraph/resources/pi-runtime/bin/pi.exe

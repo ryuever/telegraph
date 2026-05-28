@@ -12,11 +12,19 @@ export { WindowManagerId };
 const WINDOW_BACKGROUND_COLOR = '#080d17';
 const WINDOW_ACCENT_COLOR = '#ff5436';
 const APP_ICON_PATH = join(app.getAppPath(), 'assets/icons/icon.png');
+const MAIN_WINDOW_RENDERER_NAME = 'main_window';
 const DEFAULT_WINDOW_THEME: MainWindowThemePayload = {
   mode: 'dark',
   backgroundColor: WINDOW_BACKGROUND_COLOR,
   accentColor: WINDOW_ACCENT_COLOR,
 };
+
+export function resolveMainWindowRendererHtmlPath(
+  fileName: 'index.html' | 'setting.html',
+  mainBundleDir = __dirname,
+): string {
+  return join(mainBundleDir, '../renderer', MAIN_WINDOW_RENDERER_NAME, fileName);
+}
 
 @injectable()
 export class WindowManager implements IWindowManager {
@@ -48,7 +56,7 @@ export class WindowManager implements IWindowManager {
     if (devServerUrl) {
       void this.mainWindow.loadURL(devServerUrl);
     } else {
-      void this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+      void this.mainWindow.loadFile(resolveMainWindowRendererHtmlPath('index.html'));
     }
 
     this.setupApplicationMenu();
@@ -117,7 +125,7 @@ export class WindowManager implements IWindowManager {
     if (devServerUrl) {
       void this.settingWindow.loadURL(`${devServerUrl}/setting.html`);
     } else {
-      void this.settingWindow.loadFile(join(__dirname, '../renderer/setting.html'));
+      void this.settingWindow.loadFile(resolveMainWindowRendererHtmlPath('setting.html'));
     }
 
     for (const cb of this.settingWindowCallbacks) {

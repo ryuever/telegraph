@@ -394,7 +394,7 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                   >
                     <div
                       className={cn(
-                        'grid min-h-14 w-full grid-cols-[24px_minmax(0,1fr)_82px_64px_32px] items-center px-3 transition-colors',
+                        'grid min-h-10 w-full grid-cols-[24px_minmax(0,1fr)_82px_64px_32px] items-center px-3 transition-colors',
                         containsSelectedRun ? 'bg-surface-soft/70' : 'hover:bg-muted/35',
                       )}
                     >
@@ -414,22 +414,13 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedRunKey(session.latestRunKey)
-                        }}
-                        className="col-span-3 grid h-full min-w-0 grid-cols-[minmax(0,1fr)_82px_64px] items-center text-left"
+                        onClick={() => { toggleSession(session.key); }}
+                        className="col-span-3 grid h-full min-w-0 cursor-pointer grid-cols-[minmax(0,1fr)_82px_64px] items-center text-left"
                         title={session.title}
                       >
                         <span className="min-w-0 pr-3">
                           <span className="block truncate text-[13px] font-semibold text-foreground">
                             {session.title}
-                          </span>
-                          <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-                            <span className="truncate">{shortId(session.sessionId)}</span>
-                            <span className="shrink-0">·</span>
-                            <span className="shrink-0">{session.runCount} {session.runCount === 1 ? 'run' : 'runs'}</span>
-                            <span className="shrink-0">·</span>
-                            <span className="truncate">Last {formatTime(session.updatedAt)}</span>
                           </span>
                         </span>
                         <StatusPill status={session.status} />
@@ -465,16 +456,20 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                               type="button"
                               onClick={() => { setSelectedRunKey(runKey(run)); }}
                               className={cn(
-                                'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_82px_64px_32px] items-center px-3 text-left transition-colors',
+                                'grid min-h-9 w-full grid-cols-[40px_minmax(0,1fr)_82px_64px_32px] items-center px-3 text-left transition-colors',
                                 selected ? 'bg-background' : 'hover:bg-background/75',
                               )}
                             >
-                              <span className="min-w-0 py-1 pl-6 pr-3">
-                                <span className="block truncate text-[13px] font-medium text-foreground">
+                              <span className="flex h-full items-center justify-end pr-2">
+                                <span className={cn(
+                                  'h-1.5 w-1.5 rounded-full',
+                                  selected ? 'bg-primary' : 'bg-muted-foreground/40',
+                                )}
+                                />
+                              </span>
+                              <span className="min-w-0 pr-3">
+                                <span className="block truncate text-[12.5px] font-medium text-foreground">
                                   {run.inputPreview || run.runId}
-                                </span>
-                                <span className="mt-1 block truncate text-[11px] text-muted-foreground">
-                                  {run.runId} · {formatTime(run.updatedAt)}
                                 </span>
                               </span>
                               <StatusPill status={run.status} />

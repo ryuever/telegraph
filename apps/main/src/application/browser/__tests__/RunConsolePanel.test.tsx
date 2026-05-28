@@ -456,10 +456,8 @@ describe('RunConsolePanel interaction', () => {
     const parentButtons = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[aria-expanded]'))
     expect(parentButtons).toHaveLength(2)
     expect(parentButtons.every(button => button.getAttribute('aria-expanded') === 'false')).toBe(true)
-    expect(panel.textContent).toContain('session-shared')
-    expect(panel.textContent).toContain('2 runs')
-    expect(panel.textContent).not.toContain('run-shared-1')
-    expect(panel.textContent).not.toContain('run-shared-2')
+    expect(panel.textContent).toContain('First turn')
+    expect(panel.textContent).not.toContain('Follow up')
 
     const sharedParent = parentButtons.find(button => button.getAttribute('aria-label')?.includes('session-shared'))
     expect(sharedParent).toBeDefined()
@@ -470,8 +468,8 @@ describe('RunConsolePanel interaction', () => {
     })
 
     expect(sharedParent?.getAttribute('aria-expanded')).toBe('true')
-    expect(panel.textContent).toContain('run-shared-1')
-    expect(panel.textContent).toContain('run-shared-2')
+    expect(panel.textContent).toContain('First turn')
+    expect(panel.textContent).toContain('Follow up')
 
     await act(async () => {
       sharedParent?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -479,10 +477,8 @@ describe('RunConsolePanel interaction', () => {
     })
 
     expect(sharedParent?.getAttribute('aria-expanded')).toBe('false')
-    expect(panel.textContent).toContain('session-shared')
-    expect(panel.textContent).toContain('2 runs')
-    expect(panel.textContent).not.toContain('run-shared-1')
-    expect(panel.textContent).not.toContain('run-shared-2')
+    expect(panel.textContent).toContain('First turn')
+    expect(panel.textContent).not.toContain('Follow up')
   })
 
   it('deletes a session item from the run tree', async () => {
@@ -544,6 +540,64 @@ describe('RunConsolePanel interaction', () => {
     expect(panel.textContent).not.toContain('Delete me')
     expect(panel.textContent).not.toContain('session-delete')
     expect(panel.textContent).toContain('Keep me')
+  })
+
+  it('toggles a session row without selecting its latest run', async () => {
+    serviceMocks.listRuns.mockResolvedValue([
+      {
+        runId: 'run-latest',
+        sessionId: 'session-latest',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'Latest session' },
+        inputPreview: 'Latest session',
+        eventCount: 1,
+        createdAt: 10,
+        startedAt: 10,
+        completedAt: 11,
+        lastEventAt: 11,
+      },
+      {
+        runId: 'run-older',
+        sessionId: 'session-older',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'Older session' },
+        inputPreview: 'Older session',
+        eventCount: 1,
+        createdAt: 1,
+        startedAt: 1,
+        completedAt: 2,
+        lastEventAt: 2,
+      },
+    ])
+
+    const panel = await renderPanel()
+    await act(async () => {
+      await flushPromises()
+    })
+
+    const initialEventLoadCount = serviceMocks.listRunEvents.mock.calls.length
+    const olderToggle = Array.from(panel.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.getAttribute('title') === 'Older session')
+    const olderExpander = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[aria-expanded]'))
+      .find(button => button.getAttribute('aria-label')?.includes('session-older'))
+
+    expect(olderToggle).toBeDefined()
+    expect(olderToggle?.className).toContain('cursor-pointer')
+    expect(olderExpander?.getAttribute('aria-expanded')).toBe('false')
+
+    await act(async () => {
+      olderToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+    })
+
+    expect(olderExpander?.getAttribute('aria-expanded')).toBe('true')
+    expect(serviceMocks.listRunEvents.mock.calls.length).toBe(initialEventLoadCount)
   })
 
   it('shows each model request once in the event sidebar and displays the raw request payload in the detail pane', async () => {

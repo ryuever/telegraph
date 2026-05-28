@@ -101,6 +101,7 @@ features:
 |---|------|------|------|
 | R-001 | [20260508-x-oasis-link-to-source-setup.md](./reference/20260508-x-oasis-link-to-source-setup.md) | x-oasis 本地 source link 配置手册（telegraph） | 把 telegraph 4 个 app 全部指向本地 x-oasis source 的完整步骤：上游 12 个包改 main + telegraph pnpm.overrides + 移除 vite external + tsconfig paths。 |
 | R-002 | [20260521-pi-subagents-implementation-study.md](./reference/20260521-pi-subagents-implementation-study.md) | pi-subagents 实现解剖与 Telegraph Native Harness 借鉴清单 | 拆解 pi-subagents 的 Agent tool、AgentManager、独立 AgentSession、后台结果回流、steering/resume/event bus/scheduler 等实现，并映射为 Telegraph Native Harness 后续清单。 |
+| R-003 | [20260528-desktop-mobile-packaging-runbook.md](./reference/20260528-desktop-mobile-packaging-runbook.md) | Desktop 与 Mobile 打包 Runbook | 记录 Telegraph 桌面端与 mobile 端当前打包入口、已验证产物、问题清单与复验步骤。 |
 
 ### roadmap/ — 规划路线
 

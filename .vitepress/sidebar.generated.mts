@@ -204,6 +204,10 @@ export const wikiSidebar = {
         {
           "text": "R-002 pi-subagents 实现解剖与 Telegraph Native Harness 借鉴清单",
           "link": "/reference/20260521-pi-subagents-implementation-study"
+        },
+        {
+          "text": "R-003 Desktop 与 Mobile 打包 Runbook",
+          "link": "/reference/20260528-desktop-mobile-packaging-runbook"
         }
       ]
     }
