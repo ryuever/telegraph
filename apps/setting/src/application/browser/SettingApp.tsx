@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import type React from 'react';
 import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/browser';
 import { Check, Palette } from 'lucide-react';
 import type { StateChangeEvent, ConnectionStats } from '@x-oasis/async-call-rpc/orchestrator';
@@ -36,6 +37,8 @@ type SettingWindowPage = 'settings' | 'dev';
 const SETTING_WINDOW_PAGE_STORAGE_KEY = 'telegraph.settingWindowPage';
 const SETTING_WINDOW_PAGE_BROADCAST_CHANNEL = 'telegraph-setting-window-page';
 const DEFAULT_SETTING_WINDOW_PAGE: SettingWindowPage = 'settings';
+const HAS_DARWIN_WINDOW_CONTROLS =
+  typeof navigator !== 'undefined' && /Macintosh|Mac OS X/i.test(navigator.userAgent);
 
 let logIdCounter = 0;
 
@@ -263,7 +266,9 @@ function SettingApp() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-        }}
+          WebkitAppRegion: 'drag',
+          paddingLeft: HAS_DARWIN_WINDOW_CONTROLS ? 84 : 24,
+        } as React.CSSProperties}
       >
         <div>
           <div style={{ fontSize: 16, fontWeight: 700 }}>{activePageTitle}</div>

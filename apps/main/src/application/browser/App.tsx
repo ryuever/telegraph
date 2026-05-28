@@ -27,6 +27,8 @@ const PAGE_ICONS: Record<PageConfig['id'], typeof Palette> = {
 const ACTIVE_PAGE_STORAGE_KEY = 'telegraph.activePageId';
 const SETTING_WINDOW_PAGE_STORAGE_KEY = 'telegraph.settingWindowPage';
 const SETTING_WINDOW_PAGE_BROADCAST_CHANNEL = 'telegraph-setting-window-page';
+const HAS_DARWIN_WINDOW_CONTROLS =
+  typeof navigator !== 'undefined' && /Macintosh|Mac OS X/i.test(navigator.userAgent);
 
 type SettingWindowPage = 'settings' | 'dev';
 
@@ -259,7 +261,10 @@ function AppContextBar({
 
   return (
     <header
-      className="relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 shadow-[inset_0_-1px_0_var(--border)]"
+      className={cn(
+        'relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 pr-3 shadow-[inset_0_-1px_0_var(--border)]',
+        HAS_DARWIN_WINDOW_CONTROLS ? 'pl-[86px]' : 'pl-3',
+      )}
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="flex min-w-0 items-center gap-2.5">
