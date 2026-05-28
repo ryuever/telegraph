@@ -7,6 +7,10 @@ interface TelegraphThemePackDefinition {
   mode: TelegraphThemeMode
   source: string
   swatches: readonly string[]
+  window: {
+    backgroundColor: string
+    accentColor: string
+  }
 }
 
 export const TELEGRAPH_THEME_STORAGE_KEY = 'telegraph.theme.id'
@@ -19,6 +23,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'dark',
     source: 'Primer and Carbon inspired',
     swatches: ['#0b0f17', '#161b24', '#ff6542', '#42d6a4', '#a78bfa'],
+    window: { backgroundColor: '#0b0f17', accentColor: '#ff6542' },
   },
   {
     id: 'tweakcn-modern',
@@ -27,6 +32,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'light',
     source: 'TweakCN inspired',
     swatches: ['#fafafa', '#ffffff', '#695cff', '#0ea5e9', '#f97316'],
+    window: { backgroundColor: '#fafafa', accentColor: '#695cff' },
   },
   {
     id: 'graphite-light-console',
@@ -35,6 +41,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'light',
     source: 'Cloudscape and Atlassian inspired',
     swatches: ['#f7f8fa', '#ffffff', '#155e75', '#0891b2', '#d6dde5'],
+    window: { backgroundColor: '#f7f8fa', accentColor: '#155e75' },
   },
   {
     id: 'shadcn-neutral',
@@ -43,6 +50,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'light',
     source: 'shadcn/ui New York inspired',
     swatches: ['#ffffff', '#f8fafc', '#111827', '#64748b', '#e2e8f0'],
+    window: { backgroundColor: '#ffffff', accentColor: '#111827' },
   },
   {
     id: 'catppuccin-mocha',
@@ -51,6 +59,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'dark',
     source: 'Catppuccin inspired',
     swatches: ['#1e1e2e', '#313244', '#cba6f7', '#89b4fa', '#a6e3a1'],
+    window: { backgroundColor: '#1e1e2e', accentColor: '#cba6f7' },
   },
   {
     id: 'nord-frost',
@@ -59,6 +68,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'dark',
     source: 'Nord inspired',
     swatches: ['#2e3440', '#3b4252', '#88c0d0', '#a3be8c', '#d8dee9'],
+    window: { backgroundColor: '#2e3440', accentColor: '#88c0d0' },
   },
   {
     id: 'frosted-command',
@@ -67,6 +77,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'light',
     source: 'Apple materials inspired',
     swatches: ['#f4f8fb', '#ffffff', '#2563eb', '#14b8a6', '#cbd5e1'],
+    window: { backgroundColor: '#f4f8fb', accentColor: '#2563eb' },
   },
   {
     id: 'neo-brutalist-lab',
@@ -75,6 +86,7 @@ export const TELEGRAPH_THEME_PACKS = [
     mode: 'light',
     source: 'Neo brutalism inspired',
     swatches: ['#fffef3', '#ffffff', '#111827', '#ff5d2e', '#00c2ff'],
+    window: { backgroundColor: '#fffef3', accentColor: '#ff5d2e' },
   },
 ] as const satisfies readonly TelegraphThemePackDefinition[]
 

@@ -41,6 +41,12 @@ export interface MainSwitchPagePayload {
   pageletId?: string;
 }
 
+export interface MainWindowThemePayload {
+  mode: 'light' | 'dark';
+  backgroundColor: string;
+  accentColor: string;
+}
+
 export interface IMainRpcService {
   mainPing(msg: string): Promise<string>;
   openRun(runId: string, options?: MainOpenRunOptions): Promise<MainOpenRunResult>;
@@ -50,5 +56,6 @@ export const MAIN_WINDOW_SERVICE_PATH = 'main-window';
 
 export interface IMainWindowService {
   openSettingWindow(): Promise<void>;
+  applyWindowTheme(theme: MainWindowThemePayload): Promise<void>;
   onSwitchPage(callback: (pageId: string, payload?: MainSwitchPagePayload) => void): void;
 }

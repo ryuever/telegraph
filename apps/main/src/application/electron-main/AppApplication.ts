@@ -38,6 +38,7 @@ import {
   MONITOR_PARTICIPANT_ID,
   RENDERER_PARTICIPANT_ID,
 } from '@/packages/services/pagelet-host/common';
+import type { MainWindowThemePayload } from '@/packages/services/pagelet-host/common';
 import { MAIN_METRICS_SERVICE_PATH } from '@/packages/services/main-metrics/common';
 import type { IMainMetricsService } from '@/packages/services/main-metrics/common';
 import { MainMetricsServiceId } from '@/packages/services/main-metrics/common';
@@ -183,6 +184,9 @@ export class AppApplication implements IAppApplication {
     rendererIpcChannel.serviceHost?.registerServiceHandler(MAIN_WINDOW_SERVICE_PATH, {
       openSettingWindow: () => {
         this.windowManager.openSettingWindow();
+      },
+      applyWindowTheme: (theme: MainWindowThemePayload) => {
+        this.windowManager.applyWindowTheme(theme);
       },
       onSwitchPage: (callback: (pageId: string) => void) => {
         this.windowManager.setSwitchPageCallback(callback);

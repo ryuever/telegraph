@@ -1,11 +1,10 @@
 import { injectable } from '@x-oasis/di';
 import { BrowserWindow, Menu, app, nativeImage, nativeTheme } from 'electron';
-import type { BrowserWindowConstructorOptions } from 'electron';
 import { join } from 'path';
 
 import type { IWindowManager } from '@/apps/main/application/common';
 import { WindowManagerId } from '@/apps/main/application/common';
-import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common';
+import type { MainSwitchPagePayload, MainWindowThemePayload } from '@/packages/services/pagelet-host/common';
 
 export type { IWindowManager };
 export { WindowManagerId };
@@ -13,18 +12,6 @@ export { WindowManagerId };
 const WINDOW_BACKGROUND_COLOR = '#080d17';
 const WINDOW_ACCENT_COLOR = '#ff5436';
 const APP_ICON_PATH = join(app.getAppPath(), 'assets/icons/icon.png');
-const MAIN_TRAFFIC_LIGHT_POSITION = { x: 76, y: 17 };
-const SETTING_TRAFFIC_LIGHT_POSITION = { x: 18, y: 17 };
-
-function darwinInsetTitleBarOptions(
-  trafficLightPosition: { x: number; y: number },
-): Partial<BrowserWindowConstructorOptions> {
-  if (process.platform !== 'darwin') return {};
-  return {
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition,
-  };
-}
 
 @injectable()
 export class WindowManager implements IWindowManager {
@@ -44,7 +31,6 @@ export class WindowManager implements IWindowManager {
       backgroundColor: WINDOW_BACKGROUND_COLOR,
       accentColor: WINDOW_ACCENT_COLOR,
       darkTheme: true,
-      ...darwinInsetTitleBarOptions(MAIN_TRAFFIC_LIGHT_POSITION),
       webPreferences: {
         preload: join(__dirname, '../preload/preload.js'),
         contextIsolation: true,
@@ -114,7 +100,6 @@ export class WindowManager implements IWindowManager {
       backgroundColor: WINDOW_BACKGROUND_COLOR,
       accentColor: WINDOW_ACCENT_COLOR,
       darkTheme: true,
-      ...darwinInsetTitleBarOptions(SETTING_TRAFFIC_LIGHT_POSITION),
       webPreferences: {
         preload: join(__dirname, '../preload/setting-preload.js'),
         contextIsolation: true,
@@ -138,6 +123,21 @@ export class WindowManager implements IWindowManager {
     });
 
     return this.settingWindow;
+  }
+
+  applyWindowTheme(theme: MainWindowThemePayload): void {
+    nativeTheme.themeSource = theme.mode;
+    this.applyBrowserWindowTheme(this.mainWindow, theme);
+    this.applyBrowserWindowTheme(this.settingWindow, theme);
+  }
+
+  private applyBrowserWindowTheme(
+    win: BrowserWindow | null,
+    theme: MainWindowThemePayload,
+  ): void {
+    if (!win || win.isDestroyed()) return;
+    win.setBackgroundColor(theme.backgroundColor);
+    win.setAccentColor(theme.accentColor);
   }
 
   private applyNativeWindowTheme(): void {

@@ -27,8 +27,6 @@ const PAGE_ICONS: Record<PageConfig['id'], typeof Palette> = {
 const ACTIVE_PAGE_STORAGE_KEY = 'telegraph.activePageId';
 const SETTING_WINDOW_PAGE_STORAGE_KEY = 'telegraph.settingWindowPage';
 const SETTING_WINDOW_PAGE_BROADCAST_CHANNEL = 'telegraph-setting-window-page';
-const HAS_DARWIN_WINDOW_CONTROLS =
-  typeof navigator !== 'undefined' && /Macintosh|Mac OS X/i.test(navigator.userAgent);
 
 type SettingWindowPage = 'settings' | 'dev';
 
@@ -73,7 +71,7 @@ function broadcastSettingWindowPage(page: SettingWindowPage): void {
 }
 
 function App(): React.JSX.Element {
-  useTelegraphTheme();
+  const { themePack } = useTelegraphTheme();
 
   const [activePage, setActivePage] = useState<PageConfig>(loadInitialPage);
   const [runConsoleFocus, setRunConsoleFocus] = useState<MainSwitchPagePayload | undefined>();
@@ -96,6 +94,14 @@ function App(): React.JSX.Element {
       if (page) selectPage(page);
     });
   }, [selectPage]);
+
+  useEffect(() => {
+    void mainWindowClient.applyWindowTheme({
+      mode: themePack.mode,
+      backgroundColor: themePack.window.backgroundColor,
+      accentColor: themePack.window.accentColor,
+    });
+  }, [themePack]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
@@ -261,10 +267,7 @@ function AppContextBar({
 
   return (
     <header
-      className={cn(
-        'relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 pr-3 shadow-[inset_0_-1px_0_var(--border)]',
-        HAS_DARWIN_WINDOW_CONTROLS ? 'pl-[86px]' : 'pl-3',
-      )}
+      className="relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 shadow-[inset_0_-1px_0_var(--border)]"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="flex min-w-0 items-center gap-2.5">

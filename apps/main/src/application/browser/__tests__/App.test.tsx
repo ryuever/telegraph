@@ -11,6 +11,7 @@ import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/com
 const rpcMock = vi.hoisted(() => ({
   switchPage: undefined as ((pageId: string, payload?: MainSwitchPagePayload) => void) | undefined,
   openSettingWindow: vi.fn(),
+  applyWindowTheme: vi.fn(),
 }))
 
 const localStorageMock = vi.hoisted(() => {
@@ -33,6 +34,7 @@ vi.mock('@/apps/main/application/browser/rpc-clients', () => ({
       rpcMock.switchPage = callback
     }),
     openSettingWindow: rpcMock.openSettingWindow,
+    applyWindowTheme: rpcMock.applyWindowTheme,
   },
 }))
 
@@ -60,6 +62,7 @@ describe('App page navigation', () => {
     localStorageMock.clear()
     rpcMock.switchPage = undefined
     rpcMock.openSettingWindow.mockClear()
+    rpcMock.applyWindowTheme.mockClear()
   })
 
   afterEach(() => {
@@ -92,6 +95,11 @@ describe('App page navigation', () => {
     const app = renderApp()
 
     expect(app.querySelector('[data-testid="active-page"]')?.textContent).toBe('chat')
+    expect(rpcMock.applyWindowTheme).toHaveBeenCalledWith({
+      mode: 'dark',
+      backgroundColor: '#0b0f17',
+      accentColor: '#ff6542',
+    })
   })
 
   it('persists sidebar page selection', () => {
