@@ -13,7 +13,6 @@ import {
   File,
   FileJson,
   Image,
-  ListTree,
   Loader2,
   MessagesSquare,
   RefreshCw,
@@ -358,7 +357,7 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] overflow-hidden max-lg:grid-cols-1">
         <section className="flex min-h-0 min-w-0 flex-col border-r border-border max-lg:border-b max-lg:border-r-0">
-          <div className="grid h-9 shrink-0 grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center border-b border-border bg-muted/40 px-3 text-[11px] font-medium uppercase text-muted-foreground">
+          <div className="grid h-12 shrink-0 grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center border-b border-border bg-muted/40 px-3 text-[11px] font-medium uppercase text-muted-foreground">
             <span>Source</span>
             <span>Run</span>
             <span>Status</span>
@@ -468,7 +467,7 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                               onClick={() => { setSelectedRunKey(runKey(run)); }}
                               className={cn(
                                 'grid min-h-12 w-full grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center px-3 text-left transition-colors',
-                                selected ? 'bg-background shadow-[inset_3px_0_0_var(--primary)]' : 'hover:bg-background/75',
+                                selected ? 'bg-background' : 'hover:bg-background/75',
                               )}
                             >
                               <span className="flex items-center gap-2 pl-7 text-[10px] font-medium text-muted-foreground">
@@ -503,40 +502,14 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
         </section>
 
         <section className="flex min-h-0 min-w-0 flex-col">
-          <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">
-                {selectedRun ? selectedRun.inputPreview || selectedRun.runId : 'No run selected'}
-              </div>
-              {selectedRun ? (
-                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  {SOURCE_LABELS[selectedRun.source]} · {selectedRun.runId}
-                </div>
-              ) : null}
-            </div>
-            {eventsLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : null}
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {eventsError ? (
-              <div className="flex h-full min-h-40 items-center justify-center gap-2 px-4 text-sm text-destructive">
-                <AlertCircle size={16} />
-                <span>{eventsError}</span>
-              </div>
-            ) : logGroups.length === 0 ? (
-              <div className="flex h-full min-h-40 items-center justify-center px-4 text-sm text-muted-foreground">
-                No events
-              </div>
-            ) : (
-              <RunLogInspector
-                groups={logGroups}
-                selectedKey={selectedLogKey}
-                onSelect={setSelectedLogKey}
-              />
-            )}
-          </div>
+          <RunLogInspector
+            groups={logGroups}
+            selectedKey={selectedLogKey}
+            selectedRun={selectedRun}
+            eventsLoading={eventsLoading}
+            eventsError={eventsError}
+            onSelect={setSelectedLogKey}
+          />
         </section>
       </div>
     </div>
@@ -546,73 +519,146 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
 function RunLogInspector({
   groups,
   selectedKey,
+  selectedRun,
+  eventsLoading,
+  eventsError,
   onSelect,
 }: {
   groups: ConsoleLogGroup[]
   selectedKey: string | null
+  selectedRun: ConsoleRun | null
+  eventsLoading: boolean
+  eventsError?: string
   onSelect: (key: string) => void
 }): React.JSX.Element {
   const selected = groups.find(group => group.key === selectedKey) ?? groups[0]
-  const artifacts = selected.event ? extractObservationArtifacts(selected.event) : []
+  const artifacts = selected?.event ? extractObservationArtifacts(selected.event) : []
+  const [copied, setCopied] = useState(false)
+  const selectedCopyContent = useMemo(() => (
+    selected ? selected.messages.map(message => message.content).join('\n\n') : ''
+  ), [selected])
+  const handleCopySelected = useCallback(() => {
+    if (!selectedCopyContent) return
+    void navigator.clipboard.writeText(selectedCopyContent)
+      .then(() => {
+        setCopied(true)
+      })
+      .catch(() => {
+        // Clipboard permission can be unavailable in test or restricted renderer contexts.
+      })
+  }, [selectedCopyContent])
+
+  useEffect(() => {
+    setCopied(false)
+  }, [selected?.key])
+
+  useEffect(() => {
+    if (!copied) return undefined
+    const timeout = window.setTimeout(() => {
+      setCopied(false)
+    }, 1200)
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [copied])
 
   return (
     <div className="grid h-full min-h-0 grid-cols-[minmax(220px,300px)_minmax(0,1fr)] max-md:grid-cols-1">
       <aside className="flex min-h-0 min-w-0 flex-col border-r border-border bg-muted/20 max-md:max-h-56 max-md:border-b max-md:border-r-0">
-        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3 text-[11px] font-medium uppercase text-muted-foreground">
-          <ListTree size={13} />
-          Events
+        <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">
+              {selectedRun ? selectedRun.inputPreview || selectedRun.runId : 'No run selected'}
+            </div>
+            {selectedRun ? (
+              <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                {SOURCE_LABELS[selectedRun.source]} · {selectedRun.runId}
+              </div>
+            ) : null}
+          </div>
+          {eventsLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : null}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {groups.map(group => {
-            const selectedGroup = group.key === selected.key
-            return (
-              <button
-                key={group.key}
-                type="button"
-                onClick={() => { onSelect(group.key); }}
-                className={cn(
-                  'grid min-h-14 w-full grid-cols-[46px_minmax(0,1fr)] gap-2 border-b border-border px-3 py-2 text-left transition-colors',
-                  selectedGroup ? 'bg-background' : 'hover:bg-background/70',
-                )}
-              >
-                <span className="pt-0.5 text-[11px] tabular-nums text-muted-foreground">{group.marker}</span>
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-medium text-foreground">{group.title}</span>
-                  <span className="mt-1 block truncate text-[11px] text-muted-foreground">{group.summary}</span>
-                </span>
-              </button>
-            )
-          })}
+          {eventsError ? (
+            <div className="flex h-full min-h-40 items-center justify-center gap-2 px-4 text-sm text-destructive">
+              <AlertCircle size={16} />
+              <span>{eventsError}</span>
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="flex h-full min-h-40 items-center justify-center px-4 text-sm text-muted-foreground">
+              No events
+            </div>
+          ) : (
+            groups.map(group => {
+              const selectedGroup = selected ? group.key === selected.key : false
+              return (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => { onSelect(group.key); }}
+                  className={cn(
+                    'grid min-h-14 w-full grid-cols-[46px_minmax(0,1fr)] gap-2 border-b border-border px-3 py-2 text-left transition-colors',
+                    selectedGroup ? 'bg-background' : 'hover:bg-background/70',
+                  )}
+                >
+                  <span className="pt-0.5 text-[11px] tabular-nums text-muted-foreground">{group.marker}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium text-foreground">{group.title}</span>
+                    <span className="mt-1 block truncate text-[11px] text-muted-foreground">{group.summary}</span>
+                  </span>
+                </button>
+              )
+            })
+          )}
         </div>
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-col">
-        <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <MessagesSquare size={15} className="shrink-0 text-muted-foreground" />
-              <span className="truncate text-sm font-semibold">{selected.title}</span>
-            </div>
-            <div className="mt-1 truncate text-[11px] text-muted-foreground">
-              {selected.marker} · {formatTime(selected.ts)}
-            </div>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className="flex h-full min-h-0 flex-col gap-3">
-            {selected.messages.map(message => (
-              <MessageBlock key={message.key} message={message} />
-            ))}
-            {artifacts.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {artifacts.map(artifact => (
-                  <ObservationArtifactCard key={artifact.uri} artifact={artifact} />
-                ))}
+        {selected ? (
+          <>
+            <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <MessagesSquare size={15} className="shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm font-semibold">{selected.title}</span>
+                </div>
+                <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                  {selected.marker} · {formatTime(selected.ts)}
+                </div>
               </div>
-            ) : null}
+              <button
+                type="button"
+                onClick={handleCopySelected}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title={copied ? 'Copied' : 'Copy'}
+                aria-label={copied ? 'Copied log content' : 'Copy log content'}
+              >
+                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <div className="flex h-full min-h-0 flex-col gap-3">
+                {selected.messages.map(message => (
+                  <MessageBlock key={message.key} message={message} />
+                ))}
+                {artifacts.length > 0 ? (
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {artifacts.map(artifact => (
+                      <ObservationArtifactCard key={artifact.uri} artifact={artifact} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full min-h-40 items-center justify-center px-4 text-sm text-muted-foreground">
+            Select an event to inspect
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
@@ -621,7 +667,6 @@ function RunLogInspector({
 function MessageBlock({ message }: { message: ConsoleLogMessage }): React.JSX.Element {
   const contentView = parseMessageContentView(message.content)
   const jsonContent = contentView.kind === 'text' ? undefined : contentView.content
-  const [copied, setCopied] = useState(false)
   const handleJsonEditorMount = useCallback<OnMount>((editor) => {
     window.requestAnimationFrame(() => {
       editor.layout()
@@ -638,46 +683,10 @@ function MessageBlock({ message }: { message: ConsoleLogMessage }): React.JSX.El
       observer.disconnect()
     })
   }, [])
-  const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(message.content)
-      .then(() => {
-        setCopied(true)
-      })
-      .catch(() => {
-        // Clipboard permission can be unavailable in test or restricted renderer contexts.
-      })
-  }, [message.content])
-
-  useEffect(() => {
-    if (!copied) return undefined
-    const timeout = window.setTimeout(() => {
-      setCopied(false)
-    }, 1200)
-    return () => {
-      window.clearTimeout(timeout)
-    }
-  }, [copied])
 
   return (
     <section className="flex h-full min-h-[220px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-card">
-      <div className="flex min-h-8 items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
-        <span className={cn(
-          'rounded px-1.5 py-0.5 text-[11px] font-medium',
-          messageRoleClassName(message.role),
-        )}
-        >
-          {message.title}
-        </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-          title={copied ? 'Copied' : 'Copy'}
-          aria-label={copied ? 'Copied log content' : 'Copy log content'}
-        >
-          {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-        </button>
-      </div>
+      <span className="sr-only">{message.title}</span>
       {jsonContent ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {contentView.kind === 'mixed-json' ? (
@@ -1095,14 +1104,6 @@ function eventRole(event: AgentEvent): ConsoleLogMessage['role'] {
   if (event.type === 'assistant_delta' || event.type === 'assistant_message' || event.type === 'run_completed') return 'assistant'
   if (event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'tool_error') return 'tool'
   return 'event'
-}
-
-function messageRoleClassName(role: ConsoleLogMessage['role']): string {
-  if (role === 'system') return 'bg-slate-100 text-slate-700'
-  if (role === 'user') return 'bg-sky-50 text-sky-700'
-  if (role === 'assistant') return 'bg-emerald-50 text-emerald-700'
-  if (role === 'tool') return 'bg-amber-50 text-amber-700'
-  return 'bg-muted text-muted-foreground'
 }
 
 function findFocusedRun(runs: ConsoleRun[], focus: MainSwitchPagePayload): ConsoleRun | undefined {
