@@ -353,11 +353,11 @@
   --chart-3: #00f5a0;
   --chart-4: #ffe66d;
   --chart-5: #ff5d2e;
-  --sidebar: #111827;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffe66d;
-  --sidebar-primary-foreground: #111827;
-  --sidebar-accent: #00c2ff;
+  --sidebar: #ffe66d;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #111827;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fffef3;
   --sidebar-accent-foreground: #111827;
   --sidebar-border: #111827;
   --sidebar-ring: #ff5d2e;

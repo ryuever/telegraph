@@ -85,7 +85,7 @@ export const TELEGRAPH_THEME_PACKS = [
     description: 'High-contrast experimental lab style with chunky borders and bold accents.',
     mode: 'light',
     source: 'Neo brutalism inspired',
-    swatches: ['#fffef3', '#ffffff', '#111827', '#ff5d2e', '#00c2ff'],
+    swatches: ['#fffef3', '#ffe66d', '#111827', '#ff5d2e', '#00c2ff'],
     window: { backgroundColor: '#fffef3', accentColor: '#ff5d2e' },
   },
 ] as const satisfies readonly TelegraphThemePackDefinition[]
