@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import { Activity, Cable, ListTree, MessageCircle, Palette, Settings } from 'lucide-react';
+import { Activity, Cable, ChevronUp, Code2, ListTree, MessageCircle, Palette, Settings, UserRound } from 'lucide-react';
 import { mainWindowClient } from '@/apps/main/application/browser/rpc-clients';
 import { PageletHost } from '@/apps/main/application/browser/PageletHost';
 import { cn } from '@/packages/ui/lib/utils';
@@ -25,6 +25,10 @@ const PAGE_ICONS: Record<PageConfig['id'], typeof Palette> = {
 };
 
 const ACTIVE_PAGE_STORAGE_KEY = 'telegraph.activePageId';
+const SETTING_WINDOW_PAGE_STORAGE_KEY = 'telegraph.settingWindowPage';
+const SETTING_WINDOW_PAGE_BROADCAST_CHANNEL = 'telegraph-setting-window-page';
+
+type SettingWindowPage = 'settings' | 'dev';
 
 function findPageById(pageId: string | null): PageConfig | undefined {
   if (!pageId) return undefined;
@@ -47,6 +51,25 @@ function persistActivePage(page: PageConfig): void {
   }
 }
 
+function persistSettingWindowPage(page: SettingWindowPage): void {
+  try {
+    globalThis.localStorage.setItem(SETTING_WINDOW_PAGE_STORAGE_KEY, page);
+  } catch {
+    // Ignore storage failures; the setting window will fall back to its default page.
+  }
+}
+
+function broadcastSettingWindowPage(page: SettingWindowPage): void {
+  if (typeof BroadcastChannel === 'undefined') return;
+
+  const channel = new BroadcastChannel(SETTING_WINDOW_PAGE_BROADCAST_CHANNEL);
+  try {
+    channel.postMessage({ page });
+  } finally {
+    channel.close();
+  }
+}
+
 function App(): React.JSX.Element {
   useTelegraphTheme();
 
@@ -55,6 +78,11 @@ function App(): React.JSX.Element {
   const selectPage = useCallback((page: PageConfig) => {
     setActivePage(page);
     persistActivePage(page);
+  }, []);
+  const openSettingWindowPage = useCallback((page: SettingWindowPage) => {
+    persistSettingWindowPage(page);
+    broadcastSettingWindowPage(page);
+    void mainWindowClient.openSettingWindow();
   }, []);
 
   useEffect(() => {
@@ -109,27 +137,113 @@ function App(): React.JSX.Element {
         </nav>
 
         <div className="w-full border-t border-border p-2">
-          <button
-            type="button"
-            onClick={() => { void mainWindowClient.openSettingWindow(); }}
-            aria-label="Open Settings Window"
-            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
-            title="Open Settings Window"
-          >
-            <Settings size={18} />
-          </button>
+          <AvatarMenu
+            onOpenSettings={() => { openSettingWindowPage('settings'); }}
+            onOpenDev={() => { openSettingWindowPage('dev'); }}
+          />
         </div>
       </aside>
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
         <AppContextBar
           activePage={activePage}
-          onOpenSettings={() => { void mainWindowClient.openSettingWindow(); }}
+          onOpenSettings={() => { openSettingWindowPage('settings'); }}
         />
         <div className="min-h-0 min-w-0 flex-1">
           <PageletHost activePage={activePage} runConsoleFocus={runConsoleFocus} />
         </div>
       </main>
+    </div>
+  );
+}
+
+function AvatarMenu({
+  onOpenSettings,
+  onOpenDev,
+}: {
+  onOpenSettings: () => void;
+  onOpenDev: () => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !menuRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  const openSettings = useCallback(() => {
+    setOpen(false);
+    onOpenSettings();
+  }, [onOpenSettings]);
+  const openDev = useCallback(() => {
+    setOpen(false);
+    onOpenDev();
+  }, [onOpenDev]);
+
+  return (
+    <div ref={menuRef} className="relative">
+      {open && (
+        <div
+          role="menu"
+          aria-label="Account menu"
+          className="absolute bottom-12 left-0 z-50 w-44 rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={openSettings}
+            className="flex h-9 w-full items-center gap-2 rounded-[5px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-surface-soft"
+          >
+            <Settings size={14} />
+            <span>Setting</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={openDev}
+            className="flex h-9 w-full items-center gap-2 rounded-[5px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-surface-soft"
+          >
+            <Code2 size={14} />
+            <span>Dev</span>
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => { setOpen((value) => !value); }}
+        aria-label="Open account menu"
+        aria-expanded={open}
+        className="group flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card/70 text-muted-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-surface-soft hover:text-foreground"
+        title="Account"
+      >
+        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary/12 text-primary">
+          <UserRound size={17} />
+          <ChevronUp
+            size={10}
+            className={cn(
+              'absolute -bottom-0.5 -right-0.5 rounded-full bg-card text-muted-foreground transition-transform',
+              open ? 'rotate-180' : 'rotate-0',
+            )}
+          />
+        </span>
+      </button>
     </div>
   );
 }

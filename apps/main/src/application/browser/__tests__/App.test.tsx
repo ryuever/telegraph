@@ -124,6 +124,56 @@ describe('App page navigation', () => {
     expect(localStorageMock.getItem('telegraph.activePageId')).toBe('run-console')
   })
 
+  it('opens settings from the account avatar menu', () => {
+    const app = renderApp()
+    const accountButton = Array.from(app.querySelectorAll('button'))
+      .find((button) => button.getAttribute('aria-label') === 'Open account menu')
+
+    expect(accountButton).toBeDefined()
+
+    act(() => {
+      accountButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    const menuItem = Array.from(app.querySelectorAll('[role="menuitem"]'))
+      .find((item) => item.textContent === 'Setting')
+
+    expect(menuItem).toBeDefined()
+
+    act(() => {
+      menuItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(rpcMock.openSettingWindow).toHaveBeenCalledTimes(1)
+    expect(localStorageMock.getItem('telegraph.settingWindowPage')).toBe('settings')
+    expect(app.querySelector('[role="menu"]')).toBeNull()
+  })
+
+  it('opens dev from the account avatar menu', () => {
+    const app = renderApp()
+    const accountButton = Array.from(app.querySelectorAll('button'))
+      .find((button) => button.getAttribute('aria-label') === 'Open account menu')
+
+    expect(accountButton).toBeDefined()
+
+    act(() => {
+      accountButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    const menuItem = Array.from(app.querySelectorAll('[role="menuitem"]'))
+      .find((item) => item.textContent === 'Dev')
+
+    expect(menuItem).toBeDefined()
+
+    act(() => {
+      menuItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(rpcMock.openSettingWindow).toHaveBeenCalledTimes(1)
+    expect(localStorageMock.getItem('telegraph.settingWindowPage')).toBe('dev')
+    expect(app.querySelector('[role="menu"]')).toBeNull()
+  })
+
   it('restores the run console after a renderer remount', () => {
     localStorageMock.setItem('telegraph.activePageId', 'run-console')
 
