@@ -12,6 +12,10 @@ const serviceMocks = vi.hoisted(() => ({
   listRunEvents: vi.fn((_runId?: string, _signal?: AbortSignal) => Promise.resolve([] as unknown[])),
   listAgentRuns: vi.fn((_signal?: AbortSignal) => Promise.resolve([] as unknown[])),
   listAgentRunEvents: vi.fn((_runId?: string, _signal?: AbortSignal) => Promise.resolve([] as unknown[])),
+  deleteSessionRuns: vi.fn((sessionId: string): Promise<{ sessionId: string; deletedRunIds: string[] }> =>
+    Promise.resolve({ sessionId, deletedRunIds: [] })),
+  deleteAgentSessionRuns: vi.fn((sessionId: string): Promise<{ sessionId: string; deletedRunIds: string[] }> =>
+    Promise.resolve({ sessionId, deletedRunIds: [] })),
 }))
 
 vi.mock('@/apps/chat/application/browser/pagelet-agent-service', () => ({
@@ -22,6 +26,10 @@ vi.mock('@/apps/chat/application/browser/pagelet-agent-service', () => ({
 
     listRunEvents(runId: string, signal?: AbortSignal) {
       return serviceMocks.listRunEvents(runId, signal)
+    }
+
+    deleteSessionRuns(sessionId: string) {
+      return serviceMocks.deleteSessionRuns(sessionId)
     }
   },
 }))
@@ -34,6 +42,10 @@ vi.mock('@/apps/design/application/browser/pagelet-design-agent-service', () => 
 
     listAgentRunEvents(runId: string, signal?: AbortSignal) {
       return serviceMocks.listAgentRunEvents(runId, signal)
+    }
+
+    deleteAgentSessionRuns(sessionId: string) {
+      return serviceMocks.deleteAgentSessionRuns(sessionId)
     }
   },
 }))
@@ -261,10 +273,14 @@ describe('RunConsolePanel interaction', () => {
     serviceMocks.listRunEvents.mockReset()
     serviceMocks.listAgentRuns.mockReset()
     serviceMocks.listAgentRunEvents.mockReset()
+    serviceMocks.deleteSessionRuns.mockReset()
+    serviceMocks.deleteAgentSessionRuns.mockReset()
     serviceMocks.listRuns.mockResolvedValue([])
     serviceMocks.listRunEvents.mockResolvedValue([])
     serviceMocks.listAgentRuns.mockResolvedValue([])
     serviceMocks.listAgentRunEvents.mockResolvedValue([])
+    serviceMocks.deleteSessionRuns.mockResolvedValue({ sessionId: 'session', deletedRunIds: [] })
+    serviceMocks.deleteAgentSessionRuns.mockResolvedValue({ sessionId: 'session', deletedRunIds: [] })
   })
 
   async function renderPanel(): Promise<HTMLDivElement> {
@@ -279,6 +295,152 @@ describe('RunConsolePanel interaction', () => {
 
     return container
   }
+
+  it('groups runs from the same session under a collapsible tree parent', async () => {
+    serviceMocks.listRuns.mockResolvedValue([
+      {
+        runId: 'run-shared-1',
+        sessionId: 'session-shared',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'First turn' },
+        inputPreview: 'First turn',
+        eventCount: 1,
+        createdAt: 1,
+        startedAt: 1,
+        completedAt: 2,
+        lastEventAt: 2,
+      },
+      {
+        runId: 'run-shared-2',
+        sessionId: 'session-shared',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'Follow up' },
+        inputPreview: 'Follow up',
+        eventCount: 3,
+        createdAt: 3,
+        startedAt: 3,
+        completedAt: 4,
+        lastEventAt: 4,
+      },
+      {
+        runId: 'run-alone',
+        sessionId: 'session-alone',
+        status: 'running',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'Separate thread' },
+        inputPreview: 'Separate thread',
+        eventCount: 2,
+        createdAt: 5,
+        startedAt: 5,
+        lastEventAt: 6,
+      },
+    ])
+
+    const panel = await renderPanel()
+    await act(async () => {
+      await flushPromises()
+    })
+
+    const parentButtons = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[aria-expanded]'))
+    expect(parentButtons).toHaveLength(2)
+    expect(parentButtons.every(button => button.getAttribute('aria-expanded') === 'false')).toBe(true)
+    expect(panel.textContent).toContain('session-shared')
+    expect(panel.textContent).toContain('2 runs')
+    expect(panel.textContent).not.toContain('run-shared-1')
+    expect(panel.textContent).not.toContain('run-shared-2')
+
+    const sharedParent = parentButtons.find(button => button.getAttribute('aria-label')?.includes('session-shared'))
+    expect(sharedParent).toBeDefined()
+
+    await act(async () => {
+      sharedParent?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+    })
+
+    expect(sharedParent?.getAttribute('aria-expanded')).toBe('true')
+    expect(panel.textContent).toContain('run-shared-1')
+    expect(panel.textContent).toContain('run-shared-2')
+
+    await act(async () => {
+      sharedParent?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+    })
+
+    expect(sharedParent?.getAttribute('aria-expanded')).toBe('false')
+    expect(panel.textContent).toContain('session-shared')
+    expect(panel.textContent).toContain('2 runs')
+    expect(panel.textContent).not.toContain('run-shared-1')
+    expect(panel.textContent).not.toContain('run-shared-2')
+  })
+
+  it('deletes a session item from the run tree', async () => {
+    serviceMocks.listRuns.mockResolvedValue([
+      {
+        runId: 'run-delete',
+        sessionId: 'session-delete',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'Delete me' },
+        inputPreview: 'Delete me',
+        eventCount: 1,
+        createdAt: 1,
+        startedAt: 1,
+        completedAt: 2,
+        lastEventAt: 2,
+      },
+      {
+        runId: 'run-keep',
+        sessionId: 'session-keep',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'Keep me' },
+        inputPreview: 'Keep me',
+        eventCount: 1,
+        createdAt: 3,
+        startedAt: 3,
+        completedAt: 4,
+        lastEventAt: 4,
+      },
+    ])
+    serviceMocks.deleteSessionRuns.mockResolvedValue({
+      sessionId: 'session-delete',
+      deletedRunIds: ['run-delete'],
+    })
+
+    const panel = await renderPanel()
+    await act(async () => {
+      await flushPromises()
+    })
+
+    expect(panel.textContent).toContain('Delete me')
+    expect(panel.textContent).toContain('Keep me')
+
+    const deleteButton = Array.from(panel.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.getAttribute('aria-label') === 'Delete Chat session session-delete')
+    expect(deleteButton).toBeDefined()
+
+    await act(async () => {
+      deleteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+    })
+
+    expect(serviceMocks.deleteSessionRuns).toHaveBeenCalledWith('session-delete')
+    expect(panel.textContent).not.toContain('Delete me')
+    expect(panel.textContent).not.toContain('session-delete')
+    expect(panel.textContent).toContain('Keep me')
+  })
 
   it('shows each model request once in the event sidebar and displays the raw request payload in the detail pane', async () => {
     const modelRequest: AgentEvent = {

@@ -5,6 +5,8 @@ import type { OnMount } from '@monaco-editor/react'
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   Copy,
   Database,
@@ -15,6 +17,7 @@ import {
   Loader2,
   MessagesSquare,
   RefreshCw,
+  Trash2,
   XCircle,
 } from 'lucide-react'
 import { PageletAgentService } from '@/apps/chat/application/browser/pagelet-agent-service'
@@ -41,6 +44,20 @@ interface ConsoleRun {
   inputPreview?: string
   updatedAt: number
   createdAt: number
+}
+
+interface ConsoleRunSession {
+  key: string
+  source: RunSource
+  sessionId: string
+  title: string
+  status: string
+  eventCount: number
+  runCount: number
+  updatedAt: number
+  createdAt: number
+  latestRunKey: string
+  runs: ConsoleRun[]
 }
 
 interface ConsoleEvent {
@@ -115,7 +132,10 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
   const [events, setEvents] = useState<ConsoleEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | undefined>()
+  const [deleteError, setDeleteError] = useState<string | undefined>()
   const [selectedLogKey, setSelectedLogKey] = useState<string | null>(null)
+  const [expandedSessionKeys, setExpandedSessionKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [deletingSessionKeys, setDeletingSessionKeys] = useState<ReadonlySet<string>>(() => new Set())
 
   const selectedRun = useMemo(
     () => runs.find(run => runKey(run) === selectedRunKey) ?? null,
@@ -127,17 +147,17 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
     [events],
   )
 
-  const visibleRuns = useMemo(() => {
-    const filtered = sourceFilter === 'all'
-      ? runs
-      : runs.filter(run => run.source === sourceFilter)
-    return filtered.sort((a, b) => b.updatedAt - a.updatedAt)
-  }, [runs, sourceFilter])
+  const visibleRunSessions = useMemo(
+    () => groupConsoleRuns(runs, sourceFilter),
+    [runs, sourceFilter],
+  )
 
   useEffect(() => {
     if (!focus?.runId) return
     const match = findFocusedRun(runs, focus)
-    if (match) setSelectedRunKey(runKey(match))
+    if (!match) return
+    setSelectedRunKey(runKey(match))
+    setExpandedSessionKeys(current => withSetValue(current, runSessionKey(match)))
   }, [focus, runs])
 
   const refreshRuns = useCallback(async () => {
@@ -150,6 +170,7 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
       design: { loading: true, count: 0 },
       chat: { loading: true, count: 0 },
     })
+    setDeleteError(undefined)
 
     const [designResult, chatResult] = await Promise.allSettled([
       designAgentService.listAgentRuns(controller.signal),
@@ -198,6 +219,47 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
       return logGroups[0]?.key ?? null
     })
   }, [logGroups])
+
+  const toggleSession = useCallback((key: string) => {
+    setExpandedSessionKeys(current => {
+      const next = new Set(current)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }, [])
+
+  const deleteRunSession = useCallback(async (session: ConsoleRunSession) => {
+    setDeletingSessionKeys(current => withSetValue(current, session.key))
+    setDeleteError(undefined)
+    try {
+      if (session.source === 'design') {
+        await designAgentService.deleteAgentSessionRuns(session.sessionId)
+      } else {
+        await chatAgentService.deleteSessionRuns(session.sessionId)
+      }
+
+      const deletedRunKeys = new Set(session.runs.map(runKey))
+      setRuns(current => current.filter(run => runSessionKey(run) !== session.key))
+      setExpandedSessionKeys(current => withoutSetValue(current, session.key))
+      setSelectedRunKey(current => (current && deletedRunKeys.has(current) ? null : current))
+      setSourceState(current => ({
+        ...current,
+        [session.source]: {
+          ...current[session.source],
+          count: Math.max(0, current[session.source].count - session.runCount),
+          error: undefined,
+        },
+      }))
+    } catch (error) {
+      setDeleteError(statusError(error))
+    } finally {
+      setDeletingSessionKeys(current => withoutSetValue(current, session.key))
+    }
+  }, [])
 
   useEffect(() => {
     if (!selectedRun) {
@@ -254,6 +316,12 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               <SourceBadge source="design" state={sourceState.design} />
               <SourceBadge source="chat" state={sourceState.chat} />
+              {deleteError ? (
+                <span className="inline-flex items-center gap-1 text-amber-700">
+                  <AlertCircle size={11} />
+                  Delete failed: {deleteError}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -290,43 +358,144 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] overflow-hidden max-lg:grid-cols-1">
         <section className="flex min-h-0 min-w-0 flex-col border-r border-border max-lg:border-b max-lg:border-r-0">
-          <div className="grid h-9 shrink-0 grid-cols-[72px_minmax(0,1fr)_82px_64px] items-center border-b border-border bg-muted/40 px-3 text-[11px] font-medium uppercase text-muted-foreground">
+          <div className="grid h-9 shrink-0 grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center border-b border-border bg-muted/40 px-3 text-[11px] font-medium uppercase text-muted-foreground">
             <span>Source</span>
             <span>Run</span>
             <span>Status</span>
             <span className="text-right">Events</span>
+            <span aria-hidden="true" />
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {visibleRuns.length === 0 ? (
+            {visibleRunSessions.length === 0 ? (
               <div className="flex h-full min-h-40 items-center justify-center px-4 text-sm text-muted-foreground">
                 No runs
               </div>
             ) : (
-              visibleRuns.map(run => {
-                const selected = runKey(run) === selectedRunKey
+              visibleRunSessions.map(session => {
+                const expanded = expandedSessionKeys.has(session.key)
+                const containsSelectedRun = selectedRun ? runSessionKey(selectedRun) === session.key : false
+                const deletingSession = deletingSessionKeys.has(session.key)
                 return (
-                  <button
-                    key={runKey(run)}
-                    type="button"
-                    onClick={() => { setSelectedRunKey(runKey(run)); }}
+                  <div
+                    key={session.key}
                     className={cn(
-                      'grid min-h-16 w-full grid-cols-[72px_minmax(0,1fr)_82px_64px] items-center border-b border-border px-3 text-left transition-colors',
-                      selected ? 'bg-surface-soft' : 'hover:bg-muted/50',
+                      'group border-b border-border bg-background',
+                      containsSelectedRun && 'bg-surface-soft/45',
                     )}
                   >
-                    <span className="text-xs font-medium text-muted-foreground">{SOURCE_LABELS[run.source]}</span>
-                    <span className="min-w-0 pr-3">
-                      <span className="block truncate text-[13px] font-medium text-foreground">
-                        {run.inputPreview || run.runId}
-                      </span>
-                      <span className="mt-1 block truncate text-[11px] text-muted-foreground">
-                        {run.runId} · {formatTime(run.updatedAt)}
-                      </span>
-                    </span>
-                    <StatusPill status={run.status} />
-                    <span className="text-right text-xs tabular-nums text-muted-foreground">{run.eventCount}</span>
-                  </button>
+                    <div
+                      className={cn(
+                        'grid min-h-14 w-full grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center px-3 transition-colors',
+                        containsSelectedRun ? 'bg-surface-soft/70' : 'hover:bg-muted/35',
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => { toggleSession(session.key); }}
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${SOURCE_LABELS[session.source]} session ${session.sessionId}`}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                          title={expanded ? 'Collapse session' : 'Expand session'}
+                        >
+                          {expanded ? (
+                            <ChevronDown size={13} />
+                          ) : (
+                            <ChevronRight size={13} />
+                          )}
+                        </button>
+                        <span className={cn(
+                          'truncate rounded px-1.5 py-0.5 text-[11px] font-medium',
+                          sourcePillClassName(session.source),
+                        )}
+                        >
+                          {SOURCE_LABELS[session.source]}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRunKey(session.latestRunKey)
+                        }}
+                        className="col-span-3 grid h-full min-w-0 grid-cols-[minmax(0,1fr)_82px_64px] items-center text-left"
+                        title={session.title}
+                      >
+                        <span className="min-w-0 pr-3">
+                          <span className="block truncate text-[13px] font-semibold text-foreground">
+                            {session.title}
+                          </span>
+                          <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <span className="truncate">{shortId(session.sessionId)}</span>
+                            <span className="shrink-0">·</span>
+                            <span className="shrink-0">{session.runCount} {session.runCount === 1 ? 'run' : 'runs'}</span>
+                            <span className="shrink-0">·</span>
+                            <span className="truncate">Last {formatTime(session.updatedAt)}</span>
+                          </span>
+                        </span>
+                        <StatusPill status={session.status} />
+                        <span className="text-right text-xs tabular-nums text-muted-foreground">{session.eventCount}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { void deleteRunSession(session) }}
+                        disabled={deletingSession}
+                        aria-label={`Delete ${SOURCE_LABELS[session.source]} session ${session.sessionId}`}
+                        title="Delete session"
+                        className={cn(
+                          'ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-colors hover:bg-background hover:text-destructive focus:opacity-100 group-hover:opacity-100',
+                          (containsSelectedRun || deletingSession) && 'opacity-100',
+                          deletingSession && 'cursor-wait hover:text-muted-foreground',
+                        )}
+                      >
+                        {deletingSession ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={13} />
+                        )}
+                      </button>
+                    </div>
+
+                    {expanded ? (
+                      <div className="border-t border-border/70 bg-muted/15">
+                        {session.runs.map(run => {
+                          const selected = runKey(run) === selectedRunKey
+                          return (
+                            <button
+                              key={runKey(run)}
+                              type="button"
+                              onClick={() => { setSelectedRunKey(runKey(run)); }}
+                              className={cn(
+                                'grid min-h-12 w-full grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center px-3 text-left transition-colors',
+                                selected ? 'bg-background shadow-[inset_3px_0_0_var(--primary)]' : 'hover:bg-background/75',
+                              )}
+                            >
+                              <span className="flex items-center gap-2 pl-7 text-[10px] font-medium text-muted-foreground">
+                                <span className={cn(
+                                  'h-1.5 w-1.5 shrink-0 rounded-full',
+                                  selected ? 'bg-primary' : 'bg-muted-foreground/40',
+                                )}
+                                />
+                                Run
+                              </span>
+                              <span className="min-w-0 pr-3">
+                                <span className="block truncate text-[13px] font-medium text-foreground">
+                                  {run.inputPreview || run.runId}
+                                </span>
+                                <span className="mt-1 block truncate text-[11px] text-muted-foreground">
+                                  {run.runId} · {formatTime(run.updatedAt)}
+                                </span>
+                              </span>
+                              <StatusPill status={run.status} />
+                              <span className="text-right text-xs tabular-nums text-muted-foreground">{run.eventCount}</span>
+                              <span aria-hidden="true" />
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 )
               })
             )}
@@ -693,6 +862,87 @@ function normalizeEventRecord(
 
 function runKey(run: Pick<ConsoleRun, 'source' | 'runId'>): string {
   return `${run.source}:${run.runId}`
+}
+
+function runSessionKey(run: Pick<ConsoleRun, 'source' | 'sessionId' | 'runId'>): string {
+  return `${run.source}:${run.sessionId ?? run.runId}`
+}
+
+export function groupConsoleRuns(runs: ConsoleRun[], sourceFilter: SourceFilter): ConsoleRunSession[] {
+  const sessions = new Map<string, ConsoleRun[]>()
+  const filteredRuns = sourceFilter === 'all'
+    ? runs
+    : runs.filter(run => run.source === sourceFilter)
+
+  for (const run of filteredRuns) {
+    const key = runSessionKey(run)
+    const sessionRuns = sessions.get(key) ?? []
+    sessionRuns.push(run)
+    sessions.set(key, sessionRuns)
+  }
+
+  return Array.from(sessions.entries())
+    .map(([key, sessionRuns]) => makeConsoleRunSession(key, sessionRuns))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+function makeConsoleRunSession(key: string, runs: ConsoleRun[]): ConsoleRunSession {
+  const timelineRuns = [...runs].sort((a, b) => a.createdAt - b.createdAt)
+  const firstRun = timelineRuns[0]
+  const latestRun = runs.reduce((latest, run) => (
+    run.updatedAt > latest.updatedAt ? run : latest
+  ), firstRun)
+  const sessionId = firstRun.sessionId ?? latestRun.sessionId ?? latestRun.runId
+
+  return {
+    key,
+    source: latestRun.source,
+    sessionId,
+    title: consoleSessionTitle(firstRun, latestRun),
+    status: consoleSessionStatus(timelineRuns, latestRun),
+    eventCount: timelineRuns.reduce((total, run) => total + run.eventCount, 0),
+    runCount: timelineRuns.length,
+    updatedAt: latestRun.updatedAt,
+    createdAt: firstRun.createdAt,
+    latestRunKey: runKey(latestRun),
+    runs: timelineRuns,
+  }
+}
+
+function consoleSessionTitle(firstRun: ConsoleRun, latestRun: ConsoleRun): string {
+  return firstRun.inputPreview ||
+    latestRun.inputPreview ||
+    `${SOURCE_LABELS[latestRun.source]} session`
+}
+
+function consoleSessionStatus(runs: ConsoleRun[], latestRun: ConsoleRun): string {
+  if (runs.some(run => run.status === 'running')) return 'running'
+  if (runs.some(run => run.status === 'queued')) return 'queued'
+  return latestRun.status
+}
+
+function sourcePillClassName(source: RunSource): string {
+  if (source === 'design') return 'bg-fuchsia-50 text-fuchsia-700'
+  return 'bg-sky-50 text-sky-700'
+}
+
+function withSetValue(values: ReadonlySet<string>, value: string): ReadonlySet<string> {
+  if (values.has(value)) return values
+  const next = new Set(values)
+  next.add(value)
+  return next
+}
+
+function withoutSetValue(values: ReadonlySet<string>, value: string): ReadonlySet<string> {
+  if (!values.has(value)) return values
+  const next = new Set(values)
+  next.delete(value)
+  return next
+}
+
+function shortId(value: string): string {
+  if (value.length <= 14) return value
+  return `${value.slice(0, 6)}...${value.slice(-5)}`
 }
 
 export function projectConsoleLogGroups(item: ConsoleEvent): ConsoleLogGroup[] {
