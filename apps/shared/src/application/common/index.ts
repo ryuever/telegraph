@@ -102,6 +102,9 @@ export const SharedApplicationId = createId('SharedApplication');
 
 export interface ISharedProcess {
   spawn(): Promise<void>;
+  stop(): void;
+  resume(): Promise<void>;
+  restart(reason?: string): Promise<void>;
   getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
   subscribeStateChange(listener: () => void): () => void;
 }

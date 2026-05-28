@@ -4,6 +4,10 @@ import type {
   MonitorSnapshot,
   SupervisorInspectorSnapshot,
 } from '@/apps/daemon/diagnostics/common';
+import type {
+  ProcessControlAction,
+  ProcessControlResult,
+} from '@/packages/services/pagelet-host/common';
 
 export type {
   ProcessRow,
@@ -11,6 +15,10 @@ export type {
   MonitorSnapshot,
   SupervisorInspectorSnapshot,
 } from '@/apps/daemon/diagnostics/common';
+export type {
+  ProcessControlAction,
+  ProcessControlResult,
+} from '@/packages/services/pagelet-host/common';
 
 export const MONITOR_PAGELET_SERVICE_PATH = 'monitor-pagelet-api';
 
@@ -32,6 +40,10 @@ export interface IMonitorPageletService {
   onSupervisorSnapshotsChanged(
     callback: (snapshots: SupervisorInspectorSnapshot[]) => void
   ): () => void;
+  controlSupervisor(
+    participantId: string,
+    action: ProcessControlAction
+  ): Promise<ProcessControlResult>;
 }
 
 export interface IMonitorApplication {

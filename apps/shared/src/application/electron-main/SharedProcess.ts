@@ -32,6 +32,7 @@ export { SharedProcessId };
 export class SharedProcess implements ISharedProcess {
   private supervisor: UtilityProcessSupervisor | null = null;
   private lastPid: number | null = null;
+  private readonly stateChangeListeners = new Set<() => void>();
   private readonly pendingStateChangeListeners = new Set<() => void>();
 
   constructor(
@@ -41,7 +42,13 @@ export class SharedProcess implements ISharedProcess {
   ) {}
 
   async spawn(): Promise<void> {
-    this.supervisor = new UtilityProcessSupervisor({
+    this.supervisor = this.createSupervisor();
+    await this.supervisor.start();
+    this.logger.info('[SharedProcess] spawned');
+  }
+
+  private createSupervisor(): UtilityProcessSupervisor {
+    const supervisor = new UtilityProcessSupervisor({
       orchestrator: this.cpServer.getOrchestrator(),
       participantId: SHARED_PARTICIPANT_ID,
       entry: join(__dirname, '../preload/shared-worker.js'),
@@ -68,18 +75,27 @@ export class SharedProcess implements ISharedProcess {
         { this.logger.info(`[SharedProcess:${level}] ${msg}`); },
     });
     for (const listener of this.pendingStateChangeListeners) {
-      this.supervisor.subscribeStateChange(() => { listener(); });
+      this.stateChangeListeners.add(listener);
     }
     this.pendingStateChangeListeners.clear();
-    await this.supervisor.start();
-    this.logger.info('[SharedProcess] spawned');
+    supervisor.subscribeStateChange(() => {
+      this.notifyStateChange();
+    });
+    return supervisor;
+  }
+
+  private notifyStateChange(): void {
+    for (const listener of this.stateChangeListeners) {
+      listener();
+    }
   }
 
   subscribeStateChange(listener: () => void): () => void {
     if (this.supervisor) {
-      return this.supervisor.subscribeStateChange(() => {
-        listener();
-      });
+      this.stateChangeListeners.add(listener);
+      return () => {
+        this.stateChangeListeners.delete(listener);
+      };
     }
     // See DaemonProcess.subscribeStateChange for the buffer/disposer
     // caveat — same trade-off applies here.
@@ -87,6 +103,35 @@ export class SharedProcess implements ISharedProcess {
     return () => {
       this.pendingStateChangeListeners.delete(listener);
     };
+  }
+
+  stop(): void {
+    if (!this.supervisor) {
+      throw new Error('[SharedProcess] shared is not supervised');
+    }
+    this.supervisor.stop();
+    if (this.lastPid !== null) {
+      this.pidNameRegistry.unregister(this.lastPid);
+      this.lastPid = null;
+    }
+    this.notifyStateChange();
+  }
+
+  async resume(): Promise<void> {
+    if (this.supervisor && ['running', 'starting', 'restarting'].includes(this.supervisor.state)) {
+      return;
+    }
+    this.supervisor = this.createSupervisor();
+    await this.supervisor.start();
+    this.notifyStateChange();
+  }
+
+  async restart(reason?: string): Promise<void> {
+    if (!this.supervisor) {
+      throw new Error('[SharedProcess] shared is not supervised');
+    }
+    await this.supervisor.restart(reason);
+    this.notifyStateChange();
   }
 
   getInspectorSnapshot(): SupervisorInspectorSnapshot | null {

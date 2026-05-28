@@ -25,6 +25,8 @@ export const ORCHESTRATOR_SERVICE_PATH = 'orchestrator';
 
 export const MAIN_RPC_SERVICE_PATH = 'main-rpc';
 
+export const MAIN_PROCESS_SUPERVISOR_SERVICE_PATH = 'main-process-supervisor';
+
 export interface MainOpenRunOptions {
   pageletId?: string;
 }
@@ -50,6 +52,28 @@ export interface MainWindowThemePayload {
 export interface IMainRpcService {
   mainPing(msg: string): Promise<string>;
   openRun(runId: string, options?: MainOpenRunOptions): Promise<MainOpenRunResult>;
+}
+
+export type ProcessControlAction = 'kill' | 'resume' | 'restart';
+
+export interface ProcessControlRequest {
+  participantId: string;
+  action: ProcessControlAction;
+  reason?: string;
+}
+
+export interface ProcessControlResult {
+  participantId: string;
+  action: ProcessControlAction;
+  ok: boolean;
+  state?: string;
+  error?: string;
+}
+
+export interface IMainProcessSupervisorService {
+  controlParticipant(
+    request: ProcessControlRequest
+  ): Promise<ProcessControlResult>;
 }
 
 export const MAIN_WINDOW_SERVICE_PATH = 'main-window';

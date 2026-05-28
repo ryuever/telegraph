@@ -81,6 +81,9 @@ export class WindowManager implements IWindowManager {
 
   onSettingWindowCreated(callback: (win: BrowserWindow) => void): void {
     this.settingWindowCallbacks.push(callback);
+    if (this.settingWindow && !this.settingWindow.isDestroyed()) {
+      callback(this.settingWindow);
+    }
   }
 
   setSwitchPageCallback(callback: (pageId: string, payload?: MainSwitchPagePayload) => void): void {
@@ -121,15 +124,15 @@ export class WindowManager implements IWindowManager {
       },
     });
 
+    for (const cb of this.settingWindowCallbacks) {
+      cb(this.settingWindow);
+    }
+
     const devServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL;
     if (devServerUrl) {
       void this.settingWindow.loadURL(`${devServerUrl}/setting.html`);
     } else {
       void this.settingWindow.loadFile(resolveMainWindowRendererHtmlPath('setting.html'));
-    }
-
-    for (const cb of this.settingWindowCallbacks) {
-      cb(this.settingWindow);
     }
 
     this.settingWindow.on('closed', () => {

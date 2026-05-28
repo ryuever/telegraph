@@ -32,6 +32,7 @@ export { DaemonProcessId };
 export class DaemonProcess implements IDaemonProcess {
   private supervisor: UtilityProcessSupervisor | null = null;
   private lastPid: number | null = null;
+  private readonly stateChangeListeners = new Set<() => void>();
   /**
    * Listeners registered before {@link spawn} completes. We need to
    * buffer them because {@link UtilityProcessSupervisor} is constructed
@@ -49,7 +50,13 @@ export class DaemonProcess implements IDaemonProcess {
   ) {}
 
   async spawn(): Promise<void> {
-    this.supervisor = new UtilityProcessSupervisor({
+    this.supervisor = this.createSupervisor();
+    await this.supervisor.start();
+    this.logger.info('[DaemonProcess] spawned');
+  }
+
+  private createSupervisor(): UtilityProcessSupervisor {
+    const supervisor = new UtilityProcessSupervisor({
       orchestrator: this.cpServer.getOrchestrator(),
       participantId: DAEMON_PARTICIPANT_ID,
       entry: join(__dirname, '../preload/daemon-worker.js'),
@@ -80,20 +87,27 @@ export class DaemonProcess implements IDaemonProcess {
     });
     // Drain any subscribers registered before spawn().
     for (const listener of this.pendingStateChangeListeners) {
-      this.supervisor.subscribeStateChange(() => { listener(); });
+      this.stateChangeListeners.add(listener);
     }
     this.pendingStateChangeListeners.clear();
-    await this.supervisor.start();
-    this.logger.info('[DaemonProcess] spawned');
+    supervisor.subscribeStateChange(() => {
+      this.notifyStateChange();
+    });
+    return supervisor;
+  }
+
+  private notifyStateChange(): void {
+    for (const listener of this.stateChangeListeners) {
+      listener();
+    }
   }
 
   subscribeStateChange(listener: () => void): () => void {
     if (this.supervisor) {
-      // Adapt: x-oasis emits a StateChangeEvent payload; consumers
-      // here only need a notification.
-      return this.supervisor.subscribeStateChange(() => {
-        listener();
-      });
+      this.stateChangeListeners.add(listener);
+      return () => {
+        this.stateChangeListeners.delete(listener);
+      };
     }
     // Buffer for later; spawn() will rebind these to the supervisor.
     // NOTE: the returned disposer only removes the listener from the
@@ -106,6 +120,35 @@ export class DaemonProcess implements IDaemonProcess {
     return () => {
       this.pendingStateChangeListeners.delete(listener);
     };
+  }
+
+  stop(): void {
+    if (!this.supervisor) {
+      throw new Error('[DaemonProcess] daemon is not supervised');
+    }
+    this.supervisor.stop();
+    if (this.lastPid !== null) {
+      this.pidNameRegistry.unregister(this.lastPid);
+      this.lastPid = null;
+    }
+    this.notifyStateChange();
+  }
+
+  async resume(): Promise<void> {
+    if (this.supervisor && ['running', 'starting', 'restarting'].includes(this.supervisor.state)) {
+      return;
+    }
+    this.supervisor = this.createSupervisor();
+    await this.supervisor.start();
+    this.notifyStateChange();
+  }
+
+  async restart(reason?: string): Promise<void> {
+    if (!this.supervisor) {
+      throw new Error('[DaemonProcess] daemon is not supervised');
+    }
+    await this.supervisor.restart(reason);
+    this.notifyStateChange();
   }
 
   getInspectorSnapshot(): SupervisorInspectorSnapshot | null {

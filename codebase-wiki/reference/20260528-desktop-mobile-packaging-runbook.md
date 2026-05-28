@@ -31,6 +31,7 @@ Mobile 只通过 `MobileRemoteControlClient` 访问 remote-control HTTP relay，
 |---|---|---|
 | 根 `package.json` 的 `package` / `make` 使用 `pnpm --filter telegraph ...` | 当前 workspace 包名是 `@telegraph/main`，根命令不会命中任何项目 | 根脚本改为 `package:desktop` / `make:desktop`，默认 `package` 与 `make` 代理到 desktop |
 | Desktop packaged app 黑屏 | `WindowManager` 在 production 加载 `../renderer/index.html`，但 Forge Vite 输出目录是 `../renderer/main_window/index.html` | packaged `loadFile` 路径改为 `../renderer/main_window/{index,setting}.html`，并补单测 |
+| Desktop Dev 页 Connect 一直 connecting | 主窗口的 `openSettingWindow` RPC 早于 setting-window 注册回调暴露，启动后快速打开 Dev 可能让 `setting-rpc` 没有注册到主进程 | setting-window 创建回调提前注册；`WindowManager` 支持已打开窗口的补登记，并在加载 `setting.html` 前绑定 IPC |
 | Mobile 只有 dev/run 脚本，没有明确的生成/打包入口 | 不清楚该用 export、prebuild 还是 release build | `apps/mobile/package.json` 增加 `package`、`export:*`、`generate:native*` 与 native release 辅助脚本 |
 | Expo prebuild 会生成大量原生 scaffold | 容易把可再生成的 native 目录混入业务 diff | `.gitignore` 增加 `apps/mobile/android/` 与 `apps/mobile/ios/`，按 CNG 方式本地生成 |
 
@@ -64,7 +65,10 @@ pnpm --filter @telegraph/mobile native:android:release
 | 命令 | 结果 | 备注 |
 |---|---|---|
 | `pnpm --filter @telegraph/main package` | 通过 | 生成 `apps/main/out/Telegraph-darwin-arm64/Telegraph.app` |
+| `pnpm --filter @telegraph/main typecheck` | 通过 | main TypeScript 无错误 |
+| `pnpm --filter @telegraph/main test -- WindowManager.test.ts` | 通过 | 5 个相关测试文件，29 个测试通过 |
 | `pnpm make:desktop` | 通过 | 生成 `apps/main/out/make/zip/darwin/arm64/Telegraph-darwin-arm64-0.0.0.zip` |
+| Desktop packaged app Dev smoke | 通过 | 打开左下角头像 Dev 后状态为 READY；Disconnect 后再 Connect 可回 READY；Pagelet Info 返回 `setting ready (...)` |
 | `pnpm --filter @telegraph/mobile typecheck` | 通过 | TypeScript 无错误 |
 | `pnpm --filter @telegraph/mobile test` | 通过 | 2 个测试文件，4 个测试通过 |
 | `pnpm --filter @telegraph/mobile exec expo export --platform all --output-dir dist` | 通过 | 生成 iOS/Android Hermes bundle 与 `metadata.json` |

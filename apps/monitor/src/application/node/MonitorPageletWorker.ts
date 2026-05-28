@@ -4,7 +4,11 @@ import { createParticipantProxy } from '@x-oasis/async-call-rpc-electron';
 import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagelet-host/node/PageletWorker';
 import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
 import { MONITOR_PAGELET_SERVICE_PATH } from '@/apps/monitor/application/common';
-import type { SupervisorInspectorSnapshot } from '@/apps/monitor/application/common';
+import type {
+  ProcessControlAction,
+  ProcessControlResult,
+  SupervisorInspectorSnapshot,
+} from '@/apps/monitor/application/common';
 import type {
   IDaemonService,
   MonitorSnapshot,
@@ -13,6 +17,10 @@ import {
   MAIN_METRICS_SERVICE_PATH,
   type IMainMetricsService,
 } from '@/packages/services/main-metrics/common';
+import {
+  MAIN_PROCESS_SUPERVISOR_SERVICE_PATH,
+  type IMainProcessSupervisorService,
+} from '@/packages/services/pagelet-host/common';
 import { createLogger } from '@/packages/services/log/node/logger';
 
 const logger = createLogger('monitor');
@@ -51,6 +59,8 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
   private readonly supervisorSnapshotListeners =
     new Set<SupervisorSnapshotCallback>();
   private mainMetricsClient: IMainMetricsService | null = null;
+  private mainProcessSupervisorClient: IMainProcessSupervisorService | null =
+    null;
   private mainSupervisorSubscriptionAttached = false;
   /** Latest payload from main; replayed to new renderer subscribers. */
   private latestSupervisorSnapshots: SupervisorInspectorSnapshot[] | null = null;
@@ -96,6 +106,11 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
     this.mainMetricsClient = clientHost
       .registerClient(MAIN_METRICS_SERVICE_PATH, { channel: this.mainChannel })
       .createProxy() as unknown as IMainMetricsService;
+    this.mainProcessSupervisorClient = clientHost
+      .registerClient(MAIN_PROCESS_SUPERVISOR_SERVICE_PATH, {
+        channel: this.mainChannel,
+      })
+      .createProxy() as unknown as IMainProcessSupervisorService;
 
     const subscribe = (): void => {
       try {
@@ -204,6 +219,24 @@ export class MonitorPageletWorker extends PageletWorker<unknown, IDaemonService>
           return () => {
             this.supervisorSnapshotListeners.delete(callback);
           };
+        },
+        controlSupervisor: async (
+          participantId: string,
+          action: ProcessControlAction
+        ): Promise<ProcessControlResult> => {
+          if (!this.mainProcessSupervisorClient) {
+            return {
+              participantId,
+              action,
+              ok: false,
+              error: 'main process supervisor client is not ready',
+            };
+          }
+          return this.mainProcessSupervisorClient.controlParticipant({
+            participantId,
+            action,
+            reason: 'monitor-context-menu',
+          });
         },
       },
     });

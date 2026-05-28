@@ -20,6 +20,9 @@ export type { MonitorSnapshot };
 
 export interface IDaemonProcess {
   spawn(): Promise<void>;
+  stop(): void;
+  resume(): Promise<void>;
+  restart(reason?: string): Promise<void>;
   getInspectorSnapshot(): SupervisorInspectorSnapshot | null;
   subscribeStateChange(listener: () => void): () => void;
 }

@@ -33,19 +33,26 @@ import {
   CHAT_PARTICIPANT_ID,
   CONNECTION_PARTICIPANT_ID,
   DESIGN_PARTICIPANT_ID,
+  MAIN_PROCESS_SUPERVISOR_SERVICE_PATH,
   MAIN_RPC_SERVICE_PATH,
   MAIN_WINDOW_SERVICE_PATH,
   MONITOR_PARTICIPANT_ID,
   RENDERER_PARTICIPANT_ID,
+} from '@/packages/services/pagelet-host/common';
+import type {
+  IMainProcessSupervisorService,
+  ProcessControlAction,
+  ProcessControlRequest,
+  ProcessControlResult,
 } from '@/packages/services/pagelet-host/common';
 import type { MainWindowThemePayload } from '@/packages/services/pagelet-host/common';
 import { MAIN_METRICS_SERVICE_PATH } from '@/packages/services/main-metrics/common';
 import type { IMainMetricsService } from '@/packages/services/main-metrics/common';
 import { MainMetricsServiceId } from '@/packages/services/main-metrics/common';
 import type { IDaemonProcess } from '@/apps/daemon/application/common';
-import { DaemonProcessId } from '@/apps/daemon/application/common';
+import { DAEMON_PARTICIPANT_ID, DaemonProcessId } from '@/apps/daemon/application/common';
 import type { ISharedProcess } from '@/apps/shared/application/common';
-import { SharedProcessId } from '@/apps/shared/application/common';
+import { SHARED_PARTICIPANT_ID, SharedProcessId } from '@/apps/shared/application/common';
 import type { IPageletProcess } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { PageletProcessId } from '@/packages/services/pagelet-host/electron-main/PageletProcess';
 import { LogServiceId } from '@/packages/services/log/common/LogService';
@@ -117,6 +124,11 @@ export class AppApplication implements IAppApplication {
       this.mainCpServer.getSettingOrchestrator()
     );
 
+    this.windowManager.onSettingWindowCreated((win) => {
+      this.mainCpServer.registerSettingWindow(win);
+      this.appOrchestrator.registerSettingOrchestratorService();
+    });
+
     const rendererIpcChannel = this.mainCpServer.getRendererIpcChannel();
 
     let mainCallCount = 0;
@@ -161,6 +173,15 @@ export class AppApplication implements IAppApplication {
       ) => this.metricsService.onSupervisorSnapshotsChanged(callback),
     });
 
+    const processSupervisorService: IMainProcessSupervisorService = {
+      controlParticipant: (request) =>
+        this.controlParticipantProcess(request.participantId, request.action),
+    };
+    serviceHost.registerServiceHandler(MAIN_PROCESS_SUPERVISOR_SERVICE_PATH, {
+      controlParticipant: (request: ProcessControlRequest) =>
+        processSupervisorService.controlParticipant(request),
+    });
+
     // Bridge supervisor state transitions → MainMetricsService event
     // bus so monitor renderer sees transient states (`restarting`,
     // `failed`, `starting`) even when the transition is shorter than
@@ -199,11 +220,6 @@ export class AppApplication implements IAppApplication {
     await this.remoteControlApp.start();
     await this.designApp.start();
     await this.chatApp.start();
-
-    this.windowManager.onSettingWindowCreated((win) => {
-      this.mainCpServer.registerSettingWindow(win);
-      this.appOrchestrator.registerSettingOrchestratorService();
-    });
 
     // Cmd+R recreates the renderer/preload context without destroying the
     // BrowserWindow. The orchestrator's control-plane IPC can survive that
@@ -317,5 +333,73 @@ export class AppApplication implements IAppApplication {
     }
 
     this.logger.info('[AppApplication] start() done');
+  }
+
+  private async controlParticipantProcess(
+    participantId: string,
+    action: ProcessControlAction
+  ): Promise<ProcessControlResult> {
+    try {
+      if (participantId === DAEMON_PARTICIPANT_ID) {
+        await this.controlSingletonProcess(this.daemonProcess, action, 'daemon');
+      } else if (participantId === SHARED_PARTICIPANT_ID) {
+        await this.controlSingletonProcess(this.sharedProcess, action, 'shared');
+      } else {
+        await this.controlPageletProcess(participantId, action);
+      }
+
+      this.metricsService.triggerSupervisorSnapshotsChanged();
+      const snapshot = this.metricsService
+        .getSupervisorSnapshots()
+        .find((s) => s.participantId === participantId);
+      return {
+        participantId,
+        action,
+        ok: true,
+        state: snapshot?.state,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `[AppApplication] process control failed (${action} ${participantId}): ${message}`
+      );
+      return {
+        participantId,
+        action,
+        ok: false,
+        error: message,
+      };
+    }
+  }
+
+  private async controlSingletonProcess(
+    process: Pick<IDaemonProcess, 'stop' | 'resume' | 'restart'>,
+    action: ProcessControlAction,
+    label: string
+  ): Promise<void> {
+    if (action === 'kill') {
+      process.stop();
+      return;
+    }
+    if (action === 'resume') {
+      await process.resume();
+      return;
+    }
+    await process.restart(`monitor:${label}`);
+  }
+
+  private async controlPageletProcess(
+    participantId: string,
+    action: ProcessControlAction
+  ): Promise<void> {
+    if (action === 'kill') {
+      this.pageletProcess.stop(participantId);
+      return;
+    }
+    if (action === 'resume') {
+      await this.pageletProcess.resume(participantId);
+      return;
+    }
+    await this.pageletProcess.restart(participantId, 'monitor');
   }
 }

@@ -44,6 +44,9 @@ export interface IPageletProcess {
     options?: PageletSpawnOptions
   ): Promise<void>;
   kill(pageletId: string): void;
+  stop(pageletId: string): void;
+  resume(pageletId: string): Promise<void>;
+  restart(pageletId: string, reason?: string): Promise<void>;
   getChannel(pageletId: string): ElectronUtilityProcessChannel | undefined;
   /**
    * Inspector snapshot for every currently-supervised pagelet (one per
@@ -75,6 +78,10 @@ export class PageletProcess implements IPageletProcess {
   private supervisors = new Map<string, UtilityProcessSupervisor>();
   private channels = new Map<string, ElectronUtilityProcessChannel>();
   private lastPids = new Map<string, number>();
+  private spawnSpecs = new Map<
+    string,
+    { workerFileName: string; options: PageletSpawnOptions }
+  >();
   /**
    * Application-level state-change subscribers. Wired onto every
    * existing supervisor and onto each future supervisor created by
@@ -109,7 +116,24 @@ export class PageletProcess implements IPageletProcess {
         `[PageletProcess] pagelet "${pageletId}" already spawned`
       );
     }
+    this.spawnSpecs.set(pageletId, { workerFileName, options });
+    const supervisor = this.createSupervisor(pageletId, workerFileName, options);
+    this.supervisors.set(pageletId, supervisor);
+    supervisor.subscribeStateChange(() => {
+      this.notifyStateChange();
+    });
+    await supervisor.start();
+    this.logger.info(`[PageletProcess] spawned ${pageletId}`);
+    // The set of supervisors changed — the inspector view of "who
+    // exists" mutated, so push to subscribers as well.
+    this.notifyStateChange();
+  }
 
+  private createSupervisor(
+    pageletId: string,
+    workerFileName: string,
+    options: PageletSpawnOptions
+  ): UtilityProcessSupervisor {
     // The default main orchestrator + any additional orchestrators declared
     // by MainCpServer.getAdditionalOrchestratorsFor() (e.g. the setting
     // pagelet, which also belongs to the setting window's orchestrator).
@@ -125,7 +149,7 @@ export class PageletProcess implements IPageletProcess {
       options.displayName ??
       pageletId.charAt(0).toUpperCase() + pageletId.slice(1);
 
-    const supervisor = new UtilityProcessSupervisor({
+    return new UtilityProcessSupervisor({
       orchestrator: orchestrators,
       participantId: pageletId,
       entry: join(__dirname, `../preload/${workerFileName}`),
@@ -155,19 +179,6 @@ export class PageletProcess implements IPageletProcess {
       logger: (level: string, msg: string) =>
         { this.logger.info(`[PageletProcess:${pageletId}:${level}] ${msg}`); },
     });
-
-    this.supervisors.set(pageletId, supervisor);
-    // Wire the new supervisor into the application-level fan-out so
-    // every subscriber registered before/after this spawn is notified
-    // on its state transitions.
-    supervisor.subscribeStateChange(() => {
-      this.notifyStateChange();
-    });
-    await supervisor.start();
-    this.logger.info(`[PageletProcess] spawned ${pageletId}`);
-    // The set of supervisors changed — the inspector view of "who
-    // exists" mutated, so push to subscribers as well.
-    this.notifyStateChange();
   }
 
   kill(pageletId: string): void {
@@ -182,6 +193,54 @@ export class PageletProcess implements IPageletProcess {
       this.lastPids.delete(pageletId);
     }
     // Set of supervisors changed; notify so monitor drops the card.
+    this.notifyStateChange();
+  }
+
+  stop(pageletId: string): void {
+    const supervisor = this.supervisors.get(pageletId);
+    if (!supervisor) {
+      throw new Error(`[PageletProcess] pagelet "${pageletId}" is not supervised`);
+    }
+    supervisor.stop();
+    this.channels.delete(pageletId);
+    const lastPid = this.lastPids.get(pageletId);
+    if (lastPid !== undefined) {
+      this.pidNameRegistry.unregister(lastPid);
+      this.lastPids.delete(pageletId);
+    }
+    this.notifyStateChange();
+  }
+
+  async resume(pageletId: string): Promise<void> {
+    const existing = this.supervisors.get(pageletId);
+    if (existing && ['running', 'starting', 'restarting'].includes(existing.state)) {
+      return;
+    }
+    const spec = this.spawnSpecs.get(pageletId);
+    if (!spec) {
+      throw new Error(`[PageletProcess] no spawn spec recorded for "${pageletId}"`);
+    }
+    this.supervisors.delete(pageletId);
+    this.channels.delete(pageletId);
+    const supervisor = this.createSupervisor(
+      pageletId,
+      spec.workerFileName,
+      spec.options
+    );
+    this.supervisors.set(pageletId, supervisor);
+    supervisor.subscribeStateChange(() => {
+      this.notifyStateChange();
+    });
+    await supervisor.start();
+    this.notifyStateChange();
+  }
+
+  async restart(pageletId: string, reason?: string): Promise<void> {
+    const supervisor = this.supervisors.get(pageletId);
+    if (!supervisor) {
+      throw new Error(`[PageletProcess] pagelet "${pageletId}" is not supervised`);
+    }
+    await supervisor.restart(reason);
     this.notifyStateChange();
   }
 
