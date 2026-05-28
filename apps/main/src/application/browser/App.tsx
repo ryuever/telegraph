@@ -263,17 +263,12 @@ function AppContextBar({
   activePage: PageConfig;
   onOpenSettings: () => void;
 }): React.JSX.Element {
-  const Icon = PAGE_ICONS[activePage.id];
-
   return (
     <header
       className="relative flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-3 shadow-[inset_0_-1px_0_var(--border)]"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary shadow-[var(--shadow-primary-soft)]">
-          <Icon size={15} />
-        </div>
+      <div className="flex min-w-0 items-center">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <div className="truncate text-[13px] font-semibold leading-none text-foreground">{activePage.label}</div>

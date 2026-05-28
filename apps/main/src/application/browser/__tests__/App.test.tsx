@@ -117,6 +117,14 @@ describe('App page navigation', () => {
     expect(localStorageMock.getItem('telegraph.activePageId')).toBe('chat')
   })
 
+  it('puts chat before design in the main sidebar', () => {
+    const app = renderApp()
+    const navLabels = Array.from(app.querySelectorAll('nav button'))
+      .map((button) => button.getAttribute('aria-label'))
+
+    expect(navLabels.slice(0, 2)).toEqual(['Chat', 'Design'])
+  })
+
   it('persists run console page selection', () => {
     const app = renderApp()
     const runsButton = Array.from(app.querySelectorAll('button'))

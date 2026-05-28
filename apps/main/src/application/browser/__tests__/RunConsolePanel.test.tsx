@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent } from '@/packages/agent-protocol'
 import { extractObservationArtifacts, projectConsoleLogGroups, RunConsolePanel } from '@/apps/main/application/browser/RunConsolePanel'
+import { PageletActivityProvider, type PageletId } from '@/apps/main/application/browser/pagelet-activity'
+import { CHAT_PAGE, RUN_CONSOLE_PAGE } from '@/apps/main/application/common/cp-config'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
@@ -295,6 +297,108 @@ describe('RunConsolePanel interaction', () => {
 
     return container
   }
+
+  async function renderPanelWithActivePage(activePageId: PageletId): Promise<HTMLDivElement> {
+    container ??= document.createElement('div')
+    if (!container.isConnected) document.body.append(container)
+    root ??= createRoot(container)
+
+    await act(async () => {
+      root?.render(
+        <PageletActivityProvider activePageId={activePageId} pageId={RUN_CONSOLE_PAGE.id}>
+          <RunConsolePanel />
+        </PageletActivityProvider>,
+      )
+      await flushPromises()
+    })
+
+    return container
+  }
+
+  it('refreshes runs when the keep-alive run console becomes active again', async () => {
+    serviceMocks.listRuns
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        runId: 'run-new-session',
+        sessionId: 'session-new',
+        status: 'completed',
+        runtimeId: 'pi-ai',
+        artifactRefs: [],
+        settings: {},
+        input: { message: 'New session from chat' },
+        inputPreview: 'New session from chat',
+        eventCount: 1,
+        createdAt: 10,
+        startedAt: 10,
+        completedAt: 12,
+        lastEventAt: 12,
+      }])
+
+    const panel = await renderPanelWithActivePage(RUN_CONSOLE_PAGE.id)
+    await act(async () => {
+      await flushPromises()
+    })
+
+    expect(serviceMocks.listRuns).toHaveBeenCalledTimes(1)
+    expect(panel.textContent).not.toContain('New session from chat')
+
+    await renderPanelWithActivePage(CHAT_PAGE.id)
+    await act(async () => {
+      await flushPromises()
+    })
+
+    expect(serviceMocks.listRuns).toHaveBeenCalledTimes(1)
+
+    await renderPanelWithActivePage(RUN_CONSOLE_PAGE.id)
+    await act(async () => {
+      await flushPromises()
+    })
+
+    expect(serviceMocks.listRuns).toHaveBeenCalledTimes(2)
+    expect(panel.textContent).toContain('New session from chat')
+  })
+
+  it('defaults to chat runs without rendering an all filter or source column', async () => {
+    serviceMocks.listAgentRuns.mockResolvedValue([{
+      runId: 'design-run',
+      sessionId: 'design-session',
+      status: 'completed',
+      prompt: 'Design-only run',
+      events: [],
+      startedAt: 1,
+      completedAt: 2,
+      updatedAt: 2,
+    }])
+    serviceMocks.listRuns.mockResolvedValue([{
+      runId: 'chat-run',
+      sessionId: 'chat-session',
+      status: 'completed',
+      runtimeId: 'pi-ai',
+      artifactRefs: [],
+      settings: {},
+      input: { message: 'Chat default run' },
+      inputPreview: 'Chat default run',
+      eventCount: 1,
+      createdAt: 3,
+      startedAt: 3,
+      completedAt: 4,
+      lastEventAt: 4,
+    }])
+
+    const panel = await renderPanel()
+    await act(async () => {
+      await flushPromises()
+    })
+
+    const filterLabels = Array.from(panel.querySelectorAll('header button'))
+      .map(button => button.textContent?.trim())
+      .filter(Boolean)
+
+    expect(filterLabels).not.toContain('All')
+    expect(panel.textContent).not.toContain('Source')
+    expect(panel.textContent).toContain('Chat default run')
+    expect(panel.textContent).not.toContain('Design-only run')
+  })
 
   it('groups runs from the same session under a collapsible tree parent', async () => {
     serviceMocks.listRuns.mockResolvedValue([

@@ -23,6 +23,7 @@ import { PageletAgentService } from '@/apps/chat/application/browser/pagelet-age
 import type { ChatAgentRunRecordSnapshot } from '@/apps/chat/application/common'
 import { PageletDesignAgentService } from '@/apps/design/application/browser/pagelet-design-agent-service'
 import type { DesignAgentRunRecordSnapshot } from '@/apps/design/application/common'
+import { useIsPageletActive } from '@/apps/main/application/browser/pagelet-activity'
 import type { AgentEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common'
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
@@ -32,7 +33,7 @@ const designAgentService = new PageletDesignAgentService()
 const chatAgentService = new PageletAgentService()
 
 type RunSource = 'design' | 'chat'
-type SourceFilter = 'all' | RunSource
+type SourceFilter = RunSource
 
 interface ConsoleRun {
   source: RunSource
@@ -115,18 +116,18 @@ const SOURCE_LABELS: Record<RunSource, string> = {
 }
 
 const FILTERS: Array<{ id: SourceFilter; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'design', label: 'Design' },
   { id: 'chat', label: 'Chat' },
+  { id: 'design', label: 'Design' },
 ]
 
 export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {}): React.JSX.Element {
+  const isRunConsoleActive = useIsPageletActive('run-console')
   const [runs, setRuns] = useState<ConsoleRun[]>([])
   const [sourceState, setSourceState] = useState<Record<RunSource, SourceState>>({
     design: { loading: true, count: 0 },
     chat: { loading: true, count: 0 },
   })
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('chat')
   const [selectedRunKey, setSelectedRunKey] = useState<string | null>(null)
   const [events, setEvents] = useState<ConsoleEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
@@ -150,6 +151,12 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
     () => groupConsoleRuns(runs, sourceFilter),
     [runs, sourceFilter],
   )
+
+  useEffect(() => {
+    if (focus?.pageletId === 'chat' || focus?.pageletId === 'design') {
+      setSourceFilter(focus.pageletId)
+    }
+  }, [focus?.pageletId])
 
   useEffect(() => {
     if (!focus?.runId) return
@@ -203,14 +210,16 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
     setRuns(nextRuns)
     setSourceState(nextSourceState)
     setSelectedRunKey((current) => {
-      if (current && nextRuns.some(run => runKey(run) === current)) return current
-      return nextRuns[0] ? runKey(nextRuns[0]) : null
+      const nextVisibleRuns = nextRuns.filter(run => run.source === sourceFilter)
+      if (current && nextVisibleRuns.some(run => runKey(run) === current)) return current
+      return nextVisibleRuns[0] ? runKey(nextVisibleRuns[0]) : null
     })
-  }, [])
+  }, [sourceFilter])
 
   useEffect(() => {
+    if (!isRunConsoleActive) return
     void refreshRuns()
-  }, [refreshRuns])
+  }, [isRunConsoleActive, refreshRuns])
 
   useEffect(() => {
     setSelectedLogKey(current => {
@@ -357,8 +366,8 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] overflow-hidden max-lg:grid-cols-1">
         <section className="flex min-h-0 min-w-0 flex-col border-r border-border max-lg:border-b max-lg:border-r-0">
-          <div className="grid h-12 shrink-0 grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center border-b border-border bg-muted/40 px-3 text-[11px] font-medium uppercase text-muted-foreground">
-            <span>Source</span>
+          <div className="grid h-12 shrink-0 grid-cols-[24px_minmax(0,1fr)_82px_64px_32px] items-center border-b border-border bg-muted/40 px-3 text-[11px] font-medium uppercase text-muted-foreground">
+            <span aria-hidden="true" />
             <span>Run</span>
             <span>Status</span>
             <span className="text-right">Events</span>
@@ -385,34 +394,24 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                   >
                     <div
                       className={cn(
-                        'grid min-h-14 w-full grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center px-3 transition-colors',
+                        'grid min-h-14 w-full grid-cols-[24px_minmax(0,1fr)_82px_64px_32px] items-center px-3 transition-colors',
                         containsSelectedRun ? 'bg-surface-soft/70' : 'hover:bg-muted/35',
                       )}
                     >
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => { toggleSession(session.key); }}
-                          aria-expanded={expanded}
-                          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${SOURCE_LABELS[session.source]} session ${session.sessionId}`}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                          title={expanded ? 'Collapse session' : 'Expand session'}
-                        >
-                          {expanded ? (
-                            <ChevronDown size={13} />
-                          ) : (
-                            <ChevronRight size={13} />
-                          )}
-                        </button>
-                        <span className={cn(
-                          'truncate rounded px-1.5 py-0.5 text-[11px] font-medium',
-                          sourcePillClassName(session.source),
+                      <button
+                        type="button"
+                        onClick={() => { toggleSession(session.key); }}
+                        aria-expanded={expanded}
+                        aria-label={`${expanded ? 'Collapse' : 'Expand'} ${SOURCE_LABELS[session.source]} session ${session.sessionId}`}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                        title={expanded ? 'Collapse session' : 'Expand session'}
+                      >
+                        {expanded ? (
+                          <ChevronDown size={13} />
+                        ) : (
+                          <ChevronRight size={13} />
                         )}
-                        >
-                          {SOURCE_LABELS[session.source]}
-                        </span>
-                      </div>
-
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -466,19 +465,11 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
                               type="button"
                               onClick={() => { setSelectedRunKey(runKey(run)); }}
                               className={cn(
-                                'grid min-h-12 w-full grid-cols-[72px_minmax(0,1fr)_82px_64px_32px] items-center px-3 text-left transition-colors',
+                                'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_82px_64px_32px] items-center px-3 text-left transition-colors',
                                 selected ? 'bg-background' : 'hover:bg-background/75',
                               )}
                             >
-                              <span className="flex items-center gap-2 pl-7 text-[10px] font-medium text-muted-foreground">
-                                <span className={cn(
-                                  'h-1.5 w-1.5 shrink-0 rounded-full',
-                                  selected ? 'bg-primary' : 'bg-muted-foreground/40',
-                                )}
-                                />
-                                Run
-                              </span>
-                              <span className="min-w-0 pr-3">
+                              <span className="min-w-0 py-1 pl-6 pr-3">
                                 <span className="block truncate text-[13px] font-medium text-foreground">
                                   {run.inputPreview || run.runId}
                                 </span>
@@ -879,9 +870,7 @@ function runSessionKey(run: Pick<ConsoleRun, 'source' | 'sessionId' | 'runId'>):
 
 export function groupConsoleRuns(runs: ConsoleRun[], sourceFilter: SourceFilter): ConsoleRunSession[] {
   const sessions = new Map<string, ConsoleRun[]>()
-  const filteredRuns = sourceFilter === 'all'
-    ? runs
-    : runs.filter(run => run.source === sourceFilter)
+  const filteredRuns = runs.filter(run => run.source === sourceFilter)
 
   for (const run of filteredRuns) {
     const key = runSessionKey(run)
@@ -928,11 +917,6 @@ function consoleSessionStatus(runs: ConsoleRun[], latestRun: ConsoleRun): string
   if (runs.some(run => run.status === 'running')) return 'running'
   if (runs.some(run => run.status === 'queued')) return 'queued'
   return latestRun.status
-}
-
-function sourcePillClassName(source: RunSource): string {
-  if (source === 'design') return 'bg-fuchsia-50 text-fuchsia-700'
-  return 'bg-sky-50 text-sky-700'
 }
 
 function withSetValue(values: ReadonlySet<string>, value: string): ReadonlySet<string> {
