@@ -126,9 +126,13 @@ export class WindowManager implements IWindowManager {
   }
 
   applyWindowTheme(theme: MainWindowThemePayload): void {
-    nativeTheme.themeSource = theme.mode;
-    this.applyBrowserWindowTheme(this.mainWindow, theme);
-    this.applyBrowserWindowTheme(this.settingWindow, theme);
+    try {
+      nativeTheme.themeSource = theme.mode;
+      this.applyBrowserWindowTheme(this.mainWindow, theme);
+      this.applyBrowserWindowTheme(this.settingWindow, theme);
+    } catch {
+      // Window chrome theming is best-effort and must never break renderer RPC.
+    }
   }
 
   private applyBrowserWindowTheme(
@@ -137,7 +141,10 @@ export class WindowManager implements IWindowManager {
   ): void {
     if (!win || win.isDestroyed()) return;
     win.setBackgroundColor(theme.backgroundColor);
-    win.setAccentColor(theme.accentColor);
+    const maybeSetAccentColor = (win as { setAccentColor?: (color: string) => void }).setAccentColor;
+    if (maybeSetAccentColor) {
+      maybeSetAccentColor.call(win, theme.accentColor);
+    }
   }
 
   private applyNativeWindowTheme(): void {
