@@ -433,7 +433,8 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
 
   private async publishRunProjection(record: AgentRunRecord, event?: AgentRunEventRecord): Promise<void> {
     try {
-      const artifactRefs = remoteArtifactRefs(record.artifactRefs, await this.runs.listRunEvents(record.runId));
+      const runEvents = await this.runs.listRunEvents(record.runId);
+      const artifactRefs = remoteArtifactRefs(record.artifactRefs, runEvents);
       await this.shared.registerRunProjection({
         runId: record.runId,
         sessionId: record.sessionId,
@@ -452,6 +453,7 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
         metadata: {
           runtimeId: record.runtimeId,
           failureReason: record.failureReason,
+          chat: chatProjectionMetadata(record, runEvents),
         },
       });
     } catch {
@@ -681,6 +683,50 @@ function replayRuntimeLog(runId: string, replay: AgentRunReplaySource): AgentEve
 function runProjectionStatus(record: AgentRunRecord): RunProjectionStatus {
   if (record.failureReason === 'runtime_recovery') return 'recovered';
   return record.status;
+}
+
+function chatProjectionMetadata(record: AgentRunRecord, events: AgentRunEventRecord[]): Record<string, unknown> {
+  const assistantText = assistantTextFromEvents(events);
+  return {
+    prompt: record.input?.message ?? record.inputPreview,
+    assistantText,
+    assistantPreview: compactProjectionText(assistantText),
+    provider: record.settings.provider,
+    modelId: record.settings.modelId,
+    backend: record.settings.backend ?? record.runtimeId,
+  };
+}
+
+function assistantTextFromEvents(events: AgentRunEventRecord[]): string {
+  let text = '';
+  for (const record of events) {
+    const event = record.event;
+    if (event.type === 'assistant_delta') {
+      text += event.text;
+      continue;
+    }
+    if (event.type === 'assistant_message' && event.message.role === 'assistant') {
+      text += event.message.content;
+      continue;
+    }
+    if (event.type === 'run_completed' && !text.trim()) {
+      text = textFromUnknown(event.output);
+    }
+  }
+  return text.trim();
+}
+
+function textFromUnknown(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  const reply = record.reply ?? record.text ?? record.message ?? record.output;
+  return typeof reply === 'string' ? reply : '';
+}
+
+function compactProjectionText(value: string): string {
+  const text = value.replace(/\s+/g, ' ').trim();
+  return text.length > 240 ? `${text.slice(0, 237)}...` : text;
 }
 
 function intentRunId(intent: RunIntentRecord): string {

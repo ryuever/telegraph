@@ -40,6 +40,10 @@ declare module 'react-native' {
     resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center'
   }
 
+  export const UIManager: {
+    getViewManagerConfig(name: string): unknown
+  }
+
   export const ActivityIndicator: ComponentType<BaseProps & { size?: 'small' | 'large'; color?: string }>
   export const Image: ComponentType<ImageProps>
   export const Pressable: ComponentType<PressableProps>

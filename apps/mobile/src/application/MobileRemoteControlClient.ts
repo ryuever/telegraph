@@ -145,6 +145,7 @@ export class MobileRemoteControlClient {
   async loadDashboard(input: {
     connection?: MobileConnectionState
     selectedRunId?: string
+    selectedChatSessionId?: string
   } = {}): Promise<MobileDashboardModel> {
     const [devices, runs, intents, approvals, replies] = await Promise.all([
       this.listDevices(),
@@ -161,6 +162,7 @@ export class MobileRemoteControlClient {
       approvals,
       replies,
       selectedRunId: input.selectedRunId,
+      selectedChatSessionId: input.selectedChatSessionId,
     })
   }
 
@@ -182,6 +184,7 @@ export class MobileRemoteControlClient {
   watchDashboard(input: {
     intervalMs?: number
     selectedRunId?: () => string | undefined
+    selectedChatSessionId?: () => string | undefined
     onUpdate: (model: MobileDashboardModel) => void
     onError?: (error: Error) => void
   }): { unsubscribe(): void } {
@@ -191,6 +194,7 @@ export class MobileRemoteControlClient {
       try {
         const model = await this.loadDashboard({
           selectedRunId: input.selectedRunId?.(),
+          selectedChatSessionId: input.selectedChatSessionId?.(),
           connection: 'live',
         })
         if (!stopped) input.onUpdate(model)

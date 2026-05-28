@@ -8,6 +8,7 @@
     "icon": "./assets/images/icon.png",
     "jsEngine": "hermes",
     "platforms": ["ios", "android"],
+    "plugins": ["react-native-bottom-tabs", "./plugins/with-ios-bottom-tabs-build-fixes.cjs"],
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",

@@ -11,6 +11,7 @@ export interface MobileDashboardSnapshot {
   approvals: ApprovalRequestRecord[]
   replies: ChannelReply[]
   selectedRunId?: string
+  selectedChatSessionId?: string
   now?: number
 }
 
@@ -49,6 +50,33 @@ export interface MobileArtifactPreviewItem {
   previewKind: 'image' | 'link'
 }
 
+export interface MobileChatSessionItem {
+  sessionId: string
+  title: string
+  subtitle: string
+  status: RunProjectionStatus
+  statusTone: MobileRunItem['statusTone']
+  messageCount: number
+  updatedAt: number
+}
+
+export interface MobileChatMessageItem {
+  id: string
+  sessionId: string
+  runId: string
+  role: 'user' | 'assistant'
+  content: string
+  status: 'queued' | 'streaming' | 'done' | 'error'
+  createdAt: number
+}
+
+export interface MobileChatModel {
+  sessions: MobileChatSessionItem[]
+  selectedSessionId?: string
+  selectedSession?: MobileChatSessionItem
+  messages: MobileChatMessageItem[]
+}
+
 export interface MobileDashboardModel {
   connection: MobileConnectionState
   summary: {
@@ -61,6 +89,7 @@ export interface MobileDashboardModel {
   runs: MobileRunItem[]
   approvals: MobileApprovalItem[]
   artifacts: MobileArtifactPreviewItem[]
+  chat: MobileChatModel
   latestReply?: ChannelReply
   selectedRun?: MobileRunItem
 }
@@ -75,6 +104,7 @@ export function createMobileDashboardModel(snapshot: MobileDashboardSnapshot): M
   const selectedRun = runs.find(run => run.runId === selectedRunId)
   const relevantReplies = snapshot.replies.filter(reply => !selectedRunId || reply.runId === selectedRunId)
   const artifacts = collectArtifactPreviews(snapshot.runs, relevantReplies, selectedRunId)
+  const chat = createMobileChatModel(sourceRuns, snapshot.replies, snapshot.selectedChatSessionId)
   const approvals = snapshot.approvals
     .slice()
     .sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending') || b.updatedAt - a.updatedAt)
@@ -96,6 +126,7 @@ export function createMobileDashboardModel(snapshot: MobileDashboardSnapshot): M
     runs,
     approvals,
     artifacts,
+    chat,
     latestReply: relevantReplies.slice().sort((a, b) => b.createdAt - a.createdAt)[0],
     selectedRun,
   }
@@ -154,6 +185,149 @@ function collectArtifactPreviews(
     mediaType: ref.mediaType,
     previewKind: isImageArtifact(ref) ? 'image' : 'link',
   }))
+}
+
+function createMobileChatModel(
+  runs: RunProjectionRecord[],
+  replies: ChannelReply[],
+  selectedSessionHint: string | undefined,
+): MobileChatModel {
+  const chatRuns = runs
+    .filter(run => run.pageletId === 'chat')
+    .slice()
+    .sort((a, b) => a.createdAt - b.createdAt)
+  const repliesByRunId = groupRepliesByRunId(replies)
+  const sessionMap = new Map<string, {
+    session: MobileChatSessionItem
+    messages: MobileChatMessageItem[]
+  }>()
+
+  for (const run of chatRuns) {
+    const sessionId = run.sessionId ?? run.runId
+    const existing = sessionMap.get(sessionId)
+    const prompt = projectionPrompt(run)
+    const assistantText = projectionAssistantText(run) ?? latestReplyText(repliesByRunId.get(run.runId))
+    const messages: MobileChatMessageItem[] = []
+
+    if (prompt) {
+      messages.push({
+        id: `${run.runId}:user`,
+        sessionId,
+        runId: run.runId,
+        role: 'user',
+        content: prompt,
+        status: 'done',
+        createdAt: run.createdAt,
+      })
+    }
+
+    messages.push({
+      id: `${run.runId}:assistant`,
+      sessionId,
+      runId: run.runId,
+      role: 'assistant',
+      content: assistantText ?? assistantPlaceholder(run),
+      status: assistantStatus(run.status),
+      createdAt: run.updatedAt,
+    })
+
+    const currentMessages = existing?.messages ?? []
+    const nextMessages = currentMessages.concat(messages)
+    sessionMap.set(sessionId, {
+      session: {
+        sessionId,
+        title: existing?.session.title ?? deriveChatSessionTitle(run, prompt),
+        subtitle: `${String(nextMessages.length)} messages / ${run.status}`,
+        status: run.status,
+        statusTone: statusTone(run.status),
+        messageCount: nextMessages.length,
+        updatedAt: Math.max(existing?.session.updatedAt ?? 0, run.updatedAt),
+      },
+      messages: nextMessages,
+    })
+  }
+
+  const sessions = Array.from(sessionMap.values())
+    .map(item => item.session)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+  const selectedSessionId = selectedSessionHint && sessionMap.has(selectedSessionHint)
+    ? selectedSessionHint
+    : sessions[0]?.sessionId
+  const selectedSession = selectedSessionId ? sessions.find(session => session.sessionId === selectedSessionId) : undefined
+  const messages = selectedSessionId
+    ? (sessionMap.get(selectedSessionId)?.messages ?? []).sort((a, b) => a.createdAt - b.createdAt)
+    : []
+
+  return {
+    sessions,
+    selectedSessionId,
+    selectedSession,
+    messages,
+  }
+}
+
+function groupRepliesByRunId(replies: ChannelReply[]): Map<string, ChannelReply[]> {
+  const grouped = new Map<string, ChannelReply[]>()
+  for (const reply of replies) {
+    if (!reply.runId) continue
+    grouped.set(reply.runId, (grouped.get(reply.runId) ?? []).concat(reply))
+  }
+  return grouped
+}
+
+function projectionPrompt(run: RunProjectionRecord): string {
+  const chat = projectionChatMetadata(run)
+  const metadataPrompt = stringRecordValue(chat, 'prompt')
+  return (metadataPrompt ?? run.promptPreview ?? run.title ?? '').trim()
+}
+
+function projectionAssistantText(run: RunProjectionRecord): string | undefined {
+  const chat = projectionChatMetadata(run)
+  const value = stringRecordValue(chat, 'assistantText') ?? stringRecordValue(chat, 'assistantPreview')
+  const text = value?.trim()
+  return text ? text : undefined
+}
+
+function projectionChatMetadata(run: RunProjectionRecord): Record<string, unknown> | undefined {
+  const value = run.metadata?.chat
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  return value as Record<string, unknown>
+}
+
+function stringRecordValue(record: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = record?.[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function latestReplyText(replies: ChannelReply[] | undefined): string | undefined {
+  const text = replies
+    ?.slice()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .find(reply => reply.text && reply.text !== 'Run queued.')
+    ?.text
+    ?.trim()
+  return text ? text : undefined
+}
+
+function assistantPlaceholder(run: RunProjectionRecord): string {
+  if (run.status === 'failed') return run.error ?? 'Run failed.'
+  if (run.status === 'cancelled') return 'Run cancelled.'
+  if (run.status === 'completed') return 'Run completed.'
+  if (run.status === 'queued') return 'Queued on desktop.'
+  return 'Desktop agent is working...'
+}
+
+function assistantStatus(status: RunProjectionStatus): MobileChatMessageItem['status'] {
+  if (status === 'failed' || status === 'cancelled' || status === 'recovered') return 'error'
+  if (status === 'completed') return 'done'
+  if (status === 'running') return 'streaming'
+  return 'queued'
+}
+
+function deriveChatSessionTitle(run: RunProjectionRecord, prompt: string): string {
+  const candidate = (run.title ?? prompt).replace(/\s+/g, ' ').trim()
+  const title = candidate || run.runId
+  return title.length > 40 ? `${title.slice(0, 37)}...` : title
 }
 
 function statusTone(status: RunProjectionStatus): MobileRunItem['statusTone'] {

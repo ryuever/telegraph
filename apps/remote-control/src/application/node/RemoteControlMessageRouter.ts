@@ -95,10 +95,22 @@ function externalPrompt(message: ExternalMessage): string {
 }
 
 function replyTextForProjection(projection: RunProjectionRecord): string {
+  const assistantText = projectionAssistantText(projection)
+  if (assistantText) return assistantText
   if (projection.status === 'completed') return 'Run completed.'
   if (projection.status === 'failed') return projection.error ? `Run failed: ${projection.error}` : 'Run failed.'
   if (projection.status === 'cancelled') return 'Run cancelled.'
   return `Run ${projection.status}.`
+}
+
+function projectionAssistantText(projection: RunProjectionRecord): string | undefined {
+  const chat = projection.metadata?.chat
+  if (!chat || typeof chat !== 'object' || Array.isArray(chat)) return undefined
+  const record = chat as Record<string, unknown>
+  const value = record.assistantText ?? record.assistantPreview
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  return text.length > 0 ? text : undefined
 }
 
 function stringMetadata(metadata: Record<string, unknown> | undefined, key: string): string | undefined {

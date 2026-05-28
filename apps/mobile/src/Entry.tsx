@@ -1,5 +1,6 @@
 import type React from 'react'
 import Constants from 'expo-constants'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { TelegraphMobileApp } from './App'
 
 declare const process: {
@@ -15,10 +16,12 @@ const inferredRelayEndpoint = relayEndpoint ?? inferRelayEndpointFromExpoHost()
 
 export function TelegraphMobileEntry(): React.JSX.Element {
   return (
-    <TelegraphMobileApp
-      relayEndpoint={inferredRelayEndpoint}
-      relayToken={relayToken}
-    />
+    <SafeAreaProvider>
+      <TelegraphMobileApp
+        relayEndpoint={inferredRelayEndpoint}
+        relayToken={relayToken}
+      />
+    </SafeAreaProvider>
   )
 }
 

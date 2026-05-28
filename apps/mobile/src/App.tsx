@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   StatusBar,
@@ -12,8 +11,17 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import TabView, { type AppleIcon } from 'react-native-bottom-tabs'
+import type { RemoteControlRuntimeSettingsInput } from '@/apps/remote-control/application/common'
 import { REMOTE_PROTOCOL_SCHEMA_VERSION, type RemoteActorSnapshot } from '@/packages/remote-protocol'
-import type { MobileConnectionState, MobileDashboardModel, MobileRunItem } from './application/MobileDashboardViewModel'
+import type {
+  MobileChatMessageItem,
+  MobileChatSessionItem,
+  MobileConnectionState,
+  MobileDashboardModel,
+  MobileRunItem,
+} from './application/MobileDashboardViewModel'
 import type { MobileSlackGovernanceModel } from './application/MobileSlackGovernanceViewModel'
 import {
   HttpMobileRemoteControlTransport,
@@ -27,9 +35,32 @@ export interface TelegraphMobileAppProps {
   actor?: RemoteActorSnapshot
 }
 
-type MobileTab = 'runs' | 'approvals' | 'devices' | 'artifacts' | 'slack'
+type RootTab = 'chat' | 'cockpit'
+type CockpitTab = 'runs' | 'approvals' | 'devices' | 'artifacts' | 'slack'
 
-const TABS: Array<{ id: MobileTab; label: string; hint: string }> = [
+interface RootRoute {
+  key: RootTab
+  title: string
+  focusedIcon: AppleIcon
+  unfocusedIcon: AppleIcon
+}
+
+const ROOT_ROUTES: RootRoute[] = [
+  {
+    key: 'chat',
+    title: 'Chat',
+    focusedIcon: { sfSymbol: 'message.fill' },
+    unfocusedIcon: { sfSymbol: 'message' },
+  },
+  {
+    key: 'cockpit',
+    title: 'Cockpit',
+    focusedIcon: { sfSymbol: 'rectangle.grid.2x2.fill' },
+    unfocusedIcon: { sfSymbol: 'rectangle.grid.2x2' },
+  },
+]
+
+const COCKPIT_TABS: Array<{ id: CockpitTab; label: string; hint: string }> = [
   { id: 'runs', label: 'Runs', hint: 'live work' },
   { id: 'approvals', label: 'Approvals', hint: 'human gate' },
   { id: 'devices', label: 'Devices', hint: 'bindings' },
@@ -50,21 +81,32 @@ const DEFAULT_ACTOR: RemoteActorSnapshot = {
 }
 
 const DEFAULT_DEVICE_ID = 'telegraph-mobile-dev'
-const MOBILE_CHAT_SETTINGS = {
+const DEFAULT_MOBILE_CHAT_SETTINGS: RemoteControlRuntimeSettingsInput = {
+  provider: 'telegraph',
+  modelId: 'orchestrator',
   backend: 'telegraph-orchestrator',
+  apiKey: '',
 }
 
 export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.Element {
+  const insets = useSafeAreaInsets()
   const actor = props.actor ?? DEFAULT_ACTOR
-  const [tab, setTab] = useState<MobileTab>('runs')
+  const [rootTabIndex, setRootTabIndex] = useState(0)
+  const rootTab = ROOT_ROUTES[rootTabIndex]?.key ?? 'chat'
+  const [cockpitTab, setCockpitTab] = useState<CockpitTab>('runs')
   const [prompt, setPrompt] = useState('')
   const [oauthCode, setOauthCode] = useState('')
   const [relayEndpoint, setRelayEndpoint] = useState(props.relayEndpoint ?? '')
   const [relayToken, setRelayToken] = useState(props.relayToken ?? '')
   const [deviceId, setDeviceId] = useState(actor.deviceId ?? DEFAULT_DEVICE_ID)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [relaySettingsOpen, setRelaySettingsOpen] = useState(false)
+  const [chatSettingsOpen, setChatSettingsOpen] = useState(false)
+  const [chatSettings, setChatSettings] = useState<RemoteControlRuntimeSettingsInput>(DEFAULT_MOBILE_CHAT_SETTINGS)
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
     props.initialDashboard?.selectedRun?.runId,
+  )
+  const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | undefined>(
+    props.initialDashboard?.chat.selectedSessionId,
   )
   const [dashboard, setDashboard] = useState<MobileDashboardModel | undefined>(props.initialDashboard)
   const [connection, setConnection] = useState<MobileConnectionState>(
@@ -73,12 +115,14 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
   const [slack, setSlack] = useState<MobileSlackGovernanceModel | undefined>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
+
   const client = useMemo(() => relayEndpoint.trim()
     ? new MobileRemoteControlClient(new HttpMobileRemoteControlTransport({
       endpoint: relayEndpoint.trim(),
       headers: relayToken.trim() ? { authorization: `Bearer ${relayToken.trim()}` } : undefined,
     }))
     : null, [relayEndpoint, relayToken])
+
   useEffect(() => {
     if (!client) {
       setConnection('offline')
@@ -86,7 +130,9 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
     }
     setConnection('connecting')
     const subscription = client.watchDashboard({
+      intervalMs: 2000,
       selectedRunId: () => selectedRunId,
+      selectedChatSessionId: () => selectedChatSessionId,
       onUpdate: model => {
         setDashboard(model)
         setConnection('live')
@@ -99,7 +145,13 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
     return () => {
       subscription.unsubscribe()
     }
-  }, [client, selectedRunId])
+  }, [client, selectedRunId, selectedChatSessionId])
+
+  useEffect(() => {
+    if (!selectedChatSessionId && dashboard?.chat.selectedSessionId) {
+      setSelectedChatSessionId(dashboard.chat.selectedSessionId)
+    }
+  }, [dashboard, selectedChatSessionId])
 
   const refresh = async (): Promise<void> => {
     if (!client) return
@@ -108,7 +160,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
     setConnection('connecting')
     try {
       const [nextDashboard, nextSlack] = await Promise.all([
-        client.loadDashboard({ selectedRunId }),
+        client.loadDashboard({ selectedRunId, selectedChatSessionId }),
         client.loadSlackGovernance(),
       ])
       setDashboard(nextDashboard)
@@ -139,6 +191,8 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
 
   const submit = async (): Promise<void> => {
     if (!client || !prompt.trim()) return
+    const sessionId = selectedChatSessionId ?? dashboard?.chat.selectedSessionId ?? `mobile-session-${Date.now().toString(36)}`
+    setSelectedChatSessionId(sessionId)
     setBusy(true)
     setError(undefined)
     try {
@@ -159,15 +213,21 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
           channel: {
             kind: 'mobile',
             channelId: 'mobile',
+            threadId: sessionId,
           },
           text: prompt.trim(),
           receivedAt: Date.now(),
           schemaVersion: REMOTE_PROTOCOL_SCHEMA_VERSION,
         },
-        { requireDeviceBinding: true, targetPagelet: 'chat', settings: MOBILE_CHAT_SETTINGS },
+        {
+          requireDeviceBinding: true,
+          targetPagelet: 'chat',
+          sessionId,
+          settings: compactChatSettings(chatSettings),
+        },
       )
       setPrompt('')
-      setDashboard(await client.loadDashboard())
+      setDashboard(await client.loadDashboard({ selectedChatSessionId: sessionId, selectedRunId }))
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : String(submitError))
     } finally {
@@ -181,7 +241,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
     setError(undefined)
     try {
       await client.decideApproval(approvalId, granted, actor, granted ? 'Approved from mobile' : 'Denied from mobile')
-      setDashboard(await client.loadDashboard({ selectedRunId }))
+      setDashboard(await client.loadDashboard({ selectedRunId, selectedChatSessionId }))
     } catch (decisionError) {
       setError(decisionError instanceof Error ? decisionError.message : String(decisionError))
     } finally {
@@ -189,8 +249,17 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
     }
   }
 
+  const selectChatSession = (sessionId: string): void => {
+    setSelectedChatSessionId(sessionId)
+    if (client) {
+      void client.loadDashboard({ selectedRunId, selectedChatSessionId: sessionId })
+        .then(setDashboard)
+        .catch(() => undefined)
+    }
+  }
+
   return (
-    <SafeAreaView style={styles.shell}>
+    <View style={[styles.shell, { paddingTop: insets.top + 16 }]}>
       <StatusBar barStyle="light-content" backgroundColor="#080d17" />
       <View style={styles.header}>
         <View style={styles.brandRow}>
@@ -199,7 +268,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
           </View>
           <View>
             <Text style={styles.title}>Telegraph</Text>
-            <Text style={styles.subtitle}>Mobile cockpit</Text>
+            <Text style={styles.subtitle}>{rootTab === 'chat' ? 'Remote chat' : 'Mobile cockpit'}</Text>
           </View>
         </View>
         <View style={styles.headerActions}>
@@ -207,8 +276,8 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
             <View style={[styles.statusDot, connection === 'live' ? styles.statusDotLive : styles.statusDotIdle]} />
             <Text style={styles.connectionChipText}>{connectionLabel(connection)}</Text>
           </View>
-          <Pressable style={styles.iconButton} onPress={() => { setSettingsOpen(value => !value); }}>
-            <Text style={styles.iconButtonText}>Set</Text>
+          <Pressable style={styles.iconButton} onPress={() => { setRelaySettingsOpen(value => !value); }}>
+            <Text style={styles.iconButtonText}>Relay</Text>
           </Pressable>
           <Pressable style={styles.iconButton} disabled={!client || busy} onPress={() => { void refresh(); }}>
             <Text style={styles.iconButtonText}>{busy ? '...' : 'Sync'}</Text>
@@ -216,159 +285,427 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
         </View>
       </View>
 
-      {(settingsOpen || !client) && (
-        <View style={styles.connectionPanel}>
-          <View style={styles.panelHeader}>
-            <Text style={styles.panelTitle}>Relay link</Text>
-            <Text style={styles.panelMeta}>{client ? 'configured' : 'required'}</Text>
-          </View>
-          <TextInput
-            value={relayEndpoint}
-            placeholder="Remote endpoint"
-            placeholderTextColor="#6f7b8b"
-            style={styles.compactInput}
-            onChangeText={setRelayEndpoint}
-          />
-          <TextInput
-            value={relayToken}
-            placeholder="Token"
-            placeholderTextColor="#6f7b8b"
-            style={styles.compactInput}
-            onChangeText={setRelayToken}
-          />
-        </View>
+      {(relaySettingsOpen || !client) && (
+        <RelaySettingsPanel
+          clientReady={Boolean(client)}
+          relayEndpoint={relayEndpoint}
+          relayToken={relayToken}
+          deviceId={deviceId}
+          onEndpointChange={setRelayEndpoint}
+          onTokenChange={setRelayToken}
+          onDeviceIdChange={setDeviceId}
+        />
       )}
 
-      <View style={styles.composer}>
-        <View style={styles.panelHeader}>
-          <View>
-            <Text style={styles.panelTitle}>Command relay</Text>
-            <Text style={styles.panelMeta}>{deviceId.trim() || DEFAULT_DEVICE_ID}</Text>
-          </View>
-          <Text style={styles.schemaBadge}>v{String(REMOTE_PROTOCOL_SCHEMA_VERSION)}</Text>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <TabView
+        navigationState={{ index: rootTabIndex, routes: ROOT_ROUTES }}
+        onIndexChange={setRootTabIndex}
+        renderScene={({ route }) => renderRootScene(route.key, {
+          dashboard,
+          connection,
+          prompt,
+          busy,
+          clientReady: Boolean(client),
+          chatSettingsOpen,
+          chatSettings,
+          selectedChatSessionId,
+          selectedRunId,
+          cockpitTab,
+          slack,
+          oauthCode,
+          relayEndpoint,
+          relayToken,
+          deviceId,
+          setPrompt,
+          submit,
+          selectChatSession,
+          setSelectedChatSessionId,
+          setChatSettingsOpen,
+          setChatSettings,
+          setRelayEndpoint,
+          setRelayToken,
+          setDeviceId,
+          setCockpitTab,
+          setSelectedRunId,
+          setOauthCode,
+          submitSlackOAuth,
+          decide,
+        })}
+        labeled
+        hapticFeedbackEnabled
+        tabBarActiveTintColor="#ff5436"
+        tabBarInactiveTintColor="#8a95a6"
+        tabBarStyle={{ backgroundColor: '#101720' }}
+        activeIndicatorColor="#ff543633"
+      />
+    </View>
+  )
+}
+
+export default TelegraphMobileApp
+
+interface RootSceneContext {
+  dashboard: MobileDashboardModel | undefined
+  connection: MobileConnectionState
+  prompt: string
+  busy: boolean
+  clientReady: boolean
+  chatSettingsOpen: boolean
+  chatSettings: RemoteControlRuntimeSettingsInput
+  selectedChatSessionId?: string
+  selectedRunId?: string
+  cockpitTab: CockpitTab
+  slack: MobileSlackGovernanceModel | undefined
+  oauthCode: string
+  relayEndpoint: string
+  relayToken: string
+  deviceId: string
+  setPrompt: (value: string) => void
+  submit: () => Promise<void>
+  selectChatSession: (sessionId: string) => void
+  setSelectedChatSessionId: (sessionId: string) => void
+  setChatSettingsOpen: React.Dispatch<React.SetStateAction<boolean>>
+  setChatSettings: (settings: RemoteControlRuntimeSettingsInput) => void
+  setRelayEndpoint: (value: string) => void
+  setRelayToken: (value: string) => void
+  setDeviceId: (value: string) => void
+  setCockpitTab: (tab: CockpitTab) => void
+  setSelectedRunId: (runId: string) => void
+  setOauthCode: (value: string) => void
+  submitSlackOAuth: () => Promise<void>
+  decide: (approvalId: string, granted: boolean) => Promise<void>
+}
+
+function renderRootScene(routeKey: RootTab, context: RootSceneContext): React.JSX.Element {
+  return (
+    <View style={styles.mainContent}>
+      {routeKey === 'chat' ? (
+        <ChatTab
+          model={context.dashboard ?? emptyDashboard(context.connection)}
+          prompt={context.prompt}
+          busy={context.busy}
+          clientReady={context.clientReady}
+          settingsOpen={context.chatSettingsOpen}
+          settings={context.chatSettings}
+          selectedSessionId={context.selectedChatSessionId}
+          onPromptChange={context.setPrompt}
+          onSubmit={() => { void context.submit(); }}
+          onSelectSession={context.selectChatSession}
+          onCreateSession={() => {
+            const sessionId = `mobile-session-${Date.now().toString(36)}`
+            context.setSelectedChatSessionId(sessionId)
+          }}
+          onToggleSettings={() => { context.setChatSettingsOpen(value => !value); }}
+          onSettingsChange={context.setChatSettings}
+        />
+      ) : !context.dashboard ? (
+        <EmptyState
+          relayConfigured={context.clientReady}
+          busy={context.busy}
+          endpoint={context.relayEndpoint}
+          token={context.relayToken}
+          onEndpointChange={context.setRelayEndpoint}
+          onTokenChange={context.setRelayToken}
+          deviceId={context.deviceId}
+          onDeviceIdChange={context.setDeviceId}
+        />
+      ) : (
+        <CockpitTabView
+          model={context.dashboard}
+          tab={context.cockpitTab}
+          slack={context.slack}
+          oauthCode={context.oauthCode}
+          selectedRunId={context.selectedRunId}
+          onTabChange={context.setCockpitTab}
+          onSelectRun={context.setSelectedRunId}
+          onOAuthCodeChange={context.setOauthCode}
+          onSubmitOAuth={() => { void context.submitSlackOAuth(); }}
+          onDecide={(approvalId, granted) => { void context.decide(approvalId, granted); }}
+        />
+      )}
+    </View>
+  )
+}
+
+function ChatTab(props: {
+  model: MobileDashboardModel
+  prompt: string
+  busy: boolean
+  clientReady: boolean
+  settingsOpen: boolean
+  settings: RemoteControlRuntimeSettingsInput
+  selectedSessionId?: string
+  onPromptChange: (value: string) => void
+  onSubmit: () => void
+  onSelectSession: (sessionId: string) => void
+  onCreateSession: () => void
+  onToggleSettings: () => void
+  onSettingsChange: (settings: RemoteControlRuntimeSettingsInput) => void
+}): React.JSX.Element {
+  const chat = props.model.chat
+  const selectedSessionId = props.selectedSessionId ?? chat.selectedSessionId
+  const canSend = props.clientReady && !props.busy && props.prompt.trim().length > 0
+
+  return (
+    <View style={styles.chatPane}>
+      <View style={styles.chatHeader}>
+        <View style={styles.chatTitleBlock}>
+          <Text style={styles.panelTitle}>{chat.selectedSession?.title ?? 'New chat'}</Text>
+          <Text style={styles.panelMeta}>{messageCountLabel(chat.messages.length)} / desktop-run only</Text>
         </View>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.secondaryButtonCompact} onPress={props.onCreateSession}>
+            <Text style={styles.secondaryButtonText}>New</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButtonCompact} onPress={props.onToggleSettings}>
+            <Text style={styles.secondaryButtonText}>Model</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <ModelSummary settings={props.settings} />
+
+      {props.settingsOpen ? (
+        <ChatSettingsPanel settings={props.settings} onChange={props.onSettingsChange} />
+      ) : null}
+
+      <SessionStrip
+        sessions={chat.sessions}
+        selectedSessionId={selectedSessionId}
+        onSelect={props.onSelectSession}
+      />
+
+      <ScrollView style={styles.messages} contentContainerStyle={styles.messagesContent}>
+        {chat.messages.length > 0 ? (
+          chat.messages.map(message => <ChatMessageBubble key={message.id} message={message} />)
+        ) : (
+          <ListEmpty title="No chat yet" body="Send a message to the desktop agent host, or select a synced desktop session." />
+        )}
+      </ScrollView>
+
+      <View style={styles.chatComposer}>
         <TextInput
           multiline
-          value={prompt}
-          placeholder="Ask Telegraph"
+          value={props.prompt}
+          placeholder="Message Telegraph on desktop"
           placeholderTextColor="#6f7b8b"
-          style={styles.input}
-          onChangeText={setPrompt}
+          style={styles.chatInput}
+          onChangeText={props.onPromptChange}
         />
         <View style={styles.quickPromptRow}>
           {QUICK_PROMPTS.map(item => (
-            <Pressable key={item} style={styles.quickPrompt} onPress={() => { setPrompt(item); }}>
+            <Pressable key={item} style={styles.quickPrompt} onPress={() => { props.onPromptChange(item); }}>
               <Text style={styles.quickPromptText}>{item}</Text>
             </Pressable>
           ))}
         </View>
         <View style={styles.composerFooter}>
-          <Text style={styles.composerHint}>{client ? 'Ready for remote intake' : 'Connect relay to send'}</Text>
-          <Pressable style={[styles.primaryButton, !client || busy || !prompt.trim() ? styles.disabledButton : {}]} disabled={!client || busy || !prompt.trim()} onPress={() => { void submit(); }}>
+          <Text style={styles.composerHint}>{props.clientReady ? 'Runs execute on desktop' : 'Connect relay to send'}</Text>
+          <Pressable style={[styles.primaryButton, !canSend ? styles.disabledButton : {}]} disabled={!canSend} onPress={props.onSubmit}>
             <Text style={styles.primaryButtonText}>Send</Text>
           </Pressable>
         </View>
       </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!dashboard ? (
-        <EmptyState
-          relayConfigured={Boolean(client)}
-          busy={busy}
-          endpoint={relayEndpoint}
-          token={relayToken}
-          onEndpointChange={setRelayEndpoint}
-          onTokenChange={setRelayToken}
-          deviceId={deviceId}
-          onDeviceIdChange={setDeviceId}
-        />
-      ) : (
-        <>
-          <Summary model={dashboard} />
-          <Tabs current={tab} model={dashboard} slack={slack} onChange={setTab} />
-          <ScrollView style={styles.content}>
-            {tab === 'runs' ? (
-              dashboard.runs.length > 0
-                ? dashboard.runs.map(run => (
-                  <RunRow
-                    key={run.runId}
-                    run={run}
-                    selected={run.runId === selectedRunId}
-                    onSelect={() => {
-                      setSelectedRunId(run.runId)
-                    }}
-                  />
-                ))
-                : <ListEmpty title="No runs yet" body="Runs will appear here when the desktop agent starts work." />
-            ) : null}
-            {tab === 'approvals' ? (
-              dashboard.approvals.length > 0
-                ? dashboard.approvals.map(approval => (
-                  <View key={approval.approvalId} style={styles.item}>
-                    <View style={styles.itemHeader}>
-                      <Text style={styles.itemTitle}>{approval.title}</Text>
-                      <Text style={approval.pending ? styles.active : styles.muted}>{approval.status}</Text>
-                    </View>
-                    <Text style={styles.itemMeta}>{approval.runId}</Text>
-                    {approval.body ? <Text style={styles.body}>{approval.body}</Text> : null}
-                    {approval.pending ? (
-                      <View style={styles.rowActions}>
-                        <Pressable style={styles.secondaryButton} onPress={() => { void decide(approval.approvalId, false); }}>
-                          <Text style={styles.secondaryButtonText}>Deny</Text>
-                        </Pressable>
-                        <Pressable style={styles.primaryButton} onPress={() => { void decide(approval.approvalId, true); }}>
-                          <Text style={styles.primaryButtonText}>Approve</Text>
-                        </Pressable>
-                      </View>
-                    ) : null}
-                  </View>
-                ))
-                : <ListEmpty title="No pending approvals" body="Human-in-the-loop decisions will collect here." />
-            ) : null}
-            {tab === 'devices' ? (
-              dashboard.devices.length > 0
-                ? dashboard.devices.map(device => (
-                  <View key={device.id} style={styles.item}>
-                    <View style={styles.itemHeader}>
-                      <Text style={styles.itemTitle}>{device.title}</Text>
-                      <Text style={device.active ? styles.good : styles.muted}>{device.status}</Text>
-                    </View>
-                    <Text style={styles.itemMeta}>{device.subtitle}</Text>
-                  </View>
-                ))
-                : <ListEmpty title="No devices" body="Device bindings appear after a mobile actor is trusted." />
-            ) : null}
-            {tab === 'artifacts' ? (
-              dashboard.artifacts.length > 0
-                ? dashboard.artifacts.map(artifact => (
-                  <View key={`${artifact.artifactId}:${artifact.uri}`} style={styles.item}>
-                    <Text style={styles.itemTitle}>{artifact.title}</Text>
-                    <Text style={styles.itemMeta}>{artifact.mediaType ?? artifact.previewKind}</Text>
-                    {artifact.previewKind === 'image' && artifact.uri.startsWith('http') ? (
-                      <Image source={{ uri: artifact.uri }} resizeMode="cover" style={styles.preview} />
-                    ) : (
-                      <Text style={styles.body}>{artifact.uri}</Text>
-                    )}
-                  </View>
-                ))
-                : <ListEmpty title="No artifacts" body="Generated previews and exports will land in this tab." />
-            ) : null}
-            {tab === 'slack' ? (
-              <SlackGovernancePanel
-                model={slack}
-                oauthCode={oauthCode}
-                onOAuthCodeChange={setOauthCode}
-                onSubmitOAuth={() => { void submitSlackOAuth(); }}
-              />
-            ) : null}
-          </ScrollView>
-        </>
-      )}
-    </SafeAreaView>
+    </View>
   )
 }
 
-export default TelegraphMobileApp
+function ModelSummary({ settings }: { settings: RemoteControlRuntimeSettingsInput }): React.JSX.Element {
+  return (
+    <View style={styles.modelBar}>
+      <Text style={styles.modelLabel}>{settings.backend ?? 'desktop runtime'}</Text>
+      <Text style={styles.modelValue}>{settings.provider ?? 'provider'} / {settings.modelId ?? 'model'}</Text>
+    </View>
+  )
+}
+
+function ChatSettingsPanel(props: {
+  settings: RemoteControlRuntimeSettingsInput
+  onChange: (settings: RemoteControlRuntimeSettingsInput) => void
+}): React.JSX.Element {
+  const setField = (key: keyof RemoteControlRuntimeSettingsInput, value: string): void => {
+    props.onChange({
+      ...props.settings,
+      [key]: value,
+    })
+  }
+
+  return (
+    <View style={styles.connectionPanel}>
+      <View style={styles.panelHeader}>
+        <Text style={styles.panelTitle}>Model settings</Text>
+        <Text style={styles.panelMeta}>sent with next run</Text>
+      </View>
+      <TextInput
+        value={props.settings.backend ?? ''}
+        placeholder="Backend"
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={value => { setField('backend', value); }}
+      />
+      <TextInput
+        value={props.settings.provider ?? ''}
+        placeholder="Provider"
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={value => { setField('provider', value); }}
+      />
+      <TextInput
+        value={props.settings.modelId ?? ''}
+        placeholder="Model"
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={value => { setField('modelId', value); }}
+      />
+      <TextInput
+        value={props.settings.apiKey ?? ''}
+        placeholder="API key on desktop"
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={value => { setField('apiKey', value); }}
+      />
+    </View>
+  )
+}
+
+function SessionStrip(props: {
+  sessions: MobileChatSessionItem[]
+  selectedSessionId?: string
+  onSelect: (sessionId: string) => void
+}): React.JSX.Element {
+  if (props.sessions.length === 0) {
+    return (
+      <View style={styles.sessionEmpty}>
+        <Text style={styles.sessionEmptyText}>Desktop sessions will sync here.</Text>
+      </View>
+    )
+  }
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sessionStrip} contentContainerStyle={styles.sessionStripContent}>
+      {props.sessions.map(session => (
+        <Pressable
+          key={session.sessionId}
+          style={[styles.sessionPill, session.sessionId === props.selectedSessionId ? styles.sessionPillActive : styles.sessionPillIdle]}
+          onPress={() => { props.onSelect(session.sessionId); }}
+        >
+          <Text style={session.sessionId === props.selectedSessionId ? styles.sessionTitleActive : styles.sessionTitle}>{session.title}</Text>
+          <Text style={styles.sessionMeta}>{session.subtitle}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  )
+}
+
+function ChatMessageBubble({ message }: { message: MobileChatMessageItem }): React.JSX.Element {
+  const isUser = message.role === 'user'
+  return (
+    <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowAssistant]}>
+      <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+        <View style={styles.messageTopLine}>
+          <Text style={styles.messageRole}>{isUser ? 'You' : 'Telegraph'}</Text>
+          <Text style={statusTextStyle(message.status)}>{message.status}</Text>
+        </View>
+        <Text style={styles.messageText}>{message.content}</Text>
+      </View>
+    </View>
+  )
+}
+
+function CockpitTabView(props: {
+  model: MobileDashboardModel
+  tab: CockpitTab
+  slack: MobileSlackGovernanceModel | undefined
+  oauthCode: string
+  selectedRunId: string | undefined
+  onTabChange: (tab: CockpitTab) => void
+  onSelectRun: (runId: string) => void
+  onOAuthCodeChange: (value: string) => void
+  onSubmitOAuth: () => void
+  onDecide: (approvalId: string, granted: boolean) => void
+}): React.JSX.Element {
+  return (
+    <>
+      <Summary model={props.model} />
+      <CockpitTabs current={props.tab} model={props.model} slack={props.slack} onChange={props.onTabChange} />
+      <ScrollView style={styles.content}>
+        {props.tab === 'runs' ? (
+          props.model.runs.length > 0
+            ? props.model.runs.map(run => (
+              <RunRow
+                key={run.runId}
+                run={run}
+                selected={run.runId === props.selectedRunId}
+                onSelect={() => { props.onSelectRun(run.runId); }}
+              />
+            ))
+            : <ListEmpty title="No runs yet" body="Runs will appear here when the desktop agent starts work." />
+        ) : null}
+        {props.tab === 'approvals' ? (
+          props.model.approvals.length > 0
+            ? props.model.approvals.map(approval => (
+              <View key={approval.approvalId} style={styles.item}>
+                <View style={styles.itemHeader}>
+                  <Text style={styles.itemTitle}>{approval.title}</Text>
+                  <Text style={approval.pending ? styles.active : styles.muted}>{approval.status}</Text>
+                </View>
+                <Text style={styles.itemMeta}>{approval.runId}</Text>
+                {approval.body ? <Text style={styles.body}>{approval.body}</Text> : null}
+                {approval.pending ? (
+                  <View style={styles.rowActions}>
+                    <Pressable style={styles.secondaryButton} onPress={() => { props.onDecide(approval.approvalId, false); }}>
+                      <Text style={styles.secondaryButtonText}>Deny</Text>
+                    </Pressable>
+                    <Pressable style={styles.primaryButton} onPress={() => { props.onDecide(approval.approvalId, true); }}>
+                      <Text style={styles.primaryButtonText}>Approve</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            ))
+            : <ListEmpty title="No pending approvals" body="Human-in-the-loop decisions will collect here." />
+        ) : null}
+        {props.tab === 'devices' ? (
+          props.model.devices.length > 0
+            ? props.model.devices.map(device => (
+              <View key={device.id} style={styles.item}>
+                <View style={styles.itemHeader}>
+                  <Text style={styles.itemTitle}>{device.title}</Text>
+                  <Text style={device.active ? styles.good : styles.muted}>{device.status}</Text>
+                </View>
+                <Text style={styles.itemMeta}>{device.subtitle}</Text>
+              </View>
+            ))
+            : <ListEmpty title="No devices" body="Device bindings appear after a mobile actor is trusted." />
+        ) : null}
+        {props.tab === 'artifacts' ? (
+          props.model.artifacts.length > 0
+            ? props.model.artifacts.map(artifact => (
+              <View key={`${artifact.artifactId}:${artifact.uri}`} style={styles.item}>
+                <Text style={styles.itemTitle}>{artifact.title}</Text>
+                <Text style={styles.itemMeta}>{artifact.mediaType ?? artifact.previewKind}</Text>
+                {artifact.previewKind === 'image' && artifact.uri.startsWith('http') ? (
+                  <Image source={{ uri: artifact.uri }} resizeMode="cover" style={styles.preview} />
+                ) : (
+                  <Text style={styles.body}>{artifact.uri}</Text>
+                )}
+              </View>
+            ))
+            : <ListEmpty title="No artifacts" body="Generated previews and exports will land in this tab." />
+        ) : null}
+        {props.tab === 'slack' ? (
+          <SlackGovernancePanel
+            model={props.slack}
+            oauthCode={props.oauthCode}
+            onOAuthCodeChange={props.onOAuthCodeChange}
+            onSubmitOAuth={props.onSubmitOAuth}
+          />
+        ) : null}
+      </ScrollView>
+    </>
+  )
+}
 
 function Summary({ model }: { model: MobileDashboardModel }): React.JSX.Element {
   return (
@@ -390,21 +727,19 @@ function Metric({ label, value }: { label: string; value: number }): React.JSX.E
   )
 }
 
-function Tabs(props: {
-  current: MobileTab
+function CockpitTabs(props: {
+  current: CockpitTab
   model: MobileDashboardModel
   slack: MobileSlackGovernanceModel | undefined
-  onChange: (tab: MobileTab) => void
+  onChange: (tab: CockpitTab) => void
 }): React.JSX.Element {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={styles.tabsContent}>
-      {TABS.map(tab => (
+      {COCKPIT_TABS.map(tab => (
         <Pressable
           key={tab.id}
           style={[styles.tab, props.current === tab.id ? styles.tabActive : styles.tabIdle]}
-          onPress={() => {
-            props.onChange(tab.id)
-          }}
+          onPress={() => { props.onChange(tab.id); }}
         >
           <View style={styles.tabTopLine}>
             <Text style={props.current === tab.id ? styles.tabTextActive : styles.tabText}>{tab.label}</Text>
@@ -418,7 +753,7 @@ function Tabs(props: {
 }
 
 function tabCount(
-  tab: MobileTab,
+  tab: CockpitTab,
   model: MobileDashboardModel,
   slack: MobileSlackGovernanceModel | undefined,
 ): number {
@@ -513,6 +848,46 @@ function RunRow(props: {
   )
 }
 
+function RelaySettingsPanel(props: {
+  clientReady: boolean
+  relayEndpoint: string
+  relayToken: string
+  deviceId: string
+  onEndpointChange: (value: string) => void
+  onTokenChange: (value: string) => void
+  onDeviceIdChange: (value: string) => void
+}): React.JSX.Element {
+  return (
+    <View style={styles.connectionPanel}>
+      <View style={styles.panelHeader}>
+        <Text style={styles.panelTitle}>Relay link</Text>
+        <Text style={styles.panelMeta}>{props.clientReady ? 'configured' : 'required'}</Text>
+      </View>
+      <TextInput
+        value={props.relayEndpoint}
+        placeholder="Remote endpoint"
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={props.onEndpointChange}
+      />
+      <TextInput
+        value={props.relayToken}
+        placeholder="Token"
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={props.onTokenChange}
+      />
+      <TextInput
+        value={props.deviceId}
+        placeholder={DEFAULT_DEVICE_ID}
+        placeholderTextColor="#6f7b8b"
+        style={styles.compactInput}
+        onChangeText={props.onDeviceIdChange}
+      />
+    </View>
+  )
+}
+
 function EmptyState({
   relayConfigured,
   busy,
@@ -583,11 +958,57 @@ function ListEmpty({ title, body }: { title: string; body: string }): React.JSX.
   )
 }
 
+function compactChatSettings(settings: RemoteControlRuntimeSettingsInput): RemoteControlRuntimeSettingsInput {
+  return {
+    provider: blankToUndefined(settings.provider),
+    modelId: blankToUndefined(settings.modelId),
+    apiKey: settings.apiKey ?? '',
+    baseUrl: blankToUndefined(settings.baseUrl),
+    backend: blankToUndefined(settings.backend),
+    orchestration: blankToUndefined(settings.orchestration),
+    orchestrationPattern: blankToUndefined(settings.orchestrationPattern),
+    worktreeIsolation: settings.worktreeIsolation,
+    extensionBlocklist: settings.extensionBlocklist,
+    taskCapabilityProfile: settings.taskCapabilityProfile,
+  }
+}
+
+function emptyDashboard(connection: MobileConnectionState): MobileDashboardModel {
+  return {
+    connection,
+    summary: {
+      activeDevices: 0,
+      runningRuns: 0,
+      pendingApprovals: 0,
+      artifactPreviews: 0,
+    },
+    devices: [],
+    runs: [],
+    approvals: [],
+    artifacts: [],
+    chat: {
+      sessions: [],
+      messages: [],
+    },
+  }
+}
+
+function blankToUndefined(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
+}
+
 function toneStyle(tone: MobileRunItem['statusTone']): Record<string, unknown> {
   if (tone === 'active') return styles.active
   if (tone === 'success') return styles.good
   if (tone === 'danger') return styles.bad
   return styles.muted
+}
+
+function statusTextStyle(status: MobileChatMessageItem['status']): Record<string, unknown> {
+  if (status === 'streaming' || status === 'queued') return styles.active
+  if (status === 'error') return styles.bad
+  return styles.good
 }
 
 function connectionLabel(connection: string): string {
@@ -596,9 +1017,14 @@ function connectionLabel(connection: string): string {
   return 'Offline'
 }
 
+function messageCountLabel(count: number): string {
+  return count === 1 ? '1 message' : `${String(count)} messages`
+}
+
 const styles = StyleSheet.create({
   shell: { flex: 1, backgroundColor: '#080d17', padding: 16 },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  mainContent: { flex: 1, minHeight: 0 },
+  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   brandRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   logoMark: {
     alignItems: 'center',
@@ -630,10 +1056,39 @@ const styles = StyleSheet.create({
   panelHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   panelTitle: { color: '#f0f4f8', fontSize: 13, fontWeight: '900' },
   panelMeta: { color: '#8a95a6', fontSize: 11, fontWeight: '700', marginTop: 2 },
-  schemaBadge: { backgroundColor: '#ff54361a', borderColor: '#ff543640', borderRadius: 7, borderWidth: 1, color: '#ff9a83', fontSize: 11, fontWeight: '800', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4 },
-  composer: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, gap: 10, padding: 12 },
-  input: { color: '#f0f4f8', minHeight: 58, padding: 0 },
   compactInput: { backgroundColor: '#080d17', borderColor: '#ffffff17', borderRadius: 8, borderWidth: 1, color: '#f0f4f8', minHeight: 38, paddingHorizontal: 10 },
+  input: { color: '#f0f4f8', minHeight: 58, padding: 0 },
+  error: { backgroundColor: '#3a1414', borderColor: '#ff54364d', borderRadius: 8, borderWidth: 1, color: '#ff9a83', marginBottom: 10, padding: 10 },
+  chatPane: { flex: 1, minHeight: 0 },
+  chatHeader: { alignItems: 'center', backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, padding: 12 },
+  chatTitleBlock: { flex: 1, minWidth: 0 },
+  modelBar: { alignItems: 'center', backgroundColor: '#101720', borderColor: '#ffffff17', borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  modelLabel: { color: '#ff9a83', fontSize: 11, fontWeight: '900' },
+  modelValue: { color: '#aab5c5', flexShrink: 1, fontSize: 11, fontWeight: '700', textAlign: 'right' },
+  secondaryButtonCompact: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, minHeight: 32, paddingHorizontal: 11, paddingVertical: 8 },
+  sessionStrip: { flexGrow: 0, marginBottom: 8 },
+  sessionStripContent: { gap: 8, paddingRight: 2 },
+  sessionPill: { borderRadius: 8, borderWidth: 1, maxWidth: 190, minWidth: 138, paddingHorizontal: 11, paddingVertical: 9 },
+  sessionPillActive: { backgroundColor: '#2a1518', borderColor: '#ff54365c' },
+  sessionPillIdle: { backgroundColor: '#121926', borderColor: '#ffffff17' },
+  sessionTitle: { color: '#aab5c5', fontSize: 12, fontWeight: '900' },
+  sessionTitleActive: { color: '#ff8d76', fontSize: 12, fontWeight: '900' },
+  sessionMeta: { color: '#6f7b8b', fontSize: 10, fontWeight: '700', marginTop: 4 },
+  sessionEmpty: { backgroundColor: '#12192680', borderColor: '#ffffff17', borderRadius: 8, borderWidth: 1, marginBottom: 8, padding: 12 },
+  sessionEmptyText: { color: '#8a95a6', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  messages: { flex: 1 },
+  messagesContent: { gap: 10, paddingBottom: 10 },
+  messageRow: { flexDirection: 'row' },
+  messageRowUser: { justifyContent: 'flex-end' },
+  messageRowAssistant: { justifyContent: 'flex-start' },
+  messageBubble: { borderRadius: 8, borderWidth: 1, maxWidth: '86%', padding: 11 },
+  userBubble: { backgroundColor: '#2a1518', borderColor: '#ff54365c' },
+  assistantBubble: { backgroundColor: '#121926cc', borderColor: '#ffffff1f' },
+  messageTopLine: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between', marginBottom: 6 },
+  messageRole: { color: '#f0f4f8', fontSize: 11, fontWeight: '900' },
+  messageText: { color: '#dbe5ef', fontSize: 14, lineHeight: 20 },
+  chatComposer: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, gap: 10, padding: 12 },
+  chatInput: { color: '#f0f4f8', maxHeight: 120, minHeight: 44, padding: 0 },
   quickPromptRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   quickPrompt: { backgroundColor: '#1a2433', borderColor: '#ffffff17', borderRadius: 7, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6 },
   quickPromptText: { color: '#aab5c5', fontSize: 11, fontWeight: '700' },
@@ -644,8 +1099,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#160d0a', fontWeight: '900' },
   secondaryButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   secondaryButtonText: { color: '#dbe5ef', fontWeight: '800' },
-  error: { backgroundColor: '#3a1414', borderColor: '#ff54364d', borderRadius: 8, borderWidth: 1, color: '#ff9a83', marginTop: 10, padding: 10 },
-  summary: { flexDirection: 'row', gap: 8, marginVertical: 14 },
+  summary: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   metric: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, flex: 1, padding: 10 },
   metricValue: { color: '#f0f4f8', fontSize: 22, fontWeight: '900' },
   metricLabel: { color: '#8a95a6', fontSize: 10, fontWeight: '800', marginTop: 2, textTransform: 'uppercase' },

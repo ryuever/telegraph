@@ -152,4 +152,51 @@ describe('MobileDashboardViewModel', () => {
       status: 'completed',
     })
   })
+
+  it('projects chat sessions and assistant responses from desktop run state', () => {
+    const model = createMobileDashboardModel({
+      connection: 'live',
+      devices: [],
+      runs: [{
+        runId: 'run-chat-1',
+        sessionId: 'session-desktop',
+        pageletId: 'chat',
+        status: 'completed',
+        title: 'How does mobile sync work?',
+        promptPreview: 'How does mobile sync work?',
+        cursor: 4,
+        eventCount: 4,
+        metadata: {
+          chat: {
+            prompt: 'How does mobile sync work?',
+            assistantText: 'Mobile submits a RunIntent; desktop chat executes it and publishes projections.',
+            provider: 'telegraph',
+            modelId: 'orchestrator',
+            backend: 'telegraph-orchestrator',
+          },
+        },
+        createdAt: 100,
+        updatedAt: 150,
+      }],
+      approvals: [],
+      replies: [],
+      selectedChatSessionId: 'session-desktop',
+    })
+
+    expect(model.chat.sessions).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-desktop',
+        title: 'How does mobile sync work?',
+        messageCount: 2,
+      }),
+    ])
+    expect(model.chat.messages).toEqual([
+      expect.objectContaining({ role: 'user', content: 'How does mobile sync work?' }),
+      expect.objectContaining({
+        role: 'assistant',
+        content: 'Mobile submits a RunIntent; desktop chat executes it and publishes projections.',
+        status: 'done',
+      }),
+    ])
+  })
 })
