@@ -1,4 +1,18 @@
 export {
+  PromptInput,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputTools,
+  PromptInputButton,
+  PromptInputSubmit,
+  type PromptInputProps,
+  type PromptInputMessage,
+  type PromptInputTextareaProps,
+  type PromptInputStatus,
+  type PromptInputSubmitProps,
+} from './PromptInput'
+export {
   AgentActivity,
   AgentActivityItem,
   AgentActivityStatusBadge,
@@ -46,4 +60,3 @@ export type {
   AgentActivityStatus,
   AgentActivityTone,
 } from './types'
-

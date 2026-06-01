@@ -23,6 +23,7 @@
       "@/apps/main/*": ["../main/src/*"],
       "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
+      "@/packages/agent/*": ["../../packages/agent/src/*"],
       "@/packages/run-protocol": ["../../packages/run-protocol/src/index.ts"],
       "@/packages/run-protocol/*": ["../../packages/run-protocol/src/*"],
       "@/packages/remote-protocol": ["../../packages/remote-protocol/src/index.ts"],

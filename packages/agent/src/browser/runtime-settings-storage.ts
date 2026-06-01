@@ -1,5 +1,7 @@
 import type {
+  RuntimeAuthMode,
   RuntimeSettings,
+  RuntimeSubscriptionCredentials,
   RuntimeTaskCapabilityProfile,
 } from '@/packages/agent-protocol'
 
@@ -10,6 +12,7 @@ export interface DefaultRuntimeSettings extends RuntimeSettings {
   provider: string
   modelId: string
   apiKey: string
+  authMode: RuntimeAuthMode
   backend: string
   orchestration: string
   orchestrationPattern: string
@@ -22,6 +25,7 @@ export const DEFAULT_RUNTIME_SETTINGS: DefaultRuntimeSettings = {
   provider: 'minimax-cn',
   modelId: 'MiniMax-M2.7',
   apiKey: '',
+  authMode: 'api-key',
   backend: 'pi-ai',
   orchestration: 'none',
   orchestrationPattern: 'chain',
@@ -56,11 +60,19 @@ export function writeRuntimeSettingsToStorage(
 function normalizeRuntimeSettings(parsed: Record<string, unknown>): RuntimeSettings {
   const str = (value: unknown, fallback: string): string => typeof value === 'string' ? value : fallback
   const bool = (value: unknown, fallback: boolean): boolean => typeof value === 'boolean' ? value : fallback
+  const authMode = normalizeAuthMode(parsed.authMode)
+  const subscriptionProvider = stringOrUndefined(parsed.subscriptionProvider)
+  const subscriptionCredentials = normalizeSubscriptionCredentials(parsed.subscriptionCredentials)
 
   return {
     provider: str(parsed.provider, DEFAULT_RUNTIME_SETTINGS.provider),
     modelId: str(parsed.modelId, DEFAULT_RUNTIME_SETTINGS.modelId),
     apiKey: str(parsed.apiKey, DEFAULT_RUNTIME_SETTINGS.apiKey),
+    authMode,
+    subscriptionProvider: authMode === 'subscription'
+      ? (subscriptionProvider ?? str(parsed.provider, DEFAULT_RUNTIME_SETTINGS.provider))
+      : undefined,
+    subscriptionCredentials: authMode === 'subscription' ? subscriptionCredentials : undefined,
     baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
     backend: str(parsed.backend, DEFAULT_RUNTIME_SETTINGS.backend),
     orchestration: str(parsed.orchestration, DEFAULT_RUNTIME_SETTINGS.orchestration),
@@ -69,6 +81,32 @@ function normalizeRuntimeSettings(parsed: Record<string, unknown>): RuntimeSetti
     extensionBlocklist: stringList(parsed.extensionBlocklist),
     taskCapabilityProfile: normalizeTaskCapabilityProfile(parsed.taskCapabilityProfile),
   }
+}
+
+function normalizeAuthMode(value: unknown): RuntimeAuthMode {
+  return value === 'subscription' ? 'subscription' : 'api-key'
+}
+
+function normalizeSubscriptionCredentials(value: unknown): RuntimeSubscriptionCredentials | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  if (
+    typeof record.refresh !== 'string' ||
+    typeof record.access !== 'string' ||
+    typeof record.expires !== 'number'
+  ) {
+    return undefined
+  }
+  return {
+    ...record,
+    refresh: record.refresh,
+    access: record.access,
+    expires: record.expires,
+  }
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
 }
 
 function stringList(value: unknown): string[] {

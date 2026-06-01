@@ -1,8 +1,20 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, type CSSProperties } from 'react';
 import { createOrchestratorClient } from '@x-oasis/async-call-rpc-electron/browser';
 import { Check, Palette } from 'lucide-react';
 import type { StateChangeEvent, ConnectionStats } from '@x-oasis/async-call-rpc/orchestrator';
-import { SETTING_PAGELET_SERVICE_PATH, ISettingPageletService } from '@/apps/setting/application/common';
+import {
+  SETTING_PAGELET_SERVICE_PATH,
+  type ISettingPageletService,
+  type PiAiProviderDescriptor,
+  type PiAiModelDescriptor,
+  type PiAiConnectionTestResult,
+  type PiAiProviderAuthMode,
+} from '@/apps/setting/application/common';
+import {
+  readRuntimeSettingsFromStorage,
+  writeRuntimeSettingsToStorage,
+  DEFAULT_RUNTIME_SETTINGS,
+} from '@/packages/agent/browser/runtime-settings-storage';
 import { TELEGRAPH_THEME_PACKS, type TelegraphThemeId, type TelegraphThemePack, useTelegraphTheme } from '@/packages/ui/theme';
 
 const client = createOrchestratorClient({
@@ -10,7 +22,7 @@ const client = createOrchestratorClient({
   ipcChannelDescription: 'setting-page↔preload:ipc',
 });
 
-type SettingServiceProxy = Record<string, (...args: unknown[]) => Promise<string>>;
+type SettingServiceProxy = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 const settingClient = client.getProxy<SettingServiceProxy>(SETTING_PAGELET_SERVICE_PATH) as unknown as ISettingPageletService;
 
@@ -32,10 +44,28 @@ interface StatusInfo {
 type ConnectionState = 'IDLE' | 'CONNECTING' | 'READY' | 'TRANSIENT_FAILURE' | 'DISCONNECTING' | 'CLOSED';
 
 type SettingWindowPage = 'settings' | 'dev';
+type SettingSubPage = 'theme' | 'models';
+
+interface ModelSettingsDraft {
+  provider: string;
+  modelId: string;
+  backend: string;
+  baseUrl: string;
+  authMode: PiAiProviderAuthMode;
+  apiKey: string;
+  subscriptionProvider: string;
+  subscriptionCredentialsText: string;
+}
+
+interface SaveMessage {
+  tone: 'idle' | 'success' | 'error';
+  text: string;
+}
 
 const SETTING_WINDOW_PAGE_STORAGE_KEY = 'telegraph.settingWindowPage';
 const SETTING_WINDOW_PAGE_BROADCAST_CHANNEL = 'telegraph-setting-window-page';
 const DEFAULT_SETTING_WINDOW_PAGE: SettingWindowPage = 'settings';
+const DEFAULT_SETTING_SUB_PAGE: SettingSubPage = 'theme';
 
 let logIdCounter = 0;
 
@@ -62,12 +92,87 @@ function readSettingWindowPageMessage(value: unknown): SettingWindowPage | null 
   return typeof page === 'string' && isSettingWindowPage(page) ? page : null;
 }
 
+function loadInitialModelSettings(): ModelSettingsDraft {
+  try {
+    const settings = readRuntimeSettingsFromStorage(localStorage);
+    const provider = settings.provider ?? DEFAULT_RUNTIME_SETTINGS.provider;
+    return {
+      provider,
+      modelId: settings.modelId ?? DEFAULT_RUNTIME_SETTINGS.modelId,
+      backend: settings.backend ?? DEFAULT_RUNTIME_SETTINGS.backend,
+      baseUrl: settings.baseUrl ?? '',
+      authMode: settings.authMode === 'subscription' ? 'subscription' : 'api-key',
+      apiKey: settings.apiKey ?? '',
+      subscriptionProvider: settings.subscriptionProvider ?? provider,
+      subscriptionCredentialsText: formatJson(settings.subscriptionCredentials),
+    };
+  } catch {
+    return {
+      provider: DEFAULT_RUNTIME_SETTINGS.provider,
+      modelId: DEFAULT_RUNTIME_SETTINGS.modelId,
+      backend: DEFAULT_RUNTIME_SETTINGS.backend,
+      baseUrl: '',
+      authMode: 'api-key',
+      apiKey: DEFAULT_RUNTIME_SETTINGS.apiKey,
+      subscriptionProvider: DEFAULT_RUNTIME_SETTINGS.provider,
+      subscriptionCredentialsText: '',
+    };
+  }
+}
+
+function formatJson(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return '';
+  }
+}
+
+function parseSubscriptionCredentials(text: string): {
+  refresh: string;
+  access: string;
+  expires: number;
+  [key: string]: unknown;
+} | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    if (
+      typeof record.refresh !== 'string' ||
+      typeof record.access !== 'string' ||
+      typeof record.expires !== 'number'
+    ) {
+      return null;
+    }
+    return {
+      ...record,
+      refresh: record.refresh,
+      access: record.access,
+      expires: record.expires,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function SettingApp() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('IDLE');
   const [statusInfo, setStatusInfo] = useState<StatusInfo | null>(null);
   const [activePage, setActivePage] = useState<SettingWindowPage>(loadInitialSettingWindowPage);
+  const [settingsSubPage, setSettingsSubPage] = useState<SettingSubPage>(DEFAULT_SETTING_SUB_PAGE);
+  const [modelDraft, setModelDraft] = useState<ModelSettingsDraft>(loadInitialModelSettings);
+  const [providers, setProviders] = useState<PiAiProviderDescriptor[]>([]);
+  const [models, setModels] = useState<PiAiModelDescriptor[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [isTestingModel, setIsTestingModel] = useState(false);
+  const [modelTestResult, setModelTestResult] = useState<PiAiConnectionTestResult | null>(null);
+  const [saveMessage, setSaveMessage] = useState<SaveMessage>({ tone: 'idle', text: '' });
   const { themeId, themePack, setThemeId } = useTelegraphTheme();
 
   const isReady = connectionState === 'READY';
@@ -177,6 +282,68 @@ function SettingApp() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isReady) return;
+    let cancelled = false;
+    void settingClient
+      .listPiAiProviders()
+      .then((items) => {
+        if (cancelled) return;
+        setProviders(items);
+        setModelDraft((prev) => {
+          if (items.length === 0) return prev;
+          const hasProvider = items.some((item) => item.id === prev.provider);
+          const fallbackProvider = items[0]?.id ?? prev.provider;
+          return hasProvider ? prev : {
+            ...prev,
+            provider: fallbackProvider,
+            subscriptionProvider: prev.subscriptionProvider || fallbackProvider,
+          };
+        });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setSaveMessage({ tone: 'error', text: `Load providers failed: ${getErrorMessage(err)}` });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady]);
+
+  useEffect(() => {
+    if (!isReady || !modelDraft.provider) {
+      setModels([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingModels(true);
+    void settingClient
+      .listPiAiModels(modelDraft.provider)
+      .then((items) => {
+        if (cancelled) return;
+        setModels(items);
+        setModelDraft((prev) => {
+          if (items.length === 0) return prev;
+          const hasModel = items.some((item) => item.id === prev.modelId);
+          return hasModel ? prev : {
+            ...prev,
+            modelId: items[0]?.id ?? prev.modelId,
+          };
+        });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setSaveMessage({ tone: 'error', text: `Load models failed: ${getErrorMessage(err)}` });
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingModels(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, modelDraft.provider]);
+
   const handleConnect = useCallback(async () => {
     setConnectionState('CONNECTING');
     try {
@@ -228,6 +395,119 @@ function SettingApp() {
     [isReady, addLog],
   );
 
+  const updateModelDraft = useCallback((patch: Partial<ModelSettingsDraft>) => {
+    setModelDraft((prev) => ({ ...prev, ...patch }));
+    setSaveMessage((prev) => (prev.tone === 'error' ? { tone: 'idle', text: '' } : prev));
+  }, []);
+
+  const handleSaveModelSettings = useCallback(() => {
+    if (!modelDraft.provider || !modelDraft.modelId) {
+      setSaveMessage({ tone: 'error', text: 'Provider and model are required.' });
+      return;
+    }
+
+    const subscriptionCredentials = parseSubscriptionCredentials(modelDraft.subscriptionCredentialsText);
+    if (modelDraft.authMode === 'subscription' && !subscriptionCredentials) {
+      setSaveMessage({
+        tone: 'error',
+        text: 'Subscription credentials must be valid JSON with refresh/access/expires.',
+      });
+      return;
+    }
+
+    try {
+      writeRuntimeSettingsToStorage({
+        ...readRuntimeSettingsFromStorage(localStorage),
+        provider: modelDraft.provider,
+        modelId: modelDraft.modelId,
+        backend: modelDraft.backend,
+        baseUrl: modelDraft.baseUrl.trim() ? modelDraft.baseUrl.trim() : undefined,
+        apiKey: modelDraft.apiKey.trim(),
+        authMode: modelDraft.authMode,
+        subscriptionProvider: modelDraft.authMode === 'subscription'
+          ? (modelDraft.subscriptionProvider.trim() || modelDraft.provider)
+          : undefined,
+        subscriptionCredentials: modelDraft.authMode === 'subscription'
+          ? subscriptionCredentials ?? undefined
+          : undefined,
+      }, localStorage);
+      setSaveMessage({
+        tone: 'success',
+        text: 'Model settings saved. Chat and Design runs will use this configuration.',
+      });
+    } catch (err: unknown) {
+      setSaveMessage({
+        tone: 'error',
+        text: `Save failed: ${getErrorMessage(err)}`,
+      });
+    }
+  }, [modelDraft]);
+
+  const handleTestModelConnection = useCallback(async () => {
+    if (!isReady) return;
+    const provider = modelDraft.provider.trim();
+    const modelId = modelDraft.modelId.trim();
+    if (!provider || !modelId) {
+      setModelTestResult({
+        ok: false,
+        provider,
+        modelId,
+        authMode: modelDraft.authMode,
+        latencyMs: 0,
+        error: 'Provider and model are required.',
+      });
+      return;
+    }
+
+    const subscriptionCredentials = parseSubscriptionCredentials(modelDraft.subscriptionCredentialsText);
+    if (modelDraft.authMode === 'subscription' && !subscriptionCredentials) {
+      setModelTestResult({
+        ok: false,
+        provider,
+        modelId,
+        authMode: modelDraft.authMode,
+        latencyMs: 0,
+        error: 'Subscription credentials must be valid JSON with refresh/access/expires.',
+      });
+      return;
+    }
+
+    setIsTestingModel(true);
+    try {
+      const result = await settingClient.testPiAiConnection({
+        provider,
+        modelId,
+        authMode: modelDraft.authMode,
+        apiKey: modelDraft.authMode === 'api-key' ? modelDraft.apiKey.trim() : undefined,
+        subscriptionProvider: modelDraft.authMode === 'subscription'
+          ? (modelDraft.subscriptionProvider.trim() || provider)
+          : undefined,
+        subscriptionCredentials: modelDraft.authMode === 'subscription'
+          ? subscriptionCredentials ?? undefined
+          : undefined,
+      });
+      setModelTestResult(result);
+      if (result.ok && result.refreshedSubscriptionCredentials && modelDraft.authMode === 'subscription') {
+        setModelDraft((prev) => ({
+          ...prev,
+          apiKey: result.resolvedApiKey ?? prev.apiKey,
+          subscriptionCredentialsText: JSON.stringify(result.refreshedSubscriptionCredentials, null, 2),
+        }));
+      }
+    } catch (err: unknown) {
+      setModelTestResult({
+        ok: false,
+        provider,
+        modelId,
+        authMode: modelDraft.authMode,
+        latencyMs: 0,
+        error: getErrorMessage(err),
+      });
+    } finally {
+      setIsTestingModel(false);
+    }
+  }, [isReady, modelDraft]);
+
   const stateColor: Record<string, string> = {
     IDLE: 'var(--muted-foreground)',
     CONNECTING: 'var(--chart-4)',
@@ -240,7 +520,9 @@ function SettingApp() {
 
   const stats = statusInfo?.stats;
   const activePageTitle = activePage === 'settings' ? 'Setting' : 'Dev';
-  const activePageDescription = activePage === 'settings' ? 'Theme and personal preferences' : 'Pagelet diagnostics and RPC tools';
+  const activePageDescription = activePage === 'settings'
+    ? 'Theme, model provider mode, and runtime preferences'
+    : 'Pagelet diagnostics and RPC tools';
 
   return (
     <div
@@ -253,32 +535,32 @@ function SettingApp() {
         flexDirection: 'column',
       }}
     >
-      <div
-        style={{
-          backgroundColor: 'var(--card)',
-          borderBottom: '1px solid var(--border)',
-          padding: '16px 24px',
-          color: 'var(--foreground)',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{activePageTitle}</div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'var(--muted-foreground)',
-              marginTop: 2,
-            }}
-          >
-            {activePageDescription}
+      {activePage === 'dev' && (
+        <div
+          style={{
+            backgroundColor: 'var(--card)',
+            borderBottom: '1px solid var(--border)',
+            padding: '16px 24px',
+            color: 'var(--foreground)',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{activePageTitle}</div>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--muted-foreground)',
+                marginTop: 2,
+              }}
+            >
+              {activePageDescription}
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {activePage === 'dev' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
                 display: 'flex',
@@ -301,9 +583,9 @@ function SettingApp() {
               />
               <span style={{ fontSize: 11 }}>{connectionState}</span>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div
         style={{
@@ -316,7 +598,77 @@ function SettingApp() {
         }}
       >
         {activePage === 'settings' ? (
-          <ThemeSection currentThemeId={themeId} currentThemeLabel={themePack.label} onThemeChange={handleThemeChange} />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(180px, 220px) minmax(0, 1fr)',
+              gap: 12,
+              alignItems: 'start',
+            }}
+          >
+            <aside
+              style={{
+                backgroundColor: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              {([
+                { id: 'theme', label: 'Theme', desc: 'Colors and appearance' },
+                { id: 'models', label: 'Models', desc: 'Provider, auth, connectivity' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setSettingsSubPage(tab.id);
+                  }}
+                  style={{
+                    border: settingsSubPage === tab.id ? '1px solid var(--primary)' : '1px solid transparent',
+                    borderRadius: 8,
+                    backgroundColor: settingsSubPage === tab.id ? 'var(--accent)' : 'transparent',
+                    color: settingsSubPage === tab.id ? 'var(--foreground)' : 'var(--muted-foreground)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    padding: '8px 9px',
+                    transition: 'all 120ms ease',
+                  }}
+                  aria-current={settingsSubPage === tab.id}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{tab.label}</div>
+                  <div style={{ fontSize: 10.5, marginTop: 1 }}>{tab.desc}</div>
+                </button>
+              ))}
+            </aside>
+
+            <div style={{ minWidth: 0 }}>
+              {settingsSubPage === 'theme' ? (
+                <ThemeSection
+                  currentThemeId={themeId}
+                  currentThemeLabel={themePack.label}
+                  onThemeChange={handleThemeChange}
+                />
+              ) : (
+                <ModelsSection
+                  isReady={isReady}
+                  providers={providers}
+                  models={models}
+                  loadingModels={loadingModels}
+                  draft={modelDraft}
+                  isTesting={isTestingModel}
+                  testResult={modelTestResult}
+                  saveMessage={saveMessage}
+                  onDraftChange={updateModelDraft}
+                  onSave={handleSaveModelSettings}
+                  onTest={handleTestModelConnection}
+                />
+              )}
+            </div>
+          </div>
         ) : (
           <>
               <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
@@ -774,6 +1126,453 @@ function SettingApp() {
       </div>
     </div>
   );
+}
+
+function ModelsSection({
+  isReady,
+  providers,
+  models,
+  loadingModels,
+  draft,
+  isTesting,
+  testResult,
+  saveMessage,
+  onDraftChange,
+  onSave,
+  onTest,
+}: {
+  isReady: boolean;
+  providers: PiAiProviderDescriptor[];
+  models: PiAiModelDescriptor[];
+  loadingModels: boolean;
+  draft: ModelSettingsDraft;
+  isTesting: boolean;
+  testResult: PiAiConnectionTestResult | null;
+  saveMessage: SaveMessage;
+  onDraftChange: (patch: Partial<ModelSettingsDraft>) => void;
+  onSave: () => void;
+  onTest: () => Promise<void>;
+}) {
+  const providersForMode = providers.filter((provider) =>
+    draft.authMode === 'subscription' ? provider.supportsSubscription : provider.supportsApiKey,
+  );
+  const currentProvider = providers.find((provider) => provider.id === draft.provider);
+  const hasSubscriptionConfig = parseSubscriptionCredentials(draft.subscriptionCredentialsText) !== null;
+  const inputStyle: CSSProperties = {
+    width: '100%',
+    borderRadius: 8,
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--background)',
+    color: 'var(--foreground)',
+    padding: '8px 10px',
+    fontSize: 12,
+  };
+
+  return (
+    <section
+      style={{
+        backgroundColor: 'var(--card)',
+        borderRadius: 'var(--radius)',
+        border: '1px solid var(--border)',
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>Models</div>
+          <div style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 2 }}>
+            Configure pi-ai provider auth mode (api-key / subscription OAuth) and validate connectivity.
+          </div>
+        </div>
+        <div
+          style={{
+            borderRadius: 999,
+            border: '1px solid var(--border)',
+            backgroundColor: isReady ? 'var(--accent)' : 'var(--muted)',
+            color: isReady ? 'var(--foreground)' : 'var(--muted-foreground)',
+            fontSize: 11,
+            padding: '5px 10px',
+            fontWeight: 600,
+          }}
+        >
+          {isReady ? 'Setting Pagelet Ready' : 'Connecting...'}
+        </div>
+      </div>
+
+      <div
+        style={{
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: 12,
+          backgroundColor: 'var(--surface-soft)',
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: 8 }}>
+          Select authentication method:
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {([
+            { id: 'subscription', label: 'Use a subscription' },
+            { id: 'api-key', label: 'Use an API key' },
+          ] as const).map((mode) => {
+            const selected = draft.authMode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => {
+                  const nextAuthMode = mode.id;
+                  const providersForNextMode = providers.filter((provider) =>
+                    nextAuthMode === 'subscription' ? provider.supportsSubscription : provider.supportsApiKey,
+                  );
+                  const fallbackProvider = providersForNextMode[0]?.id ?? draft.provider;
+                  onDraftChange({
+                    authMode: nextAuthMode,
+                    provider: nextAuthMode === draft.authMode ? draft.provider : fallbackProvider,
+                    subscriptionProvider: nextAuthMode === 'subscription'
+                      ? (draft.subscriptionProvider || draft.provider)
+                      : draft.subscriptionProvider,
+                  });
+                }}
+                style={{
+                  border: selected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  backgroundColor: selected ? 'var(--accent)' : 'var(--card)',
+                  color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
+                  borderRadius: 8,
+                  padding: '8px 10px',
+                  textAlign: 'left',
+                  fontWeight: selected ? 700 : 500,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                {selected ? '→ ' : ''}{mode.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div
+        style={{
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: 12,
+          backgroundColor: 'var(--surface-soft)',
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: 8 }}>
+          Select provider to configure:
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {providersForMode.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--muted-foreground)', padding: '4px 6px' }}>
+              {draft.authMode === 'subscription'
+                ? 'No subscription providers available.'
+                : 'No API key providers available.'}
+            </div>
+          ) : (
+            providersForMode.map((provider) => {
+              const selected = draft.provider === provider.id;
+              const status = providerStatusLabel({
+                provider,
+                selected,
+                draft,
+                hasSubscriptionConfig,
+              });
+              return (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => {
+                    onDraftChange({
+                      provider: provider.id,
+                      subscriptionProvider: draft.authMode === 'subscription'
+                        ? provider.id
+                        : draft.subscriptionProvider,
+                    });
+                  }}
+                  style={{
+                    border: selected ? '1px solid var(--primary)' : '1px solid transparent',
+                    backgroundColor: selected ? 'var(--card)' : 'transparent',
+                    color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
+                    borderRadius: 8,
+                    padding: '7px 9px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                  }}
+                >
+                  <span>{selected ? '→ ' : ''}{provider.displayName}</span>
+                  <span style={{ fontSize: 11, opacity: 0.9 }}>{status}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 10,
+        }}
+      >
+        <label style={{ display: 'block' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
+            Model {loadingModels ? '(loading...)' : ''}
+          </div>
+          <select
+            value={draft.modelId}
+            onChange={(event) => {
+              onDraftChange({ modelId: event.target.value });
+            }}
+            style={inputStyle}
+          >
+            {models.length === 0 ? (
+              <option value="">No models for provider</option>
+            ) : (
+              models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.label}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+
+        <label style={{ display: 'block' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>Backend</div>
+          <select
+            value={draft.backend}
+            onChange={(event) => {
+              onDraftChange({ backend: event.target.value });
+            }}
+            style={inputStyle}
+          >
+            <option value="pi-ai">pi-ai</option>
+            <option value="pi-embedded">pi-embedded</option>
+          </select>
+        </label>
+      </div>
+
+      <label style={{ display: 'block' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>Base URL (optional)</div>
+        <input
+          type="text"
+          value={draft.baseUrl}
+          placeholder="https://api.example.com/v1"
+          onChange={(event) => {
+            onDraftChange({ baseUrl: event.target.value });
+          }}
+          style={inputStyle}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </label>
+
+      {draft.authMode === 'api-key' ? (
+        <label style={{ display: 'block' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>API Key</div>
+          <input
+            type="password"
+            value={draft.apiKey}
+            placeholder="sk-..."
+            onChange={(event) => {
+              onDraftChange({ apiKey: event.target.value });
+            }}
+            style={inputStyle}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+      ) : (
+        <>
+          <label style={{ display: 'block' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
+              Subscription Provider
+            </div>
+            <select
+              value={draft.subscriptionProvider}
+              onChange={(event) => {
+                onDraftChange({ subscriptionProvider: event.target.value });
+              }}
+              style={inputStyle}
+            >
+              {providers.filter((provider) => provider.supportsSubscription).length === 0 ? (
+                <option value={draft.provider}>{draft.provider}</option>
+              ) : (
+                providers
+                  .filter((provider) => provider.supportsSubscription)
+                  .map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.displayName}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          <label style={{ display: 'block' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
+              Subscription Credentials (JSON)
+            </div>
+            <textarea
+              value={draft.subscriptionCredentialsText}
+              onChange={(event) => {
+                onDraftChange({ subscriptionCredentialsText: event.target.value });
+              }}
+              placeholder={'{\n  "refresh": "...",\n  "access": "...",\n  "expires": 0\n}'}
+              style={{
+                ...inputStyle,
+                minHeight: 140,
+                resize: 'vertical',
+                fontFamily: 'monospace',
+              }}
+              spellCheck={false}
+            />
+          </label>
+        </>
+      )}
+
+      <div
+        style={{
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: 10,
+          fontSize: 11,
+          color: 'var(--muted-foreground)',
+          backgroundColor: 'var(--surface-soft)',
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          gap: '4px 8px',
+        }}
+      >
+        <span>Provider mode:</span>
+        <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
+          {draft.authMode}
+        </span>
+        <span>Current provider:</span>
+        <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
+          {(currentProvider?.displayName ?? draft.provider) || '-'}
+        </span>
+        <span>Model count:</span>
+        <span>{currentProvider ? String(currentProvider.modelCount) : '-'}</span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => {
+            onTest().catch(() => {});
+          }}
+          disabled={!isReady || isTesting}
+          style={{
+            border: 'none',
+            borderRadius: 8,
+            padding: '7px 14px',
+            fontWeight: 600,
+            fontSize: 12,
+            cursor: !isReady || isTesting ? 'not-allowed' : 'pointer',
+            backgroundColor: !isReady || isTesting ? 'var(--muted)' : 'var(--primary)',
+            color: !isReady || isTesting ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
+          }}
+        >
+          {isTesting ? 'Testing...' : 'Test Connection'}
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            padding: '7px 14px',
+            fontWeight: 600,
+            fontSize: 12,
+            cursor: 'pointer',
+            backgroundColor: 'var(--card)',
+            color: 'var(--foreground)',
+          }}
+        >
+          Save Settings
+        </button>
+      </div>
+
+      {testResult && (
+        <div
+          style={{
+            border: `1px solid ${testResult.ok ? 'var(--accent-mint)' : 'var(--destructive)'}`,
+            borderRadius: 8,
+            backgroundColor: testResult.ok ? 'color-mix(in srgb, var(--accent-mint) 12%, var(--card))' : 'color-mix(in srgb, var(--destructive) 14%, var(--card))',
+            color: 'var(--foreground)',
+            padding: 10,
+            fontSize: 11,
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr',
+            gap: '4px 8px',
+          }}
+        >
+          <span>Status:</span>
+          <span style={{ fontWeight: 700 }}>{testResult.ok ? 'Connected' : 'Failed'}</span>
+          <span>Latency:</span>
+          <span>{`${String(testResult.latencyMs)}ms`}</span>
+          <span>Mode:</span>
+          <span>{testResult.authMode}</span>
+          {!testResult.ok && (
+            <>
+              <span>Error:</span>
+              <span style={{ color: 'var(--destructive)' }}>{testResult.error ?? 'Unknown error'}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {saveMessage.tone !== 'idle' && (
+        <div
+          style={{
+            borderRadius: 8,
+            padding: '8px 10px',
+            fontSize: 11,
+            border: `1px solid ${saveMessage.tone === 'error' ? 'var(--destructive)' : 'var(--accent-mint)'}`,
+            color: saveMessage.tone === 'error' ? 'var(--destructive)' : 'var(--foreground)',
+            backgroundColor: saveMessage.tone === 'error'
+              ? 'color-mix(in srgb, var(--destructive) 13%, var(--card))'
+              : 'color-mix(in srgb, var(--accent-mint) 10%, var(--card))',
+          }}
+        >
+          {saveMessage.text}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function providerStatusLabel({
+  provider,
+  selected,
+  draft,
+  hasSubscriptionConfig,
+}: {
+  provider: PiAiProviderDescriptor;
+  selected: boolean;
+  draft: ModelSettingsDraft;
+  hasSubscriptionConfig: boolean;
+}): string {
+  if (draft.authMode === 'subscription') {
+    if (selected && hasSubscriptionConfig) return 'configured';
+    return 'unconfigured';
+  }
+
+  if (selected && draft.apiKey.trim()) return 'configured';
+  if (provider.environmentKeyName) return `env: ${provider.environmentKeyName}`;
+  return 'unconfigured';
 }
 
 function ThemeSection({ currentThemeId, currentThemeLabel, onThemeChange }: { currentThemeId: TelegraphThemeId; currentThemeLabel: string; onThemeChange: (themeId: TelegraphThemeId) => void }) {

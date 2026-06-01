@@ -4,8 +4,10 @@ import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagele
 import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
 import { ElectronMessagePortMainChannel } from '@x-oasis/async-call-rpc-electron';
 import { SETTING_PAGELET_SERVICE_PATH } from '@/apps/setting/application/common';
+import type { PiAiConnectionTestInput } from '@/apps/setting/application/common';
 import type { ISharedService } from '@/apps/shared/application/common';
 import type { IDaemonService } from '@/apps/daemon/application/common';
+import { listPiAiModels, listPiAiProviders, testPiAiConnection } from './pi-ai-provider-service';
 
 export const SettingWorkerId = createId('SettingWorker');
 
@@ -32,6 +34,9 @@ export class SettingWorker extends PageletWorker<ISharedService, IDaemonService>
         callDaemonSystemStatus: (): Promise<string> =>
           this.daemon.systemStatus(),
         callMainPing: (msg: string): Promise<string> => this.main.mainPing(msg),
+        listPiAiProviders: () => listPiAiProviders(),
+        listPiAiModels: (provider: string) => listPiAiModels(provider),
+        testPiAiConnection: (input: PiAiConnectionTestInput) => testPiAiConnection(input),
       },
     });
   }

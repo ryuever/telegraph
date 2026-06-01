@@ -1,9 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { cn } from '@/packages/ui/lib/utils'
+import { Globe, Plus } from 'lucide-react'
+import {
+  PromptInput,
+  PromptInputButton,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  type PromptInputMessage,
+} from '@/packages/ui/components/ai-elements'
 
 export interface ChatComposerProps {
   sessionId: string
   seedText: string
+  modelValue: string
+  modelOptions: Array<{ value: string; label: string }>
+  onSelectModel: (value: string) => void
   onPersistSessionDraft: (sessionId: string, text: string) => void
   onSendMessage: (text: string) => void
   onStop: () => void
@@ -11,11 +24,12 @@ export interface ChatComposerProps {
   placeholder?: string
 }
 
-const MAX_HEIGHT = 220
-
 export const ChatComposer = React.memo(function ChatComposer({
   sessionId,
   seedText,
+  modelValue,
+  modelOptions,
+  onSelectModel,
   onPersistSessionDraft,
   onSendMessage,
   onStop,
@@ -23,7 +37,6 @@ export const ChatComposer = React.memo(function ChatComposer({
   placeholder = 'Message the agent',
 }: ChatComposerProps) {
   const [text, setText] = useState(seedText)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const textRef = useRef(text)
   textRef.current = text
 
@@ -35,29 +48,13 @@ export const ChatComposer = React.memo(function ChatComposer({
     }
   }, [sessionId, onPersistSessionDraft])
 
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = '0px'
-    const next = Math.min(MAX_HEIGHT, el.scrollHeight)
-    el.style.height = String(next) + 'px'
-    el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden'
-  }, [text])
-
-  const handleSend = () => {
-    const t = text.trim()
+  const handleSend = (message: PromptInputMessage) => {
+    const t = message.text.trim()
     if (!t || isStreaming) return
     onSendMessage(t)
     setText('')
     if (sessionId) {
       onPersistSessionDraft(sessionId, '')
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault()
-      handleSend()
     }
   }
 
@@ -72,7 +69,7 @@ export const ChatComposer = React.memo(function ChatComposer({
     setText(current => {
       const next = current.slice(0, selectionStart) + pastedText + current.slice(selectionEnd)
       requestAnimationFrame(() => {
-        const el = textareaRef.current
+        const el = target
         if (!el) return
         const caret = selectionStart + pastedText.length
         el.setSelectionRange(caret, caret)
@@ -86,61 +83,53 @@ export const ChatComposer = React.memo(function ChatComposer({
   return (
     <div className="border-t border-border bg-card/70 px-4 pb-4 pt-3">
       <div className="mx-auto max-w-3xl">
-        <div
-          className={cn(
-            'group relative flex items-end gap-2 rounded-md border border-border bg-background px-3 py-2.5 shadow-sm transition-colors',
-            'focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/25'
-          )}
-        >
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={e => { setText(e.target.value); }}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder={placeholder}
-            rows={1}
-            className="min-h-[24px] flex-1 resize-none border-0 bg-transparent text-[13.5px] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
-          />
-          {isStreaming ? (
-            <button
-              type="button"
-              onClick={onStop}
-              aria-label="Stop generating"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground shadow transition-colors hover:bg-secondary/80"
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="5" y="5" width="14" height="14" rx="2" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!canSend}
-              aria-label="Send message"
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-md shadow transition-all',
-                canSend
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'cursor-not-allowed bg-muted text-muted-foreground'
-              )}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+        <PromptInput className="group" onSubmit={handleSend}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              value={text}
+              onChange={e => { setText(e.target.value); }}
+              onPaste={handlePaste}
+              placeholder={placeholder}
+              className="flex-1"
+            />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              <PromptInputButton
+                aria-label="Add attachment"
+                className="h-7 w-7 rounded-full text-muted-foreground"
+                variant="ghost"
               >
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            </button>
-          )}
-        </div>
+                <Plus className="size-4" />
+              </PromptInputButton>
+              <PromptInputButton
+                className="h-7 rounded-full px-2.5 text-muted-foreground"
+                variant="ghost"
+              >
+                <Globe className="size-4" />
+                <span className="text-xs">Search</span>
+              </PromptInputButton>
+              <label className="sr-only" htmlFor="chat-model-select">Model</label>
+              <select
+                id="chat-model-select"
+                value={modelValue}
+                onChange={e => { onSelectModel(e.target.value); }}
+                className="h-7 max-w-[220px] rounded-full border border-border bg-background px-2.5 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus:border-ring"
+                aria-label="Model selection"
+              >
+                {modelOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </PromptInputTools>
+            <PromptInputSubmit
+              className="h-8 w-8 rounded-md"
+              disabled={!canSend && !isStreaming}
+              onStop={onStop}
+              status={isStreaming ? 'streaming' : 'ready'}
+            />
+          </PromptInputFooter>
+        </PromptInput>
       </div>
     </div>
   )

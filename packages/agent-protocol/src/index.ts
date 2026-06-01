@@ -3,6 +3,8 @@ export type {
   AgentRunRequest,
   AgentRuntime,
   RunInput,
+  RuntimeAuthMode,
+  RuntimeSubscriptionCredentials,
   RuntimeSettings,
   RuntimeTaskCapabilityProfile,
 } from './runtime.js'

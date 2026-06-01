@@ -58,6 +58,9 @@ function renderComposer({
       <ChatComposer
         sessionId={sessionId}
         seedText=""
+        modelValue="openai::gpt-4o-mini"
+        modelOptions={[{ value: 'openai::gpt-4o-mini', label: 'OpenAI · GPT-4o mini' }]}
+        onSelectModel={() => {}}
         onPersistSessionDraft={() => {}}
         onSendMessage={onSendMessage}
         onStop={() => {}}

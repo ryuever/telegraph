@@ -75,4 +75,47 @@ describe('runtime settings storage', () => {
       },
     })
   })
+
+  it('persists subscription auth settings', () => {
+    const storage = new MemoryStorage()
+    writeRuntimeSettingsToStorage({
+      provider: 'openai-codex',
+      modelId: 'gpt-5-codex',
+      authMode: 'subscription',
+      subscriptionProvider: 'openai-codex',
+      subscriptionCredentials: {
+        refresh: 'refresh-token',
+        access: 'access-token',
+        expires: 123456,
+      },
+      apiKey: '',
+    }, storage)
+
+    expect(readRuntimeSettingsFromStorage(storage)).toMatchObject({
+      provider: 'openai-codex',
+      modelId: 'gpt-5-codex',
+      authMode: 'subscription',
+      subscriptionProvider: 'openai-codex',
+      subscriptionCredentials: {
+        refresh: 'refresh-token',
+        access: 'access-token',
+        expires: 123456,
+      },
+    })
+  })
+
+  it('falls back to api-key mode when auth values are invalid', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+      authMode: 'invalid-mode',
+      subscriptionProvider: 'openai-codex',
+      subscriptionCredentials: { nope: true },
+    }))
+
+    expect(readRuntimeSettingsFromStorage(storage)).toMatchObject({
+      authMode: 'api-key',
+      subscriptionProvider: undefined,
+      subscriptionCredentials: undefined,
+    })
+  })
 })

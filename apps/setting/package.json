@@ -13,6 +13,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
+    "@mariozechner/pi-ai": "^0.72.1",
     "@telegraph/daemon": "workspace:*",
     "@telegraph/services": "workspace:*",
     "@telegraph/shared": "workspace:*",

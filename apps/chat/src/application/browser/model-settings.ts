@@ -40,11 +40,23 @@ export interface ApiKeySettings {
   baseUrl?: string
 }
 
+export interface ProviderAuthSettings {
+  authMode: 'api-key' | 'subscription'
+  subscriptionProvider?: string
+  subscriptionCredentials?: {
+    refresh: string
+    access: string
+    expires: number
+    [key: string]: unknown
+  }
+}
+
 export interface ChatModelSettings
   extends ModelSelection,
     OrchestrationSettings,
     ExtensionSettings,
-    ApiKeySettings {}
+    ApiKeySettings,
+    ProviderAuthSettings {}
 
 export interface EnvModelConfig {
   provider: string
@@ -85,11 +97,18 @@ export const DEFAULT_API_KEY: ApiKeySettings = {
   baseUrl: undefined,
 }
 
+export const DEFAULT_PROVIDER_AUTH: ProviderAuthSettings = {
+  authMode: 'api-key',
+  subscriptionProvider: undefined,
+  subscriptionCredentials: undefined,
+}
+
 export const DEFAULT_SETTINGS: ChatModelSettings = {
   ...DEFAULT_MODEL_SELECTION,
   ...DEFAULT_ORCHESTRATION,
   ...DEFAULT_EXTENSION,
   ...DEFAULT_API_KEY,
+  ...DEFAULT_PROVIDER_AUTH,
 }
 
 export function loadEnvModels(): EnvModelConfig[] {
@@ -126,6 +145,11 @@ export function loadSettings(): ChatModelSettings {
       modelId: parsed.modelId ?? DEFAULT_SETTINGS.modelId,
       backend: normalizeBackend(parsed.backend),
       apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : DEFAULT_SETTINGS.apiKey,
+      authMode: normalizeAuthMode(parsed.authMode),
+      subscriptionProvider: typeof parsed.subscriptionProvider === 'string'
+        ? parsed.subscriptionProvider
+        : undefined,
+      subscriptionCredentials: normalizeSubscriptionCredentials(parsed.subscriptionCredentials),
       baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : DEFAULT_SETTINGS.baseUrl,
       orchestration: normalizeOrchestration(parsed.orchestration),
       orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
@@ -159,6 +183,9 @@ export function toRuntimeSettings(
     provider: settings.provider,
     modelId: settings.modelId,
     apiKey: settings.apiKey || env?.apiKey || '',
+    authMode: settings.authMode,
+    subscriptionProvider: settings.subscriptionProvider,
+    subscriptionCredentials: settings.subscriptionCredentials,
     baseUrl: settings.baseUrl ?? env?.baseUrl,
     backend: normalizeBackend(settings.backend),
     orchestration: settings.orchestration,
@@ -251,6 +278,30 @@ function normalizeBackend(value: unknown): AgentBackendKind {
 function normalizeOrchestration(value: unknown): AgentOrchestrationMode {
   if (value === 'none' || value === 'telegraph-subagents') return value
   return DEFAULT_SETTINGS.orchestration
+}
+
+function normalizeAuthMode(value: unknown): 'api-key' | 'subscription' {
+  return value === 'subscription' ? 'subscription' : 'api-key'
+}
+
+function normalizeSubscriptionCredentials(
+  value: unknown,
+): ProviderAuthSettings['subscriptionCredentials'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  if (
+    typeof record.refresh !== 'string' ||
+    typeof record.access !== 'string' ||
+    typeof record.expires !== 'number'
+  ) {
+    return undefined
+  }
+  return {
+    ...record,
+    refresh: record.refresh,
+    access: record.access,
+    expires: record.expires,
+  }
 }
 
 function normalizeExtensionBlocklist(value: unknown): string[] {

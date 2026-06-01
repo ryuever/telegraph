@@ -37,6 +37,17 @@ export interface AgentRuntimeSettings {
   provider: string
   modelId: string
   apiKey: string
+  /** Provider authentication mode for pi-ai core. */
+  authMode?: 'api-key' | 'subscription'
+  /** OAuth provider id used when authMode is 'subscription'. */
+  subscriptionProvider?: string
+  /** OAuth credentials payload used to mint an API key on demand. */
+  subscriptionCredentials?: {
+    refresh: string
+    access: string
+    expires: number
+    [key: string]: unknown
+  }
   /** Optional override — only honored by providers whose Model definition reads it (currently MiniMax custom). */
   baseUrl?: string
   /** Execution backend selector; defaults to 'pi-ai'. */

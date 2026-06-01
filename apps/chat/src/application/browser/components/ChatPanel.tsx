@@ -21,6 +21,7 @@ import { upsertToolCall } from '../chat-tool-calls'
 import { upsertSubagentUpdate } from '../chat-subagents'
 import { groupPersistedRuns, sortRunsForSessionTimeline } from '../persisted-run-groups'
 import {
+  CATALOG,
   loadSettings,
   saveSettings,
   loadEnvModels,
@@ -604,6 +605,24 @@ export function ChatPanel({ agent }: Props) {
     saveSettings(next)
   }
 
+  const modelOptions = useMemo(
+    () => CATALOG.map(model => ({
+      value: `${model.provider}::${model.id}`,
+      label: model.label,
+    })),
+    []
+  )
+
+  const selectedModelValue = `${settings.provider}::${settings.modelId}`
+
+  const handleSelectModel = useCallback((nextValue: string) => {
+    const [provider, modelId] = nextValue.split('::')
+    if (!provider || !modelId) return
+    const nextSettings: ChatModelSettings = { ...settings, provider, modelId }
+    setSettings(nextSettings)
+    saveSettings(nextSettings)
+  }, [settings])
+
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground">
       <div className="flex min-h-0 flex-1">
@@ -651,6 +670,9 @@ export function ChatPanel({ agent }: Props) {
               key={`${composerKey}|${String(composerRemountKey)}`}
               sessionId={composerKey}
               seedText={seedText}
+              modelValue={selectedModelValue}
+              modelOptions={modelOptions}
+              onSelectModel={handleSelectModel}
               onPersistSessionDraft={persistSessionDraft}
               onSendMessage={handleSendMessage}
               onStop={stop}

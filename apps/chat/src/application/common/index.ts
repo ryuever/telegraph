@@ -24,6 +24,14 @@ export interface AgentRuntimeSettings {
   provider: string
   modelId: string
   apiKey: string
+  authMode?: 'api-key' | 'subscription'
+  subscriptionProvider?: string
+  subscriptionCredentials?: {
+    refresh: string
+    access: string
+    expires: number
+    [key: string]: unknown
+  }
   baseUrl?: string
   backend?: AgentBackendKind
   orchestration?: AgentOrchestrationMode

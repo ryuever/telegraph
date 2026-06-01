@@ -520,6 +520,9 @@ importers:
 
   apps/setting:
     dependencies:
+      '@mariozechner/pi-ai':
+        specifier: ^0.72.1
+        version: 0.72.1(ws@8.21.0)(zod@4.4.3)
       '@telegraph/daemon':
         specifier: workspace:*
         version: link:../daemon

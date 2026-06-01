@@ -9,6 +9,9 @@ export interface RuntimeSettings {
   provider?: string
   modelId?: string
   apiKey?: string
+  authMode?: RuntimeAuthMode
+  subscriptionProvider?: string
+  subscriptionCredentials?: RuntimeSubscriptionCredentials
   baseUrl?: string
   backend?: string
   orchestration?: string
@@ -16,6 +19,15 @@ export interface RuntimeSettings {
   worktreeIsolation?: boolean
   extensionBlocklist?: string[]
   taskCapabilityProfile?: RuntimeTaskCapabilityProfile
+}
+
+export type RuntimeAuthMode = 'api-key' | 'subscription'
+
+export interface RuntimeSubscriptionCredentials {
+  refresh: string
+  access: string
+  expires: number
+  [key: string]: unknown
 }
 
 export type RuntimeTaskCapabilityProfile =

@@ -4,6 +4,7 @@ import type { RuntimeEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { resolveModel } from '@/packages/agent/providers/index'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
+import { resolvePiAiApiKey } from '@/packages/agent/runtime/resolvePiAiApiKey'
 
 const PI_AI_DEFAULT_SYSTEM = 'You are a helpful assistant.'
 const DEFAULT_MAX_TOOL_ITERATIONS = 8
@@ -125,9 +126,10 @@ export async function* streamPiAiRuntimeEvents(opts: {
   const producerVersion = TELEGRAPH_PI_AI_PRODUCER_VERSION
   const requestIdPrefix = `req-${runId.slice(0, 12)}`
 
-  if (!settings.provider || !settings.modelId || !settings.apiKey) {
-    throw new Error('Chat model settings are required: provider, modelId, and apiKey must be configured.')
+  if (!settings.provider || !settings.modelId) {
+    throw new Error('Chat model settings are required: provider and modelId must be configured.')
   }
+  const { apiKey } = await resolvePiAiApiKey(settings)
 
   const model = resolveModel(settings)
   if (!model) {
@@ -164,7 +166,7 @@ export async function* streamPiAiRuntimeEvents(opts: {
       }
 
       const s = stream(model, context, {
-        apiKey: settings.apiKey,
+        apiKey,
         signal,
       } as Parameters<typeof stream>[2])
 

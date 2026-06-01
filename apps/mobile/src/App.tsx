@@ -35,7 +35,7 @@ export interface TelegraphMobileAppProps {
   actor?: RemoteActorSnapshot
 }
 
-type RootTab = 'chat' | 'cockpit'
+type RootTab = 'chat' | 'cockpit' | 'me'
 type CockpitTab = 'runs' | 'approvals' | 'devices' | 'artifacts' | 'slack'
 
 interface RootRoute {
@@ -57,6 +57,12 @@ const ROOT_ROUTES: RootRoute[] = [
     title: 'Cockpit',
     focusedIcon: { sfSymbol: 'rectangle.grid.2x2.fill' },
     unfocusedIcon: { sfSymbol: 'rectangle.grid.2x2' },
+  },
+  {
+    key: 'me',
+    title: 'Me',
+    focusedIcon: { sfSymbol: 'person.circle.fill' },
+    unfocusedIcon: { sfSymbol: 'person.circle' },
   },
 ]
 
@@ -99,7 +105,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
   const [relayEndpoint, setRelayEndpoint] = useState(props.relayEndpoint ?? '')
   const [relayToken, setRelayToken] = useState(props.relayToken ?? '')
   const [deviceId, setDeviceId] = useState(actor.deviceId ?? DEFAULT_DEVICE_ID)
-  const [relaySettingsOpen, setRelaySettingsOpen] = useState(false)
+  const [profileSidebarOpen, setProfileSidebarOpen] = useState(false)
   const [chatSettingsOpen, setChatSettingsOpen] = useState(false)
   const [chatSettings, setChatSettings] = useState<RemoteControlRuntimeSettingsInput>(DEFAULT_MOBILE_CHAT_SETTINGS)
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
@@ -259,43 +265,35 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
   }
 
   return (
-    <View style={[styles.shell, { paddingTop: insets.top + 16 }]}>
+    <View style={[styles.shell, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor="#080d17" />
-      <View style={styles.header}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoText}>T</Text>
-          </View>
-          <View>
-            <Text style={styles.title}>Telegraph</Text>
-            <Text style={styles.subtitle}>{rootTab === 'chat' ? 'Remote chat' : 'Mobile cockpit'}</Text>
-          </View>
+      <View style={styles.topBar}>
+        <Pressable
+          style={styles.topAvatar}
+          onPress={() => {
+            if (rootTab === 'me') {
+              setProfileSidebarOpen(value => !value)
+              return
+            }
+            setRootTabIndex(ROOT_ROUTES.findIndex(route => route.key === 'me'))
+          }}
+        >
+          <Text style={styles.topAvatarText}>T</Text>
+        </Pressable>
+        <View style={styles.topTitleBlock}>
+          <Text style={styles.topTitle}>{rootTitle(rootTab)}</Text>
+          <Text style={styles.topSubtitle}>{rootSubtitle(rootTab)}</Text>
         </View>
-        <View style={styles.headerActions}>
-          <View style={[styles.connectionChip, connection === 'live' ? styles.connectionChipLive : styles.connectionChipIdle]}>
+        <View style={styles.topActions}>
+          <View style={styles.topStatusButton}>
             <View style={[styles.statusDot, connection === 'live' ? styles.statusDotLive : styles.statusDotIdle]} />
-            <Text style={styles.connectionChipText}>{connectionLabel(connection)}</Text>
+            <Text style={styles.topStatusText}>{connectionLabel(connection)}</Text>
           </View>
-          <Pressable style={styles.iconButton} onPress={() => { setRelaySettingsOpen(value => !value); }}>
-            <Text style={styles.iconButtonText}>Relay</Text>
-          </Pressable>
-          <Pressable style={styles.iconButton} disabled={!client || busy} onPress={() => { void refresh(); }}>
-            <Text style={styles.iconButtonText}>{busy ? '...' : 'Sync'}</Text>
+          <Pressable style={styles.topIconButton} disabled={!client || busy} onPress={() => { void refresh(); }}>
+            <Text style={styles.topIconText}>{busy ? '...' : 'Sync'}</Text>
           </Pressable>
         </View>
       </View>
-
-      {(relaySettingsOpen || !client) && (
-        <RelaySettingsPanel
-          clientReady={Boolean(client)}
-          relayEndpoint={relayEndpoint}
-          relayToken={relayToken}
-          deviceId={deviceId}
-          onEndpointChange={setRelayEndpoint}
-          onTokenChange={setRelayToken}
-          onDeviceIdChange={setDeviceId}
-        />
-      )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -318,6 +316,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
           relayEndpoint,
           relayToken,
           deviceId,
+          profileSidebarOpen,
           setPrompt,
           submit,
           selectChatSession,
@@ -327,6 +326,7 @@ export function TelegraphMobileApp(props: TelegraphMobileAppProps): React.JSX.El
           setRelayEndpoint,
           setRelayToken,
           setDeviceId,
+          setProfileSidebarOpen,
           setCockpitTab,
           setSelectedRunId,
           setOauthCode,
@@ -362,6 +362,7 @@ interface RootSceneContext {
   relayEndpoint: string
   relayToken: string
   deviceId: string
+  profileSidebarOpen: boolean
   setPrompt: (value: string) => void
   submit: () => Promise<void>
   selectChatSession: (sessionId: string) => void
@@ -371,6 +372,7 @@ interface RootSceneContext {
   setRelayEndpoint: (value: string) => void
   setRelayToken: (value: string) => void
   setDeviceId: (value: string) => void
+  setProfileSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>
   setCockpitTab: (tab: CockpitTab) => void
   setSelectedRunId: (runId: string) => void
   setOauthCode: (value: string) => void
@@ -400,16 +402,24 @@ function renderRootScene(routeKey: RootTab, context: RootSceneContext): React.JS
           onToggleSettings={() => { context.setChatSettingsOpen(value => !value); }}
           onSettingsChange={context.setChatSettings}
         />
+      ) : routeKey === 'me' ? (
+        <MeTab
+          clientReady={context.clientReady}
+          connection={context.connection}
+          sidebarOpen={context.profileSidebarOpen}
+          relayEndpoint={context.relayEndpoint}
+          relayToken={context.relayToken}
+          deviceId={context.deviceId}
+          onSidebarOpenChange={context.setProfileSidebarOpen}
+          onEndpointChange={context.setRelayEndpoint}
+          onTokenChange={context.setRelayToken}
+          onDeviceIdChange={context.setDeviceId}
+        />
       ) : !context.dashboard ? (
         <EmptyState
           relayConfigured={context.clientReady}
           busy={context.busy}
           endpoint={context.relayEndpoint}
-          token={context.relayToken}
-          onEndpointChange={context.setRelayEndpoint}
-          onTokenChange={context.setRelayToken}
-          deviceId={context.deviceId}
-          onDeviceIdChange={context.setDeviceId}
         />
       ) : (
         <CockpitTabView
@@ -609,6 +619,85 @@ function ChatMessageBubble({ message }: { message: MobileChatMessageItem }): Rea
         </View>
         <Text style={styles.messageText}>{message.content}</Text>
       </View>
+    </View>
+  )
+}
+
+function MeTab(props: {
+  clientReady: boolean
+  connection: MobileConnectionState
+  sidebarOpen: boolean
+  relayEndpoint: string
+  relayToken: string
+  deviceId: string
+  onSidebarOpenChange: React.Dispatch<React.SetStateAction<boolean>>
+  onEndpointChange: (value: string) => void
+  onTokenChange: (value: string) => void
+  onDeviceIdChange: (value: string) => void
+}): React.JSX.Element {
+  return (
+    <View style={styles.profilePane}>
+      <View style={styles.profileTopBar}>
+        <Pressable style={styles.sidebarToggle} onPress={() => { props.onSidebarOpenChange(value => !value); }}>
+          <Text style={styles.sidebarToggleText}>{props.sidebarOpen ? 'Close' : 'Menu'}</Text>
+        </Pressable>
+        <View style={styles.profileTitleBlock}>
+          <Text style={styles.panelTitle}>Telegraph Mobile</Text>
+          <Text style={styles.panelMeta}>{props.clientReady ? 'relay configured' : 'settings required'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.profileHero}>
+        <View style={styles.profileAvatar}>
+          <Text style={styles.profileAvatarText}>T</Text>
+        </View>
+        <Text style={styles.profileTitle}>Personal control</Text>
+        <Text style={styles.profileBody}>
+          Mobile sends instructions to the desktop agent host. Runtime execution stays on desktop.
+        </Text>
+        <View style={styles.profileStatusRow}>
+          <View style={[styles.connectionChip, props.connection === 'live' ? styles.connectionChipLive : styles.connectionChipIdle]}>
+            <View style={[styles.statusDot, props.connection === 'live' ? styles.statusDotLive : styles.statusDotIdle]} />
+            <Text style={styles.connectionChipText}>{connectionLabel(props.connection)}</Text>
+          </View>
+          <Text style={styles.profileStatusText}>{props.deviceId.trim() || DEFAULT_DEVICE_ID}</Text>
+        </View>
+      </View>
+
+      <View style={styles.profileInfoCard}>
+        <Text style={styles.itemTitle}>Desktop relay</Text>
+        <Text style={styles.body}>
+          {props.clientReady
+            ? props.relayEndpoint.trim()
+            : 'Open the sidebar and configure Settings to connect this device.'}
+        </Text>
+      </View>
+
+      {props.sidebarOpen ? (
+        <View style={styles.sidebarOverlay}>
+          <View style={styles.sidebarPanel}>
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Me</Text>
+              <Pressable style={styles.sidebarClose} onPress={() => { props.onSidebarOpenChange(false); }}>
+                <Text style={styles.sidebarCloseText}>Close</Text>
+              </Pressable>
+            </View>
+            <View style={styles.sidebarItemActive}>
+              <Text style={styles.sidebarItemTextActive}>Settings</Text>
+            </View>
+            <RelaySettingsPanel
+              clientReady={props.clientReady}
+              relayEndpoint={props.relayEndpoint}
+              relayToken={props.relayToken}
+              deviceId={props.deviceId}
+              onEndpointChange={props.onEndpointChange}
+              onTokenChange={props.onTokenChange}
+              onDeviceIdChange={props.onDeviceIdChange}
+            />
+          </View>
+          <Pressable style={styles.sidebarScrim} onPress={() => { props.onSidebarOpenChange(false); }} />
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -892,20 +981,10 @@ function EmptyState({
   relayConfigured,
   busy,
   endpoint,
-  token,
-  onEndpointChange,
-  onTokenChange,
-  deviceId,
-  onDeviceIdChange,
 }: {
   relayConfigured: boolean
   busy: boolean
   endpoint: string
-  token: string
-  onEndpointChange: (value: string) => void
-  onTokenChange: (value: string) => void
-  deviceId: string
-  onDeviceIdChange: (value: string) => void
 }): React.JSX.Element {
   return (
     <View style={styles.empty}>
@@ -917,34 +996,8 @@ function EmptyState({
       <Text style={styles.body}>
         {relayConfigured
           ? `Trying ${endpoint.trim()}`
-          : 'Pass relayEndpoint to connect this mobile control surface.'}
+          : 'Open Me, then Settings, to connect this mobile control surface.'}
       </Text>
-      <View style={styles.emptyConnectionForm}>
-        <Text style={styles.formLabel}>Remote endpoint</Text>
-        <TextInput
-          value={endpoint}
-          placeholder="http://192.168.2.57:8799/rpc"
-          placeholderTextColor="#6f7b8b"
-          style={styles.formInput}
-          onChangeText={onEndpointChange}
-        />
-        <Text style={styles.formLabel}>Token</Text>
-        <TextInput
-          value={token}
-          placeholder="dev"
-          placeholderTextColor="#6f7b8b"
-          style={styles.formInput}
-          onChangeText={onTokenChange}
-        />
-        <Text style={styles.formLabel}>Device ID</Text>
-        <TextInput
-          value={deviceId}
-          placeholder={DEFAULT_DEVICE_ID}
-          placeholderTextColor="#6f7b8b"
-          style={styles.formInput}
-          onChangeText={onDeviceIdChange}
-        />
-      </View>
     </View>
   )
 }
@@ -1017,6 +1070,18 @@ function connectionLabel(connection: string): string {
   return 'Offline'
 }
 
+function rootTitle(tab: RootTab): string {
+  if (tab === 'chat') return 'Chat'
+  if (tab === 'cockpit') return 'Cockpit'
+  return 'Me'
+}
+
+function rootSubtitle(tab: RootTab): string {
+  if (tab === 'chat') return 'Remote chat'
+  if (tab === 'cockpit') return 'Mobile cockpit'
+  return 'Personal settings'
+}
+
 function messageCountLabel(count: number): string {
   return count === 1 ? '1 message' : `${String(count)} messages`
 }
@@ -1024,24 +1089,17 @@ function messageCountLabel(count: number): string {
 const styles = StyleSheet.create({
   shell: { flex: 1, backgroundColor: '#080d17', padding: 16 },
   mainContent: { flex: 1, minHeight: 0 },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  brandRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  logoMark: {
-    alignItems: 'center',
-    backgroundColor: '#2b1113',
-    borderColor: '#ff54364d',
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 38,
-    justifyContent: 'center',
-    shadowColor: '#ff5436',
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    width: 38,
-  },
-  logoText: { color: '#ff7a5f', fontSize: 20, fontWeight: '900' },
-  title: { color: '#f0f4f8', fontSize: 25, fontWeight: '900' },
-  subtitle: { color: '#8a95a6', fontSize: 12, marginTop: 2 },
+  topBar: { alignItems: 'center', flexDirection: 'row', gap: 12, height: 54, marginBottom: 8 },
+  topAvatar: { alignItems: 'center', backgroundColor: '#2b1113', borderColor: '#ff54364d', borderRadius: 999, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 },
+  topAvatarText: { color: '#ff7a5f', fontSize: 18, fontWeight: '900' },
+  topTitleBlock: { alignItems: 'center', flex: 1, minWidth: 0 },
+  topTitle: { color: '#f0f4f8', fontSize: 17, fontWeight: '900' },
+  topSubtitle: { color: '#6f7b8b', fontSize: 11, fontWeight: '700', marginTop: 1 },
+  topActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  topStatusButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff1f', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, height: 34, paddingHorizontal: 10 },
+  topStatusText: { color: '#dbe5ef', fontSize: 11, fontWeight: '800' },
+  topIconButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff1f', borderRadius: 999, borderWidth: 1, height: 34, justifyContent: 'center', paddingHorizontal: 12 },
+  topIconText: { color: '#dbe5ef', fontSize: 11, fontWeight: '900' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 6 },
   connectionChip: { alignItems: 'center', borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 6, height: 32, paddingHorizontal: 9 },
   connectionChipLive: { backgroundColor: '#112420', borderColor: '#38dca84d' },
@@ -1050,8 +1108,6 @@ const styles = StyleSheet.create({
   statusDotLive: { backgroundColor: '#38dca8' },
   statusDotIdle: { backgroundColor: '#ffb154' },
   connectionChipText: { color: '#dbe5ef', fontSize: 11, fontWeight: '800' },
-  iconButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, height: 32, justifyContent: 'center', paddingHorizontal: 9 },
-  iconButtonText: { color: '#dbe5ef', fontSize: 11, fontWeight: '800' },
   connectionPanel: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, gap: 8, marginBottom: 10, padding: 12 },
   panelHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   panelTitle: { color: '#f0f4f8', fontSize: 13, fontWeight: '900' },
@@ -1099,6 +1155,28 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#160d0a', fontWeight: '900' },
   secondaryButton: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   secondaryButtonText: { color: '#dbe5ef', fontWeight: '800' },
+  profilePane: { flex: 1, minHeight: 0 },
+  profileTopBar: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 10 },
+  sidebarToggle: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, height: 38, justifyContent: 'center', paddingHorizontal: 12 },
+  sidebarToggleText: { color: '#dbe5ef', fontSize: 12, fontWeight: '900' },
+  profileTitleBlock: { flex: 1, minWidth: 0 },
+  profileHero: { alignItems: 'center', backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, padding: 18 },
+  profileAvatar: { alignItems: 'center', backgroundColor: '#2b1113', borderColor: '#ff54364d', borderRadius: 8, borderWidth: 1, height: 58, justifyContent: 'center', marginBottom: 12, width: 58 },
+  profileAvatarText: { color: '#ff7a5f', fontSize: 30, fontWeight: '900' },
+  profileTitle: { color: '#f0f4f8', fontSize: 20, fontWeight: '900' },
+  profileBody: { color: '#8a95a6', fontSize: 13, lineHeight: 19, marginTop: 8, textAlign: 'center' },
+  profileStatusRow: { alignItems: 'center', flexDirection: 'row', gap: 10, marginTop: 14 },
+  profileStatusText: { color: '#aab5c5', flexShrink: 1, fontSize: 12, fontWeight: '800' },
+  profileInfoCard: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, marginTop: 10, padding: 12 },
+  sidebarOverlay: { bottom: 0, flexDirection: 'row', left: 0, position: 'absolute', right: 0, top: 0 },
+  sidebarPanel: { backgroundColor: '#0d1420', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, padding: 12, width: 286, zIndex: 2 },
+  sidebarScrim: { backgroundColor: '#00000066', flex: 1 },
+  sidebarHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  sidebarTitle: { color: '#f0f4f8', fontSize: 18, fontWeight: '900' },
+  sidebarClose: { alignItems: 'center', backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, height: 32, justifyContent: 'center', paddingHorizontal: 10 },
+  sidebarCloseText: { color: '#dbe5ef', fontSize: 11, fontWeight: '900' },
+  sidebarItemActive: { backgroundColor: '#2a1518', borderColor: '#ff54365c', borderRadius: 8, borderWidth: 1, marginBottom: 10, paddingHorizontal: 11, paddingVertical: 10 },
+  sidebarItemTextActive: { color: '#ff8d76', fontSize: 12, fontWeight: '900' },
   summary: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   metric: { backgroundColor: '#121926cc', borderColor: '#ffffff1f', borderRadius: 8, borderWidth: 1, flex: 1, padding: 10 },
   metricValue: { color: '#f0f4f8', fontSize: 22, fontWeight: '900' },
@@ -1132,10 +1210,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
   emptyMark: { alignItems: 'center', backgroundColor: '#2b1113', borderColor: '#ff54364d', borderRadius: 8, borderWidth: 1, height: 52, justifyContent: 'center', marginBottom: 16, width: 52 },
   emptyMarkText: { color: '#ff7a5f', fontSize: 26, fontWeight: '900' },
-  emptyConnectionForm: { alignSelf: 'stretch', gap: 8, marginTop: 18 },
   emptyTitle: { color: '#f0f4f8', fontSize: 18, fontWeight: '900', marginBottom: 8 },
-  formInput: { backgroundColor: '#121926', borderColor: '#ffffff24', borderRadius: 8, borderWidth: 1, color: '#f0f4f8', minHeight: 42, paddingHorizontal: 10 },
-  formLabel: { alignSelf: 'stretch', color: '#aab5c5', fontSize: 12, fontWeight: '900', marginTop: 4 },
   listEmpty: { alignItems: 'center', backgroundColor: '#12192680', borderColor: '#ffffff17', borderRadius: 8, borderWidth: 1, padding: 22 },
   listEmptyTitle: { color: '#f0f4f8', fontSize: 15, fontWeight: '900' },
   listEmptyBody: { color: '#8a95a6', fontSize: 12, lineHeight: 18, marginTop: 6, textAlign: 'center' },
