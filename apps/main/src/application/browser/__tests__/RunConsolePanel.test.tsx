@@ -391,7 +391,7 @@ describe('RunConsolePanel interaction', () => {
     })
 
     const filterLabels = Array.from(panel.querySelectorAll('header button'))
-      .map(button => button.textContent?.trim())
+      .map(button => button.textContent.trim())
       .filter(Boolean)
 
     expect(filterLabels).not.toContain('All')

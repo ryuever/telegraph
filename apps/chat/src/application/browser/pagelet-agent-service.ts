@@ -11,6 +11,7 @@ import {
   type ChatRunTraceBundle,
   type ChatRunTraceImportResult,
   type ChatRuntimeCapabilityDescriptorSnapshot,
+  type ChatConfiguredModelDescriptorSnapshot,
   type ChatAgentRunStatus,
   type ChatSubagentRecordSnapshot,
   type ChatDeleteSessionRunsResult,
@@ -240,6 +241,12 @@ export class PageletAgentService implements AgentService {
     await waitForChatPageletReady(signal)
     throwIfAborted(signal)
     return getChatPageletClient().listRuntimeCapabilities()
+  }
+
+  async listConfiguredModels(signal?: AbortSignal): Promise<ChatConfiguredModelDescriptorSnapshot[]> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().listConfiguredModels()
   }
 
   async exportRunTraceBundle(runId: string, signal?: AbortSignal): Promise<ChatRunTraceBundle | null> {

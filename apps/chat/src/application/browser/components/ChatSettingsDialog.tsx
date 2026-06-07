@@ -1,14 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/packages/ui/lib/utils'
 import {
-  CATALOG,
   type ChatModelSettings,
-  type EnvModelConfig,
-  type ModelConnectionStatus,
-  loadEnvModels,
-  testModelConnection,
-  getProviderOptions,
-  getModelOptions,
+  getConfiguredProviderOptions,
+  getConfiguredModelOptions,
 } from '../model-settings'
 import {
   capabilitySupport,
@@ -17,11 +12,13 @@ import {
   type RuntimeCapabilitySupport,
 } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
 import type { ChatRuntimeCapabilityDescriptorSnapshot } from '@/apps/chat/application/common'
+import type { ChatConfiguredModelDescriptorSnapshot } from '@/apps/chat/application/common'
 
 interface Props {
   open: boolean
   settings: ChatModelSettings
   runtimeCapabilities?: ChatRuntimeCapabilityDescriptorSnapshot[]
+  configuredModels?: ChatConfiguredModelDescriptorSnapshot[]
   onClose: () => void
   onSave: (next: ChatModelSettings) => void
 }
@@ -34,46 +31,32 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'extensions', label: 'Extensions' },
 ]
 
-export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClose, onSave }: Props) {
+export function ChatSettingsDialog({
+  open,
+  settings,
+  runtimeCapabilities,
+  configuredModels = [],
+  onClose,
+  onSave,
+}: Props) {
   const [draft, setDraft] = useState<ChatModelSettings>(settings)
-  const [envModels, setEnvModels] = useState<EnvModelConfig[]>([])
-  const [connectionStatus, setConnectionStatus] = useState<Map<string, ModelConnectionStatus>>(
-    new Map()
-  )
-  const [isTesting, setIsTesting] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingsTab>('model')
 
   useEffect(() => {
     if (open) {
       setDraft(settings)
-      const models = loadEnvModels()
-      setEnvModels(models)
-      testAllConnections(models)
     }
   }, [open, settings])
 
-  const testAllConnections = (models: EnvModelConfig[]) => {
-    if (models.length === 0) return
-    setIsTesting(true)
-    const results = new Map<string, ModelConnectionStatus>()
-    for (const model of models) {
-      if (model.apiKey) {
-        const status = testModelConnection(
-          model.provider,
-          model.modelId,
-          model.apiKey,
-          model.baseUrl
-        )
-        results.set(`${model.provider}:${model.modelId}`, status)
-      }
-    }
-    setConnectionStatus(results)
-    setIsTesting(false)
-  }
-
   const provider = draft.provider
-  const providerOptions = useMemo(() => getProviderOptions(), [])
-  const modelOptions = useMemo(() => getModelOptions(provider), [provider])
+  const providerOptions = useMemo(
+    () => getConfiguredProviderOptions(configuredModels),
+    [configuredModels]
+  )
+  const modelOptions = useMemo(
+    () => getConfiguredModelOptions(provider, configuredModels),
+    [configuredModels, provider]
+  )
   const capabilityDescriptors = useMemo(
     () => runtimeCapabilities && runtimeCapabilities.length > 0
       ? runtimeCapabilities
@@ -85,19 +68,10 @@ export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClos
     [capabilityDescriptors, draft]
   )
 
-  const currentStatus = connectionStatus.get(`${provider}:${draft.modelId}`)
-
-  const availableEnvModels = useMemo(() => {
-    return envModels.filter(m => {
-      const status = connectionStatus.get(`${m.provider}:${m.modelId}`)
-      return status?.connected
-    })
-  }, [envModels, connectionStatus])
-
   if (!open) return null
 
   const setProvider = (next: string) => {
-    const firstModel = CATALOG.find(m => m.provider === next)
+    const firstModel = configuredModels.find(m => m.provider === next)
     setDraft(d => ({
       ...d,
       provider: next,
@@ -108,10 +82,6 @@ export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClos
   const setModel = (id: string) => { setDraft(d => ({ ...d, modelId: id })); }
   const setBackend = (backend: ChatModelSettings['backend']) =>
     { setDraft(d => ({ ...d, backend })); }
-  const setApiKey = (apiKey: string) =>
-    { setDraft(d => ({ ...d, apiKey })); }
-  const setBaseUrl = (baseUrl: string) =>
-    { setDraft(d => ({ ...d, baseUrl: baseUrl || undefined })); }
   const setOrchestration = (orchestration: ChatModelSettings['orchestration']) =>
     { setDraft(d => ({ ...d, orchestration })); }
   const setOrchestrationPattern = (
@@ -148,9 +118,6 @@ export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClos
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
           <div className="flex items-center gap-3">
             <h2 className="text-[13.5px] font-semibold text-foreground">Settings</h2>
-            {isTesting && (
-              <span className="animate-pulse text-[10px] text-muted-foreground">testing...</span>
-            )}
           </div>
           <button
             type="button"
@@ -189,19 +156,14 @@ export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClos
           {activeTab === 'model' && (
             <ModelTab
               draft={draft}
-              envModels={envModels}
-              availableEnvModels={availableEnvModels}
-              connectionStatus={connectionStatus}
-              currentStatus={currentStatus}
               providerOptions={providerOptions}
               modelOptions={modelOptions}
+              configuredModelCount={configuredModels.length}
               runtimeCapabilities={capabilityDescriptors}
               selectedRuntime={selectedRuntime}
               onSetProvider={setProvider}
               onSetModel={setModel}
               onSetBackend={setBackend}
-              onSetApiKey={setApiKey}
-              onSetBaseUrl={setBaseUrl}
             />
           )}
           {activeTab === 'orchestration' && (
@@ -225,13 +187,9 @@ export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClos
 
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <div className="flex items-center gap-2">
-            {envModels.length > 0 ? (
-              <span className="text-[11px] text-muted-foreground">
-                {envModels.length} model(s) from .env
-              </span>
-            ) : (
-              <span className="text-[11px] text-muted-foreground">No .env config found</span>
-            )}
+            <span className="text-[11px] text-muted-foreground">
+              {configuredModels.length} configured model(s)
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -257,78 +215,30 @@ export function ChatSettingsDialog({ open, settings, runtimeCapabilities, onClos
 
 function ModelTab({
   draft,
-  envModels: _envModels,
-  availableEnvModels,
-  connectionStatus,
-  currentStatus,
   providerOptions,
   modelOptions,
+  configuredModelCount,
   runtimeCapabilities,
   selectedRuntime,
   onSetProvider,
   onSetModel,
   onSetBackend,
-  onSetApiKey,
-  onSetBaseUrl,
 }: {
   draft: ChatModelSettings
-  envModels: EnvModelConfig[]
-  availableEnvModels: EnvModelConfig[]
-  connectionStatus: Map<string, ModelConnectionStatus>
-  currentStatus: ModelConnectionStatus | undefined
-  providerOptions: { id: string; label: string }[]
-  modelOptions: { provider: string; id: string; label: string }[]
+  providerOptions: { id: string; label: string; authLabel?: string }[]
+  modelOptions: ChatConfiguredModelDescriptorSnapshot[]
+  configuredModelCount: number
   runtimeCapabilities: RuntimeCapabilityDescriptor[]
   selectedRuntime?: RuntimeCapabilityDescriptor
   onSetProvider: (id: string) => void
   onSetModel: (id: string) => void
   onSetBackend: (backend: ChatModelSettings['backend']) => void
-  onSetApiKey: (apiKey: string) => void
-  onSetBaseUrl: (baseUrl: string) => void
 }) {
   return (
     <div className="space-y-4">
-      {availableEnvModels.length > 0 && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
-          <div className="mb-2 flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-green-500" />
-            <span className="text-[11px] font-medium text-emerald-700">
-              Available models (from .env)
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {availableEnvModels.map(model => {
-              const status = connectionStatus.get(`${model.provider}:${model.modelId}`)
-              const isSelected =
-                draft.provider === model.provider && draft.modelId === model.modelId
-              return (
-                <button
-                  key={`${model.provider}:${model.modelId}`}
-                  onClick={() => {
-                    onSetProvider(model.provider)
-                    onSetModel(model.modelId)
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] transition-colors',
-                    isSelected
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      status?.connected ? 'bg-green-400' : 'bg-muted-foreground'
-                    )}
-                  />
-                  {model.label || `${model.provider} · ${model.modelId}`}
-                  {status?.latency && (
-                    <span className="text-[10px] opacity-70">({status.latency}ms)</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+      {configuredModelCount === 0 && (
+        <div className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          No configured provider models are available yet. Add provider auth in Settings / Providers.
         </div>
       )}
 
@@ -337,55 +247,39 @@ function ModelTab({
           value={draft.provider}
           onChange={e => { onSetProvider(e.target.value); }}
           className={selectClass}
+          disabled={providerOptions.length === 0}
         >
           {providerOptions.map(p => (
             <option key={p.id} value={p.id}>
-              {p.label}
+              {p.authLabel ? `${p.label} (${p.authLabel})` : p.label}
             </option>
           ))}
+          {!providerOptions.some(provider => provider.id === draft.provider) && (
+            <option value={draft.provider} disabled>
+              {draft.provider} (not configured)
+            </option>
+          )}
         </select>
       </Field>
 
       <Field label="Model">
-        <div className="flex items-center gap-2">
-          <select
-            value={draft.modelId}
-            onChange={e => { onSetModel(e.target.value); }}
-            className={cn(selectClass, 'flex-1')}
-          >
-            {modelOptions.map(m => {
-              const status = connectionStatus.get(`${m.provider}:${m.id}`)
-              return (
-                <option key={m.id} value={m.id}>
-                  {m.label} {status?.connected ? '\u2713' : status?.error ? '\u2717' : ''}
-                </option>
-              )
-            })}
-          </select>
-          {currentStatus && (
-            <div
-              className={cn(
-                'flex h-9 items-center gap-1.5 rounded-md px-3 text-[11px]',
-                currentStatus.connected
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-rose-100 text-rose-700'
-              )}
-            >
-              <div
-                className={cn(
-                  'h-2 w-2 rounded-full',
-                  currentStatus.connected ? 'bg-green-500' : 'bg-red-500'
-                )}
-              />
-              {currentStatus.connected
-                ? `Connected (${String(currentStatus.latency)}ms)`
-                : 'Disconnected'}
-            </div>
+        <select
+          value={draft.modelId}
+          onChange={e => { onSetModel(e.target.value); }}
+          className={selectClass}
+          disabled={modelOptions.length === 0}
+        >
+          {modelOptions.map(m => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+          {!modelOptions.some(model => model.id === draft.modelId) && (
+            <option value={draft.modelId} disabled>
+              {draft.modelId} (not configured)
+            </option>
           )}
-        </div>
-        {currentStatus?.error && (
-          <div className="mt-1.5 text-[11px] text-red-400">Error: {currentStatus.error}</div>
-        )}
+        </select>
       </Field>
 
       <Field label="Execution backend">
@@ -410,43 +304,6 @@ function ModelTab({
       </Field>
 
       <RuntimeCapabilityMatrix descriptor={selectedRuntime} />
-
-      <Field label="API Key" hint="Stored in localStorage (MVP)">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={draft.apiKey}
-            onChange={e => { onSetApiKey(e.target.value); }}
-            placeholder="Enter your API key"
-            className={cn(inputClass, 'flex-1')}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.readText()
-                .then(text => { onSetApiKey(text.trim()); })
-                .catch(() => { /* clipboard read denied */ });
-            }}
-            className="shrink-0 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent hover:text-foreground"
-          >
-            Paste
-          </button>
-        </div>
-      </Field>
-
-      <Field label="Base URL" hint="Optional — override the default endpoint">
-        <input
-          type="text"
-          value={draft.baseUrl ?? ''}
-          onChange={e => { onSetBaseUrl(e.target.value); }}
-          placeholder="https://api.example.com/v1"
-          className={inputClass}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </Field>
     </div>
   )
 }

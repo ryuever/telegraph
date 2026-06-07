@@ -65,6 +65,27 @@ describe('chat model settings', () => {
       },
     })
   })
+
+  it('does not persist provider credentials from the chat settings surface', () => {
+    installLocalStorage()
+
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      apiKey: 'legacy-local-key',
+      baseUrl: 'https://example.test/v1',
+      subscriptionCredentials: {
+        refresh: 'refresh-token',
+        access: 'access-token',
+        expires: 123,
+      },
+    })
+
+    expect(loadSettings()).toMatchObject({
+      apiKey: '',
+      baseUrl: undefined,
+      subscriptionCredentials: undefined,
+    })
+  })
 })
 
 function installLocalStorage(): void {

@@ -69,10 +69,8 @@ export const ChatComposer = React.memo(function ChatComposer({
     setText(current => {
       const next = current.slice(0, selectionStart) + pastedText + current.slice(selectionEnd)
       requestAnimationFrame(() => {
-        const el = target
-        if (!el) return
         const caret = selectionStart + pastedText.length
-        el.setSelectionRange(caret, caret)
+        target.setSelectionRange(caret, caret)
       })
       return next
     })

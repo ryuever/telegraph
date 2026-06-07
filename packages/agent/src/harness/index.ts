@@ -52,6 +52,7 @@ export {
   CapabilityHost,
   type AgentCapability,
   type AgentCapabilityContext,
+  type CapabilityHookRegistrar,
   type CapabilityKind,
   type FeedbackAPI,
   type FilesystemCapability,
@@ -62,7 +63,7 @@ export {
   type ProcessCapability,
   type ProcessExecResult,
   type ToolCapability,
-} from './CapabilityHost'
+} from '@/packages/agent-capabilities'
 export {
   HookBus,
   HookExecutionError,
@@ -73,4 +74,4 @@ export {
   codingCapabilities,
   designCapabilities,
   feedbackCapability,
-} from './capabilities'
+} from '@/packages/agent-capabilities'

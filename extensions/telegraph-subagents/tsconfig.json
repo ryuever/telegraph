@@ -12,6 +12,12 @@
     "paths": {
       "@/extensions/telegraph-subagents/*": ["./*"],
       "@/packages/agent/*": ["../../packages/agent/src/*"],
+      "@/packages/agent-capabilities": ["../../packages/agent-capabilities/src/index.ts"],
+      "@/packages/agent-capabilities/*": ["../../packages/agent-capabilities/src/*"],
+      "@/packages/agent-extension-host": ["../../packages/agent-extension-host/src/index.ts"],
+      "@/packages/agent-extension-host/*": ["../../packages/agent-extension-host/src/*"],
+      "@/packages/agent-resources": ["../../packages/agent-resources/src/index.ts"],
+      "@/packages/agent-resources/*": ["../../packages/agent-resources/src/*"],
       "@/packages/agent-protocol": ["../../packages/agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../../packages/agent-protocol/src/*"],
       "@/packages/computer-use": ["../../packages/computer-use/src/index.ts"],

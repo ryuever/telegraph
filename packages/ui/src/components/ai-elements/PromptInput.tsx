@@ -23,8 +23,9 @@ export function PromptInput({ className, onSubmit, children, ...props }: PromptI
     event.preventDefault()
     const form = event.currentTarget
     const formData = new FormData(form)
-    const text = String(formData.get('message') ?? '')
-    onSubmit({ text }, event)
+    const message = formData.get('message')
+    const text = typeof message === 'string' ? message : ''
+    void onSubmit({ text }, event)
   }
 
   return (
@@ -41,7 +42,7 @@ export function PromptInput({ className, onSubmit, children, ...props }: PromptI
   )
 }
 
-export interface PromptInputBodyProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type PromptInputBodyProps = React.HTMLAttributes<HTMLDivElement>
 
 export function PromptInputBody({ className, ...props }: PromptInputBodyProps) {
   return <div className={cn('w-full pb-1', className)} {...props} />
@@ -145,7 +146,7 @@ export const PromptInputTextarea = React.forwardRef<HTMLTextAreaElement, PromptI
   }
 )
 
-export interface PromptInputFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type PromptInputFooterProps = React.HTMLAttributes<HTMLDivElement>
 
 export function PromptInputFooter({ className, ...props }: PromptInputFooterProps) {
   return (
@@ -159,13 +160,13 @@ export function PromptInputFooter({ className, ...props }: PromptInputFooterProp
   )
 }
 
-export interface PromptInputToolsProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type PromptInputToolsProps = React.HTMLAttributes<HTMLDivElement>
 
 export function PromptInputTools({ className, ...props }: PromptInputToolsProps) {
   return <div className={cn('flex min-w-0 items-center gap-1', className)} {...props} />
 }
 
-export interface PromptInputButtonProps extends ButtonProps {}
+export type PromptInputButtonProps = ButtonProps
 
 export function PromptInputButton({ className, variant = 'ghost', size, ...props }: PromptInputButtonProps) {
   const nextSize = size ?? (React.Children.count(props.children) > 1 ? 'sm' : 'icon')

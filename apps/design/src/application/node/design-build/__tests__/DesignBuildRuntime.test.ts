@@ -692,7 +692,7 @@ describe('DesignBuildRuntime', () => {
       type: 'run_failed',
       error: {
         code: 'codegen_failed',
-        message: 'Design build model settings are required: provider, modelId, and apiKey must be configured.',
+        message: 'Design build model settings are required: provider and modelId must be configured.',
       },
     })
   })

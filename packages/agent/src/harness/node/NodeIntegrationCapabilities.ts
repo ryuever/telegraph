@@ -11,7 +11,7 @@ import type {
   PatchPreview,
   ProcessCapability,
   ProcessExecResult,
-} from '../CapabilityHost'
+} from '@/packages/agent-capabilities'
 import type {
   PermissionBroker,
   PermissionBrokerRequestContext,

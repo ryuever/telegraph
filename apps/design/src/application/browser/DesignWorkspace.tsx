@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, JSX, KeyboardEvent, PointerEvent } from 'react'
-import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Settings, Sparkles, Square, UserRound } from 'lucide-react'
+import { ArrowLeft, Bot, CheckCircle2, ChevronDown, CircleDashed, Layers3, SendHorizontal, Sparkles, Square, UserRound } from 'lucide-react'
 import type { AgentEvent } from '@/packages/agent-protocol'
 import {
   AgentActivity,
@@ -17,6 +17,7 @@ import { Textarea } from '@/packages/ui/components/ui/textarea'
 import { cn } from '@/packages/ui/lib/utils'
 import type {
   ComponentEditDirtyOperation,
+  DesignConfiguredModelDescriptorSnapshot,
   DesignAgentStreamEvent,
   DesignExportFormat,
   DesignPatchFileOperation,
@@ -31,6 +32,7 @@ import {
   type ArtifactApplyState,
   type DesignSelectedComponent,
 } from './DesignArtifactWorkbench'
+import { DesignPromptControls } from './DesignPromptControls'
 import { extractDesignPatchOperations } from './design-artifact-view'
 import {
   reduceDesignSubagentItems,
@@ -82,6 +84,12 @@ interface DesignWorkspaceProps {
   initialState?: DesignWorkspaceInitialState
   isActive?: boolean
   onOpenSettings?: () => void
+  configuredModels?: DesignConfiguredModelDescriptorSnapshot[]
+  selectedProvider?: string
+  selectedModelId?: string
+  onModelSelect?: (provider: string, modelId: string) => void
+  modelReady?: boolean
+  modelsLoading?: boolean
   onReturnToEntry?: () => void
   onSessionUpdate?: (sessionId: string, summary: DesignWorkspaceSummary) => void
 }
@@ -98,6 +106,7 @@ const OPERATION_CONTENT_PREVIEW_LIMIT = 320
 const DEFAULT_AGENT_LOG_PANEL_WIDTH = 392
 const MIN_AGENT_LOG_PANEL_WIDTH = 320
 const MAX_AGENT_LOG_PANEL_WIDTH = 560
+const ASSISTANT_TEXT_FLUSH_MS = 50
 
 export function DesignWorkspace({
   initialPrompt,
@@ -106,6 +115,12 @@ export function DesignWorkspace({
   initialState,
   isActive = true,
   onOpenSettings,
+  configuredModels = [],
+  selectedProvider,
+  selectedModelId,
+  onModelSelect,
+  modelReady = false,
+  modelsLoading = false,
   onReturnToEntry,
   onSessionUpdate,
 }: DesignWorkspaceProps): JSX.Element {
@@ -115,6 +130,8 @@ export function DesignWorkspace({
   const agent = useMemo(() => new PageletDesignAgentService(), [])
   const initialRunStarted = useRef(Boolean(initialState))
   const activeControllers = useRef<Map<string, AbortController>>(new Map())
+  const pendingAssistantText = useRef<Map<string, string>>(new Map())
+  const assistantTextFlushTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const assistantArtifactTitles = useRef<Map<string, string>>(new Map())
   const artifactOperationBaselines = useRef<Map<string, DesignPatchFileOperation[]>>(new Map())
   const agentLogResizeStartRef = useRef({ pointerX: 0, width: DEFAULT_AGENT_LOG_PANEL_WIDTH })
@@ -135,7 +152,7 @@ export function DesignWorkspace({
   const [agentLogResizing, setAgentLogResizing] = useState(false)
   const headerSubagentItems = useMemo(() => flattenMessageSubagents(messages), [messages])
 
-  const appendAssistantText = (text: string, messageId?: string): void => {
+  const appendAssistantTextNow = (text: string, messageId?: string): void => {
     setMessages((prev) => {
       const next = [...prev]
       const targetIndex = messageId
@@ -148,6 +165,38 @@ export function DesignWorkspace({
       }
       return [...next, { id: messageId ?? globalThis.crypto.randomUUID(), role: 'assistant', content: text }]
     })
+  }
+
+  const flushAssistantText = (messageId: string): void => {
+    const text = pendingAssistantText.current.get(messageId)
+    if (!text) return
+    pendingAssistantText.current.delete(messageId)
+    const timer = assistantTextFlushTimers.current.get(messageId)
+    if (timer) {
+      clearTimeout(timer)
+      assistantTextFlushTimers.current.delete(messageId)
+    }
+    appendAssistantTextNow(text, messageId)
+  }
+
+  const flushAllAssistantText = (): void => {
+    for (const messageId of pendingAssistantText.current.keys()) {
+      flushAssistantText(messageId)
+    }
+  }
+
+  const appendAssistantText = (text: string, messageId?: string): void => {
+    if (!messageId) {
+      appendAssistantTextNow(text)
+      return
+    }
+    pendingAssistantText.current.set(messageId, `${pendingAssistantText.current.get(messageId) ?? ''}${text}`)
+    if (assistantTextFlushTimers.current.has(messageId)) return
+    const timer = setTimeout(() => {
+      assistantTextFlushTimers.current.delete(messageId)
+      flushAssistantText(messageId)
+    }, ASSISTANT_TEXT_FLUSH_MS)
+    assistantTextFlushTimers.current.set(messageId, timer)
   }
 
   const setAssistantRunStatus = (messageId: string, nextStatus: DesignRunStatus): void => {
@@ -197,11 +246,13 @@ export function DesignWorkspace({
       context,
       signal: abortController.signal,
       onStatus: nextStatus => {
+        flushAssistantText(assistantMessageId)
         setStatus(nextStatus)
         setAssistantRunStatus(assistantMessageId, nextStatus)
       },
       onAssistantText: text => { appendAssistantText(text, assistantMessageId) },
       onTraceEvent: event => {
+        if (isHighFrequencyTraceEvent(event)) return
         updateAssistantRunDetails(assistantMessageId, message => ({
           traceItems: reduceTraceItems(message.traceItems ?? [], event),
           sessionLogItems: reduceDesignSessionLogItems(message.sessionLogItems ?? [], event),
@@ -241,18 +292,22 @@ export function DesignWorkspace({
       },
     }).catch((error: unknown) => {
       if (isCancelledError(error)) {
+        flushAssistantText(assistantMessageId)
         setStatus('cancelled')
         return
       }
+      flushAssistantText(assistantMessageId)
       setStatus('failed')
       setAssistantRunStatus(assistantMessageId, 'failed')
       appendAssistantText(`\n${error instanceof Error ? error.message : String(error)}`, assistantMessageId)
     }).finally(() => {
+      flushAssistantText(assistantMessageId)
       activeControllers.current.delete(assistantMessageId)
     })
   }
 
   const stopAgentRuns = (): void => {
+    flushAllAssistantText()
     for (const [messageId, controller] of activeControllers.current) {
       controller.abort()
       setAssistantRunStatus(messageId, 'cancelled')
@@ -270,6 +325,11 @@ export function DesignWorkspace({
         controller.abort()
       }
       activeControllers.current.clear()
+      for (const timer of assistantTextFlushTimers.current.values()) {
+        clearTimeout(timer)
+      }
+      assistantTextFlushTimers.current.clear()
+      pendingAssistantText.current.clear()
     }
   }, [initialPrompt])
 
@@ -283,7 +343,7 @@ export function DesignWorkspace({
   }, [activeArtifactId, artifacts, onSessionUpdate, sessionId, status])
 
   const handleSend = () => {
-    if (!input.trim()) return
+    if (!input.trim() || !modelReady) return
     const prompt = input.trim()
     const assistantMessageId = globalThis.crypto.randomUUID()
     setMessages((prev) => [
@@ -470,9 +530,11 @@ export function DesignWorkspace({
       setActiveArtifactId(projected.id)
       rememberAssistantArtifact(assistantMessageId, projected)
       appendAssistantText(`已导出 ${format}。`, assistantMessageId)
+      flushAssistantText(assistantMessageId)
       setAssistantRunStatus(assistantMessageId, 'completed')
     }).catch((error: unknown) => {
       appendAssistantText(`导出失败：${error instanceof Error ? error.message : String(error)}`, assistantMessageId)
+      flushAssistantText(assistantMessageId)
       setAssistantRunStatus(assistantMessageId, 'failed')
     })
   }
@@ -577,17 +639,6 @@ export function DesignWorkspace({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              {onOpenSettings && (
-                <button
-                  type="button"
-                  title="Design settings"
-                  aria-label="Design settings"
-                  onClick={onOpenSettings}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-surface-soft hover:text-foreground"
-                >
-                  <Settings size={14} />
-                </button>
-              )}
               <StatusPill status={status} />
             </div>
           </div>
@@ -613,9 +664,20 @@ export function DesignWorkspace({
               rows={3}
             />
             <div className="flex items-center justify-between gap-2 border-t border-border/70 px-2.5 py-2">
-              <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-                {status === 'running' ? <CircleDashed size={12} /> : <CheckCircle2 size={12} />}
-                <span className="truncate">{statusLabel(status)}</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <DesignPromptControls
+                  configuredModels={configuredModels}
+                  provider={selectedProvider}
+                  modelId={selectedModelId}
+                  onModelSelect={onModelSelect}
+                  onOpenSettings={onOpenSettings}
+                  loading={modelsLoading}
+                  compact
+                />
+                <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                  {status === 'running' ? <CircleDashed size={12} /> : <CheckCircle2 size={12} />}
+                  <span className="truncate">{statusLabel(status)}</span>
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
@@ -629,7 +691,14 @@ export function DesignWorkspace({
                   <Square size={13} />
                   停止
                 </Button>
-                <Button size="sm" onClick={handleSend} disabled={!input.trim()} aria-label="Send design prompt" className="h-8">
+                <Button
+                  size="sm"
+                  onClick={handleSend}
+                  disabled={!input.trim() || !modelReady}
+                  title={modelReady ? 'Send design prompt' : 'Configure a provider model in Settings / Providers'}
+                  aria-label="Send design prompt"
+                  className="h-8"
+                >
                   <SendHorizontal size={14} />
                   发送
                 </Button>
@@ -1230,6 +1299,13 @@ function reduceTraceItems(prev: DesignTraceItem[], event: DesignAgentStreamEvent
   if (!item) return prev
   const next = [...prev.filter(entry => entry.id !== item.id), item]
   return next.slice(-80)
+}
+
+function isHighFrequencyTraceEvent(event: DesignAgentStreamEvent): boolean {
+  return event.type === 'agent_event' && (
+    event.event.type === 'assistant_delta' ||
+    event.event.type === 'model_event'
+  )
 }
 
 export function initialDesignTraceItemsFromEvents(events: AgentEvent[], fallbackRunId: string): DesignTraceItem[] {

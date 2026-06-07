@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import type { JSX } from 'react'
-import { Settings, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
+import type { DesignConfiguredModelDescriptorSnapshot } from '@/apps/design/application/common'
 import { Button } from '@/packages/ui/components/ui/button'
 import { Textarea } from '@/packages/ui/components/ui/textarea'
+import { DesignPromptControls } from './DesignPromptControls'
 
 const QUICK_PROMPT_OPTIONS = [
   {
@@ -30,17 +32,29 @@ const QUICK_PROMPT_OPTIONS = [
 interface DesignEntryProps {
   onSubmit: (prompt: string) => void
   onOpenSettings?: () => void
+  configuredModels?: DesignConfiguredModelDescriptorSnapshot[]
+  selectedProvider?: string
+  selectedModelId?: string
+  onModelSelect?: (provider: string, modelId: string) => void
+  modelReady?: boolean
+  modelsLoading?: boolean
 }
 
 export function DesignEntry({
   onSubmit,
   onOpenSettings,
+  configuredModels = [],
+  selectedProvider,
+  selectedModelId,
+  onModelSelect,
+  modelReady = false,
+  modelsLoading = false,
 }: DesignEntryProps): JSX.Element {
   const [prompt, setPrompt] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSubmit = () => {
-    if (prompt.trim()) {
+    if (prompt.trim() && modelReady) {
       onSubmit(prompt.trim())
     }
   }
@@ -68,19 +82,6 @@ export function DesignEntry({
           <span className="h-2 w-2 rounded-full bg-accent-mint" />
           <span>Design workspace</span>
         </div>
-        {onOpenSettings && (
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            title="Design settings"
-            aria-label="Design settings"
-            className="h-8 w-8"
-            onClick={onOpenSettings}
-          >
-            <Settings size={14} />
-          </Button>
-        )}
       </div>
       <h1 className="mb-7 text-2xl font-semibold text-foreground">
         你想创建什么界面？
@@ -96,11 +97,19 @@ export function DesignEntry({
             className="min-h-[96px] resize-none border-0 bg-transparent px-4 pt-4 text-[15px] shadow-none focus-visible:ring-0"
           />
           <div className="flex items-center justify-between gap-3 border-t border-border/70 px-3 py-3">
-            <span />
+            <DesignPromptControls
+              configuredModels={configuredModels}
+              provider={selectedProvider}
+              modelId={selectedModelId}
+              onModelSelect={onModelSelect}
+              onOpenSettings={onOpenSettings}
+              loading={modelsLoading}
+            />
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!prompt.trim()}
+              disabled={!prompt.trim() || !modelReady}
+              title={modelReady ? 'Generate design' : 'Configure a provider model in Settings / Providers'}
               className="rounded-md"
             >
               <Sparkles size={14} />

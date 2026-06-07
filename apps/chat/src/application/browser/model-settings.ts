@@ -4,6 +4,7 @@ import {
   type AgentBackendKind,
   type AgentOrchestrationMode,
   type AgentOrchestrationPattern,
+  type ChatConfiguredModelDescriptorSnapshot,
   type ModelDescriptor,
 } from '@/apps/chat/application/common'
 import type { AgentRuntimeSettings } from '@/apps/chat/application/common'
@@ -165,28 +166,27 @@ export function loadSettings(): ChatModelSettings {
 export function saveSettings(settings: ChatModelSettings) {
   if (typeof window === 'undefined') return
   try {
-    writeRuntimeSettingsToStorage(settings, window.localStorage)
+    writeRuntimeSettingsToStorage({
+      ...settings,
+      apiKey: '',
+      baseUrl: undefined,
+      subscriptionCredentials: undefined,
+    }, window.localStorage)
   } catch { /* noop */ }
 }
 
 export function toRuntimeSettings(
   settings: ChatModelSettings,
-  envModels: EnvModelConfig[] = []
+  _envModels: EnvModelConfig[] = []
 ): AgentRuntimeSettings {
-  const envModel = envModels.find(
-    m => m.provider === settings.provider && m.modelId === settings.modelId
-  )
-  const envProviderFallback = envModels.find(m => m.provider === settings.provider)
-  const env = envModel ?? envProviderFallback
-
   return {
     provider: settings.provider,
     modelId: settings.modelId,
-    apiKey: settings.apiKey || env?.apiKey || '',
+    apiKey: '',
     authMode: settings.authMode,
     subscriptionProvider: settings.subscriptionProvider,
-    subscriptionCredentials: settings.subscriptionCredentials,
-    baseUrl: settings.baseUrl ?? env?.baseUrl,
+    subscriptionCredentials: undefined,
+    baseUrl: undefined,
     backend: normalizeBackend(settings.backend),
     orchestration: settings.orchestration,
     orchestrationPattern: settings.orchestrationPattern,
@@ -220,6 +220,28 @@ export function getProviderOptions() {
 
 export function getModelOptions(provider: string) {
   return CATALOG.filter(m => m.provider === provider)
+}
+
+export function getConfiguredProviderOptions(models: ChatConfiguredModelDescriptorSnapshot[]) {
+  const seen = new Set<string>()
+  const list: { id: string; label: string; authLabel?: string }[] = []
+  for (const model of models) {
+    if (seen.has(model.provider)) continue
+    seen.add(model.provider)
+    list.push({
+      id: model.provider,
+      label: model.provider,
+      authLabel: model.authLabel,
+    })
+  }
+  return list
+}
+
+export function getConfiguredModelOptions(
+  provider: string,
+  models: ChatConfiguredModelDescriptorSnapshot[]
+) {
+  return models.filter(model => model.provider === provider)
 }
 
 function normalizeTaskCapabilityProfile(value: unknown): RuntimeTaskCapabilityProfile {

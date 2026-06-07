@@ -67,6 +67,20 @@ vi.mock('../pagelet-design-agent-service', () => ({
   },
 }))
 
+const configuredModelProps = {
+  configuredModels: [
+    {
+      provider: 'minimax-cn',
+      id: 'MiniMax-M2.7',
+      label: 'MiniMax-M2.7',
+      authConfigured: true,
+    },
+  ],
+  selectedProvider: 'minimax-cn',
+  selectedModelId: 'MiniMax-M2.7',
+  modelReady: true,
+}
+
 describe('DesignWorkspace', () => {
   let container: HTMLDivElement | undefined
   let root: Root | undefined
@@ -185,7 +199,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" onReturnToEntry={onReturnToEntry} />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" onReturnToEntry={onReturnToEntry} {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -205,7 +219,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -253,7 +267,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -268,7 +282,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -326,7 +340,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -374,7 +388,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -430,7 +444,7 @@ describe('DesignWorkspace', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignWorkspace initialPrompt="make a hero" />)
+      root?.render(<DesignWorkspace initialPrompt="make a hero" {...configuredModelProps} />)
       await Promise.resolve()
     })
 

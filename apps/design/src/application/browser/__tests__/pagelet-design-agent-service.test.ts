@@ -22,6 +22,7 @@ const sendAgentMock = vi.fn(
   (_: DesignAgentSendRequest): Promise<DesignAgentSendResult> => new Promise<DesignAgentSendResult>(() => {}),
 )
 const cancelAgentMock = vi.fn(() => Promise.resolve(true))
+const listConfiguredModelsMock = vi.fn(() => Promise.resolve([]))
 const listAgentRunsMock = vi.fn(() => Promise.resolve([]))
 const deleteAgentSessionRunsMock = vi.fn((sessionId: string): Promise<DesignDeleteSessionRunsResult> =>
   Promise.resolve({ sessionId, deletedRunIds: [] }))
@@ -73,6 +74,7 @@ const client: IDesignPageletService = {
   ping: vi.fn((now: number) => Promise.resolve({ pong: now, serverTime: now })),
   sendAgent: sendAgentMock,
   cancelAgent: cancelAgentMock,
+  listConfiguredModels: listConfiguredModelsMock,
   listAgentRuns: listAgentRunsMock,
   deleteAgentSessionRuns: deleteAgentSessionRunsMock,
   getAgentRun: getAgentRunMock,
@@ -251,6 +253,15 @@ describe('PageletDesignAgentService', () => {
       scopes: ['artifact:write', 'repo:read'],
       artifactPolicy: 'preview',
     })
+  })
+
+  it('forwards configured model reads through the pagelet service', async () => {
+    const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
+    const service = new PageletDesignAgentService()
+
+    await expect(service.listConfiguredModels()).resolves.toEqual([])
+
+    expect(listConfiguredModelsMock).toHaveBeenCalled()
   })
 
   it('uses design-build runtime defaults when no model settings were saved', async () => {

@@ -62,7 +62,7 @@ export class ModelBackedDesignBuildChildRunner implements DesignBuildChildRunner
   async runChild(request: DesignBuildChildRunRequest): Promise<DesignBuildChildRunResult> {
     const settings = toAgentRuntimeSettings(request.settings)
     if (!settings) {
-      throw new Error('Design build model settings are required: provider/modelId plus valid api-key or subscription credentials.')
+      throw new Error('Design build model settings are required: provider and modelId must be configured.')
     }
 
     return {
@@ -405,8 +405,6 @@ function createChildUserPrompt(
 function toAgentRuntimeSettings(settings: RuntimeSettings | undefined): AgentRuntimeSettings | undefined {
   if (!settings?.provider || !settings.modelId) return undefined
   const authMode = settings.authMode === 'subscription' ? 'subscription' : 'api-key'
-  if (authMode === 'api-key' && !settings.apiKey) return undefined
-  if (authMode === 'subscription' && !settings.subscriptionCredentials) return undefined
   return {
     provider: settings.provider,
     modelId: settings.modelId,

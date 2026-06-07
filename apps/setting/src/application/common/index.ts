@@ -13,6 +13,9 @@ export interface PiAiProviderDescriptor {
   supportsSubscription: boolean;
   supportsApiKey: boolean;
   environmentKeyName?: string;
+  authConfigured?: boolean;
+  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json';
+  authLabel?: string;
 }
 
 export interface PiAiModelDescriptor {
@@ -65,15 +68,27 @@ export interface PiAiModelConfigUpsertInput {
 
 export interface PiAiProviderConfigUpsertInput {
   provider: string;
+  authMode?: PiAiProviderAuthMode;
   baseUrl?: string;
   api?: string;
   apiKey?: string;
+  subscriptionProvider?: string;
+  subscriptionCredentials?: {
+    refresh: string;
+    access: string;
+    expires: number;
+    [key: string]: unknown;
+  };
 }
 
 export interface PiAiProviderConfigSnapshot {
   baseUrl: string;
   api?: string;
   apiKey: string;
+  authMode: PiAiProviderAuthMode;
+  authConfigured: boolean;
+  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json';
+  authLabel?: string;
 }
 
 export interface ISettingPageletService {

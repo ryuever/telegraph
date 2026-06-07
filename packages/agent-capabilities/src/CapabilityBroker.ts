@@ -1,4 +1,11 @@
-import type { CapabilityHost, FeedbackAPI, FilesystemCapability, PatchCapability, ProcessCapability, ToolCapability } from '@/packages/agent/harness/CapabilityHost'
+import type {
+  CapabilityHost,
+  FeedbackAPI,
+  FilesystemCapability,
+  PatchCapability,
+  ProcessCapability,
+  ToolCapability,
+} from './CapabilityHost'
 
 export class CapabilityBroker {
   constructor(private readonly host: CapabilityHost) {}

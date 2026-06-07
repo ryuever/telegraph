@@ -6,7 +6,10 @@ export default defineConfig({
     alias: {
       '@/apps/chat': resolve(__dirname, 'src'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
+      '@/packages/agent-capabilities': resolve(__dirname, '../../packages/agent-capabilities/src'),
+      '@/packages/agent-extension-host': resolve(__dirname, '../../packages/agent-extension-host/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src'),
+      '@/packages/agent-resources': resolve(__dirname, '../../packages/agent-resources/src'),
       '@/packages/run-protocol': resolve(__dirname, '../../packages/run-protocol/src'),
       '@/packages/remote-protocol': resolve(__dirname, '../../packages/remote-protocol/src'),
       '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),

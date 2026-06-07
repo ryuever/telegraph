@@ -18,6 +18,7 @@ const deleteSessionRunsMock = vi.fn((sessionId: string) => Promise.resolve({ ses
 const getRunMock = vi.fn(() => Promise.resolve(null))
 const listRunEventsMock = vi.fn(() => Promise.resolve([]))
 const listRuntimeCapabilitiesMock = vi.fn(() => Promise.resolve([]))
+const listConfiguredModelsMock = vi.fn(() => Promise.resolve([]))
 const exportRunTraceBundleMock = vi.fn(() => Promise.resolve(null))
 const importRunTraceBundleMock = vi.fn((bundle: ChatRunTraceBundle) => Promise.resolve({
   status: 'imported' as const,
@@ -37,6 +38,7 @@ const client: IChatPageletService = {
   getRun: getRunMock,
   listRunEvents: listRunEventsMock,
   listRuntimeCapabilities: listRuntimeCapabilitiesMock,
+  listConfiguredModels: listConfiguredModelsMock,
   exportRunTraceBundle: exportRunTraceBundleMock,
   importRunTraceBundle: importRunTraceBundleMock,
   listPendingPermissions: listPendingPermissionsMock,
@@ -287,6 +289,15 @@ describe('PageletAgentService', () => {
     await expect(service.listRuntimeCapabilities()).resolves.toEqual([])
 
     expect(listRuntimeCapabilitiesMock).toHaveBeenCalled()
+  })
+
+  it('forwards configured model list calls through the pagelet service', async () => {
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await expect(service.listConfiguredModels()).resolves.toEqual([])
+
+    expect(listConfiguredModelsMock).toHaveBeenCalled()
   })
 
   it('forwards permission approval calls through the pagelet service', async () => {

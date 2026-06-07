@@ -441,13 +441,14 @@ function SettingApp() {
     void callSettingRpc('getPiAiProviderConfig', providerId)
       .then((value) => {
         if (cancelled || !value || typeof value !== 'object') return;
-        const config = value as { baseUrl?: unknown; apiKey?: unknown };
+        const config = value as { baseUrl?: unknown; apiKey?: unknown; authMode?: unknown };
         setProviderDraft((prev) => {
           if (prev.provider !== providerId) return prev;
           return {
             ...prev,
             baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : prev.baseUrl,
             apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
+            authMode: config.authMode === 'subscription' ? 'subscription' : 'api-key',
           };
         });
       })
@@ -479,29 +480,38 @@ function SettingApp() {
       const resolvedBaseUrl = providerDraft.baseUrl.trim();
       await callSettingRpc('upsertPiAiProviderConfig', {
         provider,
+        authMode: providerDraft.authMode,
         baseUrl: resolvedBaseUrl || undefined,
         apiKey: providerDraft.authMode === 'api-key'
           ? providerDraft.apiKey.trim() || undefined
           : undefined,
-      });
-      const existing = readRuntimeSettingsFromStorage(localStorage);
-      writeRuntimeSettingsToStorage({
-        ...existing,
-        provider,
-        baseUrl: resolvedBaseUrl || undefined,
-        apiKey: providerDraft.authMode === 'api-key' ? providerDraft.apiKey.trim() : '',
-        authMode: providerDraft.authMode,
         subscriptionProvider: providerDraft.authMode === 'subscription'
           ? (providerDraft.subscriptionProvider.trim() || provider)
           : undefined,
         subscriptionCredentials: providerDraft.authMode === 'subscription'
           ? subscriptionCredentials ?? undefined
           : undefined,
+      });
+      const existing = readRuntimeSettingsFromStorage(localStorage);
+      writeRuntimeSettingsToStorage({
+        ...existing,
+        provider,
+        baseUrl: undefined,
+        apiKey: '',
+        authMode: providerDraft.authMode,
+        subscriptionProvider: providerDraft.authMode === 'subscription'
+          ? (providerDraft.subscriptionProvider.trim() || provider)
+          : undefined,
+        subscriptionCredentials: undefined,
       }, localStorage);
       setSaveMessage({
         tone: 'success',
-        text: 'Provider settings saved to runtime settings and models.json.',
+        text: 'Provider settings saved to auth.json and models.json metadata.',
       });
+      const refreshedProviders = await callSettingRpc('listPiAiProviders');
+      if (Array.isArray(refreshedProviders)) {
+        setProviders(refreshedProviders as PiAiProviderDescriptor[]);
+      }
       const refreshedModelsJson = await callSettingRpc('getPiAiModelsJson');
       if (typeof refreshedModelsJson === 'string') {
         setModelsJsonDraft(refreshedModelsJson);
@@ -1589,10 +1599,12 @@ function providerStatusLabel({
   hasSubscriptionConfig: boolean;
 }): string {
   if (draft.authMode === 'subscription') {
+    if (provider.authSource === 'oauth') return provider.authLabel ?? 'auth.json oauth';
     if (selected && hasSubscriptionConfig) return 'configured';
     return 'unconfigured';
   }
 
+  if (provider.authConfigured) return provider.authLabel ?? provider.authSource ?? 'configured';
   if (selected && draft.apiKey.trim()) return 'configured';
   if (provider.environmentKeyName) return `env: ${provider.environmentKeyName}`;
   return 'unconfigured';

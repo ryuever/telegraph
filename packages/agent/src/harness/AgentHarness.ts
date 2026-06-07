@@ -13,11 +13,11 @@ import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/Age
 import {
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
   isTelegraphSubagentsSelector,
-} from '@/packages/agent/extensions/harness/constants'
+} from '@/packages/agent-extension-host'
 import {
   CapabilityHost,
   type AgentCapability,
-} from './CapabilityHost'
+} from '@/packages/agent-capabilities'
 import {
   HookBus,
   HookExecutionError,

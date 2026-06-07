@@ -4,6 +4,10 @@ import {
   createMiniMaxOpenAIModel,
   MINIMAX_OPENAI_BASE_URL,
 } from '@/packages/agent/providers/minimax'
+import {
+  applyPiModelOverridesFromFiles,
+  resolvePiModelFromFiles,
+} from '@/packages/agent/runtime/pi-ai-provider-config'
 
 /** Provider id used for MiniMax's first-class (Anthropic-messages) entry. */
 export const MINIMAX_PROVIDER_ID = 'minimax'
@@ -43,19 +47,28 @@ export const DEFAULT_MODEL_CATALOG: ModelDescriptor[] = [
  * synthetic provider honors the user's `baseUrl` so they can point at a
  * proxy / regional endpoint without editing code.
  */
-export function resolveModel(settings: AgentRuntimeSettings): Model<Api> {
+export function resolveModel(settings: AgentRuntimeSettings): Model<Api> | undefined {
   if (settings.provider === MINIMAX_OPENAI_COMPAT_PROVIDER_ID) {
     return createMiniMaxOpenAIModel({
       id: settings.modelId,
       baseUrl: settings.baseUrl ?? MINIMAX_OPENAI_BASE_URL,
     })
   }
+
+  const configuredModel = resolvePiModelFromFiles(settings)
+  if (configuredModel) return configuredModel
+
   // pi-ai's getModel signature is heavily generic; we don't know the literal
   // provider/modelId at compile time here, so we cast at the boundary.
-  return (getModel as unknown as (p: string, m: string) => Model<Api>)(
-    settings.provider,
-    settings.modelId
-  )
+  try {
+    const model = (getModel as unknown as (p: string, m: string) => Model<Api>)(
+      settings.provider,
+      settings.modelId
+    )
+    return applyPiModelOverridesFromFiles(settings, model)
+  } catch {
+    return undefined
+  }
 }
 
 export {

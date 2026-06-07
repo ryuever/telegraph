@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@mariozechner/pi-ai": "^0.72.1",
+    "@telegraph/agent": "workspace:*",
     "@telegraph/daemon": "workspace:*",
     "@telegraph/services": "workspace:*",
     "@telegraph/shared": "workspace:*",

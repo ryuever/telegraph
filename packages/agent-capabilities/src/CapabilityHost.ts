@@ -6,7 +6,6 @@ import type {
   HookName,
   ToolDefinition,
 } from '@/packages/agent-protocol'
-import type { HookBus } from './HookBus'
 
 export interface FeedbackAPI {
   notify(input: Omit<FeedbackEvent, 'type' | 'ts'> & { ts?: number }): void | Promise<void>
@@ -76,9 +75,13 @@ export type CapabilityKind =
   | 'tool'
   | 'custom'
 
+export interface CapabilityHookRegistrar {
+  on<N extends HookName>(name: N, handler: HookHandler<N>): () => void
+}
+
 export interface AgentCapabilityContext {
   host: CapabilityHost
-  hooks: HookBus
+  hooks: CapabilityHookRegistrar
 }
 
 export type AgentCapability = (context: AgentCapabilityContext) => void | Promise<void>
@@ -91,7 +94,7 @@ export class CapabilityHost {
   private readonly tools = new Map<string, ToolCapability>()
   private readonly custom = new Map<string, unknown>()
 
-  constructor(private readonly hooks: HookBus) {}
+  constructor(private readonly hooks: CapabilityHookRegistrar) {}
 
   registerFeedback(api: FeedbackAPI): void {
     this.feedbackApi = api

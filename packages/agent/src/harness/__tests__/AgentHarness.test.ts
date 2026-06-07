@@ -3,7 +3,7 @@ import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { describe, expect, it } from 'vitest'
 import { createAgentHarness, selectRuntimeId } from '../AgentHarness'
 import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
-import type { AgentCapability } from '../CapabilityHost'
+import type { AgentCapability } from '@/packages/agent-capabilities'
 import { InMemoryAgentSessionStore } from '../AgentSessionStore'
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {

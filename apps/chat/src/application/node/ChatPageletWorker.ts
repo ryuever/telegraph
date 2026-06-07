@@ -11,6 +11,7 @@ import {
   type ChatPermissionRequestSnapshot,
   type ChatPermissionResolution,
   type ChatRuntimeCapabilityDescriptorSnapshot,
+  type ChatConfiguredModelDescriptorSnapshot,
   type ChatDeleteSessionRunsResult,
   type ChatSendRequest,
   type ChatSendResult,
@@ -26,8 +27,9 @@ import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/Runti
 import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
 import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
 import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
-import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
+import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent-extension-host';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
+import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
 import { createAgentHarness, selectRuntimeId } from '@/packages/agent/harness';
 import type { AgentSessionStore } from '@/packages/agent/harness';
 import { createPageletRunCapabilities, FileAgentSessionStore } from '@/packages/agent/harness/node';
@@ -150,6 +152,9 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
 
         listRuntimeCapabilities: (): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]> =>
           Promise.resolve(listRuntimeCapabilityDescriptors()),
+
+        listConfiguredModels: async (): Promise<ChatConfiguredModelDescriptorSnapshot[]> =>
+          listPiConfiguredModels(),
 
         exportRunTraceBundle: async (runId: string): Promise<ChatRunTraceBundle | null> => {
           await this.recoveredRunsReady;

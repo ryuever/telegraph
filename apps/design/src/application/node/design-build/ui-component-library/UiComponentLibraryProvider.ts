@@ -1,4 +1,4 @@
-export type UiLibraryId = 'shadcn' | string
+export type UiLibraryId = string
 
 export interface UiComponentCatalogEntry {
   library: UiLibraryId

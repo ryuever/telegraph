@@ -3,6 +3,7 @@ import type {
   ContextProviderContribution,
   HarnessExtensionSourceKind,
   OrchestrationToolContribution,
+  ResourceContribution,
   ToolContribution,
 } from './HarnessExtensionManifest'
 
@@ -37,11 +38,18 @@ export interface ResolvedContextProviderContribution extends ContextProviderCont
   origin: ContributionOrigin
 }
 
+export interface ResolvedResourceContribution extends ResourceContribution {
+  fullId: string
+  sourcePath?: string
+  origin: ContributionOrigin
+}
+
 export interface HarnessContributionSnapshot {
   agents: ResolvedAgentContribution[]
   tools: ResolvedToolContribution[]
   orchestrationTools: ResolvedOrchestrationToolContribution[]
   contextProviders: ResolvedContextProviderContribution[]
+  resources: ResolvedResourceContribution[]
   createdAt: number
 }
 

@@ -12,7 +12,7 @@ import type {
 import type {
   AgentCapability,
   FeedbackAPI,
-} from '@/packages/agent/harness/CapabilityHost'
+} from '@/packages/agent-capabilities'
 import {
   codingCapabilities,
   type TaskCapabilityProfile,

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { agentAliasList, agentCatalogText } from '../HarnessContributionSnapshot'
-import { ContributionRegistry } from '../ContributionRegistry'
+import {
+  agentAliasList,
+  agentCatalogText,
+  ContributionRegistry,
+  parseHarnessExtensionManifest,
+} from '@/packages/agent-extension-host'
 
 describe('ContributionRegistry', () => {
-  it('creates a run snapshot with resolved agent aliases and origins', () => {
+  it('creates a snapshot with resolved agent aliases, resources, and origins', () => {
     const registry = new ContributionRegistry()
 
     registry.registerManifest({
@@ -18,6 +22,13 @@ describe('ContributionRegistry', () => {
             description: 'Collect facts.',
             prompt: './agents/scout.md',
             tools: ['read', 'grep'],
+          },
+        ],
+        resources: [
+          {
+            id: 'scout-skill',
+            kind: 'skill',
+            path: './skills/scout/SKILL.md',
           },
         ],
       },
@@ -36,6 +47,14 @@ describe('ContributionRegistry', () => {
       origin: {
         extensionId: '@telegraph/subagents',
         sourceKind: 'builtin',
+      },
+    })
+    expect(snapshot.resources[0]).toMatchObject({
+      fullId: '@telegraph/subagents/scout-skill',
+      sourcePath: '/repo/extensions/telegraph-subagents/skills/scout/SKILL.md',
+      origin: {
+        extensionId: '@telegraph/subagents',
+        contributionId: 'scout-skill',
       },
     })
     expect(agentCatalogText(snapshot)).toContain('scout: Collect facts.')
@@ -96,5 +115,18 @@ describe('ContributionRegistry', () => {
         sourceKind: 'workspace',
       },
     })
+  })
+
+  it('validates resource contributions in manifests', () => {
+    expect(() => parseHarnessExtensionManifest({
+      id: '@telegraph/bad',
+      displayName: 'Bad',
+      version: '0.1.0',
+      contributes: {
+        resources: [
+          { id: 'bad-resource', kind: 'unknown', path: './x' },
+        ],
+      },
+    })).toThrow(/invalid resource kind/)
   })
 })

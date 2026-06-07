@@ -1,0 +1,26 @@
+{
+  "name": "@telegraph/agent-resources",
+  "version": "0.0.0",
+  "description": "Telegraph agent resource discovery and prompt materialization primitives.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./skills": "./src/skills/index.ts",
+    "./skills/*": "./src/skills/*.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/agent-extension-host": "workspace:*",
+    "ignore": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import { DesignEntry } from './DesignEntry'
-import type { DesignAgentRunRecordSnapshot } from '@/apps/design/application/common'
+import type {
+  DesignAgentRunRecordSnapshot,
+  DesignConfiguredModelDescriptorSnapshot,
+} from '@/apps/design/application/common'
 import {
   PageletDesignAgentService,
 } from './pagelet-design-agent-service'
@@ -25,6 +28,12 @@ import {
 
 interface DesignViewProps {
   onOpenSettings?: () => void
+  configuredModels?: DesignConfiguredModelDescriptorSnapshot[]
+  selectedProvider?: string
+  selectedModelId?: string
+  onModelSelect?: (provider: string, modelId: string) => void
+  modelReady?: boolean
+  modelsLoading?: boolean
 }
 
 interface DesignSession extends DesignSessionListItem {
@@ -37,7 +46,15 @@ interface DesignSession extends DesignSessionListItem {
   updatedAt: number
 }
 
-export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
+export function DesignView({
+  onOpenSettings,
+  configuredModels = [],
+  selectedProvider,
+  selectedModelId,
+  onModelSelect,
+  modelReady = false,
+  modelsLoading = false,
+}: DesignViewProps): JSX.Element {
   const agent = useMemo(() => new PageletDesignAgentService(), [])
   const [sessions, setSessions] = useState<DesignSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -190,6 +207,12 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
           <DesignEntry
             onSubmit={startWorkspace}
             onOpenSettings={onOpenSettings}
+            configuredModels={configuredModels}
+            selectedProvider={selectedProvider}
+            selectedModelId={selectedModelId}
+            onModelSelect={onModelSelect}
+            modelReady={modelReady}
+            modelsLoading={modelsLoading}
           />
         )}
         {activeView === 'workspace' && activeSessionId && !openedSessionIds.has(activeSessionId) && (
@@ -211,6 +234,12 @@ export function DesignView({ onOpenSettings }: DesignViewProps): JSX.Element {
                 initialState={session.initialState}
                 isActive={isActive}
                 onOpenSettings={onOpenSettings}
+                configuredModels={configuredModels}
+                selectedProvider={selectedProvider}
+                selectedModelId={selectedModelId}
+                onModelSelect={onModelSelect}
+                modelReady={modelReady}
+                modelsLoading={modelsLoading}
                 onSessionUpdate={updateSessionSummary}
               />
             </div>

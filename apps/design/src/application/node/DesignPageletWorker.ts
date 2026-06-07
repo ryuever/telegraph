@@ -18,6 +18,7 @@ import {
   type DesignArtifactPatchPreviewResult,
   type DesignArtifactPatchRequest,
   type DesignExportablePatchArtifact,
+  type DesignConfiguredModelDescriptorSnapshot,
   type DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
@@ -29,8 +30,9 @@ import {
 } from '@/packages/agent/harness/node';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
+import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
 import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
-import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent/extensions/harness/constants';
+import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent-extension-host';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 import type { PermissionRequest, RuntimeSettings } from '@/packages/agent-protocol';
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build';
@@ -87,6 +89,8 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
         info: (): string => `design-pagelet ready (pid=${String(process.pid)})`,
         ping: (now: number) =>
           Promise.resolve({ pong: now, serverTime: Date.now() }),
+        listConfiguredModels: async (): Promise<DesignConfiguredModelDescriptorSnapshot[]> =>
+          listPiConfiguredModels(),
         sendAgent: (request: DesignAgentSendRequest): Promise<DesignAgentSendResult> =>
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>

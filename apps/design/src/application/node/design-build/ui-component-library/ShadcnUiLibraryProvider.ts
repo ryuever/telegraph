@@ -66,7 +66,7 @@ export class ShadcnUiLibraryProvider implements UiComponentLibraryProvider {
       try {
         const response = await this.fetchFn(catalogEntry.usageUrl)
         if (!response.ok) {
-          return unavailableUsage(name, `Failed to fetch shadcn usage markdown: HTTP ${response.status}.`, catalogEntry)
+          return unavailableUsage(name, `Failed to fetch shadcn usage markdown: HTTP ${String(response.status)}.`, catalogEntry)
         }
         const rawContent = await response.text()
         const markdownContent = rawContent.slice(0, this.maxMarkdownChars)
@@ -164,7 +164,7 @@ export class ShadcnUiLibraryProvider implements UiComponentLibraryProvider {
     const url = registryItemUrl(this.registryBaseUrl, componentName)
     const response = await this.fetchFn(url)
     if (!response.ok) {
-      throw new Error(`Failed to fetch shadcn registry item "${componentName}": HTTP ${response.status}.`)
+      throw new Error(`Failed to fetch shadcn registry item "${componentName}": HTTP ${String(response.status)}.`)
     }
     const parsed = parseJsonRecord(await response.text())
     if (!parsed) {

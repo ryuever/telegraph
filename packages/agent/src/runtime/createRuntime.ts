@@ -8,7 +8,7 @@ import type { AgentRuntimeSettings } from '@/packages/agent/types'
 import {
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,
   isTelegraphSubagentsSelector,
-} from '@/packages/agent/extensions/harness/constants'
+} from '@/packages/agent-extension-host'
 
 /**
  * Factory function to create a RuntimeExecutor instance.

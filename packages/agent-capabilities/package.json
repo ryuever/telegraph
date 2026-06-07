@@ -1,0 +1,23 @@
+{
+  "name": "@telegraph/agent-capabilities",
+  "version": "0.0.0",
+  "description": "Telegraph agent host capability contracts and registration helpers.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/agent-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.8"
+  }
+}

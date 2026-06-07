@@ -3,6 +3,7 @@ import type {
   HarnessExtensionManifest,
   HarnessExtensionPackage,
   HarnessExtensionSourceKind,
+  ResourceContribution,
 } from './HarnessExtensionManifest'
 import type {
   ContributionOrigin,
@@ -10,6 +11,7 @@ import type {
   ResolvedAgentContribution,
   ResolvedContextProviderContribution,
   ResolvedOrchestrationToolContribution,
+  ResolvedResourceContribution,
   ResolvedToolContribution,
 } from './HarnessContributionSnapshot'
 
@@ -43,6 +45,7 @@ export class ContributionRegistry {
     const tools: ResolvedToolContribution[] = []
     const orchestrationTools: ResolvedOrchestrationToolContribution[] = []
     const contextProviders: ResolvedContextProviderContribution[] = []
+    const resources: ResolvedResourceContribution[] = []
 
     for (const pkg of sortedPackages(this.packages)) {
       const manifest = pkg.manifest
@@ -77,6 +80,10 @@ export class ContributionRegistry {
           origin: originFor(pkg, provider.id),
         })
       }
+
+      for (const resource of manifest.contributes?.resources ?? []) {
+        resources.push(resolveResourceContribution(resource, pkg))
+      }
     }
 
     return {
@@ -84,6 +91,7 @@ export class ContributionRegistry {
       tools,
       orchestrationTools,
       contextProviders,
+      resources,
       createdAt: Date.now(),
     }
   }
@@ -95,15 +103,26 @@ function resolveAgentContribution(
 ): ResolvedAgentContribution {
   const alias = agent.id
   const fullId = fullContributionId(pkg.manifest.id, agent.id)
-  const promptPath = pkg.rootPath && !isUri(agent.prompt)
-    ? joinPath(pkg.rootPath, agent.prompt)
-    : undefined
+  const promptPath = resolvePackagePath(pkg.rootPath, agent.prompt)
   return {
     ...agent,
     alias,
     fullId,
     promptPath,
     origin: originFor(pkg, agent.id, promptPath),
+  }
+}
+
+function resolveResourceContribution(
+  resource: ResourceContribution,
+  pkg: HarnessExtensionPackage,
+): ResolvedResourceContribution {
+  const sourcePath = resolvePackagePath(pkg.rootPath, resource.path)
+  return {
+    ...resource,
+    fullId: fullContributionId(pkg.manifest.id, resource.id),
+    sourcePath,
+    origin: originFor(pkg, resource.id, sourcePath),
   }
 }
 
@@ -137,10 +156,11 @@ function fullContributionId(extensionId: string, contributionId: string): string
   return `${extensionId}/${contributionId}`
 }
 
-function isUri(value: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(value)
+function resolvePackagePath(rootPath: string | undefined, path: string): string | undefined {
+  if (!rootPath || isUri(path)) return undefined
+  return `${rootPath.replace(/[/\\]$/, '')}/${path.replace(/^\.?[/\\]/, '')}`
 }
 
-function joinPath(root: string, path: string): string {
-  return `${root.replace(/[/\\]$/, '')}/${path.replace(/^\.?[/\\]/, '')}`
+function isUri(value: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(value)
 }

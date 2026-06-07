@@ -10,6 +10,7 @@ import type {
   ChatRunTraceBundle,
   ChatRunTraceImportResult,
   ChatRuntimeCapabilityDescriptorSnapshot,
+  ChatConfiguredModelDescriptorSnapshot,
   ChatSubagentRecordSnapshot,
   ChatStreamEvent,
   EventSubscription,
@@ -21,6 +22,7 @@ export type { ChatSubagent, ChatSubagentGroup, ChatSubagentRecordSnapshot, ChatS
 export type { ChatAgentRunEventRecordSnapshot, ChatAgentRunRecordSnapshot, ChatAgentRunStatus } from '@/apps/chat/application/common'
 export type { ChatDeleteSessionRunsResult } from '@/apps/chat/application/common'
 export type { ChatRuntimeCapabilityDescriptorSnapshot } from '@/apps/chat/application/common'
+export type { ChatConfiguredModelDescriptorSnapshot } from '@/apps/chat/application/common'
 export type { ChatRunTraceBundle, ChatRunTraceImportResult } from '@/apps/chat/application/common'
 export type { ChatPermissionRequestSnapshot, ChatPermissionResolution } from '@/apps/chat/application/common'
 
@@ -44,6 +46,7 @@ export interface AgentService {
   getRun?(runId: string, signal?: AbortSignal): Promise<ChatAgentRunRecordSnapshot | null>
   listRunEvents?(runId: string, signal?: AbortSignal): Promise<ChatAgentRunEventRecordSnapshot[]>
   listRuntimeCapabilities?(signal?: AbortSignal): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>
+  listConfiguredModels?(signal?: AbortSignal): Promise<ChatConfiguredModelDescriptorSnapshot[]>
   exportRunTraceBundle?(runId: string, signal?: AbortSignal): Promise<ChatRunTraceBundle | null>
   importRunTraceBundle?(bundle: ChatRunTraceBundle, signal?: AbortSignal): Promise<ChatRunTraceImportResult>
   listPendingPermissions?(runId?: string, signal?: AbortSignal): Promise<ChatPermissionRequestSnapshot[]>

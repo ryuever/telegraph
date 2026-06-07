@@ -37,7 +37,8 @@ export class DesignRunStore {
   append(event: DesignAgentStreamEvent): void {
     const record = this.records.get(event.runId)
     if (!record) return
-    record.events.push(summarizeStreamEvent(event))
+    const summary = summarizeStreamEvent(event)
+    if (summary) record.events.push(summary)
     record.updatedAt = Date.now()
 
     if (event.type === 'run_failed') {
@@ -139,7 +140,7 @@ export function designRunSnapshotFromRecord(record: AgentRunRecord): DesignAgent
   }
 }
 
-function summarizeStreamEvent(event: DesignAgentStreamEvent): DesignAgentRunRecordSnapshot['events'][number] {
+function summarizeStreamEvent(event: DesignAgentStreamEvent): DesignAgentRunRecordSnapshot['events'][number] | null {
   if (event.type === 'run_queued') {
     return {
       type: 'run_queued',
@@ -159,6 +160,9 @@ function summarizeStreamEvent(event: DesignAgentStreamEvent): DesignAgentRunReco
       ts: Date.now(),
       label: `${event.subagent.label}: ${event.subagent.status}`,
     }
+  }
+  if (event.event.type === 'assistant_delta' || event.event.type === 'model_event') {
+    return null
   }
   return {
     ...summarizeAgentEvent(event.event),

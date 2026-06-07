@@ -21,17 +21,15 @@ import { upsertToolCall } from '../chat-tool-calls'
 import { upsertSubagentUpdate } from '../chat-subagents'
 import { groupPersistedRuns, sortRunsForSessionTimeline } from '../persisted-run-groups'
 import {
-  CATALOG,
   loadSettings,
   saveSettings,
-  loadEnvModels,
-  getDefaultModelFromEnv,
   type ChatModelSettings,
 } from '../model-settings'
 import type { AgentService, LlmTracePayload } from '../types'
 import type {
   ChatAgentRunEventRecordSnapshot,
   ChatAgentRunRecordSnapshot,
+  ChatConfiguredModelDescriptorSnapshot,
   ChatPermissionRequestSnapshot,
   ChatRunTraceBundle,
   ChatRuntimeCapabilityDescriptorSnapshot,
@@ -63,9 +61,8 @@ const SUGGESTIONS = [
 
 export function ChatPanel({ agent }: Props) {
   const [settings, setSettings] = useState<ChatModelSettings>(() => loadSettings())
-  const [_envModels, setEnvModels] = useState<import('../model-settings').EnvModelConfig[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [_isLoadingEnv, setIsLoadingEnv] = useState(true)
+  const [configuredModels, setConfiguredModels] = useState<ChatConfiguredModelDescriptorSnapshot[]>([])
   const [tracePanelOpen, setTracePanelOpenInner] = useState(readLlmTraceOpenFromStorage)
   const [persistedRuns, setPersistedRuns] = useState<ChatAgentRunRecordSnapshot[]>([])
   const [selectedPersistedSessionId, setSelectedPersistedSessionId] = useState<string | null>(null)
@@ -93,43 +90,6 @@ export function ChatPanel({ agent }: Props) {
     appendLlmTraceRow({ ...info, ts: Date.now() })
   }, [])
 
-  useEffect(() => {
-    let isMounted = true
-
-    function initEnvConfig() {
-      try {
-        const models = loadEnvModels()
-        if (!isMounted) return
-
-        setEnvModels(models)
-        const currentSettings = loadSettings()
-
-        const defaultFromEnv = getDefaultModelFromEnv(models)
-        if (defaultFromEnv && !models.some(m => m.provider === currentSettings.provider)) {
-          const updated = {
-            ...currentSettings,
-            provider: defaultFromEnv.provider,
-            modelId: defaultFromEnv.modelId,
-          }
-          setSettings(updated)
-          saveSettings(updated)
-        } else {
-          setSettings(currentSettings)
-        }
-      } catch (err) {
-        console.error('[ChatPanel] Failed to load env config:', err)
-      } finally {
-        if (isMounted) setIsLoadingEnv(false)
-      }
-    }
-
-    initEnvConfig()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
   const agentService = useMemo<AgentService>(() => {
     if (agent) return agent
     return new PageletAgentService()
@@ -149,6 +109,31 @@ export function ChatPanel({ agent }: Props) {
       })
     return () => { controller.abort(); }
   }, [agentService, settingsOpen])
+
+  useEffect(() => {
+    if (!agentService.listConfiguredModels) return
+    const controller = new AbortController()
+    agentService.listConfiguredModels(controller.signal)
+      .then(items => {
+        if (controller.signal.aborted) return
+        setConfiguredModels(items)
+        const hasCurrent = items.some(item => item.provider === settings.provider && item.id === settings.modelId)
+        const fallback = items.length > 0 ? items[0] : null
+        if (!hasCurrent && fallback) {
+          const nextSettings = {
+            ...settings,
+            provider: fallback.provider,
+            modelId: fallback.id,
+          }
+          setSettings(nextSettings)
+          saveSettings(nextSettings)
+        }
+      })
+      .catch(() => {
+        // Keep the last configured-model snapshot if the pagelet is still warming up.
+      })
+    return () => { controller.abort(); }
+  }, [agentService, settings, settingsOpen])
 
   useEffect(() => {
     if (!agentService.deleteSessionRuns) return
@@ -606,11 +591,16 @@ export function ChatPanel({ agent }: Props) {
   }
 
   const modelOptions = useMemo(
-    () => CATALOG.map(model => ({
-      value: `${model.provider}::${model.id}`,
-      label: model.label,
-    })),
-    []
+    () => configuredModels.length > 0
+      ? configuredModels.map(model => ({
+        value: `${model.provider}::${model.id}`,
+        label: `${model.provider} · ${model.label}`,
+      }))
+      : [{
+        value: `${settings.provider}::${settings.modelId}`,
+        label: `${settings.provider} · ${settings.modelId}`,
+      }],
+    [configuredModels, settings.modelId, settings.provider]
   )
 
   const selectedModelValue = `${settings.provider}::${settings.modelId}`
@@ -708,6 +698,7 @@ export function ChatPanel({ agent }: Props) {
         open={settingsOpen}
         settings={settings}
         runtimeCapabilities={runtimeCapabilities}
+        configuredModels={configuredModels}
         onClose={() => { setSettingsOpen(false); }}
         onSave={handleSaveSettings}
       />

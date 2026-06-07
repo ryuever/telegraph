@@ -15,7 +15,8 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
   ContributionRegistry,
-  parseHarnessExtensionManifest,
+  hasHarnessExtensionManifestSync,
+  loadHarnessExtensionPackageSync,
   type HarnessContributionSnapshot,
   type ResolvedAgentContribution,
 } from '@/packages/agent/extensions/harness'
@@ -54,10 +55,10 @@ export function createTelegraphSubagentsSnapshot(opts: DiscoveryOptions = {}): H
   const registry = new ContributionRegistry()
 
   if (scopes.includes('builtin')) {
-    registry.registerManifest(loadPackageManifest(opts.extensionRoot ?? defaultExtensionRoot()), {
-      rootPath: opts.extensionRoot ?? defaultExtensionRoot(),
-      sourceKind: 'builtin',
-    })
+    registry.registerPackage(loadHarnessExtensionPackageSync(
+      opts.extensionRoot ?? defaultExtensionRoot(),
+      'builtin',
+    ))
   }
 
   if (scopes.includes('user')) {
@@ -258,11 +259,6 @@ function hydrateAgentProfileFromPromptFile(contribution: ResolvedAgentContributi
   }
 }
 
-function loadPackageManifest(rootPath: string) {
-  const raw = readFileSync(join(rootPath, 'telegraph.extension.json'), 'utf8')
-  return parseHarnessExtensionManifest(JSON.parse(raw))
-}
-
 function readPromptBody(path: string): string {
   const parsed = parseAgentFile(readFileSync(path, 'utf8'), 'builtin', path)
   return parsed?.systemPrompt ?? readFileSync(path, 'utf8').trim()
@@ -275,7 +271,7 @@ function defaultExtensionRoot(): string {
     join(process.cwd(), 'extensions', 'telegraph-subagents'),
     join(process.cwd(), '..', '..', 'extensions', 'telegraph-subagents'),
   ]
-  return candidates.find(path => existsSync(join(path, 'telegraph.extension.json'))) ?? sourceRoot
+  return candidates.find(hasHarnessExtensionManifestSync) ?? sourceRoot
 }
 
 function relativePromptPath(root: string, path: string): string {

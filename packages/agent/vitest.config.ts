@@ -4,7 +4,10 @@ import { resolve } from 'node:path'
 export default defineConfig({
   resolve: {
     alias: {
+      '@/packages/agent-capabilities': resolve(__dirname, '../agent-capabilities/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../agent-protocol/src'),
+      '@/packages/agent-extension-host': resolve(__dirname, '../agent-extension-host/src'),
+      '@/packages/agent-resources': resolve(__dirname, '../agent-resources/src'),
       '@/packages/agent': resolve(__dirname, 'src'),
       '@/packages/computer-use': resolve(__dirname, '../computer-use/src'),
       '@/packages/computer-use-protocol': resolve(__dirname, '../computer-use-protocol/src'),

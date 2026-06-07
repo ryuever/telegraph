@@ -40,42 +40,41 @@ describe('ShadcnUiLibraryProvider', () => {
 
   it('returns raw markdown usage content for catalog component names', async () => {
     const provider = new ShadcnUiLibraryProvider({
-      fetchFn: async url => {
-        const href = String(url)
+      fetchFn: url => {
+        const href = url
         if (href.endsWith('/llms.txt')) {
-          return new Response(`
-## Components
+          return Promise.resolve(new Response(`
+	## Components
 
-### Overlays & Dialogs
+	### Overlays & Dialogs
 
-- [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu): Dropdown menu component.
-`)
+	- [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu): Dropdown menu component.
+	`))
         }
-        return new Response('---\ntitle: Dropdown Menu\n---\n\n## Usage\n\n```tsx\n<DropdownMenu />\n```', {
+        return Promise.resolve(new Response('---\ntitle: Dropdown Menu\n---\n\n## Usage\n\n```tsx\n<DropdownMenu />\n```', {
           headers: { 'content-type': 'text/markdown' },
-        })
+        }))
       },
     })
 
     const usages = await provider.getComponentUsages(['dropdown-menu'])
+    const usage = usages[0]
 
-    expect(usages).toEqual([
-      expect.objectContaining({
-        name: 'dropdown-menu',
-        available: true,
-        contentType: 'text/markdown',
-        markdownContent: expect.stringContaining('<DropdownMenu />'),
-        truncated: false,
-      }),
-    ])
+    expect(usages).toHaveLength(1)
+    expect(usage).toBeDefined()
+    expect(usage.name).toBe('dropdown-menu')
+    expect(usage.available).toBe(true)
+    expect(usage.contentType).toBe('text/markdown')
+    expect(usage.markdownContent).toContain('<DropdownMenu />')
+    expect(usage.truncated).toBe(false)
   })
 
   it('uses the bundled component llm catalog before fetching llms.txt', async () => {
     const calls: string[] = []
     const provider = new ShadcnUiLibraryProvider({
-      fetchFn: async url => {
-        calls.push(String(url))
-        return new Response('', { status: 500 })
+      fetchFn: url => {
+        calls.push(url)
+        return Promise.resolve(new Response('', { status: 500 }))
       },
     })
 
@@ -88,10 +87,10 @@ describe('ShadcnUiLibraryProvider', () => {
   it('installs registry files recursively from shadcn registry json', async () => {
     const provider = new ShadcnUiLibraryProvider({
       registryBaseUrl: 'https://registry.example/styles/default',
-      fetchFn: async url => {
-        const href = String(url)
+      fetchFn: url => {
+        const href = url
         if (href.endsWith('/calendar.json')) {
-          return new Response(JSON.stringify({
+          return Promise.resolve(new Response(JSON.stringify({
             dependencies: ['react-day-picker@latest', 'date-fns'],
             registryDependencies: ['button'],
             files: [
@@ -101,10 +100,10 @@ describe('ShadcnUiLibraryProvider', () => {
                 content: 'import { Button } from "@/registry/default/ui/button"\nexport function Calendar() { return <Button /> }',
               },
             ],
-          }))
+          })))
         }
         if (href.endsWith('/button.json')) {
-          return new Response(JSON.stringify({
+          return Promise.resolve(new Response(JSON.stringify({
             dependencies: ['@radix-ui/react-slot'],
             files: [
               {
@@ -113,9 +112,9 @@ describe('ShadcnUiLibraryProvider', () => {
                 content: 'export function Button() { return <button /> }',
               },
             ],
-          }))
+          })))
         }
-        return new Response('', { status: 404 })
+        return Promise.resolve(new Response('', { status: 404 }))
       },
     })
 

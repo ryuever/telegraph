@@ -4,6 +4,7 @@ import type {
   DesignAgentRunEventRecordSnapshot,
   DesignAgentRunRecordSnapshot,
   DesignDeleteSessionRunsResult,
+  DesignConfiguredModelDescriptorSnapshot,
   DesignArtifactPatchApplyResult,
   DesignArtifactExportResult,
   DesignExportFormat,
@@ -135,6 +136,12 @@ export class PageletDesignAgentService {
     await waitForDesignPageletReady(signal)
     throwIfAborted(signal)
     return getDesignPageletClient().listAgentRuns()
+  }
+
+  async listConfiguredModels(signal?: AbortSignal): Promise<DesignConfiguredModelDescriptorSnapshot[]> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    return getDesignPageletClient().listConfiguredModels()
   }
 
   async deleteAgentSessionRuns(sessionId: string, signal?: AbortSignal): Promise<DesignDeleteSessionRunsResult> {

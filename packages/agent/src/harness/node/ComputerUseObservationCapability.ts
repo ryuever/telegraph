@@ -5,7 +5,7 @@ import type {
   ObservationKind,
 } from '@/packages/computer-use-protocol'
 import type { ToolDefinition } from '@/packages/agent-protocol'
-import type { ToolCapability } from '../CapabilityHost'
+import type { ToolCapability } from '@/packages/agent-capabilities'
 
 const DEFAULT_TARGET: ComputerTarget = {
   targetId: 'desktop:main',

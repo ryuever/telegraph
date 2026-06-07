@@ -517,7 +517,7 @@ function RunLogInspector({
   eventsError?: string
   onSelect: (key: string) => void
 }): React.JSX.Element {
-  const selected = groups.find(group => group.key === selectedKey) ?? groups[0]
+  const selected = groups.find(group => group.key === selectedKey) ?? (groups.length > 0 ? groups[0] : null)
   const artifacts = selected?.event ? extractObservationArtifacts(selected.event) : []
   const [copied, setCopied] = useState(false)
   const selectedCopyContent = useMemo(() => (
@@ -926,11 +926,6 @@ function withoutSetValue(values: ReadonlySet<string>, value: string): ReadonlySe
   const next = new Set(values)
   next.delete(value)
   return next
-}
-
-function shortId(value: string): string {
-  if (value.length <= 14) return value
-  return `${value.slice(0, 6)}...${value.slice(-5)}`
 }
 
 export function projectConsoleLogGroups(item: ConsoleEvent): ConsoleLogGroup[] {

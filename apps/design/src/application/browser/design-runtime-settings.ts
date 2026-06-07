@@ -62,6 +62,23 @@ export function normalizeDesignRuntimeSettings(
   }
 }
 
+export function selectDesignRuntimeModel(
+  settings: DesignRuntimeSettings,
+  provider: string,
+  modelId: string,
+): DesignRuntimeSettings {
+  return normalizeDesignRuntimeSettings({
+    ...settings,
+    provider,
+    modelId,
+    apiKey: '',
+    authMode: 'api-key',
+    subscriptionProvider: undefined,
+    subscriptionCredentials: undefined,
+    baseUrl: undefined,
+  })
+}
+
 export function designSystemContextFromSettings(settings: DesignRuntimeSettings): Record<string, unknown> {
   const themePackId = normalizeThemePackId(settings.designSystem?.themePackId)
   const themePack = getBuiltinThemePack(themePackId)

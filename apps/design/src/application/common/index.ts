@@ -15,6 +15,7 @@ export const DESIGN_PAGELET_SERVICE_PATH = 'design-pagelet-api';
 export interface IDesignPageletService {
   info(): Promise<string>;
   ping(now: number): Promise<{ pong: number; serverTime: number }>;
+  listConfiguredModels(): Promise<DesignConfiguredModelDescriptorSnapshot[]>;
   sendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult>;
   cancelAgent(runId: string): Promise<boolean>;
   listAgentRuns(): Promise<DesignAgentRunRecordSnapshot[]>;
@@ -46,6 +47,17 @@ export interface DesignAgentSendResult {
   runId: string;
   status: 'completed' | 'failed' | 'cancelled';
   error?: string;
+}
+
+export interface DesignConfiguredModelDescriptorSnapshot {
+  provider: string;
+  id: string;
+  label: string;
+  api?: string;
+  baseUrl?: string;
+  authConfigured: boolean;
+  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json';
+  authLabel?: string;
 }
 
 export interface DesignDeleteSessionRunsResult {

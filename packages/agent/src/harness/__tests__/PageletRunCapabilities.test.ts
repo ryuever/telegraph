@@ -10,7 +10,7 @@ import {
   type WriteObservationArtifactInput,
 } from '@/packages/computer-use'
 import type { ActionResult, ComputerAction } from '@/packages/computer-use-protocol'
-import { CapabilityHost } from '@/packages/agent/harness/CapabilityHost'
+import { CapabilityHost } from '@/packages/agent-capabilities'
 import { HookBus } from '@/packages/agent/harness/HookBus'
 import { createPageletRunCapabilities } from '@/packages/agent/harness/node/PageletRunCapabilities'
 import { describe, expect, it } from 'vitest'

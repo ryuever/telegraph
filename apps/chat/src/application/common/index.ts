@@ -93,6 +93,17 @@ export type ChatAgentRunEventRecordSnapshot = AgentRunEventRecord
 
 export type ChatRuntimeCapabilityDescriptorSnapshot = RuntimeCapabilityDescriptor
 
+export interface ChatConfiguredModelDescriptorSnapshot {
+  provider: string
+  id: string
+  label: string
+  api?: string
+  baseUrl?: string
+  authConfigured: boolean
+  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json'
+  authLabel?: string
+}
+
 export interface ChatRunTraceBundle {
   schemaVersion: 1
   exportedAt: number
@@ -203,6 +214,7 @@ export interface IChatPageletService {
   getRun(runId: string): Promise<ChatAgentRunRecordSnapshot | null>
   listRunEvents(runId: string): Promise<ChatAgentRunEventRecordSnapshot[]>
   listRuntimeCapabilities(): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>
+  listConfiguredModels(): Promise<ChatConfiguredModelDescriptorSnapshot[]>
   exportRunTraceBundle(runId: string): Promise<ChatRunTraceBundle | null>
   importRunTraceBundle(bundle: ChatRunTraceBundle): Promise<ChatRunTraceImportResult>
   listPendingPermissions(runId?: string): Promise<ChatPermissionRequestSnapshot[]>

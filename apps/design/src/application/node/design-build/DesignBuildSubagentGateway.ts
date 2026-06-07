@@ -75,25 +75,15 @@ export class DesignBuildSubagentGateway {
       raw,
     )
 
-    const traceEvents: AgentEvent[] = []
-    let result
-    try {
-      result = await this.childRunner.runChild({
-        ...request,
-        profile,
-        emitEvent: event => {
-          if (isForwardedChildTraceEvent(event)) traceEvents.push(event)
-        },
-      })
-    } catch (error) {
-      for (const event of traceEvents) {
-        yield event
-      }
-      throw error
-    }
-    for (const event of traceEvents) {
-      yield event
-    }
+    const traceQueue = createLiveTraceQueue()
+    const child = this.childRunner.runChild({
+      ...request,
+      profile,
+      emitEvent: event => {
+        if (isForwardedChildTraceEvent(event)) traceQueue.push(event)
+      },
+    })
+    const result = yield* drainChildWithLiveTrace(child, traceQueue)
     yield childRunCompleted(
       request.parentRunId,
       request.childRunId,
@@ -110,9 +100,85 @@ export class DesignBuildSubagentGateway {
   }
 }
 
+interface LiveTraceQueue {
+  push(event: AgentEvent): void
+  hasEvents(): boolean
+  drain(): AgentEvent[]
+  wait(): Promise<TraceWake>
+  wake(): void
+}
+
+interface TraceWake {
+  kind: 'trace'
+}
+
+type ChildResult = { output: unknown }
+
+type ChildCompletion =
+  | { kind: 'completed'; result: ChildResult }
+  | { kind: 'failed'; error: unknown }
+
+function createLiveTraceQueue(): LiveTraceQueue {
+  const events: AgentEvent[] = []
+  let wakeWaiter: (() => void) | undefined
+  return {
+    push(event) {
+      events.push(event)
+      this.wake()
+    },
+    hasEvents() {
+      return events.length > 0
+    },
+    drain() {
+      return events.splice(0)
+    },
+    wait() {
+      return new Promise<TraceWake>(resolve => {
+        wakeWaiter = () => { resolve({ kind: 'trace' }) }
+      })
+    },
+    wake() {
+      const wake = wakeWaiter
+      wakeWaiter = undefined
+      wake?.()
+    },
+  }
+}
+
+async function* drainChildWithLiveTrace(
+  child: Promise<ChildResult>,
+  traceQueue: LiveTraceQueue,
+): AsyncGenerator<AgentEvent, ChildResult, void> {
+  const childCompletion: Promise<ChildCompletion> = child.then(
+    result => ({ kind: 'completed', result }),
+    (error: unknown) => ({ kind: 'failed', error }),
+  )
+  let completion: ChildCompletion | undefined
+
+  while (!completion) {
+    for (const event of traceQueue.drain()) {
+      yield event
+    }
+    if (traceQueue.hasEvents()) continue
+    const next = await Promise.race([childCompletion, traceQueue.wait()])
+    if (next.kind === 'trace') continue
+    completion = next
+  }
+
+  for (const event of traceQueue.drain()) {
+    yield event
+  }
+
+  if (completion.kind === 'failed') throw asError(completion.error)
+  return completion.result
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error))
+}
+
 function isForwardedChildTraceEvent(event: AgentEvent): boolean {
   return event.type === 'model_request' ||
-    event.type === 'model_event' ||
     event.type === 'tool_call' ||
     event.type === 'tool_result' ||
     event.type === 'tool_error' ||

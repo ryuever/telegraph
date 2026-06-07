@@ -14,6 +14,20 @@ const serviceMocks = vi.hoisted(() => ({
   getAgentRunProjection: vi.fn(),
 }))
 
+const configuredModelProps = {
+  configuredModels: [
+    {
+      provider: 'minimax-cn',
+      id: 'MiniMax-M2.7',
+      label: 'MiniMax-M2.7',
+      authConfigured: true,
+    },
+  ],
+  selectedProvider: 'minimax-cn',
+  selectedModelId: 'MiniMax-M2.7',
+  modelReady: true,
+}
+
 vi.mock('../pagelet-design-agent-service', () => ({
   PageletDesignAgentService: class {
     listAgentRuns = serviceMocks.listAgentRuns
@@ -140,7 +154,7 @@ describe('DesignView', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignView />)
+      root?.render(<DesignView {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -156,13 +170,61 @@ describe('DesignView', () => {
     expect(findButtonByText(container, '生成')?.disabled).toBe(false)
   })
 
+  it('selects configured models from the entry prompt input', async () => {
+    const onModelSelect = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root?.render(
+        <DesignView
+          configuredModels={[
+            {
+              provider: 'minimax-cn',
+              id: 'MiniMax-M2.7',
+              label: 'MiniMax-M2.7',
+              authConfigured: true,
+            },
+            {
+              provider: 'openai',
+              id: 'gpt-4o-mini',
+              label: 'GPT-4o mini',
+              authConfigured: true,
+            },
+          ]}
+          selectedProvider="minimax-cn"
+          selectedModelId="MiniMax-M2.7"
+          modelReady
+          onModelSelect={onModelSelect}
+        />
+      )
+      await Promise.resolve()
+    })
+
+    const modelSelect = container.querySelector<HTMLSelectElement>('select[aria-label="Design model selection"]')
+    expect(modelSelect).not.toBeNull()
+    const openaiOption = [...(modelSelect?.options ?? [])]
+      .find(option => option.textContent.includes('openai'))
+    expect(openaiOption).toBeDefined()
+
+    await act(async () => {
+      if (!modelSelect || !openaiOption) return
+      modelSelect.value = openaiOption.value
+      modelSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(onModelSelect).toHaveBeenCalledWith('openai', 'gpt-4o-mini')
+  })
+
   it('opens multiple generated app sessions without losing each workspace state', async () => {
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignView />)
+      root?.render(<DesignView {...configuredModelProps} />)
       await Promise.resolve()
     })
 
@@ -269,7 +331,7 @@ describe('DesignView', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignView />)
+      root?.render(<DesignView {...configuredModelProps} />)
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -312,7 +374,7 @@ describe('DesignView', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignView />)
+      root?.render(<DesignView {...configuredModelProps} />)
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -333,7 +395,7 @@ describe('DesignView', () => {
     root = createRoot(container)
 
     await act(async () => {
-      root?.render(<DesignView />)
+      root?.render(<DesignView {...configuredModelProps} />)
       await Promise.resolve()
       await Promise.resolve()
     })

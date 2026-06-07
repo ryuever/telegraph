@@ -5,8 +5,13 @@ const nodeBuiltins = [
   'assert', 'buffer', 'child_process', 'cluster', 'crypto', 'dgram', 'dns',
   'domain', 'events', 'fs', 'http', 'https', 'net', 'os', 'path', 'process',
   'querystring', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
-  'tty', 'url', 'util', 'v8', 'vm', 'zlib',
+  'tty', 'url', 'util', 'v8', 'vm', 'zlib', 'async_hooks', 'module',
 ];
+
+const isExternal = (id: string) =>
+  id === 'electron' ||
+  id.startsWith('node:') ||
+  nodeBuiltins.some(builtin => id === builtin || id.startsWith(`${builtin}/`));
 
 export default defineConfig({
   resolve: {
@@ -18,6 +23,14 @@ export default defineConfig({
       '@/apps/shared': resolve(__dirname, '../shared/src'),
       '@/apps/daemon': resolve(__dirname, '../daemon/src'),
       '@/apps/main': resolve(__dirname, 'src'),
+      '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
+      '@/packages/agent-capabilities': resolve(__dirname, '../../packages/agent-capabilities/src'),
+      '@/packages/agent-extension-host': resolve(__dirname, '../../packages/agent-extension-host/src'),
+      '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
+      '@/packages/agent-resources': resolve(__dirname, '../../packages/agent-resources/src'),
+      '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),
+      '@/packages/computer-use-protocol': resolve(__dirname, '../../packages/computer-use-protocol/src/index.ts'),
+      '@/packages/run-protocol': resolve(__dirname, '../../packages/run-protocol/src/index.ts'),
     },
   },
   build: {
@@ -27,7 +40,7 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: [...nodeBuiltins, ...nodeBuiltins.map(m => `node:${m}`), 'electron'],
+      external: isExternal,
       output: {
         entryFileNames: 'setting-worker.js',
       },

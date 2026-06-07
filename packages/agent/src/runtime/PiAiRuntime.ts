@@ -8,6 +8,7 @@ import type { TSchema } from '@mariozechner/pi-ai'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import { BaseAgentRuntime, type RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
 import type { RuntimeExecutableTool } from '@/packages/agent/runtime/AgentRuntime'
+import type { AgentRuntimeSettings } from '@/packages/agent/types'
 
 /**
  * Pi-AI runtime executor.
@@ -48,7 +49,7 @@ export class PiAiRuntime extends BaseAgentRuntime {
       // Stream all pi-ai events through the adapter
       for await (const ev of streamPiAiRuntimeEvents({
         runId,
-        settings: settings as any, // TODO: type alignment between RuntimeSettings and AgentRuntimeSettings
+        settings: toAgentRuntimeSettings(settings),
         message,
         messages: input.messages,
         signal,
@@ -86,5 +87,23 @@ function toPiAiExecutableTool(tool: RuntimeExecutableTool) {
     parameters: tool.definition.inputSchema as TSchema,
     execute: (toolInput: Record<string, unknown>, context: PiAiToolExecutionContext) =>
       tool.execute(toolInput, context),
+  }
+}
+
+function toAgentRuntimeSettings(settings: RuntimeInput['settings']): AgentRuntimeSettings {
+  return {
+    provider: settings.provider ?? '',
+    modelId: settings.modelId ?? '',
+    apiKey: settings.apiKey ?? '',
+    authMode: settings.authMode,
+    subscriptionProvider: settings.subscriptionProvider,
+    subscriptionCredentials: settings.subscriptionCredentials,
+    baseUrl: settings.baseUrl,
+    backend: settings.backend as AgentRuntimeSettings['backend'],
+    orchestration: settings.orchestration as AgentRuntimeSettings['orchestration'],
+    orchestrationPattern: settings.orchestrationPattern as AgentRuntimeSettings['orchestrationPattern'],
+    worktreeIsolation: settings.worktreeIsolation,
+    extensionBlocklist: settings.extensionBlocklist,
+    taskCapabilityProfile: settings.taskCapabilityProfile,
   }
 }

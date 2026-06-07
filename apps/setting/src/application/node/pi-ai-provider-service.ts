@@ -19,6 +19,10 @@ import {
   type PiAiProviderConfigUpsertInput,
   type PiAiProviderDescriptor,
 } from '@/apps/setting/application/common';
+import {
+  getPiAuthStatus,
+  upsertPiAuthCredential,
+} from '@/packages/agent/runtime/pi-ai-provider-config';
 
 type ModelLike = { id?: string; name?: string; api?: string; baseUrl?: string };
 type JsonRecord = Record<string, unknown>;
@@ -41,7 +45,15 @@ export function listPiAiProviders(): PiAiProviderDescriptor[] {
   for (const provider of catalog) {
     environmentKeyByProvider[provider.id] = findEnvKeys(provider.id)?.[0];
   }
-  return buildPiAiProviderCatalog(customProviderIds, environmentKeyByProvider);
+  return buildPiAiProviderCatalog(customProviderIds, environmentKeyByProvider).map((provider) => {
+    const auth = getPiAuthStatus(provider.id);
+    return {
+      ...provider,
+      authConfigured: auth.configured,
+      authSource: auth.source,
+      authLabel: auth.label,
+    };
+  });
 }
 
 export function listPiAiModels(provider: string): PiAiModelDescriptor[] {
@@ -204,7 +216,7 @@ export async function savePiAiModelsJson(content: string): Promise<void> {
 export function getPiAiProviderConfig(provider: string): PiAiProviderConfigSnapshot {
   const providerId = provider.trim();
   if (!providerId) {
-    return { baseUrl: '', apiKey: '' };
+    return { baseUrl: '', apiKey: '', authMode: 'api-key', authConfigured: false };
   }
 
   const modelsJson = readModelsJson();
@@ -212,7 +224,7 @@ export function getPiAiProviderConfig(provider: string): PiAiProviderConfigSnaps
   const fromJsonBaseUrl = stringOrUndefined(providerConfig.baseUrl);
   const fromJsonApiKey = stringOrUndefined(providerConfig.apiKey);
   const fromJsonApi = stringOrUndefined(providerConfig.api);
-
+  const auth = getPiAuthStatus(providerId);
   let baseUrl = fromJsonBaseUrl ?? PI_AI_PROVIDER_DEFAULT_BASE_URLS[providerId] ?? '';
   if (!baseUrl) {
     const builtInModels = safeGetModels(providerId);
@@ -222,7 +234,11 @@ export function getPiAiProviderConfig(provider: string): PiAiProviderConfigSnaps
   return {
     baseUrl,
     api: fromJsonApi,
-    apiKey: fromJsonApiKey ?? '',
+    apiKey: auth.source === 'models-json' ? fromJsonApiKey ?? '' : '',
+    authMode: auth.source === 'oauth' ? 'subscription' : 'api-key',
+    authConfigured: auth.configured,
+    authSource: auth.source,
+    authLabel: auth.label,
   };
 }
 
@@ -247,8 +263,21 @@ export async function upsertPiAiProviderConfig(input: PiAiProviderConfigUpsertIn
   if (normalizedApi) nextProviderConfig.api = normalizedApi;
   else delete nextProviderConfig.api;
 
-  if (normalizedApiKey) nextProviderConfig.apiKey = normalizedApiKey;
-  else delete nextProviderConfig.apiKey;
+  delete nextProviderConfig.apiKey;
+
+  if ((input.authMode === 'api-key' || !input.authMode) && normalizedApiKey) {
+    await upsertPiAuthCredential({
+      provider,
+      apiKey: normalizedApiKey,
+    });
+  }
+
+  if (input.authMode === 'subscription' && input.subscriptionCredentials) {
+    await upsertPiAuthCredential({
+      provider: input.subscriptionProvider?.trim() || provider,
+      oauthCredentials: input.subscriptionCredentials,
+    });
+  }
 
   providers[provider] = nextProviderConfig;
   parsed.providers = providers;
