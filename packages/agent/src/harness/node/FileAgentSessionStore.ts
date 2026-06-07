@@ -3,6 +3,7 @@ import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { RuntimeMessage } from '@/packages/agent-protocol'
 import type { AgentSessionStore } from '@/packages/agent/harness/AgentSessionStore'
+import { resolveTelegraphDataDir } from '@/packages/agent/persistence/telegraphPaths'
 
 export interface FileAgentSessionStoreOptions {
   maxMessages?: number
@@ -13,7 +14,7 @@ export class FileAgentSessionStore implements AgentSessionStore {
   private readonly maxMessages: number
   private readonly sessionQueues = new Map<string, Promise<unknown>>()
 
-  constructor(dataDir = join(process.cwd(), '.telegraph', 'agent-sessions'), options: FileAgentSessionStoreOptions = {}) {
+  constructor(dataDir = join(resolveTelegraphDataDir(), 'agent-sessions'), options: FileAgentSessionStoreOptions = {}) {
     this.dataDir = dataDir
     this.maxMessages = options.maxMessages ?? 120
     ensureDir(this.dataDir)

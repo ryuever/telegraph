@@ -22,10 +22,11 @@ import {
   type DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
-import { createAgentHarness, InMemoryAgentSessionStore } from '@/packages/agent/harness';
+import { createAgentHarness } from '@/packages/agent/harness';
 import { PermissionBroker } from '@/packages/agent/harness/PermissionBroker';
 import {
   createPageletRunCapabilities,
+  FileAgentSessionStore,
   PermissionedNodePatchCapability,
 } from '@/packages/agent/harness/node';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
@@ -37,7 +38,13 @@ import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest 
 import type { PermissionRequest, RuntimeSettings } from '@/packages/agent-protocol';
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build';
 import { BufferedAgentRunEventWriter } from '@/packages/agent/persistence/BufferedAgentRunEventWriter';
+import { DesignRunLedgerWriter } from './DesignRunLedgerWriter';
 import { FileAgentRunRepository } from '@/packages/agent/persistence/AgentRunRepository';
+import {
+  resolveTelegraphDataDir,
+  resolveTelegraphRunsDir,
+  resolveTelegraphWorkspaceRoot,
+} from '@/packages/agent/persistence/telegraphPaths';
 import type { AgentRunEventRecord, AgentRunRecord } from '@/packages/agent/persistence/AgentRunRepository';
 import type {
   ApprovalRequestChangeEvent,
@@ -60,15 +67,18 @@ export const DesignPageletWorkerId = createId('DesignPageletWorker');
 @injectable()
 export class DesignPageletWorker extends PageletWorker<ISharedService> {
   private readonly runControl = new DesignHarnessRunController();
-  private readonly agentSessions = new InMemoryAgentSessionStore();
-  private readonly runs = new FileAgentRunRepository(join(process.cwd(), '.telegraph', 'design-runs'));
-  private readonly runEvents = new BufferedAgentRunEventWriter(this.runs, {
+  private readonly workspaceRoot = resolveTelegraphWorkspaceRoot();
+  private readonly agentSessions = new FileAgentSessionStore(
+    join(resolveTelegraphDataDir(), 'design-sessions'),
+  );
+  private readonly runs = new FileAgentRunRepository(resolveTelegraphRunsDir('design'));
+  private readonly runEvents = new DesignRunLedgerWriter(new BufferedAgentRunEventWriter(this.runs, {
     onFlush: async (_runId, records) => {
       const last = records[records.length - 1];
       const record = await this.runs.getRun(last.runId);
       if (record) await this.publishRunProjection(record, last);
     },
-  });
+  }));
   private readonly recoveredRunsReady = this.runs.markRunningRunsRecovered().catch(() => []);
   private readonly sourceIntentIds = new Map<string, string>();
   private intentPollTimer: ReturnType<typeof setInterval> | null = null;
@@ -162,7 +172,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
       settings: request.settings,
       input: { message: request.prompt },
       inputPreview: request.prompt,
-      workDir: process.cwd(),
+      workDir: this.workspaceRoot,
     });
     void this.publishRunProjection(createdRun);
 
@@ -526,7 +536,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     return new PermissionedNodePatchCapability({
       broker,
       emit: emitPatchEvent,
-      allowedRoots: [process.cwd()],
+      allowedRoots: [this.workspaceRoot],
       context: {
         runId: request.runId,
         sessionId: request.sessionId,

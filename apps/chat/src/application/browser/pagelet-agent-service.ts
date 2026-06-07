@@ -15,11 +15,15 @@ import {
   type ChatAgentRunStatus,
   type ChatSubagentRecordSnapshot,
   type ChatDeleteSessionRunsResult,
+  chatStreamBelongsToRun,
+  isAgentStreamEvent,
+  isChatPermissionPendingStreamEvent,
+  isChatRunQueuedStreamEvent,
 } from '@/apps/chat/application/common'
 import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
-import { createChatAgentEventProjectionState, isLegacyProjectionEvent, projectAgentEventToChat } from './agent-event-projector'
+import { createChatAgentEventProjectionState, projectAgentEventToChat } from './agent-event-projector'
 
 const READY_ATTEMPTS = 40
 const READY_INTERVAL_MS = 500
@@ -87,21 +91,19 @@ export class PageletAgentService implements AgentService {
       },
     })
 
-    let sawAgentEvent = false
     const projectionState = createChatAgentEventProjectionState()
     const streamListener = (event: ChatStreamEvent) => {
       if (signal?.aborted) return
-      if (event.runId !== runId) return
+      if (!chatStreamBelongsToRun(event, runId, projectionState.childRunParents)) return
 
-      if (event.type === 'permission_pending' && event.permissionRequest) {
+      if (isChatPermissionPendingStreamEvent(event)) {
         onPermissionRequest?.(event.permissionRequest)
         return
       }
 
-      if (event.type === 'runtime_event' && event.event) {
-        sawAgentEvent = true
-        projectAgentEventToChat(event.event, {
-          sessionId: event.sessionId || conversation.id,
+      if (isAgentStreamEvent(event)) {
+        projectAgentEventToChat(event, {
+          sessionId: conversation.id,
           runId,
           onChunk,
           onToolCall,
@@ -113,26 +115,8 @@ export class PageletAgentService implements AgentService {
         return
       }
 
-      if (sawAgentEvent && isLegacyProjectionEvent(event.type)) {
-        return
-      }
-
-      if (event.type === 'run_queued') {
+      if (isChatRunQueuedStreamEvent(event)) {
         onStatus?.('queued')
-      } else if (event.type === 'run_started') {
-        onStatus?.('running')
-      } else if (event.type === 'text_delta') {
-        onStatus?.('running')
-        if (event.text) onChunk(event.text)
-      } else if (event.type === 'run_completed' || event.type === 'done') {
-        onStatus?.('completed')
-      } else if (event.type === 'run_failed' || event.type === 'error') {
-        onStatus?.('failed')
-      } else if (event.type === 'llm_trace') {
-        const sid = event.sessionId || conversation.id
-        if (event.trace) {
-          onLlmTrace?.({ runId, sessionId: sid, trace: event.trace })
-        }
       }
     }
 
@@ -145,6 +129,7 @@ export class PageletAgentService implements AgentService {
       throwIfAborted(signal)
 
       const client = getChatPageletClient()
+
       const subscription = client.onStreamEvent(streamListener)
       let removeAbortListener = () => {}
       const abortPromise = new Promise<never>((_resolve, reject) => {

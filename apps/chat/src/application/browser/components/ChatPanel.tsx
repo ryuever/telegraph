@@ -33,7 +33,13 @@ import type {
   ChatPermissionRequestSnapshot,
   ChatRunTraceBundle,
   ChatRuntimeCapabilityDescriptorSnapshot,
-  ChatStreamEvent,
+  ChatRunQueuedStreamEvent,
+} from '@/apps/chat/application/common'
+import {
+  chatStreamBelongsToRun,
+  isAgentStreamEvent,
+  isChatPermissionPendingStreamEvent,
+  isChatRunQueuedStreamEvent,
 } from '@/apps/chat/application/common'
 import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor'
 import type { AgentRunReplayMode } from '@/packages/agent/persistence/AgentRunRepository'
@@ -207,7 +213,7 @@ export function ChatPanel({ agent }: Props) {
       projectionState: ReturnType<typeof createChatAgentEventProjectionState>
     }>()
 
-    const ensureRemoteRun = (event: ChatStreamEvent) => {
+    const ensureRemoteRun = (event: ChatRunQueuedStreamEvent) => {
       if (!event.sourceIntentId || !event.sessionId || !event.message) return undefined
       if (isSessionDeleted(event.sessionId)) return undefined
       const existing = remoteRuns.get(event.runId)
@@ -257,24 +263,26 @@ export function ChatPanel({ agent }: Props) {
     }
 
     void agentService.subscribeToStreamEvents(event => {
-      if (event.type === 'run_queued') {
+      if (isChatRunQueuedStreamEvent(event)) {
         ensureRemoteRun(event)
         return
       }
 
-      const remoteRun = remoteRuns.get(event.runId)
-      if (!remoteRun) return
+      const matched = [...remoteRuns.entries()].find(([runId, remoteRun]) =>
+        chatStreamBelongsToRun(event, runId, remoteRun.projectionState.childRunParents))
+      if (!matched) return
+      const [streamRunId, remoteRun] = matched
       const store = getSessionStore(remoteRun.sessionId)
 
-      if (event.type === 'permission_pending' && event.permissionRequest) {
+      if (isChatPermissionPendingStreamEvent(event)) {
         rememberPermissionRequest(event.permissionRequest)
         return
       }
 
-      if (event.type === 'runtime_event' && event.event) {
-        projectAgentEventToChat(event.event, {
+      if (isAgentStreamEvent(event)) {
+        projectAgentEventToChat(event, {
           sessionId: remoteRun.sessionId,
-          runId: event.runId,
+          runId: streamRunId,
           projectionState: remoteRun.projectionState,
           onChunk: delta => {
             updateAssistant(remoteRun, message => ({
@@ -304,30 +312,14 @@ export function ChatPanel({ agent }: Props) {
           },
           onLlmTrace: appendLlmTrace,
         })
-        if (event.event.type === 'run_failed') {
-          const errorMessage = event.event.error.message
+        if (event.type === 'run_failed') {
+          const errorMessage = event.error.message
           updateAssistant(remoteRun, message => ({
             ...message,
             status: 'error',
             errorMessage,
           }))
         }
-        return
-      }
-
-      if (event.type === 'text_delta' && event.text) {
-        const delta = event.text
-        updateAssistant(remoteRun, message => ({
-          ...message,
-          content: `${message.content}${delta}`,
-          status: 'streaming',
-        }))
-      } else if (event.type === 'run_completed' || event.type === 'done') {
-        updateAssistant(remoteRun, message => ({ ...message, status: 'done' }))
-        store.setStreaming(false)
-      } else if (event.type === 'run_failed' || event.type === 'error') {
-        updateAssistant(remoteRun, message => ({ ...message, status: 'error', errorMessage: event.error }))
-        store.setStreaming(false)
       }
     }, controller.signal)
       .then(nextSubscription => {

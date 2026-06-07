@@ -23,6 +23,7 @@ import { PageletAgentService } from '@/apps/chat/application/browser/pagelet-age
 import type { ChatAgentRunRecordSnapshot } from '@/apps/chat/application/common'
 import { PageletDesignAgentService } from '@/apps/design/application/browser/pagelet-design-agent-service'
 import type { DesignAgentRunRecordSnapshot } from '@/apps/design/application/common'
+import { sanitizeDesignRunConsoleEvents } from '@/apps/design/application/common/design-run-ledger'
 import { useIsPageletActive } from '@/apps/main/application/browser/pagelet-activity'
 import type { AgentEvent, RuntimeMessage } from '@/packages/agent-protocol'
 import type { MainSwitchPagePayload } from '@/packages/services/pagelet-host/common'
@@ -293,6 +294,17 @@ export function RunConsolePanel({ focus }: { focus?: MainSwitchPagePayload } = {
     void listEvents
       .then((records) => {
         if (!active) return
+        if (selectedRun.source === 'design') {
+          const sanitized = sanitizeDesignRunConsoleEvents(records.map(record => record.event))
+          setEvents(sanitized.map((event, index) => ({
+            source: selectedRun.source,
+            runId: selectedRun.runId,
+            seq: index + 1,
+            ts: event.ts,
+            event,
+          })))
+          return
+        }
         setEvents(records.map(record => normalizeEventRecord(selectedRun.source, record)))
       })
       .catch((error: unknown) => {

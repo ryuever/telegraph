@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { appendFile, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentEvent, RuntimeSettings } from '@/packages/agent-protocol'
+import { resolveTelegraphRunsDir } from '@/packages/agent/persistence/telegraphPaths'
 
 export type AgentRunStatus =
   | 'queued'
@@ -124,7 +125,7 @@ export class FileAgentRunRepository implements AgentRunRepository {
   private readonly dataDir: string
   private readonly runQueues = new Map<string, Promise<unknown>>()
 
-  constructor(dataDir = join(process.cwd(), '.telegraph', 'runs')) {
+  constructor(dataDir = resolveTelegraphRunsDir('chat')) {
     this.dataDir = dataDir
     ensureDir(this.dataDir)
   }

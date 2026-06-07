@@ -63,7 +63,7 @@ describe('DesignBuildSubagentGateway', () => {
     ])
   })
 
-  it('forwards child model and tool trace without forwarding child assistant text or lifecycle terminals', async () => {
+  it('forwards child model/tool trace without streaming deltas or lifecycle terminals', async () => {
     const childRunner = new CapturingChildRunner({
       emitTrace: true,
     })

@@ -49,19 +49,6 @@ export type AgentOrchestrationPattern = 'chain' | 'parallel'
 // Chat service types
 // ---------------------------------------------------------------------------
 
-export interface ChatStreamEvent {
-  type: 'run_queued' | 'run_started' | 'text_delta' | 'run_completed' | 'run_failed' | 'done' | 'error' | 'llm_trace' | 'runtime_event' | 'permission_pending'
-  runId: string
-  sessionId?: string
-  sourceIntentId?: string
-  message?: string
-  text?: string
-  error?: string
-  trace?: LlmTracePayload
-  event?: AgentEvent
-  permissionRequest?: ChatPermissionRequestSnapshot
-}
-
 export interface EventSubscription {
   unsubscribe(): void
 }
@@ -131,6 +118,72 @@ export interface ChatPermissionRequestSnapshot {
 export interface ChatPermissionResolution {
   granted: boolean
   reason?: string
+}
+
+export interface ChatRunQueuedStreamEvent {
+  type: 'run_queued'
+  runId: string
+  sessionId?: string
+  sourceIntentId?: string
+  message?: string
+}
+
+export interface ChatPermissionPendingStreamEvent {
+  type: 'permission_pending'
+  runId: string
+  sessionId?: string
+  permissionRequest: ChatPermissionRequestSnapshot
+}
+
+export type ChatStreamEvent = AgentEvent | ChatRunQueuedStreamEvent | ChatPermissionPendingStreamEvent
+
+export function isChatRunQueuedStreamEvent(event: ChatStreamEvent): event is ChatRunQueuedStreamEvent {
+  return event.type === 'run_queued'
+}
+
+export function isChatPermissionPendingStreamEvent(event: ChatStreamEvent): event is ChatPermissionPendingStreamEvent {
+  return event.type === 'permission_pending'
+}
+
+export function isChatTransportStreamEvent(
+  event: ChatStreamEvent,
+): event is ChatRunQueuedStreamEvent | ChatPermissionPendingStreamEvent {
+  return event.type === 'run_queued' || event.type === 'permission_pending'
+}
+
+export function isAgentStreamEvent(event: ChatStreamEvent): event is AgentEvent {
+  return !isChatTransportStreamEvent(event)
+}
+
+export function chatStreamParentRunId(
+  event: ChatStreamEvent,
+  childRunParents: ReadonlyMap<string, string> = new Map(),
+): string | undefined {
+  if (isChatTransportStreamEvent(event)) {
+    return event.runId
+  }
+  if (event.type === 'child_run_started' || event.type === 'child_run_completed') {
+    return event.parentRunId
+  }
+  if ('runId' in event && typeof event.runId === 'string') {
+    return childRunParents.get(event.runId) ?? event.runId
+  }
+  return undefined
+}
+
+export function chatStreamBelongsToRun(
+  event: ChatStreamEvent,
+  runId: string,
+  childRunParents: ReadonlyMap<string, string> = new Map(),
+): boolean {
+  if (isChatTransportStreamEvent(event)) {
+    return event.runId === runId
+  }
+  const parentRunId = chatStreamParentRunId(event, childRunParents)
+  if (parentRunId === undefined) {
+    return true
+  }
+  return parentRunId === runId
 }
 
 export interface ChatSubagentRecordSnapshot {

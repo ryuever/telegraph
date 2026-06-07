@@ -273,12 +273,3 @@ function compactRunLabel(runId: string): string {
   if (!last) return 'Subagent'
   return last.slice(0, 1).toUpperCase() + last.slice(1)
 }
-
-export function isLegacyProjectionEvent(type: string): boolean {
-  return type === 'run_started' ||
-    type === 'text_delta' ||
-    type === 'run_completed' ||
-    type === 'run_failed' ||
-    type === 'done' ||
-    type === 'error'
-}

@@ -88,17 +88,12 @@ describe('PageletAgentService', () => {
   it('projects runtime events on a completed pagelet run and unsubscribes', async () => {
     sendMock.mockImplementationOnce((request) => {
       streamCallback?.({
-        type: 'runtime_event',
+        type: 'assistant_delta',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
         runId: request.runId,
-        sessionId: request.sessionId,
-        event: {
-          type: 'assistant_delta',
-          schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
-          runId: request.runId,
-          requestId: 'request-1',
-          text: 'hello',
-          ts: 1,
-        },
+        requestId: 'request-1',
+        text: 'hello',
+        ts: 1,
       })
       return Promise.resolve({ runId: request.runId, status: 'completed' })
     })

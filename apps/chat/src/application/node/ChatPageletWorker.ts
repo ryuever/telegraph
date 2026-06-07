@@ -37,6 +37,10 @@ import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest,
 import type { PermissionDecision, PermissionPrompt } from '@/packages/agent/harness/PermissionBroker';
 import { BufferedAgentRunEventWriter } from '@/packages/agent/persistence/BufferedAgentRunEventWriter';
 import { FileAgentRunRepository } from '@/packages/agent/persistence/AgentRunRepository';
+import {
+  resolveTelegraphDataDir,
+  resolveTelegraphWorkspaceRoot,
+} from '@/packages/agent/persistence/telegraphPaths';
 import type {
   AgentRunEventRecord,
   AgentRunRecord,
@@ -83,7 +87,10 @@ interface ChatRunBrokerService {
 export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   private streamListeners = new Set<(event: ChatStreamEvent) => void>();
   private readonly subagents = new SubagentManager();
-  private readonly agentSessions = new FileAgentSessionStore(join(process.cwd(), '.telegraph', 'chat-sessions'));
+  private readonly workspaceRoot = resolveTelegraphWorkspaceRoot();
+  private readonly agentSessions = new FileAgentSessionStore(
+    join(resolveTelegraphDataDir(), 'chat-sessions'),
+  );
   private readonly runs = new FileAgentRunRepository();
   private readonly runEvents = new BufferedAgentRunEventWriter(this.runs, {
     onFlush: async (_runId, records) => {
@@ -234,7 +241,7 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
 
   /**
    * Core agent execution: run through the pagelet-local AgentHarness,
-   * stream AgentEvents, and forward compatibility ChatStreamEvents.
+   * stream AgentEvents directly on the chat stream channel.
    */
   private async handleSend(req: ChatSendRequest): Promise<ChatSendResult> {
     const { runId, sessionId, message, settings } = req;
@@ -256,7 +263,7 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       input: { message },
       replay: req.replay,
       inputPreview: message,
-      workDir: process.cwd(),
+      workDir: this.workspaceRoot,
     });
     void this.publishRunProjection(createdRun);
 
@@ -272,7 +279,7 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       if (req.replay) {
         const event = replayRuntimeLog(runId, req.replay);
         await this.persistRunEvent(runId, event);
-        this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event });
+        this.emitStreamEvent(event);
       }
 
       const agentRequest: AgentRunRequest = {
@@ -304,12 +311,12 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
               if (!input.runId) return;
               const event = feedbackRuntimeLog(input);
               void this.persistRunEvent(input.runId, event);
-              this.emitStreamEvent({ type: 'runtime_event', runId: input.runId, sessionId: input.sessionId, event });
+              this.emitStreamEvent(event);
             },
           },
           emit: event => {
             void this.persistRunEvent(runId, event);
-            this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event });
+            this.emitStreamEvent(event);
           },
           prompt: prompt => this.promptForPermission(prompt),
         }),
@@ -319,19 +326,13 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
         if (abortController.signal.aborted) break;
 
         await this.persistRunEvent(runId, ev);
-        this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event: ev });
-
-        const chatEvent = this.agentEventToLegacyChatStream(ev, runId, sessionId);
-        if (chatEvent) {
-          this.emitStreamEvent(chatEvent);
-        }
+        this.emitStreamEvent(ev);
       }
 
       if (abortController.signal.aborted) {
         const event = cancelledAgentEvent(runId);
         await this.persistRunEvent(runId, event);
-        this.emitStreamEvent({ type: 'runtime_event', runId, sessionId, event });
-        this.emitStreamEvent({ type: 'run_failed', runId, error: 'Cancelled' });
+        this.emitStreamEvent(event);
         activeRuns.delete(runId);
         this.resolvePendingPermissionsForRun(runId, denyDecision('Run was cancelled before permission was resolved'));
         return { runId, status: 'cancelled', error: 'Cancelled' };
@@ -342,8 +343,9 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       return { runId, status: 'completed' };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      await this.persistRunEvent(runId, failedAgentEvent(runId, errorMsg));
-      this.emitStreamEvent({ type: 'run_failed', runId, error: errorMsg });
+      const event = failedAgentEvent(runId, errorMsg);
+      await this.persistRunEvent(runId, event);
+      this.emitStreamEvent(event);
       activeRuns.delete(runId);
       this.resolvePendingPermissionsForRun(runId, denyDecision('Run failed before permission was resolved'));
       return { runId, status: 'failed', error: errorMsg };
@@ -537,43 +539,6 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
     activeRuns.delete(event.runId);
     this.resolvePendingPermissionsForRun(event.runId, denyDecision(`Run ${event.command.kind} requested remotely`));
     await this.shared.markRunControlCommandApplied(event.commandId);
-  }
-
-  /**
-   * Map an AgentEvent to a legacy ChatStreamEvent for the current renderer UI.
-   */
-  private agentEventToLegacyChatStream(
-    ev: AgentEvent,
-    runId: string,
-    sessionId?: string,
-  ): ChatStreamEvent | null {
-    switch (ev.type) {
-      case 'run_started':
-        return null;
-
-      case 'assistant_delta': {
-        const text = 'text' in ev ? (ev as { text: string }).text : ''
-        return { type: 'text_delta', runId, sessionId, text };
-      }
-
-      case 'run_completed':
-        return { type: 'run_completed', runId, sessionId };
-
-      case 'run_failed': {
-        const error = 'error' in ev ? (ev as { error: { message?: string } }).error : undefined
-        return {
-          type: 'run_failed', runId, sessionId,
-          error: error?.message ?? 'Unknown error',
-        };
-      }
-
-      case 'run_cancelled':
-        return { type: 'run_failed', runId, sessionId, error: 'Cancelled' };
-
-      // All events are already forwarded as runtime_event before legacy projection.
-      default:
-        return null;
-    }
   }
 
   private async consumeQueuedRunIntents(): Promise<void> {
