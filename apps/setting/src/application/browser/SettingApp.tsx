@@ -6,9 +6,11 @@ import {
   SETTING_PAGELET_SERVICE_PATH,
   type ISettingPageletService,
   type PiAiProviderDescriptor,
-  type PiAiModelDescriptor,
-  type PiAiConnectionTestResult,
   type PiAiProviderAuthMode,
+  buildPiAiProviderCatalog,
+  parseCustomProviderIdsFromModelsJson,
+  resolveProviderApiKey,
+  resolveProviderBaseUrl,
 } from '@/apps/setting/application/common';
 import {
   readRuntimeSettingsFromStorage,
@@ -44,18 +46,18 @@ interface StatusInfo {
 type ConnectionState = 'IDLE' | 'CONNECTING' | 'READY' | 'TRANSIENT_FAILURE' | 'DISCONNECTING' | 'CLOSED';
 
 type SettingWindowPage = 'settings' | 'dev';
-type SettingSubPage = 'theme' | 'models';
+type SettingSubPage = 'theme' | 'providers';
 
-interface ModelSettingsDraft {
+interface ProviderSettingsDraft {
   provider: string;
-  modelId: string;
-  backend: string;
   baseUrl: string;
   authMode: PiAiProviderAuthMode;
   apiKey: string;
   subscriptionProvider: string;
   subscriptionCredentialsText: string;
 }
+
+type ProvidersConfigTab = 'visual' | 'json';
 
 interface SaveMessage {
   tone: 'idle' | 'success' | 'error';
@@ -92,32 +94,45 @@ function readSettingWindowPageMessage(value: unknown): SettingWindowPage | null 
   return typeof page === 'string' && isSettingWindowPage(page) ? page : null;
 }
 
-function loadInitialModelSettings(): ModelSettingsDraft {
+function loadInitialProviderSettings(): ProviderSettingsDraft {
   try {
     const settings = readRuntimeSettingsFromStorage(localStorage);
     const provider = settings.provider ?? DEFAULT_RUNTIME_SETTINGS.provider;
     return {
       provider,
-      modelId: settings.modelId ?? DEFAULT_RUNTIME_SETTINGS.modelId,
-      backend: settings.backend ?? DEFAULT_RUNTIME_SETTINGS.backend,
-      baseUrl: settings.baseUrl ?? '',
+      baseUrl: '',
       authMode: settings.authMode === 'subscription' ? 'subscription' : 'api-key',
-      apiKey: settings.apiKey ?? '',
+      apiKey: '',
       subscriptionProvider: settings.subscriptionProvider ?? provider,
       subscriptionCredentialsText: formatJson(settings.subscriptionCredentials),
     };
   } catch {
     return {
       provider: DEFAULT_RUNTIME_SETTINGS.provider,
-      modelId: DEFAULT_RUNTIME_SETTINGS.modelId,
-      backend: DEFAULT_RUNTIME_SETTINGS.backend,
       baseUrl: '',
       authMode: 'api-key',
-      apiKey: DEFAULT_RUNTIME_SETTINGS.apiKey,
+      apiKey: '',
       subscriptionProvider: DEFAULT_RUNTIME_SETTINGS.provider,
       subscriptionCredentialsText: '',
     };
   }
+}
+
+function buildProviderSwitchPatch(
+  providerId: string,
+  authMode: PiAiProviderAuthMode,
+  modelsJsonDraft: string,
+  previous: ProviderSettingsDraft,
+): Partial<ProviderSettingsDraft> {
+  return {
+    provider: providerId,
+    authMode,
+    baseUrl: resolveProviderBaseUrl(providerId, modelsJsonDraft),
+    apiKey: resolveProviderApiKey(providerId, modelsJsonDraft),
+    subscriptionProvider: authMode === 'subscription' ? providerId : previous.subscriptionProvider,
+    subscriptionCredentialsText:
+      authMode === 'subscription' ? previous.subscriptionCredentialsText : '',
+  };
 }
 
 function formatJson(value: unknown): string {
@@ -166,12 +181,12 @@ function SettingApp() {
   const [statusInfo, setStatusInfo] = useState<StatusInfo | null>(null);
   const [activePage, setActivePage] = useState<SettingWindowPage>(loadInitialSettingWindowPage);
   const [settingsSubPage, setSettingsSubPage] = useState<SettingSubPage>(DEFAULT_SETTING_SUB_PAGE);
-  const [modelDraft, setModelDraft] = useState<ModelSettingsDraft>(loadInitialModelSettings);
-  const [providers, setProviders] = useState<PiAiProviderDescriptor[]>([]);
-  const [models, setModels] = useState<PiAiModelDescriptor[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [isTestingModel, setIsTestingModel] = useState(false);
-  const [modelTestResult, setModelTestResult] = useState<PiAiConnectionTestResult | null>(null);
+  const [providerDraft, setProviderDraft] = useState<ProviderSettingsDraft>(loadInitialProviderSettings);
+  const [providers, setProviders] = useState<PiAiProviderDescriptor[]>(() => buildPiAiProviderCatalog());
+  const [providersConfigTab, setProvidersConfigTab] = useState<ProvidersConfigTab>('visual');
+  const [modelsJsonDraft, setModelsJsonDraft] = useState('');
+  const [modelsJsonLoaded, setModelsJsonLoaded] = useState('');
+  const [isSavingModelsJson, setIsSavingModelsJson] = useState(false);
   const [saveMessage, setSaveMessage] = useState<SaveMessage>({ tone: 'idle', text: '' });
   const { themeId, themePack, setThemeId } = useTelegraphTheme();
 
@@ -283,6 +298,17 @@ function SettingApp() {
   }, []);
 
   useEffect(() => {
+    const customProviderIds = parseCustomProviderIdsFromModelsJson(modelsJsonDraft);
+    setProviders((prev) => {
+      const next = buildPiAiProviderCatalog(customProviderIds);
+      if (prev.length === next.length && prev.every((item, index) => item.id === next[index]?.id)) {
+        return prev;
+      }
+      return next;
+    });
+  }, [modelsJsonDraft]);
+
+  useEffect(() => {
     if (!isReady) return;
     let cancelled = false;
     void settingClient
@@ -290,7 +316,7 @@ function SettingApp() {
       .then((items) => {
         if (cancelled) return;
         setProviders(items);
-        setModelDraft((prev) => {
+        setProviderDraft((prev) => {
           if (items.length === 0) return prev;
           const hasProvider = items.some((item) => item.id === prev.provider);
           const fallbackProvider = items[0]?.id ?? prev.provider;
@@ -301,9 +327,8 @@ function SettingApp() {
           };
         });
       })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setSaveMessage({ tone: 'error', text: `Load providers failed: ${getErrorMessage(err)}` });
+      .catch(() => {
+        // Static catalog is already shown; env-key enrichment is best-effort.
       });
     return () => {
       cancelled = true;
@@ -311,38 +336,35 @@ function SettingApp() {
   }, [isReady]);
 
   useEffect(() => {
-    if (!isReady || !modelDraft.provider) {
-      setModels([]);
-      return;
-    }
+    if (!isReady) return;
     let cancelled = false;
-    setLoadingModels(true);
-    void settingClient
-      .listPiAiModels(modelDraft.provider)
-      .then((items) => {
+    const proxy = settingClient as unknown as Record<string, () => Promise<unknown>>;
+    const getModelsJson = proxy.getPiAiModelsJson;
+    if (typeof getModelsJson !== 'function') return;
+    void getModelsJson()
+      .then((content) => {
         if (cancelled) return;
-        setModels(items);
-        setModelDraft((prev) => {
-          if (items.length === 0) return prev;
-          const hasModel = items.some((item) => item.id === prev.modelId);
-          return hasModel ? prev : {
-            ...prev,
-            modelId: items[0]?.id ?? prev.modelId,
-          };
-        });
+        if (typeof content === 'string') {
+          setModelsJsonDraft(content);
+          setModelsJsonLoaded(content);
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setSaveMessage({ tone: 'error', text: `Load models failed: ${getErrorMessage(err)}` });
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingModels(false);
+        setSaveMessage({ tone: 'error', text: `Load models.json failed: ${getErrorMessage(err)}` });
       });
-
     return () => {
       cancelled = true;
     };
-  }, [isReady, modelDraft.provider]);
+  }, [isReady]);
+
+  useEffect(() => {
+    setProviderDraft((prev) => ({
+      ...prev,
+      baseUrl: resolveProviderBaseUrl(prev.provider, modelsJsonDraft),
+      apiKey: resolveProviderApiKey(prev.provider, modelsJsonDraft),
+    }));
+  }, [modelsJsonDraft]);
 
   const handleConnect = useCallback(async () => {
     setConnectionState('CONNECTING');
@@ -395,19 +417,57 @@ function SettingApp() {
     [isReady, addLog],
   );
 
-  const updateModelDraft = useCallback((patch: Partial<ModelSettingsDraft>) => {
-    setModelDraft((prev) => ({ ...prev, ...patch }));
+  const updateProviderDraft = useCallback((patch: Partial<ProviderSettingsDraft>) => {
+    setProviderDraft((prev) => ({ ...prev, ...patch }));
     setSaveMessage((prev) => (prev.tone === 'error' ? { tone: 'idle', text: '' } : prev));
   }, []);
 
-  const handleSaveModelSettings = useCallback(() => {
-    if (!modelDraft.provider || !modelDraft.modelId) {
-      setSaveMessage({ tone: 'error', text: 'Provider and model are required.' });
+  const callSettingRpc = useCallback(
+    async (method: string, ...args: unknown[]): Promise<unknown> => {
+      const proxy = settingClient as unknown as Record<string, (...rpcArgs: unknown[]) => Promise<unknown>>;
+      const handler = proxy[method];
+      if (typeof handler !== 'function') {
+        throw new Error(`Setting RPC method not found: ${method}`);
+      }
+      return handler(...args);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isReady || !providerDraft.provider) return;
+    const providerId = providerDraft.provider;
+    let cancelled = false;
+    void callSettingRpc('getPiAiProviderConfig', providerId)
+      .then((value) => {
+        if (cancelled || !value || typeof value !== 'object') return;
+        const config = value as { baseUrl?: unknown; apiKey?: unknown };
+        setProviderDraft((prev) => {
+          if (prev.provider !== providerId) return prev;
+          return {
+            ...prev,
+            baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : prev.baseUrl,
+            apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
+          };
+        });
+      })
+      .catch(() => {
+        // Catalog + models.json values are already applied locally.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [callSettingRpc, isReady, providerDraft.provider]);
+
+  const handleSaveProviderSettings = useCallback(async () => {
+    const provider = providerDraft.provider.trim();
+    if (!provider) {
+      setSaveMessage({ tone: 'error', text: 'Provider is required.' });
       return;
     }
 
-    const subscriptionCredentials = parseSubscriptionCredentials(modelDraft.subscriptionCredentialsText);
-    if (modelDraft.authMode === 'subscription' && !subscriptionCredentials) {
+    const subscriptionCredentials = parseSubscriptionCredentials(providerDraft.subscriptionCredentialsText);
+    if (providerDraft.authMode === 'subscription' && !subscriptionCredentials) {
       setSaveMessage({
         tone: 'error',
         text: 'Subscription credentials must be valid JSON with refresh/access/expires.',
@@ -416,97 +476,63 @@ function SettingApp() {
     }
 
     try {
-      writeRuntimeSettingsToStorage({
-        ...readRuntimeSettingsFromStorage(localStorage),
-        provider: modelDraft.provider,
-        modelId: modelDraft.modelId,
-        backend: modelDraft.backend,
-        baseUrl: modelDraft.baseUrl.trim() ? modelDraft.baseUrl.trim() : undefined,
-        apiKey: modelDraft.apiKey.trim(),
-        authMode: modelDraft.authMode,
-        subscriptionProvider: modelDraft.authMode === 'subscription'
-          ? (modelDraft.subscriptionProvider.trim() || modelDraft.provider)
+      const resolvedBaseUrl = providerDraft.baseUrl.trim();
+      await callSettingRpc('upsertPiAiProviderConfig', {
+        provider,
+        baseUrl: resolvedBaseUrl || undefined,
+        apiKey: providerDraft.authMode === 'api-key'
+          ? providerDraft.apiKey.trim() || undefined
           : undefined,
-        subscriptionCredentials: modelDraft.authMode === 'subscription'
+      });
+      const existing = readRuntimeSettingsFromStorage(localStorage);
+      writeRuntimeSettingsToStorage({
+        ...existing,
+        provider,
+        baseUrl: resolvedBaseUrl || undefined,
+        apiKey: providerDraft.authMode === 'api-key' ? providerDraft.apiKey.trim() : '',
+        authMode: providerDraft.authMode,
+        subscriptionProvider: providerDraft.authMode === 'subscription'
+          ? (providerDraft.subscriptionProvider.trim() || provider)
+          : undefined,
+        subscriptionCredentials: providerDraft.authMode === 'subscription'
           ? subscriptionCredentials ?? undefined
           : undefined,
       }, localStorage);
       setSaveMessage({
         tone: 'success',
-        text: 'Model settings saved. Chat and Design runs will use this configuration.',
+        text: 'Provider settings saved to runtime settings and models.json.',
       });
+      const refreshedModelsJson = await callSettingRpc('getPiAiModelsJson');
+      if (typeof refreshedModelsJson === 'string') {
+        setModelsJsonDraft(refreshedModelsJson);
+        setModelsJsonLoaded(refreshedModelsJson);
+      }
     } catch (err: unknown) {
       setSaveMessage({
         tone: 'error',
         text: `Save failed: ${getErrorMessage(err)}`,
       });
     }
-  }, [modelDraft]);
+  }, [callSettingRpc, providerDraft]);
 
-  const handleTestModelConnection = useCallback(async () => {
-    if (!isReady) return;
-    const provider = modelDraft.provider.trim();
-    const modelId = modelDraft.modelId.trim();
-    if (!provider || !modelId) {
-      setModelTestResult({
-        ok: false,
-        provider,
-        modelId,
-        authMode: modelDraft.authMode,
-        latencyMs: 0,
-        error: 'Provider and model are required.',
-      });
-      return;
-    }
-
-    const subscriptionCredentials = parseSubscriptionCredentials(modelDraft.subscriptionCredentialsText);
-    if (modelDraft.authMode === 'subscription' && !subscriptionCredentials) {
-      setModelTestResult({
-        ok: false,
-        provider,
-        modelId,
-        authMode: modelDraft.authMode,
-        latencyMs: 0,
-        error: 'Subscription credentials must be valid JSON with refresh/access/expires.',
-      });
-      return;
-    }
-
-    setIsTestingModel(true);
+  const handleSaveModelsJson = useCallback(async () => {
     try {
-      const result = await settingClient.testPiAiConnection({
-        provider,
-        modelId,
-        authMode: modelDraft.authMode,
-        apiKey: modelDraft.authMode === 'api-key' ? modelDraft.apiKey.trim() : undefined,
-        subscriptionProvider: modelDraft.authMode === 'subscription'
-          ? (modelDraft.subscriptionProvider.trim() || provider)
-          : undefined,
-        subscriptionCredentials: modelDraft.authMode === 'subscription'
-          ? subscriptionCredentials ?? undefined
-          : undefined,
+      setIsSavingModelsJson(true);
+      await callSettingRpc('savePiAiModelsJson', modelsJsonDraft);
+      setModelsJsonLoaded(modelsJsonDraft);
+      setSaveMessage({
+        tone: 'success',
+        text: 'models.json saved.',
       });
-      setModelTestResult(result);
-      if (result.ok && result.refreshedSubscriptionCredentials && modelDraft.authMode === 'subscription') {
-        setModelDraft((prev) => ({
-          ...prev,
-          apiKey: result.resolvedApiKey ?? prev.apiKey,
-          subscriptionCredentialsText: JSON.stringify(result.refreshedSubscriptionCredentials, null, 2),
-        }));
-      }
     } catch (err: unknown) {
-      setModelTestResult({
-        ok: false,
-        provider,
-        modelId,
-        authMode: modelDraft.authMode,
-        latencyMs: 0,
-        error: getErrorMessage(err),
+      setSaveMessage({
+        tone: 'error',
+        text: `Save models.json failed: ${getErrorMessage(err)}`,
       });
     } finally {
-      setIsTestingModel(false);
+      setIsSavingModelsJson(false);
     }
-  }, [isReady, modelDraft]);
+  }, [callSettingRpc, modelsJsonDraft]);
 
   const stateColor: Record<string, string> = {
     IDLE: 'var(--muted-foreground)',
@@ -521,7 +547,7 @@ function SettingApp() {
   const stats = statusInfo?.stats;
   const activePageTitle = activePage === 'settings' ? 'Setting' : 'Dev';
   const activePageDescription = activePage === 'settings'
-    ? 'Theme, model provider mode, and runtime preferences'
+    ? 'Theme and provider models.json-backed runtime preferences'
     : 'Pagelet diagnostics and RPC tools';
 
   return (
@@ -619,7 +645,7 @@ function SettingApp() {
             >
               {([
                 { id: 'theme', label: 'Theme', desc: 'Colors and appearance' },
-                { id: 'models', label: 'Models', desc: 'Provider, auth, connectivity' },
+                { id: 'providers', label: 'Providers', desc: 'Provider auth and models.json config' },
               ] as const).map((tab) => (
                 <button
                   key={tab.id}
@@ -653,18 +679,26 @@ function SettingApp() {
                   onThemeChange={handleThemeChange}
                 />
               ) : (
-                <ModelsSection
+                <ProvidersSection
                   isReady={isReady}
                   providers={providers}
-                  models={models}
-                  loadingModels={loadingModels}
-                  draft={modelDraft}
-                  isTesting={isTestingModel}
-                  testResult={modelTestResult}
+                  draft={providerDraft}
+                  configTab={providersConfigTab}
+                  modelsJsonDraft={modelsJsonDraft}
+                  modelsJsonDirty={modelsJsonDraft !== modelsJsonLoaded}
+                  isSavingModelsJson={isSavingModelsJson}
                   saveMessage={saveMessage}
-                  onDraftChange={updateModelDraft}
-                  onSave={handleSaveModelSettings}
-                  onTest={handleTestModelConnection}
+                  onConfigTabChange={setProvidersConfigTab}
+                  onModelsJsonDraftChange={setModelsJsonDraft}
+                  onDraftChange={updateProviderDraft}
+                  onProviderSwitch={(providerId, authMode) => {
+                    setProviderDraft((prev) => ({
+                      ...prev,
+                      ...buildProviderSwitchPatch(providerId, authMode, modelsJsonDraft, prev),
+                    }));
+                  }}
+                  onSave={handleSaveProviderSettings}
+                  onSaveModelsJson={handleSaveModelsJson}
                 />
               )}
             </div>
@@ -1128,34 +1162,38 @@ function SettingApp() {
   );
 }
 
-function ModelsSection({
+function ProvidersSection({
   isReady,
   providers,
-  models,
-  loadingModels,
   draft,
-  isTesting,
-  testResult,
+  configTab,
+  modelsJsonDraft,
+  modelsJsonDirty,
+  isSavingModelsJson,
   saveMessage,
+  onConfigTabChange,
+  onModelsJsonDraftChange,
   onDraftChange,
+  onProviderSwitch,
   onSave,
-  onTest,
+  onSaveModelsJson,
 }: {
   isReady: boolean;
   providers: PiAiProviderDescriptor[];
-  models: PiAiModelDescriptor[];
-  loadingModels: boolean;
-  draft: ModelSettingsDraft;
-  isTesting: boolean;
-  testResult: PiAiConnectionTestResult | null;
+  draft: ProviderSettingsDraft;
+  configTab: ProvidersConfigTab;
+  modelsJsonDraft: string;
+  modelsJsonDirty: boolean;
+  isSavingModelsJson: boolean;
   saveMessage: SaveMessage;
-  onDraftChange: (patch: Partial<ModelSettingsDraft>) => void;
-  onSave: () => void;
-  onTest: () => Promise<void>;
+  onConfigTabChange: (tab: ProvidersConfigTab) => void;
+  onModelsJsonDraftChange: (content: string) => void;
+  onDraftChange: (patch: Partial<ProviderSettingsDraft>) => void;
+  onProviderSwitch: (providerId: string, authMode: PiAiProviderAuthMode) => void;
+  onSave: () => Promise<void>;
+  onSaveModelsJson: () => Promise<void>;
 }) {
-  const providersForMode = providers.filter((provider) =>
-    draft.authMode === 'subscription' ? provider.supportsSubscription : provider.supportsApiKey,
-  );
+  const providerList = providers;
   const currentProvider = providers.find((provider) => provider.id === draft.provider);
   const hasSubscriptionConfig = parseSubscriptionCredentials(draft.subscriptionCredentialsText) !== null;
   const inputStyle: CSSProperties = {
@@ -1182,9 +1220,9 @@ function ModelsSection({
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>Models</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>Providers</div>
           <div style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 2 }}>
-            Configure pi-ai provider auth mode (api-key / subscription OAuth) and validate connectivity.
+            Configure provider auth, base URL, and API keys. Model choice happens in chat/runtime.
           </div>
         </div>
         <div
@@ -1202,336 +1240,321 @@ function ModelsSection({
         </div>
       </div>
 
-      <div
-        style={{
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: 'var(--surface-soft)',
-        }}
-      >
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: 8 }}>
-          Select authentication method:
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([
-            { id: 'subscription', label: 'Use a subscription' },
-            { id: 'api-key', label: 'Use an API key' },
-          ] as const).map((mode) => {
-            const selected = draft.authMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => {
-                  const nextAuthMode = mode.id;
-                  const providersForNextMode = providers.filter((provider) =>
-                    nextAuthMode === 'subscription' ? provider.supportsSubscription : provider.supportsApiKey,
-                  );
-                  const fallbackProvider = providersForNextMode[0]?.id ?? draft.provider;
-                  onDraftChange({
-                    authMode: nextAuthMode,
-                    provider: nextAuthMode === draft.authMode ? draft.provider : fallbackProvider,
-                    subscriptionProvider: nextAuthMode === 'subscription'
-                      ? (draft.subscriptionProvider || draft.provider)
-                      : draft.subscriptionProvider,
-                  });
-                }}
-                style={{
-                  border: selected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  backgroundColor: selected ? 'var(--accent)' : 'var(--card)',
-                  color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
-                  borderRadius: 8,
-                  padding: '8px 10px',
-                  textAlign: 'left',
-                  fontWeight: selected ? 700 : 500,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                {selected ? '→ ' : ''}{mode.label}
-              </button>
-            );
-          })}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {([
+          { id: 'visual', label: 'Visual Config' },
+          { id: 'json', label: 'models.json' },
+        ] as const).map((tab) => {
+          const selected = configTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                onConfigTabChange(tab.id);
+              }}
+              style={{
+                border: selected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                borderRadius: 999,
+                backgroundColor: selected ? 'var(--accent)' : 'var(--card)',
+                color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '6px 12px',
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div
-        style={{
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: 'var(--surface-soft)',
-        }}
-      >
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: 8 }}>
-          Select provider to configure:
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {providersForMode.length === 0 ? (
-            <div style={{ fontSize: 11, color: 'var(--muted-foreground)', padding: '4px 6px' }}>
-              {draft.authMode === 'subscription'
-                ? 'No subscription providers available.'
-                : 'No API key providers available.'}
-            </div>
-          ) : (
-            providersForMode.map((provider) => {
-              const selected = draft.provider === provider.id;
-              const status = providerStatusLabel({
-                provider,
-                selected,
-                draft,
-                hasSubscriptionConfig,
-              });
-              return (
-                <button
-                  key={provider.id}
-                  type="button"
-                  onClick={() => {
-                    onDraftChange({
-                      provider: provider.id,
-                      subscriptionProvider: draft.authMode === 'subscription'
-                        ? provider.id
-                        : draft.subscriptionProvider,
-                    });
-                  }}
-                  style={{
-                    border: selected ? '1px solid var(--primary)' : '1px solid transparent',
-                    backgroundColor: selected ? 'var(--card)' : 'transparent',
-                    color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
-                    borderRadius: 8,
-                    padding: '7px 9px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                  }}
-                >
-                  <span>{selected ? '→ ' : ''}{provider.displayName}</span>
-                  <span style={{ fontSize: 11, opacity: 0.9 }}>{status}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 10,
-        }}
-      >
-        <label style={{ display: 'block' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
-            Model {loadingModels ? '(loading...)' : ''}
-          </div>
-          <select
-            value={draft.modelId}
-            onChange={(event) => {
-              onDraftChange({ modelId: event.target.value });
-            }}
-            style={inputStyle}
-          >
-            {models.length === 0 ? (
-              <option value="">No models for provider</option>
-            ) : (
-              models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
-
-        <label style={{ display: 'block' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>Backend</div>
-          <select
-            value={draft.backend}
-            onChange={(event) => {
-              onDraftChange({ backend: event.target.value });
-            }}
-            style={inputStyle}
-          >
-            <option value="pi-ai">pi-ai</option>
-            <option value="pi-embedded">pi-embedded</option>
-          </select>
-        </label>
-      </div>
-
-      <label style={{ display: 'block' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>Base URL (optional)</div>
-        <input
-          type="text"
-          value={draft.baseUrl}
-          placeholder="https://api.example.com/v1"
-          onChange={(event) => {
-            onDraftChange({ baseUrl: event.target.value });
-          }}
-          style={inputStyle}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </label>
-
-      {draft.authMode === 'api-key' ? (
-        <label style={{ display: 'block' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>API Key</div>
-          <input
-            type="password"
-            value={draft.apiKey}
-            placeholder="sk-..."
-            onChange={(event) => {
-              onDraftChange({ apiKey: event.target.value });
-            }}
-            style={inputStyle}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
-      ) : (
+      {configTab === 'json' ? (
         <>
           <label style={{ display: 'block' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
-              Subscription Provider
-            </div>
-            <select
-              value={draft.subscriptionProvider}
-              onChange={(event) => {
-                onDraftChange({ subscriptionProvider: event.target.value });
-              }}
-              style={inputStyle}
-            >
-              {providers.filter((provider) => provider.supportsSubscription).length === 0 ? (
-                <option value={draft.provider}>{draft.provider}</option>
-              ) : (
-                providers
-                  .filter((provider) => provider.supportsSubscription)
-                  .map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.displayName}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-          <label style={{ display: 'block' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
-              Subscription Credentials (JSON)
+              Edit `~/.pi/agent/models.json`
             </div>
             <textarea
-              value={draft.subscriptionCredentialsText}
+              value={modelsJsonDraft}
               onChange={(event) => {
-                onDraftChange({ subscriptionCredentialsText: event.target.value });
+                onModelsJsonDraftChange(event.target.value);
               }}
-              placeholder={'{\n  "refresh": "...",\n  "access": "...",\n  "expires": 0\n}'}
               style={{
                 ...inputStyle,
-                minHeight: 140,
+                minHeight: 360,
                 resize: 'vertical',
                 fontFamily: 'monospace',
               }}
               spellCheck={false}
             />
           </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                void onSaveModelsJson().catch(() => {});
+              }}
+              disabled={isSavingModelsJson || !modelsJsonDirty}
+              style={{
+                border: 'none',
+                borderRadius: 8,
+                padding: '7px 14px',
+                fontWeight: 600,
+                fontSize: 12,
+                cursor: isSavingModelsJson || !modelsJsonDirty ? 'not-allowed' : 'pointer',
+                backgroundColor: isSavingModelsJson || !modelsJsonDirty ? 'var(--muted)' : 'var(--primary)',
+                color: isSavingModelsJson || !modelsJsonDirty ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
+              }}
+            >
+              {isSavingModelsJson ? 'Saving...' : 'Save models.json'}
+            </button>
+            <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+              {modelsJsonDirty ? 'Unsaved changes' : 'No local changes'}
+            </span>
+          </div>
         </>
-      )}
+      ) : (
+        <>
+          <div
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: 12,
+              backgroundColor: 'var(--surface-soft)',
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: 8 }}>
+              Auth mode:
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { id: 'subscription', label: 'Use a subscription' },
+                { id: 'api-key', label: 'Use an API key' },
+              ] as const).map((mode) => {
+                const selected = draft.authMode === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => {
+                      const nextAuthMode = mode.id;
+                      const providersForNextMode = providers.filter((provider) =>
+                        nextAuthMode === 'subscription' ? provider.supportsSubscription : provider.supportsApiKey,
+                      );
+                      const fallbackProvider = providersForNextMode[0]?.id ?? draft.provider;
+                      const nextProvider = nextAuthMode === draft.authMode ? draft.provider : fallbackProvider;
+                      if (nextAuthMode === draft.authMode) {
+                        onDraftChange({ authMode: nextAuthMode });
+                      } else {
+                        onProviderSwitch(nextProvider, nextAuthMode);
+                      }
+                    }}
+                    style={{
+                      border: selected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      backgroundColor: selected ? 'var(--accent)' : 'var(--card)',
+                      color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
+                      borderRadius: 999,
+                      padding: '8px 10px',
+                      textAlign: 'center',
+                      fontWeight: selected ? 700 : 500,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-      <div
-        style={{
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          padding: 10,
-          fontSize: 11,
-          color: 'var(--muted-foreground)',
-          backgroundColor: 'var(--surface-soft)',
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr',
-          gap: '4px 8px',
-        }}
-      >
-        <span>Provider mode:</span>
-        <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
-          {draft.authMode}
-        </span>
-        <span>Current provider:</span>
-        <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
-          {(currentProvider?.displayName ?? draft.provider) || '-'}
-        </span>
-        <span>Model count:</span>
-        <span>{currentProvider ? String(currentProvider.modelCount) : '-'}</span>
-      </div>
+          <div
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: 12,
+              backgroundColor: 'var(--surface-soft)',
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: 8 }}>
+              Select provider to configure:
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {providerList.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'var(--muted-foreground)', padding: '4px 6px' }}>
+                  No providers available.
+                </div>
+              ) : (
+                providerList.map((provider) => {
+                  const selected = draft.provider === provider.id;
+                  const status = providerStatusLabel({
+                    provider,
+                    selected,
+                    draft,
+                    hasSubscriptionConfig,
+                  });
+                  return (
+                    <button
+                      key={provider.id}
+                      type="button"
+                      onClick={() => {
+                        const nextAuthMode = draft.authMode === 'subscription'
+                          ? (provider.supportsSubscription ? 'subscription' : 'api-key')
+                          : (provider.supportsApiKey ? 'api-key' : 'subscription');
+                        onProviderSwitch(provider.id, nextAuthMode);
+                      }}
+                      style={{
+                        border: selected ? '1px solid var(--primary)' : '1px solid transparent',
+                        backgroundColor: selected ? 'var(--card)' : 'transparent',
+                        color: selected ? 'var(--foreground)' : 'var(--muted-foreground)',
+                        borderRadius: 8,
+                        padding: '7px 9px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                      }}
+                    >
+                      <span>{selected ? '→ ' : ''}{provider.displayName}</span>
+                      <span style={{ fontSize: 11, opacity: 0.9 }}>{status}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => {
-            onTest().catch(() => {});
-          }}
-          disabled={!isReady || isTesting}
-          style={{
-            border: 'none',
-            borderRadius: 8,
-            padding: '7px 14px',
-            fontWeight: 600,
-            fontSize: 12,
-            cursor: !isReady || isTesting ? 'not-allowed' : 'pointer',
-            backgroundColor: !isReady || isTesting ? 'var(--muted)' : 'var(--primary)',
-            color: !isReady || isTesting ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
-          }}
-        >
-          {isTesting ? 'Testing...' : 'Test Connection'}
-        </button>
-        <button
-          type="button"
-          onClick={onSave}
-          style={{
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            padding: '7px 14px',
-            fontWeight: 600,
-            fontSize: 12,
-            cursor: 'pointer',
-            backgroundColor: 'var(--card)',
-            color: 'var(--foreground)',
-          }}
-        >
-          Save Settings
-        </button>
-      </div>
+          <label style={{ display: 'block' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>Base URL</div>
+            <input
+              type="text"
+              value={draft.baseUrl}
+              placeholder="https://api.example.com/v1"
+              onChange={(event) => {
+                onDraftChange({ baseUrl: event.target.value });
+              }}
+              style={inputStyle}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
 
-      {testResult && (
-        <div
-          style={{
-            border: `1px solid ${testResult.ok ? 'var(--accent-mint)' : 'var(--destructive)'}`,
-            borderRadius: 8,
-            backgroundColor: testResult.ok ? 'color-mix(in srgb, var(--accent-mint) 12%, var(--card))' : 'color-mix(in srgb, var(--destructive) 14%, var(--card))',
-            color: 'var(--foreground)',
-            padding: 10,
-            fontSize: 11,
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
-            gap: '4px 8px',
-          }}
-        >
-          <span>Status:</span>
-          <span style={{ fontWeight: 700 }}>{testResult.ok ? 'Connected' : 'Failed'}</span>
-          <span>Latency:</span>
-          <span>{`${String(testResult.latencyMs)}ms`}</span>
-          <span>Mode:</span>
-          <span>{testResult.authMode}</span>
-          {!testResult.ok && (
+          {draft.authMode === 'api-key' ? (
+            <label style={{ display: 'block' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>API Key</div>
+              <input
+                type="password"
+                value={draft.apiKey}
+                placeholder="sk-..."
+                onChange={(event) => {
+                  onDraftChange({ apiKey: event.target.value });
+                }}
+                style={inputStyle}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          ) : (
             <>
-              <span>Error:</span>
-              <span style={{ color: 'var(--destructive)' }}>{testResult.error ?? 'Unknown error'}</span>
+              <label style={{ display: 'block' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
+                  Subscription Provider
+                </div>
+                <select
+                  value={draft.subscriptionProvider}
+                  onChange={(event) => {
+                    onDraftChange({ subscriptionProvider: event.target.value });
+                  }}
+                  style={inputStyle}
+                >
+                  {providers.filter((provider) => provider.supportsSubscription).length === 0 ? (
+                    <option value={draft.provider}>{draft.provider}</option>
+                  ) : (
+                    providers
+                      .filter((provider) => provider.supportsSubscription)
+                      .map((provider) => (
+                        <option key={provider.id} value={provider.id}>
+                          {provider.displayName}
+                        </option>
+                      ))
+                  )}
+                </select>
+              </label>
+              <label style={{ display: 'block' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
+                  Subscription Credentials (JSON)
+                </div>
+                <textarea
+                  value={draft.subscriptionCredentialsText}
+                  onChange={(event) => {
+                    onDraftChange({ subscriptionCredentialsText: event.target.value });
+                  }}
+                  placeholder={'{\n  "refresh": "...",\n  "access": "...",\n  "expires": 0\n}'}
+                  style={{
+                    ...inputStyle,
+                    minHeight: 140,
+                    resize: 'vertical',
+                    fontFamily: 'monospace',
+                  }}
+                  spellCheck={false}
+                />
+              </label>
             </>
           )}
-        </div>
+
+          <div
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: 10,
+              fontSize: 11,
+              color: 'var(--muted-foreground)',
+              backgroundColor: 'var(--surface-soft)',
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr',
+              gap: '4px 8px',
+            }}
+          >
+            <span>Auth mode:</span>
+            <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
+              {draft.authMode}
+            </span>
+            <span>Current provider:</span>
+            <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
+              {(currentProvider?.displayName ?? draft.provider) || '-'}
+            </span>
+            <span>Base URL source:</span>
+            <span style={{ color: 'var(--foreground)', fontFamily: 'monospace' }}>
+              {draft.baseUrl.trim() ? 'configured' : 'default / empty'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                void onSave();
+              }}
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '7px 14px',
+                fontWeight: 600,
+                fontSize: 12,
+                cursor: 'pointer',
+                backgroundColor: 'var(--card)',
+                color: 'var(--foreground)',
+              }}
+            >
+              Save Visual Config
+            </button>
+          </div>
+        </>
       )}
 
       {saveMessage.tone !== 'idle' && (
@@ -1562,7 +1585,7 @@ function providerStatusLabel({
 }: {
   provider: PiAiProviderDescriptor;
   selected: boolean;
-  draft: ModelSettingsDraft;
+  draft: ProviderSettingsDraft;
   hasSubscriptionConfig: boolean;
 }): string {
   if (draft.authMode === 'subscription') {

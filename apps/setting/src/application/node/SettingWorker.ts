@@ -4,10 +4,23 @@ import { PageletWorker, PageletWorkerConfigId } from '@/packages/services/pagele
 import type { IPageletWorkerConfig } from '@/packages/services/pagelet-host/node/PageletWorker';
 import { ElectronMessagePortMainChannel } from '@x-oasis/async-call-rpc-electron';
 import { SETTING_PAGELET_SERVICE_PATH } from '@/apps/setting/application/common';
-import type { PiAiConnectionTestInput } from '@/apps/setting/application/common';
+import type {
+  PiAiConnectionTestInput,
+  PiAiModelConfigUpsertInput,
+  PiAiProviderConfigUpsertInput,
+} from '@/apps/setting/application/common';
 import type { ISharedService } from '@/apps/shared/application/common';
 import type { IDaemonService } from '@/apps/daemon/application/common';
-import { listPiAiModels, listPiAiProviders, testPiAiConnection } from './pi-ai-provider-service';
+import {
+  getPiAiModelsJson,
+  getPiAiProviderConfig,
+  listPiAiModels,
+  listPiAiProviders,
+  savePiAiModelsJson,
+  testPiAiConnection,
+  upsertPiAiModelConfig,
+  upsertPiAiProviderConfig,
+} from './pi-ai-provider-service';
 
 export const SettingWorkerId = createId('SettingWorker');
 
@@ -37,6 +50,11 @@ export class SettingWorker extends PageletWorker<ISharedService, IDaemonService>
         listPiAiProviders: () => listPiAiProviders(),
         listPiAiModels: (provider: string) => listPiAiModels(provider),
         testPiAiConnection: (input: PiAiConnectionTestInput) => testPiAiConnection(input),
+        getPiAiModelsJson: () => getPiAiModelsJson(),
+        savePiAiModelsJson: (content: string) => savePiAiModelsJson(content),
+        upsertPiAiModelConfig: (input: PiAiModelConfigUpsertInput) => upsertPiAiModelConfig(input),
+        getPiAiProviderConfig: (provider: string) => getPiAiProviderConfig(provider),
+        upsertPiAiProviderConfig: (input: PiAiProviderConfigUpsertInput) => upsertPiAiProviderConfig(input),
       },
     });
   }

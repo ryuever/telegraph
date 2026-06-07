@@ -1,98 +1,71 @@
-import { complete, findEnvKeys, getModel, getModels, getProviders } from '@mariozechner/pi-ai';
+import { complete, findEnvKeys, getModel, getModels } from '@mariozechner/pi-ai';
 import {
   getOAuthApiKey,
   getOAuthProvider,
-  getOAuthProviders,
   type OAuthCredentials,
 } from '@mariozechner/pi-ai/oauth';
-import type {
-  PiAiConnectionTestInput,
-  PiAiConnectionTestResult,
-  PiAiModelDescriptor,
-  PiAiProviderDescriptor,
+import { readFileSync, statSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
+import {
+  buildPiAiProviderCatalog,
+  PI_AI_PROVIDER_DEFAULT_BASE_URLS,
+  type PiAiConnectionTestInput,
+  type PiAiConnectionTestResult,
+  type PiAiModelConfigUpsertInput,
+  type PiAiModelDescriptor,
+  type PiAiProviderConfigSnapshot,
+  type PiAiProviderConfigUpsertInput,
+  type PiAiProviderDescriptor,
 } from '@/apps/setting/application/common';
 
-type ModelLike = { id?: string; name?: string; api?: string };
+type ModelLike = { id?: string; name?: string; api?: string; baseUrl?: string };
+type JsonRecord = Record<string, unknown>;
+type PiAiModelsJson = { providers: Record<string, JsonRecord> };
 
 const getModelsLoose = getModels as unknown as (provider: string) => ModelLike[];
 const getModelLoose = getModel as unknown as (provider: string, modelId: string) => unknown;
 const DEFAULT_TEST_TIMEOUT_MS = 15000;
+const MODELS_JSON_PATH = join(homedir(), '.pi', 'agent', 'models.json');
 
-const BEDROCK_PROVIDER_ID = 'amazon-bedrock';
-
-const API_KEY_LOGIN_PROVIDERS: Partial<Record<string, string>> = {
-  anthropic: 'Anthropic',
-  [BEDROCK_PROVIDER_ID]: 'Amazon Bedrock',
-  'azure-openai-responses': 'Azure OpenAI Responses',
-  cerebras: 'Cerebras',
-  'cloudflare-workers-ai': 'Cloudflare Workers AI',
-  deepseek: 'DeepSeek',
-  fireworks: 'Fireworks',
-  google: 'Google Gemini',
-  'google-vertex': 'Google Vertex AI',
-  groq: 'Groq',
-  huggingface: 'Hugging Face',
-  'kimi-coding': 'Kimi For Coding',
-  mistral: 'Mistral',
-  minimax: 'MiniMax',
-  'minimax-cn': 'MiniMax (China)',
-  opencode: 'OpenCode Zen',
-  'opencode-go': 'OpenCode Go',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  'vercel-ai-gateway': 'Vercel AI Gateway',
-  xai: 'xAI',
-  zai: 'ZAI',
-};
-
-const BUILT_IN_API_KEY_LOGIN_PROVIDERS = new Set(Object.keys(API_KEY_LOGIN_PROVIDERS));
-const OAUTH_ONLY_LOGIN_PROVIDERS = new Set([
-  'github-copilot',
-  'openai-codex',
-]);
+const DEFAULT_MODELS_JSON: PiAiModelsJson = { providers: {} };
+let cachedModelsJson: PiAiModelsJson | null = null;
+let cachedModelsJsonMtimeMs = -1;
 
 export function listPiAiProviders(): PiAiProviderDescriptor[] {
-  const oauthProviders = getOAuthProviders();
-  const oauthProviderIds = new Set(oauthProviders.map((provider) => provider.id));
-  const oauthProviderNames = new Map(oauthProviders.map((provider) => [provider.id, provider.name]));
-  const modelProviderIds = new Set(getProviders());
-  const allProviderIds = new Set<string>([...modelProviderIds, ...oauthProviderIds]);
-
-  return [...allProviderIds]
-    .map((providerId) => {
-      const models = safeGetModels(providerId);
-      const supportsSubscription = oauthProviderIds.has(providerId);
-      const supportsApiKey = isApiKeyLoginProvider(providerId, oauthProviderIds, modelProviderIds);
-      const environmentKeyName = findEnvKeys(providerId)?.[0];
-      return {
-        id: providerId,
-        displayName: oauthProviderNames.get(providerId) ??
-          API_KEY_LOGIN_PROVIDERS[providerId] ??
-          providerId,
-        modelCount: models.length,
-        supportsSubscription,
-        supportsApiKey,
-        environmentKeyName,
-      };
-    })
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const modelsJson = readModelsJson();
+  const customProviderIds = Object.keys(modelsJson.providers);
+  const catalog = buildPiAiProviderCatalog(customProviderIds);
+  const environmentKeyByProvider: Record<string, string | undefined> = {};
+  for (const provider of catalog) {
+    environmentKeyByProvider[provider.id] = findEnvKeys(provider.id)?.[0];
+  }
+  return buildPiAiProviderCatalog(customProviderIds, environmentKeyByProvider);
 }
 
 export function listPiAiModels(provider: string): PiAiModelDescriptor[] {
   if (!provider.trim()) return [];
-  try {
-    return getModelsLoose(provider)
-      .map((model) => ({
-        id: model.id ?? '',
-        label: model.name ?? model.id ?? 'unknown-model',
-        provider,
-        api: model.api,
-      }))
-      .filter((model) => model.id.length > 0)
-      .sort((a, b) => a.id.localeCompare(b.id));
-  } catch {
-    return [];
+  const merged = new Map<string, PiAiModelDescriptor>();
+  for (const model of safeGetModels(provider)) {
+    if (!model.id?.length) continue;
+    merged.set(model.id, {
+      id: model.id,
+      label: model.name ?? model.id,
+      provider,
+      api: model.api,
+      baseUrl: model.baseUrl,
+    });
   }
+  for (const model of listCustomModels(provider, readModelsJson())) {
+    if (!model.id.length) continue;
+    const existing = merged.get(model.id);
+    merged.set(model.id, {
+      ...existing,
+      ...model,
+    });
+  }
+  return [...merged.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export async function testPiAiConnection(input: PiAiConnectionTestInput): Promise<PiAiConnectionTestResult> {
@@ -212,17 +185,202 @@ function safeGetModels(provider: string): ModelLike[] {
   }
 }
 
-function isApiKeyLoginProvider(
-  providerId: string,
-  oauthProviderIds: ReadonlySet<string>,
-  builtInProviderIds: ReadonlySet<string>,
-): boolean {
-  if (BUILT_IN_API_KEY_LOGIN_PROVIDERS.has(providerId)) {
-    return true;
+export async function getPiAiModelsJson(): Promise<string> {
+  try {
+    return await readFile(MODELS_JSON_PATH, 'utf-8');
+  } catch (error) {
+    if (isNotFound(error)) {
+      return `${JSON.stringify(DEFAULT_MODELS_JSON, null, 2)}\n`;
+    }
+    throw error;
   }
-  if (builtInProviderIds.has(providerId)) {
-    // Keep API-key mode resilient as pi-ai adds new built-in providers.
-    return !OAUTH_ONLY_LOGIN_PROVIDERS.has(providerId);
+}
+
+export async function savePiAiModelsJson(content: string): Promise<void> {
+  const parsed = parseModelsJson(content);
+  await writeModelsJson(parsed);
+}
+
+export function getPiAiProviderConfig(provider: string): PiAiProviderConfigSnapshot {
+  const providerId = provider.trim();
+  if (!providerId) {
+    return { baseUrl: '', apiKey: '' };
   }
-  return !oauthProviderIds.has(providerId);
+
+  const modelsJson = readModelsJson();
+  const providerConfig = toRecord(modelsJson.providers[providerId]);
+  const fromJsonBaseUrl = stringOrUndefined(providerConfig.baseUrl);
+  const fromJsonApiKey = stringOrUndefined(providerConfig.apiKey);
+  const fromJsonApi = stringOrUndefined(providerConfig.api);
+
+  let baseUrl = fromJsonBaseUrl ?? PI_AI_PROVIDER_DEFAULT_BASE_URLS[providerId] ?? '';
+  if (!baseUrl) {
+    const builtInModels = safeGetModels(providerId);
+    baseUrl = stringOrUndefined(builtInModels[0]?.baseUrl) ?? '';
+  }
+
+  return {
+    baseUrl,
+    api: fromJsonApi,
+    apiKey: fromJsonApiKey ?? '',
+  };
+}
+
+export async function upsertPiAiProviderConfig(input: PiAiProviderConfigUpsertInput): Promise<void> {
+  const provider = input.provider.trim();
+  if (!provider) {
+    throw new Error('provider is required.');
+  }
+
+  const parsed = readModelsJson();
+  const providers = parsed.providers;
+  const providerConfig = toRecord(providers[provider]);
+  const nextProviderConfig: JsonRecord = { ...providerConfig };
+
+  const normalizedBaseUrl = trimToUndefined(input.baseUrl);
+  const normalizedApi = trimToUndefined(input.api);
+  const normalizedApiKey = trimToUndefined(input.apiKey);
+
+  if (normalizedBaseUrl) nextProviderConfig.baseUrl = normalizedBaseUrl;
+  else delete nextProviderConfig.baseUrl;
+
+  if (normalizedApi) nextProviderConfig.api = normalizedApi;
+  else delete nextProviderConfig.api;
+
+  if (normalizedApiKey) nextProviderConfig.apiKey = normalizedApiKey;
+  else delete nextProviderConfig.apiKey;
+
+  providers[provider] = nextProviderConfig;
+  parsed.providers = providers;
+  await writeModelsJson(parsed);
+}
+
+export async function upsertPiAiModelConfig(input: PiAiModelConfigUpsertInput): Promise<void> {
+  const provider = input.provider.trim();
+  const modelId = input.modelId.trim();
+  if (!provider || !modelId) {
+    throw new Error('provider and modelId are required.');
+  }
+
+  const parsed = readModelsJson();
+  const providers = parsed.providers;
+  const providerConfig = toRecord(providers[provider]);
+  const nextProviderConfig: JsonRecord = { ...providerConfig };
+  const normalizedBaseUrl = trimToUndefined(input.baseUrl);
+  const normalizedApi = trimToUndefined(input.api);
+  const normalizedLabel = trimToUndefined(input.modelLabel);
+
+  if (normalizedBaseUrl) nextProviderConfig.baseUrl = normalizedBaseUrl;
+  if (normalizedApi) nextProviderConfig.api = normalizedApi;
+
+  const models = ensureArrayOfRecords(nextProviderConfig.models);
+  const modelIndex = models.findIndex((item) => typeof item.id === 'string' && item.id === modelId);
+  const existing = modelIndex >= 0 ? models[modelIndex] : {};
+  const nextModel: JsonRecord = {
+    ...existing,
+    id: modelId,
+  };
+  if (normalizedLabel) nextModel.name = normalizedLabel;
+  if (normalizedApi) nextModel.api = normalizedApi;
+  if (normalizedBaseUrl) nextModel.baseUrl = normalizedBaseUrl;
+
+  if (modelIndex >= 0) {
+    models[modelIndex] = nextModel;
+  } else {
+    models.push(nextModel);
+  }
+  nextProviderConfig.models = models;
+  providers[provider] = nextProviderConfig;
+  parsed.providers = providers;
+  await writeModelsJson(parsed);
+}
+
+function readModelsJson(): PiAiModelsJson {
+  try {
+    const { mtimeMs } = statSync(MODELS_JSON_PATH);
+    if (cachedModelsJson && cachedModelsJsonMtimeMs === mtimeMs) {
+      return cachedModelsJson;
+    }
+    const content = readFileSync(MODELS_JSON_PATH, 'utf-8');
+    const parsed = parseModelsJson(content);
+    cachedModelsJson = parsed;
+    cachedModelsJsonMtimeMs = mtimeMs;
+    return parsed;
+  } catch {
+    cachedModelsJson = { ...DEFAULT_MODELS_JSON, providers: {} };
+    cachedModelsJsonMtimeMs = -1;
+    return cachedModelsJson;
+  }
+}
+
+function parseModelsJson(content: string): PiAiModelsJson {
+  const parsed = JSON.parse(content) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('models.json must be an object.');
+  }
+  const record = parsed as JsonRecord;
+  const providersRecord = toRecord(record.providers);
+  const providers: Record<string, JsonRecord> = {};
+  for (const [providerId, value] of Object.entries(providersRecord)) {
+    providers[providerId] = toRecord(value);
+  }
+  return { providers };
+}
+
+function listCustomModels(provider: string, source: PiAiModelsJson): PiAiModelDescriptor[] {
+  const providerConfig = toRecord(source.providers[provider]);
+  const providerApi = stringOrUndefined(providerConfig.api);
+  const providerBaseUrl = stringOrUndefined(providerConfig.baseUrl);
+  const models = ensureArrayOfRecords(providerConfig.models);
+  return models
+    .map((model): PiAiModelDescriptor | null => {
+      const id = stringOrUndefined(model.id);
+      if (!id) return null;
+      return {
+        id,
+        label: stringOrUndefined(model.name) ?? id,
+        provider,
+        api: stringOrUndefined(model.api) ?? providerApi,
+        baseUrl: stringOrUndefined(model.baseUrl) ?? providerBaseUrl,
+      };
+    })
+    .filter((item): item is PiAiModelDescriptor => item !== null);
+}
+
+async function writeModelsJson(data: PiAiModelsJson): Promise<void> {
+  await mkdir(dirname(MODELS_JSON_PATH), { recursive: true });
+  await writeFile(MODELS_JSON_PATH, `${JSON.stringify(data, null, 2)}\n`, 'utf-8');
+  cachedModelsJson = data;
+  try {
+    cachedModelsJsonMtimeMs = statSync(MODELS_JSON_PATH).mtimeMs;
+  } catch {
+    cachedModelsJsonMtimeMs = -1;
+  }
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'ENOENT';
+}
+
+function toRecord(value: unknown): JsonRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as JsonRecord;
+}
+
+function ensureArrayOfRecords(value: unknown): JsonRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is JsonRecord => typeof item === 'object' && item !== null && !Array.isArray(item));
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+function trimToUndefined(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
