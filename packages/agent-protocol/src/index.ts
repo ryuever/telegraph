@@ -9,15 +9,21 @@ export type {
   RuntimeTaskCapabilityProfile,
 } from './runtime.js'
 export type {
+  ContextProviderContribution,
   ExtensionCapability,
   ExtensionManifest,
   ExtensionSource,
   CommandContribution,
   HookContribution,
+  MessageRendererContribution,
   PanelContribution,
   RuntimeContribution,
   ToolContribution,
 } from './extensions.js'
+export type {
+  SubagentProfile,
+  SubagentProfileContribution,
+} from './subagents.js'
 export type {
   ExtensionEvent,
   HumanInteractionEvent,

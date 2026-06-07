@@ -1,8 +1,18 @@
 import type { PermissionRequest } from './permissions.js'
 import type { ToolDefinition } from './tools.js'
 import type { HookName } from './hooks.js'
+import type { SubagentProfileContribution } from './subagents.js'
 
-export type ExtensionCapability = 'tools' | 'commands' | 'panels' | 'hooks' | 'runtime' | 'model-provider'
+export type ExtensionCapability =
+  | 'tools'
+  | 'commands'
+  | 'panels'
+  | 'hooks'
+  | 'runtime'
+  | 'model-provider'
+  | 'subagents'
+  | 'context-providers'
+  | 'message-renderers'
 
 export interface ExtensionSource {
   kind: 'marketplace' | 'local' | 'git' | 'custom'
@@ -37,6 +47,31 @@ export interface HookContribution {
   hook: HookName
 }
 
+/**
+ * Injects host/parent-conversation context as a prefix into a subagent's
+ * input. Implementation lives extension-side; the protocol only describes
+ * the contribution shape.
+ */
+export interface ContextProviderContribution {
+  id: string
+  /** Stable name an extension references via `SubagentProfile.contextProvider`. */
+  name: string
+  description?: string
+}
+
+/**
+ * UI-side renderer contribution. The protocol intentionally keeps this as a
+ * descriptor only — actual React component wiring crosses the renderer
+ * boundary and is resolved in the renderer process (D-016 §9 Q1).
+ */
+export interface MessageRendererContribution {
+  id: string
+  /** Matcher to select messages this renderer handles, e.g. `tool:explore.*` */
+  match: string
+  /** Stable component id; renderer-side registry maps id → React component. */
+  componentId: string
+}
+
 export interface ExtensionManifest {
   id: string
   name: string
@@ -52,5 +87,8 @@ export interface ExtensionManifest {
     panels?: PanelContribution[]
     runtimes?: RuntimeContribution[]
     hooks?: HookContribution[]
+    subagents?: SubagentProfileContribution[]
+    contextProviders?: ContextProviderContribution[]
+    messageRenderers?: MessageRendererContribution[]
   }
 }
