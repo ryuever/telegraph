@@ -80,6 +80,7 @@ features:
 | D-016 | [20260521-design-page-agent-generation-product-architecture.md](./discussion/20260521-design-page-agent-generation-product-architecture.md) | Design Page 一句话生成页面的产品定位与 Agent 编排架构 | 归档 Design Page 对标 v0 / Lovable 的产品形态讨论，明确 repo-aware design-to-code 工作台定位、DesignBuild Runtime 目标架构、首轮出码六阶段与 subagents 受控协作边界。 |
 | D-017 | [20260522-durable-execution-agent-run-ledger.md](./discussion/20260522-durable-execution-agent-run-ledger.md) | Durable Execution 与 Agent Run Ledger 设想 | 归档 agent 层引入 durable execution 的概念分层、现有 repository 落点、Restate / DBOS / Temporal / LangGraph 选型取舍，以及从 Run Ledger 到 Resume 的分阶段路线。 |
 | D-018 | [20260526-clauge-product-ui-research.md](./discussion/20260526-clauge-product-ui-research.md) | Clauge 产品能力与 UI Shell 调研 | 调研 Clauge 的核心能力、开发者场景特点与工程图纸式 UI 风格，并映射到 Telegraph 当前 Run Cockpit、Design Page 与主界面 shell 的可借鉴方向。 |
+| D-019 | [20260608-extension-host-and-native-subagent-rewrite.md](./discussion/20260608-extension-host-and-native-subagent-rewrite.md) | Extension Host 与 Native Subagent Harness 重写方案 | 把 telegraph 当前三套并行 extension 体系收敛为一条命令式 factory 路径，并把 `extensions/telegraph-subagents` 从 BaseAgentRuntime 子类拆为 Native Subagent Harness + subagent extension；含分 PR 迁移路径、兼容性窗口与 Red Flag 清单。 |
 
 ### issue/ — Issue 记录
 
@@ -94,6 +95,7 @@ features:
 | I-007 | [20260525-design-build-submit-tool-not-called.md](./issue/20260525-design-build-submit-tool-not-called.md) | DesignBuild Worker 未调用 submit_design_child_output 导致 run failed | 记录 Design Worker 未调用最终提交工具时的协议失败路径，区分 submit tool 缺失、schema 错误与 preview 编译错误，并沉淀后续 degraded artifact 兜底方向。 |
 | I-008 | [20260526-design-preview-react-singleton-esm-sh.md](./issue/20260526-design-preview-react-singleton-esm-sh.md) | Design Preview 中 React singleton 被 esm.sh 依赖解析打散 | 记录 Design Page preview 在 Radix / Recharts / lucide-react 依赖下触发 useContext null 的排查过程、根因分层、本地 Sandpacker worker patch，以及适合沉淀到 Sandpacker 源码的 resolver 修复建议。 |
 | I-009 | [20260528-chat-session-follow-up-turn-context.md](./issue/20260528-chat-session-follow-up-turn-context.md) | Chat session 追问 turn 丢失历史上下文 | 记录 Chat session 追问新 turn 只带当前 prompt 的问题，归档 renderer transcript、pagelet durable session history、pi-embedded 与 telegraph-subagents 多段 model request 的修复和回归验证。 |
+| I-010 | [20260608-extension-loader-jiti-three-stage-fix.md](./issue/20260608-extension-loader-jiti-three-stage-fix.md) | 4-pack extension 加载链三连 fix 复盘（type-stripping → babel.cjs → jiti alias） | 记录 4 个 extension 在 chat / design pagelet utility process 中无法 activate 的三阶段事故：Node 25 type-stripping 不增强 module resolution、jiti 的 `../dist/babel.cjs` 被 vite 内联失踪、jiti 不消费 vite alias；最终通过 ExtensionHost jiti 默认 importer、双重护栏 external、per-host alias map 三处修复。 |
 
 ### reference/ — 参考手册
 
@@ -102,6 +104,7 @@ features:
 | R-001 | [20260508-x-oasis-link-to-source-setup.md](./reference/20260508-x-oasis-link-to-source-setup.md) | x-oasis 本地 source link 配置手册（telegraph） | 把 telegraph 4 个 app 全部指向本地 x-oasis source 的完整步骤：上游 12 个包改 main + telegraph pnpm.overrides + 移除 vite external + tsconfig paths。 |
 | R-002 | [20260521-pi-subagents-implementation-study.md](./reference/20260521-pi-subagents-implementation-study.md) | pi-subagents 实现解剖与 Telegraph Native Harness 借鉴清单 | 拆解 pi-subagents 的 Agent tool、AgentManager、独立 AgentSession、后台结果回流、steering/resume/event bus/scheduler 等实现，并映射为 Telegraph Native Harness 后续清单。 |
 | R-003 | [20260528-desktop-mobile-packaging-runbook.md](./reference/20260528-desktop-mobile-packaging-runbook.md) | Desktop 与 Mobile 打包 Runbook | 记录 Telegraph 桌面端与 mobile 端当前打包入口、已验证产物、问题清单与复验步骤。 |
+| R-004 | [20260608-extension-author-quickref.md](./reference/20260608-extension-author-quickref.md) | Telegraph Extension 作者速查（jiti loader · alias map · ExtensionHost API） | 面向 extension 作者的写法速查与 host 集成参考：文件布局、manifest 形状、可用 import 写法（含 first-party alias 列表）、ExtensionHost 构造选项、生命周期 listener，以及新增 alias / 新加宿主 pagelet 的 checklist。 |
 
 ### roadmap/ — 规划路线
 

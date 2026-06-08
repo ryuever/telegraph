@@ -37,6 +37,12 @@ references:
   - id: I-004
     rel: related-to
     file: ../issue/20260519-pi-subagents-structured-plan-parsing.md
+  - id: D-019
+    rel: related-to
+    file: ../discussion/20260608-extension-host-and-native-subagent-rewrite.md
+  - id: R-004
+    rel: related-to
+    file: 20260608-extension-author-quickref.md
 ---
 
 # pi-subagents 实现解剖与 Telegraph Native Harness 借鉴清单

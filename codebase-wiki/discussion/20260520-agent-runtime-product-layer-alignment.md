@@ -56,6 +56,9 @@ references:
   - id: D-017
     rel: extended-by
     file: ./20260522-durable-execution-agent-run-ledger.md
+  - id: D-019
+    rel: derives
+    file: ./20260608-extension-host-and-native-subagent-rewrite.md
 ---
 
 # Agent Runtime 产品分层与 Telegraph Native Harness 对齐

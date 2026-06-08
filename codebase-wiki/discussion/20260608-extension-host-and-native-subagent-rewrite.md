@@ -1,4 +1,38 @@
-# D-???: Extension Host 与 Native Subagent Harness 重写方案
+---
+id: D-019
+title: Extension Host 与 Native Subagent Harness 重写方案
+description: >
+  把 telegraph 当前三套并行 extension 体系收敛为一条命令式 factory 路径，并把
+  `extensions/telegraph-subagents` 从 BaseAgentRuntime 子类拆为 Native Subagent Harness
+  + subagent extension。覆盖现状摸底、TelegraphExtensionAPI 表面、Subagent 运行模型、
+  分 PR 迁移路径、兼容性窗口与 Red Flag 清单。
+category: discussion
+created: 2026-06-08
+updated: 2026-06-08
+tags: [extension, subagent, runtime, harness, capability-host, rfc]
+status: draft
+references:
+  - id: A-005
+    rel: extends
+    file: ../architecture/20260505-telegraph-agent-runtime-extension-host-theory.md
+  - id: A-012
+    rel: related-to
+    file: ../architecture/20260520-telegraph-harness-extension-architecture.md
+  - id: D-015
+    rel: derived-from
+    file: 20260520-agent-runtime-product-layer-alignment.md
+  - id: R-002
+    rel: related-to
+    file: ../reference/20260521-pi-subagents-implementation-study.md
+  - id: I-010
+    rel: related-to
+    file: ../issue/20260608-extension-loader-jiti-three-stage-fix.md
+  - id: R-004
+    rel: related-to
+    file: ../reference/20260608-extension-author-quickref.md
+---
+
+# D-019: Extension Host 与 Native Subagent Harness 重写方案
 
 > **Status**: Draft（待 review）
 > **Date**: 2026-06-08
@@ -8,6 +42,7 @@
 > - **Implements**: A-005 `20260505-...-agent-runtime-extension-host-theory.md` §4.5 / §4.6 / §10.8 / §10.11 / §15.1
 > - **Touches**: agent-runtime-guard.md（T9：新 Agent runtime / Extension 机制）；不触发 architecture-guard T1-T6
 > - **Touches**: `packages/agent-extension-host`（废弃）、`packages/agent-capabilities`（CapabilityHost 原地扩面）、`packages/agent`（新增 subagents/ 子模块）、`packages/agent-protocol`（新增 contribution 类型）、`extensions/telegraph-subagents`（按新 API 重写）
+> - **Implementation log**: I-010（loader 三连 fix 复盘）+ R-004（extension 作者速查）— 当前实施进度的事故复盘与使用文档
 
 ---
 

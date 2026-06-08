@@ -62,6 +62,12 @@ references:
   - id: D-017
     rel: extended-by
     file: ../discussion/20260522-durable-execution-agent-run-ledger.md
+  - id: D-019
+    rel: extended-by
+    file: ../discussion/20260608-extension-host-and-native-subagent-rewrite.md
+  - id: I-010
+    rel: related-to
+    file: ../issue/20260608-extension-loader-jiti-three-stage-fix.md
     note: D-017 将本文 Run / RuntimeEvent / Trace 原则扩展为 durable run ledger、recovery 与 resume 的分层设想。
 ---
 

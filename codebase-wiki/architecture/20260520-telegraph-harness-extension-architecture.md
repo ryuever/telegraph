@@ -45,6 +45,15 @@ references:
   - id: P-010
     rel: related-to
     file: ../roadmap/20260522-remote-agent-os-implementation-roadmap.md
+  - id: D-019
+    rel: related-to
+    file: ../discussion/20260608-extension-host-and-native-subagent-rewrite.md
+  - id: R-004
+    rel: related-to
+    file: ../reference/20260608-extension-author-quickref.md
+  - id: I-010
+    rel: related-to
+    file: ../issue/20260608-extension-loader-jiti-three-stage-fix.md
 ---
 
 # Telegraph Harness Extension 架构设计
