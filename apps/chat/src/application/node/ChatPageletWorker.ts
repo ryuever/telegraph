@@ -32,6 +32,7 @@ import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/Runti
 import { EXTENSION_MANIFEST_FILENAME, ExtensionHost } from '@/packages/agent-extensions';
 import {
   TelegraphExtensionHostImpl,
+  type AgentCapability,
   type CapabilityHookRegistrar,
 } from '@/packages/agent-capabilities';
 import { TELEGRAPH_SUBAGENTS_MANAGER_KEY } from '@/extensions/telegraph-subagents/src/extension';
@@ -323,6 +324,45 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   }
 
   /**
+   * 4-pack item C bridge fix: extensions register their tools on the
+   * pagelet-lifetime `telegraphHost`, but every chat run constructs a
+   * **fresh** CapabilityHost inside AgentHarness and reads tools from
+   * *that* one (`AgentHarness.ts:327` calls `capabilities.listToolCapabilities()`
+   * on the per-run host). Without an explicit bridge, extension-registered
+   * tools are invisible to the runtime adapter, so the model never learns
+   * about them and falls back to "I cannot access your todo list" style
+   * replies even though `@telegraph/todo` is loaded.
+   *
+   * The factory returned here is shipped to `createAgentHarness` as one
+   * of the `capabilities` entries; it is invoked at run-start, captures
+   * the current snapshot of extension tools, and re-registers each one
+   * on the per-run host. The execute closure is forwarded verbatim, so
+   * tool implementations keep their `this` and any captured state on
+   * the extension's `TodoStore`/etc. instances.
+   *
+   * Snapshot semantics intentionally match `extensionHookBus.snapshot()`:
+   * an extension activated after this run started (e.g. via a future
+   * hot-reload) will surface on the *next* run, not this one. That keeps
+   * tool surface deterministic per run.
+   *
+   * Only `listToolCapabilities` is bridged because it is the sole
+   * per-run host read the harness makes today (verified by grep). If
+   * harness gains a `listCommands()` / `listSubagents()` path in the
+   * future, mirror this helper for those kinds. Commands and runtimes
+   * already have their own bridges (`invokeCommand` RPC,
+   * `extensionContributedRuntimes`).
+   */
+  private extensionContributedToolsCapability(): AgentCapability {
+    const host = this.telegraphHost;
+    return ({ host: runHost }) => {
+      if (!host) return;
+      for (const tool of host.listToolCapabilities()) {
+        runHost.registerTool(tool);
+      }
+    };
+  }
+
+  /**
    * D-016 P5 + 4-pack P0: discover every extension under the workspace
    * `extensions/` directory and activate them via the command-style
    * ExtensionHost loader. The first-party `@telegraph/subagents` extension
@@ -462,26 +502,37 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
           ...this.extensionContributedRuntimes(),
           { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
         ],
-        capabilities: createPageletRunCapabilities({
-          runId,
-          sessionId,
-          pageletId: 'chat',
-          pageletKind: 'chat',
-          settings,
-          feedback: {
-            notify: input => {
-              if (!input.runId) return;
-              const event = feedbackRuntimeLog(input);
-              void this.persistRunEvent(input.runId, event);
+        capabilities: [
+          ...createPageletRunCapabilities({
+            runId,
+            sessionId,
+            pageletId: 'chat',
+            pageletKind: 'chat',
+            settings,
+            feedback: {
+              notify: input => {
+                if (!input.runId) return;
+                const event = feedbackRuntimeLog(input);
+                void this.persistRunEvent(input.runId, event);
+                this.emitStreamEvent(event);
+              },
+            },
+            emit: event => {
+              void this.persistRunEvent(runId, event);
               this.emitStreamEvent(event);
             },
-          },
-          emit: event => {
-            void this.persistRunEvent(runId, event);
-            this.emitStreamEvent(event);
-          },
-          prompt: prompt => this.promptForPermission(prompt),
-        }),
+            prompt: prompt => this.promptForPermission(prompt),
+          }),
+          // 4-pack item C bridge fix — see extensionContributedToolsCapability
+          // doc comment for the why. Appended last because
+          // CapabilityHost.registerTool is last-write-wins (Map.set keyed
+          // by tool definition name), so extension tools would silently
+          // shadow a first-party tool of the same name. That is the
+          // intended precedence for the demo (extensions can replace),
+          // but if first-party tools should win in the future, move this
+          // entry to the front of the array.
+          this.extensionContributedToolsCapability(),
+        ],
       });
 
       for await (const ev of agentHarness.run(agentRequest, { signal: abortController.signal })) {
