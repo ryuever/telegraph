@@ -1,4 +1,4 @@
-import { pathToFileURL } from 'node:url'
+import { createJiti } from 'jiti'
 import type {
   AgentCapabilityContext,
   CapabilityHookRegistrar,
@@ -38,7 +38,7 @@ import type {
 export class ExtensionHost {
   private readonly telegraph: TelegraphExtensionHost
   private readonly hooks: CapabilityHookRegistrar
-  private readonly importer: (specifier: string) => Promise<unknown>
+  private readonly importer: (absolutePath: string) => Promise<unknown>
   private readonly listener: ExtensionLifecycleListener | undefined
   private readonly now: () => number
 
@@ -47,7 +47,23 @@ export class ExtensionHost {
   constructor(options: ExtensionHostOptions) {
     this.telegraph = options.telegraph
     this.hooks = options.hooks
-    this.importer = options.importer ?? defaultImporter
+    // When the caller supplies an alias map we MUST build a dedicated jiti
+    // instance for this host because the shared singleton was created with
+    // no aliases (and jiti freezes its resolver options at construction).
+    // When neither `importer` nor `aliases` are supplied we keep using the
+    // module-level `sharedJiti` to avoid re-paying the transpiler init cost
+    // across multiple ExtensionHost instances in the same process.
+    if (options.importer !== undefined) {
+      this.importer = options.importer
+    } else if (options.aliases !== undefined) {
+      const aliasedJiti = createJiti(import.meta.url, {
+        moduleCache: false,
+        alias: options.aliases,
+      })
+      this.importer = (absolutePath: string) => aliasedJiti.import(absolutePath)
+    } else {
+      this.importer = defaultImporter
+    }
     this.listener = options.onLifecycleEvent
     this.now = options.now ?? (() => Date.now())
   }
@@ -107,7 +123,7 @@ export class ExtensionHost {
 
     let mod: unknown
     try {
-      mod = await this.importer(this.toSpecifier(pkg.mainPath))
+      mod = await this.importer(pkg.mainPath)
     } catch (error) {
       this.emit({ type: 'activation_failed', extensionId: pkg.manifest.id, ts: this.now(), error: toErrorSnapshot(error) })
       return undefined
@@ -186,11 +202,6 @@ export class ExtensionHost {
       // listener errors are never allowed to break loader; silent by design (no stderr in libs).
     }
   }
-
-  private toSpecifier(mainPath: string): string {
-    // Node ESM dynamic import of an absolute path needs a file:// URL on all platforms.
-    return pathToFileURL(mainPath).href
-  }
 }
 
 function extractFactory(mod: unknown): TelegraphExtension | undefined {
@@ -202,8 +213,25 @@ function extractFactory(mod: unknown): TelegraphExtension | undefined {
   return undefined
 }
 
-async function defaultImporter(specifier: string): Promise<unknown> {
-  return import(specifier)
+/**
+ * Single shared jiti instance: extensions are loaded throughout the
+ * pagelet's lifetime and re-creating jiti per import would re-pay the
+ * transpiler init cost. `moduleCache: false` is required so that a future
+ * deactivate / reactivate cycle re-evaluates the extension source instead
+ * of returning a stale module record — matches the lifecycle semantics
+ * documented on ExtensionHost.deactivate (RFC §4).
+ */
+const sharedJiti = createJiti(import.meta.url, { moduleCache: false })
+
+/**
+ * Default importer: load the extension entry through jiti so that TypeScript
+ * sources and bundler-style relative imports (`from './X'` without suffix)
+ * work regardless of whether the host process is the Vite-bundled
+ * chat-worker cjs or a raw `node` invocation. We pass the absolute path
+ * directly — jiti normalises path vs. URL internally.
+ */
+async function defaultImporter(absolutePath: string): Promise<unknown> {
+  return sharedJiti.import(absolutePath)
 }
 
 function toErrorSnapshot(error: unknown): { message: string; stack?: string } {

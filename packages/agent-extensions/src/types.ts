@@ -64,14 +64,30 @@ export interface ExtensionHostOptions {
    */
   hooks: CapabilityHookRegistrar
   /**
-   * Dynamic importer. Defaults to `(specifier) => import(specifier)`. Tests override
-   * this to inject in-memory modules without writing files to disk.
+   * Dynamic importer. Receives the **absolute filesystem path** of the extension's
+   * entry module (resolved from `manifest.main`). Defaults to a jiti-backed importer
+   * that transparently transpiles TypeScript and resolves extensionless / `.ts` /
+   * `.mjs` relative imports the way bundlers do — this is required because Node 25's
+   * native type-stripping does not enhance module resolution, so `import './X'` from
+   * an extension `.ts` file fails under raw `import()`. Tests override this to inject
+   * in-memory modules without writing files to disk.
    */
-  importer?: (specifier: string) => Promise<unknown>
+  importer?: (absolutePath: string) => Promise<unknown>
   /** Optional lifecycle listener — pagelet wiring uses this to bridge to RuntimeEvent. */
   onLifecycleEvent?: ExtensionLifecycleListener
   /** Clock injection for deterministic tests. */
   now?: () => number
+  /**
+   * Optional module-alias map handed to the default jiti importer so that
+   * extension sources can use the same `@/...` aliases as the host project
+   * (vite-style). jiti does not consult vite's `resolve.alias` or any
+   * tsconfig `paths`, so an alias map MUST be supplied explicitly if the
+   * extension code imports under aliases. Each value is an absolute path to
+   * the resolved on-disk location (or an alias prefix → directory prefix
+   * mapping; see jiti's alias semantics). Ignored when `importer` is
+   * overridden by tests.
+   */
+  aliases?: Record<string, string>
 }
 
 /**

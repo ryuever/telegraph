@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@telegraph/agent-capabilities": "workspace:*",
-    "@telegraph/agent-protocol": "workspace:*"
+    "@telegraph/agent-protocol": "workspace:*",
+    "jiti": "^2.4.2"
   },
   "devDependencies": {
     "typescript": "^5.3.0",

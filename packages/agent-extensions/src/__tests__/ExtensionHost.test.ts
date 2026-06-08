@@ -222,8 +222,8 @@ describe('ExtensionHost lifecycle (in-memory importer)', () => {
     const ext = new ExtensionHost({
       telegraph: host,
       hooks: noopHooks,
-      importer: async (specifier) => {
-        const id = specifier.includes('/virtual/a/') ? 'a' : 'b'
+      importer: async (absolutePath) => {
+        const id = absolutePath.includes('/virtual/a/') ? 'a' : 'b'
         const factory: TelegraphExtension = () => () => {
           order.push(id)
         }
@@ -252,7 +252,7 @@ describe('ExtensionHost lifecycle (in-memory importer)', () => {
   })
 })
 
-describe('ExtensionHost disk-based loading', () => {
+describe('ExtensionHost disk-based loading (jiti default importer)', () => {
   let dir = ''
 
   beforeEach(async () => {
@@ -263,29 +263,39 @@ describe('ExtensionHost disk-based loading', () => {
     await rm(dir, { recursive: true, force: true })
   })
 
-  it('activateFromPath loads manifest + main from disk and runs the factory', async () => {
-    const extRoot = join(dir, 'my-ext')
+  it('activateFromPath loads a TypeScript entry with relative .ts sibling imports and runs the factory', async () => {
+    // This is the regression test for the Node 25 type-stripping breakage:
+    // chat-worker tried to `import()` an extension's `extension.ts` via raw
+    // Node ESM and `from './X'` (no suffix, no .ts suffix) blew up with
+    // ERR_MODULE_NOT_FOUND. jiti must resolve the sibling without any
+    // suffix gymnastics or tsconfig flags on the extension side.
+    const extRoot = join(dir, 'my-ts-ext')
     await mkdir(extRoot, { recursive: true })
     await writeFile(
       join(extRoot, EXTENSION_MANIFEST_FILENAME),
-      JSON.stringify({ id: 'my-ext', name: 'My Ext', version: '0.1.0', main: 'index.mjs' }),
+      JSON.stringify({ id: 'my-ts-ext', name: 'My TS Ext', version: '0.1.0', main: 'index.ts' }),
     )
     await writeFile(
-      join(extRoot, 'index.mjs'),
-      `export default (ctx) => {
-         ctx.host.registerTool({
-           definition: { name: 'my.tool', description: 'd', inputSchema: { type: 'object' } },
-           execute: async () => ({ ok: true }),
-         })
-       }`,
+      join(extRoot, 'helper.ts'),
+      `export const TOOL_NAME: string = 'my.ts.tool'\n`,
+    )
+    await writeFile(
+      join(extRoot, 'index.ts'),
+      `import { TOOL_NAME } from './helper'\n` +
+        `export default (ctx: any) => {\n` +
+        `  ctx.host.registerTool({\n` +
+        `    definition: { name: TOOL_NAME, description: 'd', inputSchema: { type: 'object' } },\n` +
+        `    execute: async () => ({ ok: true }),\n` +
+        `  })\n` +
+        `}\n`,
     )
 
     const host = makeHost()
     const ext = new ExtensionHost({ telegraph: host, hooks: noopHooks })
     const { activated, diagnostics } = await ext.activateFromPath(extRoot)
     expect(diagnostics).toEqual([])
-    expect(activated?.pkg.manifest.id).toBe('my-ext')
-    expect(host.listTools().map((d) => d.name)).toContain('my.tool')
+    expect(activated?.pkg.manifest.id).toBe('my-ts-ext')
+    expect(host.listTools().map((d) => d.name)).toContain('my.ts.tool')
   })
 
   it('activateFromPath surfaces parse failure as a diagnostic without throwing', async () => {
@@ -300,15 +310,15 @@ describe('ExtensionHost disk-based loading', () => {
     expect(diagnostics.some((d) => d.code === 'manifest_parse_failed')).toBe(true)
   })
 
-  it('activateFromDirectory discovers and activates multiple child extensions', async () => {
+  it('activateFromDirectory discovers and activates multiple child TypeScript extensions', async () => {
     for (const id of ['ext-a', 'ext-b']) {
       const extRoot = join(dir, id)
       await mkdir(extRoot, { recursive: true })
       await writeFile(
         join(extRoot, EXTENSION_MANIFEST_FILENAME),
-        JSON.stringify({ id, name: id, version: '0.0.1', main: 'index.mjs' }),
+        JSON.stringify({ id, name: id, version: '0.0.1', main: 'index.ts' }),
       )
-      await writeFile(join(extRoot, 'index.mjs'), `export default () => {}`)
+      await writeFile(join(extRoot, 'index.ts'), `export default (): void => {}\n`)
     }
     // Unrelated child without manifest — should be silently skipped.
     await mkdir(join(dir, 'not-an-ext'), { recursive: true })
