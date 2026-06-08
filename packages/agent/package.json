@@ -25,7 +25,7 @@
   "dependencies": {
     "@mariozechner/pi-ai": "^0.72.1",
     "@telegraph/agent-capabilities": "workspace:*",
-    "@telegraph/agent-extension-host": "workspace:*",
+    "@telegraph/agent-extensions": "workspace:*",
     "@telegraph/agent-protocol": "workspace:*",
     "@telegraph/agent-resources": "workspace:*",
     "@telegraph/computer-use": "workspace:*",

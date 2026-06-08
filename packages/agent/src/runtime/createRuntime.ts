@@ -5,14 +5,10 @@ import { createLangGraphRuntime } from '@/packages/agent/runtime/LangGraphRuntim
 import { createVercelAiRuntime } from '@/packages/agent/runtime/VercelAiRuntime'
 import type { RuntimeExecutor } from '@/packages/agent/runtime/AgentRuntime'
 import type { AgentRuntimeSettings } from '@/packages/agent/types'
-import {
-  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-  isTelegraphSubagentsSelector,
-} from '@/packages/agent-extension-host'
 
 /**
  * Factory function to create a RuntimeExecutor instance.
- * 
+ *
  * Supports:
  * - pi-ai: LLM-only streaming (in-process)
  * - pi-embedded: Pi-AI with embedded tool loop
@@ -23,22 +19,19 @@ import {
  * They are spawned by the External Agent Runtime path, not represented as
  * framework adapters here.
  *
- * NOTE: first-party extension runtimes such as telegraph-subagents are
- * registered by pagelet-local AgentHarness instances. They are not created
- * by this framework runtime factory.
- * 
+ * NOTE: extension-contributed runtimes (e.g. `telegraph-subagents`) are
+ * registered by pagelet-local `AgentHarness` instances via the
+ * `CapabilityHost.registerRuntime` API. They are never instantiated through
+ * this framework runtime factory; the harness's `RuntimeRegistry` routes to
+ * them by ID before `createRuntime` is ever consulted.
+ *
  * @param settings Runtime configuration
  * @returns RuntimeExecutor instance ready to execute runs
  */
 export function createRuntime(settings: RuntimeSettings | AgentRuntimeSettings): RuntimeExecutor {
   const agentSettings = settings as AgentRuntimeSettings
   const backend = agentSettings.backend ?? 'pi-ai'
-  
-  // Telegraph native orchestration mode takes precedence over backend selection.
-  if (isTelegraphSubagentsSelector(agentSettings.orchestration) || isTelegraphSubagentsSelector(backend)) {
-    throw new Error(`[createRuntime] '${TELEGRAPH_SUBAGENTS_RUNTIME_ID}' is a harness extension runtime. Register it on a pagelet-local AgentHarness instead of creating it through createRuntime().`)
-  }
-  
+
   if (backend === 'pi-embedded') {
     return new PiEmbeddedRuntime()
   }

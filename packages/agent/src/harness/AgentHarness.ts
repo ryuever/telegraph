@@ -11,13 +11,22 @@ import type {
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { RuntimeExecutor, RuntimeInput } from '@/packages/agent/runtime/AgentRuntime'
 import {
-  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-  isTelegraphSubagentsSelector,
-} from '@/packages/agent-extension-host'
-import {
   CapabilityHost,
   type AgentCapability,
 } from '@/packages/agent-capabilities'
+
+/**
+ * The `telegraph-subagents` runtime ID is inlined here (D-016 P6) so the
+ * agent package no longer depends on `@/packages/agent-extension-host`.
+ * The literal still appears in `AgentBackendKind` / `AgentOrchestrationMode`
+ * unions and in chat/design UI gating; P8 will sweep those final
+ * references once the orchestration field itself is reshaped.
+ */
+const TELEGRAPH_SUBAGENTS_RUNTIME_ID = 'telegraph-subagents'
+
+function isTelegraphSubagentsSelector(value: unknown): boolean {
+  return value === TELEGRAPH_SUBAGENTS_RUNTIME_ID
+}
 import {
   HookBus,
   HookExecutionError,

@@ -66,3 +66,8 @@ export {
   type ToolContribution,
   type TraceRendererContribution,
 } from './HarnessExtensionManifest'
+export {
+  type ResourcesDiscoverEvent,
+  type ResourcesDiscoverHandler,
+  type ResourcesDiscoverResult,
+} from './resource-events'

@@ -15,7 +15,7 @@ export default defineConfig({
       '@/docs': resolve(__dirname, '../../docs'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-capabilities': resolve(__dirname, '../../packages/agent-capabilities/src'),
-      '@/packages/agent-extension-host': resolve(__dirname, '../../packages/agent-extension-host/src'),
+      '@/packages/agent-extensions': resolve(__dirname, '../../packages/agent-extensions/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src'),
       '@/packages/agent-resources': resolve(__dirname, '../../packages/agent-resources/src'),
       '@/packages/computer-use': resolve(__dirname, '../../packages/computer-use/src'),

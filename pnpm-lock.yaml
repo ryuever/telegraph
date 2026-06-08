@@ -585,6 +585,9 @@ importers:
       '@telegraph/agent':
         specifier: workspace:*
         version: link:../../packages/agent
+      '@telegraph/agent-extensions':
+        specifier: workspace:*
+        version: link:../../packages/agent-extensions
       '@telegraph/agent-protocol':
         specifier: workspace:*
         version: link:../../packages/agent-protocol
@@ -606,9 +609,9 @@ importers:
       '@telegraph/agent-capabilities':
         specifier: workspace:*
         version: link:../agent-capabilities
-      '@telegraph/agent-extension-host':
+      '@telegraph/agent-extensions':
         specifier: workspace:*
-        version: link:../agent-extension-host
+        version: link:../agent-extensions
       '@telegraph/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
@@ -645,19 +648,6 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@24.12.3)(@vitest/ui@2.1.9)(happy-dom@20.9.0)(lightningcss@1.32.0)(terser@5.48.0)
 
-  packages/agent-extension-host:
-    dependencies:
-      '@telegraph/agent-protocol':
-        specifier: workspace:*
-        version: link:../agent-protocol
-    devDependencies:
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@24.12.3)(@vitest/ui@2.1.9)(happy-dom@20.9.0)(lightningcss@1.32.0)(terser@5.48.0)
-
   packages/agent-extensions:
     dependencies:
       '@telegraph/agent-capabilities':
@@ -682,9 +672,9 @@ importers:
 
   packages/agent-resources:
     dependencies:
-      '@telegraph/agent-extension-host':
+      '@telegraph/agent-extensions':
         specifier: workspace:*
-        version: link:../agent-extension-host
+        version: link:../agent-extensions
       ignore:
         specifier: ^5.3.0
         version: 5.3.2

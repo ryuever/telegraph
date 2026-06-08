@@ -7,7 +7,6 @@ export default defineConfig({
       '@/extensions/telegraph-subagents': resolve(__dirname),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-capabilities': resolve(__dirname, '../../packages/agent-capabilities/src'),
-      '@/packages/agent-extension-host': resolve(__dirname, '../../packages/agent-extension-host/src'),
       '@/packages/agent-extensions': resolve(__dirname, '../../packages/agent-extensions/src'),
       '@/packages/agent-protocol': resolve(__dirname, '../../packages/agent-protocol/src/index.ts'),
       '@/packages/agent-resources': resolve(__dirname, '../../packages/agent-resources/src'),

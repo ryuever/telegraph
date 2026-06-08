@@ -1,5 +1,5 @@
 import { dirname } from 'node:path'
-import type { ResolvedResourceContribution } from '@/packages/agent-extension-host'
+import type { ResolvedResourceContribution } from '@/packages/agent-extensions'
 import type {
   ResourceExtensionPaths,
   ResourcePathEntry,

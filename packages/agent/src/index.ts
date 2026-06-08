@@ -229,12 +229,13 @@ export {
   type PermissionCheckResult,
   type PermissionLevel,
 } from '@/packages/agent/runtime/toolCoordination/PermissionValidator'
-export {
-  TELEGRAPH_SUBAGENTS_EXTENSION_ID,
-  TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
-  TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-  isTelegraphSubagentsSelector,
-} from '@/packages/agent-extension-host'
+// D-016 P6: the `TELEGRAPH_SUBAGENTS_*` constants and
+// `isTelegraphSubagentsSelector` helper used to be re-exported here from the
+// now-deleted `@/packages/agent-extension-host` package. They are owned by
+// the `@telegraph/subagents` extension itself
+// (`@/extensions/telegraph-subagents/src/constants`) — consumers should
+// depend on that extension directly rather than reaching through the agent
+// kernel.
 export {
   DesignBuildDurableSpike,
   InMemoryDurableStepLedger,

@@ -25,8 +25,6 @@
       "@/packages/agent/*": ["../../packages/agent/src/*"],
       "@/packages/agent-capabilities": ["../../packages/agent-capabilities/src/index.ts"],
       "@/packages/agent-capabilities/*": ["../../packages/agent-capabilities/src/*"],
-      "@/packages/agent-extension-host": ["../../packages/agent-extension-host/src/index.ts"],
-      "@/packages/agent-extension-host/*": ["../../packages/agent-extension-host/src/*"],
       "@/packages/agent-extensions": ["../../packages/agent-extensions/src/index.ts"],
       "@/packages/agent-extensions/*": ["../../packages/agent-extensions/src/*"],
       "@/packages/agent-resources": ["../../packages/agent-resources/src/index.ts"],

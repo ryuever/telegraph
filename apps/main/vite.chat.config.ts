@@ -31,7 +31,7 @@ export default defineConfig({
       '@/packages/orchestrator-core': resolve(__dirname, '../../packages/orchestrator-core/src'),
       '@/packages/agent': resolve(__dirname, '../../packages/agent/src'),
       '@/packages/agent-capabilities': resolve(__dirname, '../../packages/agent-capabilities/src'),
-      '@/packages/agent-extension-host': resolve(__dirname, '../../packages/agent-extension-host/src'),
+      '@/packages/agent-extensions': resolve(__dirname, '../../packages/agent-extensions/src'),
       '@/packages/agent-resources': resolve(__dirname, '../../packages/agent-resources/src'),
       '@/extensions/telegraph-subagents': resolve(__dirname, '../../extensions/telegraph-subagents'),
     },

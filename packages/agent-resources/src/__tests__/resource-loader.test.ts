@@ -7,7 +7,7 @@ import {
   discoverProjectContextFiles,
   projectResourceContributionsToExtensionPaths,
 } from '@/packages/agent-resources'
-import type { ResolvedResourceContribution } from '@/packages/agent-extension-host'
+import type { ResolvedResourceContribution } from '@/packages/agent-extensions'
 
 function fixtureDir(name: string): string {
   return join(tmpdir(), `telegraph-agent-resources-${name}-${String(Date.now())}-${Math.random().toString(16).slice(2)}`)
