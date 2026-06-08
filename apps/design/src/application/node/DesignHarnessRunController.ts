@@ -5,7 +5,7 @@ import type {
 } from '@/apps/design/application/common'
 import type { AgentEvent } from '@/packages/agent-protocol'
 import { AgentRunControl } from '@/packages/agent/harness'
-import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager'
+import type { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager'
 import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types'
 import { DesignRunStore } from './DesignRunStore'
 
@@ -15,26 +15,38 @@ export interface DesignHarnessRunHandle {
   signal: AbortSignal
 }
 
+/**
+ * D-016 P5: the `SubagentManager` is now owned by the
+ * `@telegraph/subagents` extension factory and injected via
+ * {@link DesignHarnessRunController.attachSubagentManager}. The controller
+ * subscribes its UI fan-out callbacks through the manager's listener API
+ * instead of constructing the manager itself.
+ */
 export class DesignHarnessRunController {
   private readonly runControl = new AgentRunControl<DesignAgentStreamEvent>()
   private readonly runtimeSubagents = new Map<string, DesignSubagentRecordSnapshot>()
   private readonly runStore = new DesignRunStore()
-  readonly subagents: SubagentManager
+  private subagentManager: SubagentManager | undefined
+  private unsubscribeFromManager: (() => void) | undefined
 
-  constructor() {
-    this.subagents = new SubagentManager({
-      onCreate: record => {
-        this.emitSubagentRecord(record)
-      },
-      onUpdate: record => {
-        this.emitSubagentRecord(record)
-      },
-      onStart: record => {
-        this.emitSubagentRecord(record)
-      },
-      onComplete: record => {
-        this.emitSubagentRecord(record)
-      },
+  /** The extension-owned manager once attached, or `undefined` pre-activation. */
+  get subagents(): SubagentManager | undefined {
+    return this.subagentManager
+  }
+
+  /**
+   * Bind an extension-provided `SubagentManager` and register the controller's
+   * UI fan-out callbacks. Replacing an already-attached manager unsubscribes
+   * from the previous one to keep listener counts honest across reloads.
+   */
+  attachSubagentManager(manager: SubagentManager): void {
+    this.unsubscribeFromManager?.()
+    this.subagentManager = manager
+    this.unsubscribeFromManager = manager.addListener({
+      onCreate: record => this.emitSubagentRecord(record),
+      onUpdate: record => this.emitSubagentRecord(record),
+      onStart: record => this.emitSubagentRecord(record),
+      onComplete: record => this.emitSubagentRecord(record),
     })
   }
 
@@ -96,14 +108,18 @@ export class DesignHarnessRunController {
     for (const snapshot of this.runtimeSubagents.values()) {
       snapshots.set(snapshot.id, snapshot)
     }
-    for (const snapshot of this.subagents.listRecords().map(snapshotSubagentRecord)) {
-      snapshots.set(snapshot.id, snapshot)
+    const manager = this.subagentManager
+    if (manager) {
+      for (const snapshot of manager.listRecords().map(snapshotSubagentRecord)) {
+        snapshots.set(snapshot.id, snapshot)
+      }
     }
     return [...snapshots.values()].sort((a, b) => b.startedAt - a.startedAt)
   }
 
   getSubagentResult(childRunId: string, consume: boolean): DesignSubagentRecordSnapshot | null {
-    const managedRecord = this.subagents.getResult(childRunId, { consume })
+    const manager = this.subagentManager
+    const managedRecord = manager?.getResult(childRunId, { consume })
     const managed = snapshotNullableSubagentRecord(managedRecord)
     if (managed) {
       if (consume && managedRecord) this.emitSubagentRecord(managedRecord)
@@ -124,8 +140,10 @@ export class DesignHarnessRunController {
   }
 
   cancelSubagent(childRunId: string): boolean {
-    const cancelled = this.subagents.abort(childRunId)
-    const record = this.subagents.getRecord(childRunId)
+    const manager = this.subagentManager
+    if (!manager) return false
+    const cancelled = manager.abort(childRunId)
+    const record = manager.getRecord(childRunId)
     if (record) this.emitSubagentRecord(record)
     return cancelled
   }

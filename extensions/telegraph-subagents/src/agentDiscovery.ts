@@ -19,7 +19,7 @@ import {
   loadHarnessExtensionPackageSync,
   type HarnessContributionSnapshot,
   type ResolvedAgentContribution,
-} from '@/packages/agent/extensions/harness'
+} from '@/packages/agent-extensions'
 import { parseAgentFile } from './agentParser'
 import type { SubagentDefinition, SubagentScope } from './types'
 

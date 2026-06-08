@@ -1,4 +1,5 @@
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
+import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager'
 import { describe, expect, it } from 'vitest'
 import { DesignHarnessRunController } from '../DesignHarnessRunController'
 
@@ -43,6 +44,7 @@ describe('DesignHarnessRunController', () => {
 
   it('publishes subagent snapshots when subagent state changes', async () => {
     const controller = new DesignHarnessRunController()
+    controller.attachSubagentManager(new SubagentManager())
     const updates: string[] = []
     controller.subscribe(event => {
       if (event.type === 'subagent_updated') {
@@ -50,7 +52,9 @@ describe('DesignHarnessRunController', () => {
       }
     })
 
-    const generator = controller.subagents.spawnAndWait({
+    const subagents = controller.subagents
+    if (!subagents) throw new Error('subagents manager not attached')
+    const generator = subagents.spawnAndWait({
       parentRunId: 'run-1',
       childRunId: 'child-1',
       label: 'Worker',

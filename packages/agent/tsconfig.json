@@ -14,6 +14,8 @@
       "@/packages/agent-capabilities/*": ["../agent-capabilities/src/*"],
       "@/packages/agent-extension-host": ["../agent-extension-host/src/index.ts"],
       "@/packages/agent-extension-host/*": ["../agent-extension-host/src/*"],
+      "@/packages/agent-extensions": ["../agent-extensions/src/index.ts"],
+      "@/packages/agent-extensions/*": ["../agent-extensions/src/*"],
       "@/packages/agent-protocol": ["../agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../agent-protocol/src/*"],
       "@/packages/agent-resources": ["../agent-resources/src/index.ts"],

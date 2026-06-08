@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
@@ -24,14 +25,18 @@ import { assertChatRunTraceBundle } from '@/apps/chat/application/common/trace-b
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor';
-import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
-import { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
+import { EXTENSION_MANIFEST_FILENAME, ExtensionHost } from '@/packages/agent-extensions';
+import {
+  TelegraphExtensionHostImpl,
+  type CapabilityHookRegistrar,
+} from '@/packages/agent-capabilities';
+import { TELEGRAPH_SUBAGENTS_MANAGER_KEY } from '@/extensions/telegraph-subagents/src/extension';
+import type { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
 import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
-import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent-extension-host';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
 import { createAgentHarness, selectRuntimeId } from '@/packages/agent/harness';
-import type { AgentSessionStore } from '@/packages/agent/harness';
+import type { AgentSessionStore, RuntimeRegistration } from '@/packages/agent/harness';
 import { createPageletRunCapabilities, FileAgentSessionStore } from '@/packages/agent/harness/node';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest, type PermissionRequest, type RuntimeMessage } from '@/packages/agent-protocol';
 import type { PermissionDecision, PermissionPrompt } from '@/packages/agent/harness/PermissionBroker';
@@ -86,7 +91,16 @@ interface ChatRunBrokerService {
 @injectable()
 export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   private streamListeners = new Set<(event: ChatStreamEvent) => void>();
-  private readonly subagents = new SubagentManager();
+  /**
+   * D-016 P5: the SubagentManager is now owned by the `@telegraph/subagents`
+   * extension factory and handed back to us under
+   * {@link TELEGRAPH_SUBAGENTS_MANAGER_KEY}. We resolve it lazily via
+   * `extensionsReady` so the pagelet boot path stays synchronous.
+   */
+  private subagents: SubagentManager | undefined;
+  private extensionHost: ExtensionHost | undefined;
+  private telegraphHost: TelegraphExtensionHostImpl | undefined;
+  private readonly extensionsReady: Promise<void> = this.activateExtensions();
   private readonly workspaceRoot = resolveTelegraphWorkspaceRoot();
   private readonly agentSessions = new FileAgentSessionStore(
     join(resolveTelegraphDataDir(), 'chat-sessions'),
@@ -194,16 +208,27 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
         resolvePermissionRequest: (requestId: string, resolution: ChatPermissionResolution): Promise<boolean> =>
           Promise.resolve(this.resolvePermissionRequest(requestId, resolution)),
 
-        listSubagents: (): Promise<ChatSubagentRecordSnapshot[]> =>
-          Promise.resolve(this.subagents.listRecords().map(snapshotSubagentRecord)),
-
-        getSubagentResult: (childRunId: string, consume: boolean = false): Promise<ChatSubagentRecordSnapshot | null> => {
-          const record = this.subagents.getResult(childRunId, { consume });
-          return Promise.resolve(record ? snapshotSubagentRecord(record) : null);
+        listSubagents: async (): Promise<ChatSubagentRecordSnapshot[]> => {
+          await this.extensionsReady;
+          const manager = this.subagents;
+          if (!manager) return [];
+          return manager.listRecords().map(snapshotSubagentRecord);
         },
 
-        cancelSubagent: (childRunId: string): Promise<boolean> =>
-          Promise.resolve(this.subagents.abort(childRunId)),
+        getSubagentResult: async (childRunId: string, consume: boolean = false): Promise<ChatSubagentRecordSnapshot | null> => {
+          await this.extensionsReady;
+          const manager = this.subagents;
+          if (!manager) return null;
+          const record = manager.getResult(childRunId, { consume });
+          return record ? snapshotSubagentRecord(record) : null;
+        },
+
+        cancelSubagent: async (childRunId: string): Promise<boolean> => {
+          await this.extensionsReady;
+          const manager = this.subagents;
+          if (!manager) return false;
+          return manager.abort(childRunId);
+        },
 
         onStreamEvent: (callback: (event: ChatStreamEvent) => void): { unsubscribe: () => void } => {
           this.streamListeners.add(callback);
@@ -227,6 +252,58 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       void this.consumeQueuedRunIntents();
     }, 1_500);
     this.intentPollTimer.unref();
+  }
+
+  /**
+   * D-016 P5: snapshot the runtime contributions registered by activated
+   * extensions and adapt them to the harness's `RuntimeRegistration` shape.
+   * Returns `[]` if extension activation hasn't completed or failed.
+   *
+   * The cast on `create` is safe because `RuntimeContribution.create` accepts
+   * `unknown` (P3) and the harness always passes a real `AgentRunRequest`.
+   */
+  private extensionContributedRuntimes(): RuntimeRegistration[] {
+    const host = this.telegraphHost;
+    if (!host) return [];
+    return host.listRuntimes().map((contribution): RuntimeRegistration => ({
+      id: contribution.id,
+      aliases: contribution.aliases,
+      create: contribution.create as RuntimeRegistration['create'],
+    }));
+  }
+
+  /**
+   * D-016 P5: load + activate the `@telegraph/subagents` command-style
+   * extension. The factory registers the subagent runtime, publishes its
+   * `SubagentManager` under {@link TELEGRAPH_SUBAGENTS_MANAGER_KEY}, and
+   * registers all discovered `SubagentProfile`s on the host.
+   *
+   * The promise is created eagerly during field initialization and awaited
+   * by every consumer (`handleSend`, subagent RPC handlers). Failures are
+   * intentionally swallowed: the chat pagelet must still serve non-subagent
+   * runtimes (pi-ai / pi-embedded) when extension activation has issues, and
+   * any subagent-bound run will surface a "Unknown agent runtime" error from
+   * the AgentHarness path.
+   */
+  private async activateExtensions(): Promise<void> {
+    const hooks: CapabilityHookRegistrar = { on: () => () => { /* noop */ } };
+    const telegraphHost = new TelegraphExtensionHostImpl(hooks);
+    const extensionHost = new ExtensionHost({ telegraph: telegraphHost, hooks });
+    this.telegraphHost = telegraphHost;
+    this.extensionHost = extensionHost;
+
+    try {
+      const extensionRoot = resolveTelegraphSubagentsRoot();
+      await extensionHost.activateFromPath(extensionRoot);
+      const manager = telegraphHost.getCustom(TELEGRAPH_SUBAGENTS_MANAGER_KEY);
+      if (manager) {
+        this.subagents = manager as SubagentManager;
+      }
+    } catch {
+      // Activation failure: keep `subagents` undefined; non-subagent flows
+      // (pi-ai / pi-embedded) still work and the AgentHarness will reject
+      // any attempt to construct the telegraph-subagents runtime.
+    }
   }
 
   private emitStreamEvent(event: ChatStreamEvent): void {
@@ -282,6 +359,11 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
         this.emitStreamEvent(event);
       }
 
+      // D-016 P5: wait for the @telegraph/subagents extension before composing
+      // the harness so its runtime contribution (telegraph-subagents) is
+      // visible to selectRuntimeId / RuntimeRegistry.
+      await this.extensionsReady;
+
       const agentRequest: AgentRunRequest = {
         runId,
         sessionId,
@@ -294,10 +376,7 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
         runtimes: [
           { id: 'pi-ai', create: () => new PiAiRuntime() },
           { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
-          {
-            id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-            create: () => new TelegraphSubagentHarness({ subagentManager: this.subagents }),
-          },
+          ...this.extensionContributedRuntimes(),
           { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
         ],
         capabilities: createPageletRunCapabilities({
@@ -949,4 +1028,20 @@ function denyDecision(reason: string): PermissionDecision {
     source: 'default-deny',
     reason,
   };
+}
+
+/**
+ * D-016 P5: locate the `@telegraph/subagents` extension on disk so the
+ * ExtensionHost can activate it. Searches a small set of candidate roots so
+ * the worker keeps working under both dev (vite cwd at repo root) and
+ * packaged (worker bundle cwd next to the pagelet js) layouts.
+ */
+function resolveTelegraphSubagentsRoot(): string {
+  const candidates = [
+    join(process.cwd(), 'extensions', 'telegraph-subagents'),
+    join(process.cwd(), '..', '..', 'extensions', 'telegraph-subagents'),
+    join(process.cwd(), '..', '..', '..', 'extensions', 'telegraph-subagents'),
+  ];
+  const found = candidates.find(candidate => existsSync(join(candidate, EXTENSION_MANIFEST_FILENAME)));
+  return found ?? candidates[0]!;
 }

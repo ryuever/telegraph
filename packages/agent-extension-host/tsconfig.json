@@ -11,6 +11,10 @@
     "paths": {
       "@/packages/agent-extension-host": ["./src/index.ts"],
       "@/packages/agent-extension-host/*": ["./src/*"],
+      "@/packages/agent-extensions": ["../agent-extensions/src/index.ts"],
+      "@/packages/agent-extensions/*": ["../agent-extensions/src/*"],
+      "@/packages/agent-capabilities": ["../agent-capabilities/src/index.ts"],
+      "@/packages/agent-capabilities/*": ["../agent-capabilities/src/*"],
       "@/packages/agent-protocol": ["../agent-protocol/src/index.ts"],
       "@/packages/agent-protocol/*": ["../agent-protocol/src/*"]
     }

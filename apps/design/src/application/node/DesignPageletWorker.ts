@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createId, inject, injectable } from '@x-oasis/di';
 import { serviceHost } from '@x-oasis/async-call-rpc';
@@ -22,7 +23,7 @@ import {
   type DesignSubagentRecordSnapshot,
 } from '@/apps/design/application/common';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
-import { createAgentHarness } from '@/packages/agent/harness';
+import { createAgentHarness, type RuntimeRegistration } from '@/packages/agent/harness';
 import { PermissionBroker } from '@/packages/agent/harness/PermissionBroker';
 import {
   createPageletRunCapabilities,
@@ -32,8 +33,13 @@ import {
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
-import { TelegraphSubagentHarness } from '@/extensions/telegraph-subagents/src/TelegraphSubagentHarness';
-import { TELEGRAPH_SUBAGENTS_RUNTIME_ID } from '@/packages/agent-extension-host';
+import { EXTENSION_MANIFEST_FILENAME, ExtensionHost } from '@/packages/agent-extensions';
+import {
+  TelegraphExtensionHostImpl,
+  type CapabilityHookRegistrar,
+} from '@/packages/agent-capabilities';
+import { TELEGRAPH_SUBAGENTS_MANAGER_KEY } from '@/extensions/telegraph-subagents/src/extension';
+import type { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest } from '@/packages/agent-protocol';
 import type { PermissionRequest, RuntimeSettings } from '@/packages/agent-protocol';
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build';
@@ -87,6 +93,14 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
   private runControlSubscription: { unsubscribe(): void } | null = null;
   private readonly ledgeredApprovalChangeKeys = new Set<string>();
   private readonly ledgeredRunControlKeys = new Set<string>();
+  /**
+   * D-016 P5: see {@link ChatPageletWorker.activateExtensions} — the design
+   * pagelet uses the same command-style ExtensionHost wiring so the
+   * `@telegraph/subagents` extension owns the `SubagentManager`.
+   */
+  private extensionHost: ExtensionHost | undefined;
+  private telegraphHost: TelegraphExtensionHostImpl | undefined;
+  private readonly extensionsReady: Promise<void> = this.activateExtensions();
 
   constructor(@inject(PageletWorkerConfigId) config: IPageletWorkerConfig) {
     super(config);
@@ -157,6 +171,47 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
     this.intentPollTimer.unref();
   }
 
+  /**
+   * D-016 P5: load + activate the `@telegraph/subagents` command-style
+   * extension. Once the factory has run, the design pagelet retrieves the
+   * shared `SubagentManager` and hands it to `DesignHarnessRunController` so
+   * the controller's UI fan-out listener gets wired up. Failures are
+   * swallowed so the rest of the design pagelet keeps running on the
+   * design-build / pi-ai runtimes.
+   */
+  private async activateExtensions(): Promise<void> {
+    const hooks: CapabilityHookRegistrar = { on: () => () => { /* noop */ } };
+    const telegraphHost = new TelegraphExtensionHostImpl(hooks);
+    const extensionHost = new ExtensionHost({ telegraph: telegraphHost, hooks });
+    this.telegraphHost = telegraphHost;
+    this.extensionHost = extensionHost;
+
+    try {
+      const extensionRoot = resolveTelegraphSubagentsRoot();
+      await extensionHost.activateFromPath(extensionRoot);
+      const manager = telegraphHost.getCustom(TELEGRAPH_SUBAGENTS_MANAGER_KEY);
+      if (manager) {
+        this.runControl.attachSubagentManager(manager as SubagentManager);
+      }
+    } catch {
+      // Activation failure: design-build / pi-ai still work; only the
+      // telegraph-subagents runtime path will be unavailable.
+    }
+  }
+
+  /**
+   * D-016 P5: see {@link ChatPageletWorker.extensionContributedRuntimes}.
+   */
+  private extensionContributedRuntimes(): RuntimeRegistration[] {
+    const host = this.telegraphHost;
+    if (!host) return [];
+    return host.listRuntimes().map((contribution): RuntimeRegistration => ({
+      id: contribution.id,
+      aliases: contribution.aliases,
+      create: contribution.create as RuntimeRegistration['create'],
+    }));
+  }
+
   private async handleSendAgent(request: DesignAgentSendRequest): Promise<DesignAgentSendResult> {
     const sessionId = request.sessionId ?? `design-${request.runId}`;
     await this.recoveredRunsReady;
@@ -175,6 +230,11 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
       workDir: this.workspaceRoot,
     });
     void this.publishRunProjection(createdRun);
+
+    // D-016 P5: ensure the @telegraph/subagents extension has activated
+    // before constructing the harness so its runtime contribution is visible
+    // to RuntimeRegistry and so DesignHarnessRunController.subagents resolves.
+    await this.extensionsReady;
 
     const run = this.runControl.startRun({
       runId: request.runId,
@@ -205,10 +265,7 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
         { id: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID, create: () => new DesignBuildRuntime() },
         { id: 'pi-ai', create: () => new PiAiRuntime() },
         { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },
-        {
-          id: TELEGRAPH_SUBAGENTS_RUNTIME_ID,
-          create: () => new TelegraphSubagentHarness({ subagentManager: this.runControl.subagents }),
-        },
+        ...this.extensionContributedRuntimes(),
         { id: 'telegraph-orchestrator', aliases: ['orchestrator-core'], create: () => createDemoOrchestratorRuntime() },
       ],
       capabilities: createPageletRunCapabilities({
@@ -869,4 +926,20 @@ function metadataRuntimeSettings(metadata: Record<string, unknown> | undefined):
   const settings = metadata?.settings;
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return {};
   return settings;
+}
+
+/**
+ * D-016 P5: locate the `@telegraph/subagents` extension on disk. See
+ * `ChatPageletWorker.ts` for the same helper — kept duplicated rather than
+ * extracted to a shared package to avoid a brand-new dependency edge between
+ * apps just for one path-search helper.
+ */
+function resolveTelegraphSubagentsRoot(): string {
+  const candidates = [
+    join(process.cwd(), 'extensions', 'telegraph-subagents'),
+    join(process.cwd(), '..', '..', 'extensions', 'telegraph-subagents'),
+    join(process.cwd(), '..', '..', '..', 'extensions', 'telegraph-subagents'),
+  ];
+  const found = candidates.find(candidate => existsSync(join(candidate, EXTENSION_MANIFEST_FILENAME)));
+  return found ?? candidates[0]!;
 }

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@telegraph/agent": "workspace:*",
+    "@telegraph/agent-extensions": "workspace:*",
     "@telegraph/agent-protocol": "workspace:*"
   },
   "devDependencies": {

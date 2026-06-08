@@ -1,5 +1,6 @@
 {
   "id": "@telegraph/subagents",
+  "name": "Telegraph Subagents",
   "displayName": "Telegraph Subagents",
   "version": "0.1.0",
   "engines": {
@@ -158,5 +159,5 @@
       "access": "read"
     }
   ],
-  "main": "./src/activate.ts"
+  "main": "./src/extension.ts"
 }
