@@ -14,19 +14,6 @@ import {
   CapabilityHost,
   type AgentCapability,
 } from '@/packages/agent-capabilities'
-
-/**
- * The `telegraph-subagents` runtime ID is inlined here (D-016 P6) so the
- * agent package no longer depends on `@/packages/agent-extension-host`.
- * The literal still appears in `AgentBackendKind` / `AgentOrchestrationMode`
- * unions and in chat/design UI gating; P8 will sweep those final
- * references once the orchestration field itself is reshaped.
- */
-const TELEGRAPH_SUBAGENTS_RUNTIME_ID = 'telegraph-subagents'
-
-function isTelegraphSubagentsSelector(value: unknown): boolean {
-  return value === TELEGRAPH_SUBAGENTS_RUNTIME_ID
-}
 import {
   HookBus,
   HookExecutionError,
@@ -99,9 +86,30 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
   return new DefaultAgentHarness(options)
 }
 
+/**
+ * Resolve the runtime registration id to execute for the given run settings.
+ *
+ * Selection order:
+ *   1. `orchestration` — when set to anything other than `'none'`, the value
+ *      is treated as the runtime id of an orchestration-contributing
+ *      extension (e.g. `'telegraph-subagents'`). The agent kernel does not
+ *      enumerate which extensions can contribute orchestration modes; the
+ *      `RuntimeRegistry` will throw `Unknown agent runtime "<id>"` if the
+ *      requested extension is not installed.
+ *   2. `backend` — well-known kernel runtime id (`'pi-ai'`, `'pi-cli'`,
+ *      `'pi-embedded'`, `'langgraph'`, `'vercel-ai'`,
+ *      `'telegraph-orchestrator'`) or an extension-contributed id used
+ *      without orchestration framing.
+ *   3. `defaultRuntimeId` — kernel default (pi-ai).
+ *
+ * This shape is intentionally extension-agnostic (D-016 P8): no literal
+ * runtime id is hardcoded here, removing the last compile-time knowledge of
+ * `'telegraph-subagents'` (or any other extension id) from the agent kernel.
+ */
 export function selectRuntimeId(settings: RuntimeSettings, defaultRuntimeId = 'pi-ai'): string {
-  if (isTelegraphSubagentsSelector(settings.orchestration) || isTelegraphSubagentsSelector(settings.backend)) {
-    return TELEGRAPH_SUBAGENTS_RUNTIME_ID
+  const orchestration = settings.orchestration
+  if (typeof orchestration === 'string' && orchestration !== 'none' && orchestration.length > 0) {
+    return orchestration
   }
   return settings.backend ?? defaultRuntimeId
 }

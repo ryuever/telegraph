@@ -60,7 +60,8 @@ export interface AgentRuntimeSettings {
   worktreeIsolation?: boolean
   /**
    * Extension capability ids denied for this run (renderer + optional daemon registry merge).
-   * Example: `['telegraph-subagents']` blocks Telegraph native subagent orchestration paths.
+   * Values are the stable runtime / contribution ids the extension registers under
+   * (e.g. the `telegraph-subagents` extension contributes that id).
    */
   extensionBlocklist?: string[]
   /** Run-scoped capability profile requested by the pagelet/user for permission brokerage. */
@@ -89,8 +90,38 @@ export interface AgentSendInput {
   onPiAiStreamEvent?: (event: unknown) => void | Promise<void>
 }
 
-export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'telegraph-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
-export type AgentOrchestrationMode = 'none' | 'telegraph-subagents'
+/**
+ * Built-in runtime backend kinds known to the agent kernel.
+ *
+ * Extensions contribute additional runtime IDs at registration time (e.g. the
+ * `telegraph-subagents` extension registers under that id). Those extra IDs
+ * are intentionally *not* enumerated here — the agent package has no
+ * compile-time knowledge of which extensions are installed. The
+ * `(string & {})` widening keeps IntelliSense for the well-known names while
+ * accepting any extension-contributed id.
+ */
+export type AgentBackendKind =
+  | 'pi-ai'
+  | 'pi-cli'
+  | 'pi-embedded'
+  | 'langgraph'
+  | 'vercel-ai'
+  | 'telegraph-orchestrator'
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {})
+
+/**
+ * Multi-agent orchestration mode. `'none'` disables routing; any other value
+ * is the runtime id of an orchestration-contributing extension (e.g.
+ * `'telegraph-subagents'` for the first-party subagent platform). See
+ * `selectRuntimeId` in `harness/AgentHarness.ts` for how this maps to a
+ * registered runtime.
+ */
+export type AgentOrchestrationMode =
+  | 'none'
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {})
+
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 
 export interface AgentBackend {

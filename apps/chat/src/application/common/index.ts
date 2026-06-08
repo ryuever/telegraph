@@ -41,8 +41,30 @@ export interface AgentRuntimeSettings {
   taskCapabilityProfile?: RuntimeTaskCapabilityProfile
 }
 
-export type AgentBackendKind = 'pi-ai' | 'pi-cli' | 'pi-embedded' | 'telegraph-subagents' | 'langgraph' | 'vercel-ai' | 'telegraph-orchestrator'
-export type AgentOrchestrationMode = 'none' | 'telegraph-subagents'
+/**
+ * Mirrored from `@/packages/agent` (`packages/agent/src/types.ts`).
+ *
+ * The chat pagelet keeps its own copy to avoid a hard dependency from the
+ * common/types layer on the agent package, but the semantics must stay in
+ * sync. As of D-016 P8 these unions widen to `(string & {})` so the agent
+ * kernel no longer needs to know any extension-contributed runtime id at
+ * compile time; chat UI is still allowed to hardcode specific values
+ * (e.g. `'telegraph-subagents'` for the first-party Team Router option)
+ * because chat deliberately ships with first-class subagent support.
+ */
+export type AgentBackendKind =
+  | 'pi-ai'
+  | 'pi-cli'
+  | 'pi-embedded'
+  | 'langgraph'
+  | 'vercel-ai'
+  | 'telegraph-orchestrator'
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {})
+export type AgentOrchestrationMode =
+  | 'none'
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {})
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 
 // ---------------------------------------------------------------------------
