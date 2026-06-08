@@ -71,6 +71,21 @@
         }
       },
       {
+        "id": "pirate",
+        "title": "Pirate",
+        "description": "Re-answer the user's request in pirate voice while preserving the technical content.",
+        "prompt": "./agents/pirate.md",
+        "tools": ["read", "grep", "glob"],
+        "runner": "embedded-kernel",
+        "metadata": {
+          "systemPromptMode": "replace",
+          "inheritProjectContext": false,
+          "inheritSkills": false,
+          "defaultContext": "fresh",
+          "preset": false
+        }
+      },
+      {
         "id": "design-product-planner",
         "title": "Design Product Planner",
         "description": "Turn a one-line design request into a concise product brief and acceptance criteria.",

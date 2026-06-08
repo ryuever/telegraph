@@ -246,6 +246,7 @@ describe('TelegraphSubagentHarness', () => {
         'planner',
         'worker',
         'reviewer',
+        'pirate',
         'design-product-planner',
         'design-component-scout',
         'design-worker',
@@ -257,6 +258,31 @@ describe('TelegraphSubagentHarness', () => {
       description: 'Find reusable UI components, import paths, and usage constraints for a design-build run.',
       tools: ['read', 'grep', 'glob'],
     })
+  })
+
+  it('discovers the pirate builtin agent with read-only tools and replace-mode prompt', () => {
+    // The pirate agent is the 4-pack reference demo for a builtin
+    // SubagentProfile that lives entirely in markdown + manifest (no
+    // companion code). Verifying its discovery shape guarantees future
+    // edits to telegraph-subagents/agents/pirate.md or the manifest entry
+    // can't silently break the contract that "pirate is dispatchable,
+    // read-only, replace-mode, fresh-context".
+    const agents = discoverAgents({ scopes: ['builtin'] })
+    const pirate = agents.get('pirate')
+
+    expect(pirate).toBeDefined()
+    expect(pirate?.name).toBe('pirate')
+    expect(pirate?.description).toBe(
+      "Re-answer the user's request in pirate voice while preserving the technical content.",
+    )
+    expect(pirate?.tools).toEqual(['read', 'grep', 'glob'])
+    expect(pirate?.systemPromptMode).toBe('replace')
+    expect(pirate?.defaultContext).toBe('fresh')
+    expect(pirate?.inheritProjectContext).toBe(false)
+    expect(pirate?.inheritSkills).toBe(false)
+    expect(pirate?.sourcePath).toContain('extensions/telegraph-subagents/agents/pirate.md')
+    expect(pirate?.systemPrompt).toContain('Pirate')
+    expect(pirate?.systemPrompt).toContain('Preserve every technical fact')
   })
 
   it('discovers custom agents by filename without requiring a name frontmatter field', async () => {
