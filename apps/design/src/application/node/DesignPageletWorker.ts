@@ -34,6 +34,7 @@ import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
 import { EXTENSION_MANIFEST_FILENAME, ExtensionHost } from '@/packages/agent-extensions';
+import { buildExtensionAliasMap } from '@/apps/main/application/node/extension-aliases';
 import {
   TelegraphExtensionHostImpl,
   type CapabilityHookRegistrar,
@@ -182,7 +183,16 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
   private async activateExtensions(): Promise<void> {
     const hooks: CapabilityHookRegistrar = { on: () => () => { /* noop */ } };
     const telegraphHost = new TelegraphExtensionHostImpl(hooks);
-    const extensionHost = new ExtensionHost({ telegraph: telegraphHost, hooks });
+    // Mirror the host project's `@/packages/*` aliases into jiti so that
+    // extension factories can `import { ... } from '@/packages/...'`
+    // exactly like first-party code. jiti does not see vite's
+    // resolve.alias map, so this MUST be supplied explicitly. See chat's
+    // equivalent wiring in ChatPageletWorker.ts.
+    const extensionHost = new ExtensionHost({
+      telegraph: telegraphHost,
+      hooks,
+      aliases: buildExtensionAliasMap(),
+    });
     this.telegraphHost = telegraphHost;
     this.extensionHost = extensionHost;
 

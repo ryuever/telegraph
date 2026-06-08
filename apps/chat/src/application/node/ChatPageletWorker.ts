@@ -30,6 +30,7 @@ import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
 import { listRuntimeCapabilityDescriptors } from '@/packages/agent/runtime/RuntimeCapabilityDescriptor';
 import { EXTENSION_MANIFEST_FILENAME, ExtensionHost } from '@/packages/agent-extensions';
+import { buildExtensionAliasMap } from '@/apps/main/application/node/extension-aliases';
 import {
   TelegraphExtensionHostImpl,
   type AgentCapability,
@@ -388,7 +389,27 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       on: (name, handler) => this.extensionHookBus.on(name, handler),
     };
     const telegraphHost = new TelegraphExtensionHostImpl(hooks);
-    const extensionHost = new ExtensionHost({ telegraph: telegraphHost, hooks });
+    const extensionHost = new ExtensionHost({
+      telegraph: telegraphHost,
+      hooks,
+      // Mirror the host project's `@/packages/*` aliases into jiti so that
+      // extension factories can `import { ... } from '@/packages/...'`
+      // exactly like first-party code. jiti does not see vite's
+      // resolve.alias map, so this MUST be supplied explicitly.
+      aliases: buildExtensionAliasMap(),
+      // Surface activation failures to stderr so they are not silently
+      // swallowed. ExtensionHost otherwise discards per-extension errors
+      // by design (RFC §8.3 Red Flag #4 — one bad extension must not
+      // brick the pagelet); without this we lost ~30min on an
+      // ERR_MODULE_NOT_FOUND that was invisible. We only surface failure
+      // events; successful activations are silent.
+      onLifecycleEvent: ev => {
+        if (ev.type === 'activation_failed' || ev.type === 'deactivation_failed') {
+          // eslint-disable-next-line no-console
+          console.error(`[chat-worker:extension:${ev.type}] ${ev.extensionId}: ${ev.error?.message ?? 'no message'}`);
+        }
+      },
+    });
     this.telegraphHost = telegraphHost;
     this.extensionHost = extensionHost;
 

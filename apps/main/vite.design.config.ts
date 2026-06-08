@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
 import { resolve } from 'node:path';
 
 const nodeBuiltins = [
@@ -8,12 +9,34 @@ const nodeBuiltins = [
   'tty', 'url', 'util', 'v8', 'vm', 'zlib', 'async_hooks', 'module',
 ];
 
+// jiti must stay external; it lazy-requires its own `../dist/babel.cjs`
+// transformer at runtime via `require()` (jiti.cjs:13). See the long
+// comment in vite.chat.config.ts for the full rationale, including why
+// `rollupOptions.external` alone is insufficient under
+// `@electron-forge/plugin-vite` (the plugin's config merge silently drops
+// the user-supplied external function) and why we need both the plugin
+// and the `isExternal` field. This file MUST stay in sync with
+// vite.chat.config.ts.
+const externalJitiPlugin: Plugin = {
+  name: 'telegraph-external-jiti',
+  enforce: 'pre',
+  resolveId(source) {
+    if (source === 'jiti' || source.startsWith('jiti/')) {
+      return { id: source, external: true };
+    }
+    return null;
+  },
+};
+
 const isExternal = (id: string) =>
   id === 'electron' ||
+  id === 'jiti' ||
+  id.startsWith('jiti/') ||
   id.startsWith('node:') ||
   nodeBuiltins.some(builtin => id === builtin || id.startsWith(`${builtin}/`));
 
 export default defineConfig({
+  plugins: [externalJitiPlugin],
   resolve: {
     mainFields: ['module', 'jsnext:main', 'jsnext'],
     alias: {
