@@ -1,7 +1,0 @@
-{
-  "name": "@telegraph/extension-workspace-agents",
-  "version": "0.0.0",
-  "description": "Virtual Telegraph extension for workspace-defined subagent profiles.",
-  "private": true,
-  "type": "module"
-}
