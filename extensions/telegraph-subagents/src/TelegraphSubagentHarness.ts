@@ -22,7 +22,7 @@ import {
   agentAliasList,
   agentCatalogText,
   type HarnessContributionSnapshot,
-} from '@/packages/agent/extensions/harness'
+} from '@/packages/agent-extensions'
 import {
   TELEGRAPH_SUBAGENTS_PRODUCER_VERSION,
   TELEGRAPH_SUBAGENTS_RUNTIME_ID,

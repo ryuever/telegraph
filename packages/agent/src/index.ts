@@ -196,21 +196,12 @@ export { SessionStore, type SessionStoreConfig } from '@/packages/agent/runtime/
 export { ToolRegistry, type ToolCallEvent, type ToolResultEvent, type ToolParameter, type ToolParameters } from '@/packages/agent/runtime/toolExecution/ToolRegistry'
 export { ToolExecutor, type ToolCallInput } from '@/packages/agent/runtime/toolExecution/ToolExecutor'
 export { ToolCallParser, type ParsedToolCall } from '@/packages/agent/runtime/toolExecution/ToolCallParser'
-// Node.js-only exports (ExtensionRegistry, createExecutor) are intentionally excluded from main export
-// Import them from '@/packages/agent/extensions/node' if needed in Node.js environments
-export {
-  validateManifest,
-  assertValidManifest,
-  parseManifest,
-  type ExtensionManifest,
-  type ToolDefinition as ExtensionToolDefinition,
-  type ExecutableConfig,
-  type RetryPolicy,
-  type Permission,
-  type PermissionType,
-  type ExecutableType,
-  type LLMHints,
-} from '@/packages/agent/extensions/ExtensionManifest'
+// Legacy `extensions/ExtensionManifest` re-exports removed in D-016 P7.
+// The orphaned manifest types lived only in the deleted `packages/agent/src/extensions/`
+// tree (System A). Current ExtensionManifest contract is owned by
+// `@/packages/agent-protocol` (`ExtensionManifest`, `ToolDefinition`) and the
+// command-style host lives in `@/packages/agent-extensions`. Import from those
+// packages directly — `@telegraph/agent` no longer brokers them.
 export { SessionRepository, type StoredSession, type StoredMessage, SessionRepositoryMigration } from '@/packages/agent/persistence/SessionRepository'
 export {
   DependencyGraph,
@@ -291,48 +282,16 @@ export {
   type MarketplaceToolRisk,
   type ResolvedMarketplaceTool,
 } from '@/packages/agent/marketplace'
-export {
-  ActivationHost,
-  CapabilityBroker,
-  ContributionRegistry,
-  HARNESS_EXTENSION_MANIFEST_FILENAME,
-  agentAliasList,
-  agentCatalogText,
-  discoverHarnessExtensionSourcesFromDirs,
-  discoverHarnessExtensionSourcesFromDirsSync,
-  hasHarnessExtensionManifest,
-  hasHarnessExtensionManifestSync,
-  loadHarnessExtensionManifest,
-  loadHarnessExtensionManifestSync,
-  loadHarnessExtensionPackage,
-  loadHarnessExtensionPackageSync,
-  loadHarnessExtensionPackages,
-  loadHarnessExtensionPackagesFromDirs,
-  loadHarnessExtensionPackagesFromDirsSync,
-  loadHarnessExtensionPackagesSync,
-  parseHarnessExtensionManifest,
-  resolveHarnessExtensionMainPath,
-  resolveHarnessExtensionManifestPath,
-  type ActivationEvent,
-  type AgentContribution,
-  type HarnessContributionSnapshot,
-  type HarnessExtensionDirectorySource,
-  type HarnessExtensionLoadDiagnostic,
-  type HarnessExtensionLoadDiagnosticCode,
-  type HarnessExtensionLoadResult,
-  type HarnessExtensionLoadSource,
-  type HarnessExtensionManifest,
-  type HarnessExtensionPackage,
-  type HarnessExtensionSourceDiscoveryResult,
-  type HarnessExtensionSourceKind,
-  type ResourceContribution,
-  type ResourceContributionKind,
-  type ResolvedAgentContribution,
-  type ResolvedResourceContribution,
-  type ResourcesDiscoverEvent,
-  type ResourcesDiscoverHandler,
-  type ResourcesDiscoverResult,
-} from '@/packages/agent/extensions/harness'
+// Legacy `extensions/harness` re-exports removed in D-016 P7.
+// The compatibility shim at `packages/agent/src/extensions/harness/index.ts`
+// (which itself just forwarded to `@/packages/agent-extensions` + `CapabilityBroker`
+// from `@/packages/agent-capabilities`) has been deleted along with the rest of
+// `packages/agent/src/extensions/`. Consumers must import these symbols directly
+// from `@/packages/agent-extensions` (host, contributions, harness manifest
+// loader) or `@/packages/agent-capabilities` (`CapabilityBroker`).
+// Repo-wide grep confirmed no external consumer relied on the `@telegraph/agent`
+// barrel for any of these names; the only call-sites lived inside the
+// `telegraph-subagents` extension and have been migrated to direct imports.
 export {
   ExecutionTimeline,
   type TimelineEntry,

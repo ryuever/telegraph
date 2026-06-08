@@ -1,5 +1,5 @@
-import type { HarnessContributionSnapshot } from '@/packages/agent/extensions/harness'
-import { agentAliasList } from '@/packages/agent/extensions/harness'
+import type { HarnessContributionSnapshot } from '@/packages/agent-extensions'
+import { agentAliasList } from '@/packages/agent-extensions'
 import type {
   SubagentOrchestratorInput,
   TeamMemberSpec,
