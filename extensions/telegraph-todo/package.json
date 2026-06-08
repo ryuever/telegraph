@@ -1,0 +1,23 @@
+{
+  "name": "@telegraph/extension-telegraph-todo",
+  "version": "0.0.0",
+  "description": "Telegraph 4-pack demo extension: scratch-pad todo list exposed as two tool capabilities (todo_read, todo_write).",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/agent-capabilities": "workspace:*",
+    "@telegraph/agent-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.8"
+  }
+}

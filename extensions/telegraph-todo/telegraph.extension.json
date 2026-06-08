@@ -1,0 +1,25 @@
+{
+  "id": "@telegraph/todo",
+  "name": "Telegraph Todo",
+  "displayName": "Telegraph Todo",
+  "version": "0.1.0",
+  "engines": {
+    "telegraph": ">=0.1.0"
+  },
+  "pagelets": ["chat"],
+  "activationEvents": ["onAgentRun:*"],
+  "contributes": {
+    "tools": [
+      {
+        "name": "todo_read",
+        "description": "Read the current scratch-pad todo list for this pagelet session. Returns an array of {id, text, done, createdAt} items."
+      },
+      {
+        "name": "todo_write",
+        "description": "Append, update, or remove items on the scratch-pad todo list. Use op = 'add' to append, 'toggle' to flip done, 'remove' to delete by id, 'clear' to wipe."
+      }
+    ]
+  },
+  "permissions": [],
+  "main": "./src/extension.ts"
+}
