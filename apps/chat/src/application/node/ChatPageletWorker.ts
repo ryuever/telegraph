@@ -273,17 +273,21 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   }
 
   /**
-   * D-016 P5: load + activate the `@telegraph/subagents` command-style
-   * extension. The factory registers the subagent runtime, publishes its
-   * `SubagentManager` under {@link TELEGRAPH_SUBAGENTS_MANAGER_KEY}, and
-   * registers all discovered `SubagentProfile`s on the host.
+   * D-016 P5 + 4-pack P0: discover every extension under the workspace
+   * `extensions/` directory and activate them via the command-style
+   * ExtensionHost loader. The first-party `@telegraph/subagents` extension
+   * still publishes its `SubagentManager` under
+   * {@link TELEGRAPH_SUBAGENTS_MANAGER_KEY}; we resolve it once activation
+   * settles. Other extensions (pirate / todo / bookmark / completion-notify)
+   * are picked up automatically as long as they ship a
+   * `telegraph.extension.json` manifest at their root.
    *
-   * The promise is created eagerly during field initialization and awaited
-   * by every consumer (`handleSend`, subagent RPC handlers). Failures are
-   * intentionally swallowed: the chat pagelet must still serve non-subagent
-   * runtimes (pi-ai / pi-embedded) when extension activation has issues, and
-   * any subagent-bound run will surface a "Unknown agent runtime" error from
-   * the AgentHarness path.
+   * Activation failures are intentionally swallowed per-extension by
+   * ExtensionHost (lifecycle event = `activation_failed`); the pagelet must
+   * still serve non-subagent runtimes (pi-ai / pi-embedded) when any
+   * individual extension has issues. AgentHarness will surface an
+   * "Unknown agent runtime" error if a subagent-bound run is requested
+   * without the subagents extension active.
    */
   private async activateExtensions(): Promise<void> {
     const hooks: CapabilityHookRegistrar = { on: () => () => { /* noop */ } };
@@ -293,16 +297,16 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
     this.extensionHost = extensionHost;
 
     try {
-      const extensionRoot = resolveTelegraphSubagentsRoot();
-      await extensionHost.activateFromPath(extensionRoot);
+      const extensionsDir = resolveExtensionsDirectory();
+      await extensionHost.activateFromDirectory(extensionsDir);
       const manager = telegraphHost.getCustom(TELEGRAPH_SUBAGENTS_MANAGER_KEY);
       if (manager) {
         this.subagents = manager as SubagentManager;
       }
     } catch {
-      // Activation failure: keep `subagents` undefined; non-subagent flows
-      // (pi-ai / pi-embedded) still work and the AgentHarness will reject
-      // any attempt to construct the telegraph-subagents runtime.
+      // Directory discovery failure: keep `subagents` undefined; non-subagent
+      // flows (pi-ai / pi-embedded) still work and the AgentHarness will
+      // reject any attempt to construct the telegraph-subagents runtime.
     }
   }
 
@@ -1031,17 +1035,23 @@ function denyDecision(reason: string): PermissionDecision {
 }
 
 /**
- * D-016 P5: locate the `@telegraph/subagents` extension on disk so the
- * ExtensionHost can activate it. Searches a small set of candidate roots so
- * the worker keeps working under both dev (vite cwd at repo root) and
- * packaged (worker bundle cwd next to the pagelet js) layouts.
+ * D-016 P5 + 4-pack P0: locate the workspace `extensions/` directory so the
+ * ExtensionHost can discover and activate every extension under it. Searches
+ * a small set of candidate roots so the worker keeps working under both dev
+ * (vite cwd at repo root) and packaged (worker bundle cwd next to the
+ * pagelet js) layouts. We probe for the first-party
+ * `telegraph-subagents/<EXTENSION_MANIFEST_FILENAME>` to anchor the
+ * candidate; that extension is guaranteed to exist (D-016 P5) and lives
+ * directly under `extensions/`.
  */
-function resolveTelegraphSubagentsRoot(): string {
+function resolveExtensionsDirectory(): string {
   const candidates = [
-    join(process.cwd(), 'extensions', 'telegraph-subagents'),
-    join(process.cwd(), '..', '..', 'extensions', 'telegraph-subagents'),
-    join(process.cwd(), '..', '..', '..', 'extensions', 'telegraph-subagents'),
+    join(process.cwd(), 'extensions'),
+    join(process.cwd(), '..', '..', 'extensions'),
+    join(process.cwd(), '..', '..', '..', 'extensions'),
   ];
-  const found = candidates.find(candidate => existsSync(join(candidate, EXTENSION_MANIFEST_FILENAME)));
+  const found = candidates.find(candidate =>
+    existsSync(join(candidate, 'telegraph-subagents', EXTENSION_MANIFEST_FILENAME))
+  );
   return found ?? candidates[0]!;
 }
