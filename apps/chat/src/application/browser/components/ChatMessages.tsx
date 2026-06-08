@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useSyncExternalStore } from 'react'
 import {
   AgentActivity,
   AgentReasoning,
@@ -8,6 +8,7 @@ import {
 import { MarkdownMessage } from '@/packages/ui/components/MarkdownMessage'
 import { cn } from '@/packages/ui/lib/utils'
 import type { ChatMessage, ChatSubagentGroup, ChatSubagentStatus } from '@/apps/chat/application/common'
+import { getBookmarksSnapshot, subscribeBookmarks } from '../bookmark-store'
 
 interface Props {
   messages: ChatMessage[]
@@ -81,6 +82,13 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
   const showCursor = isStreaming
   const showThinking = isStreaming && message.content.length === 0
   const hasActivity = showThinking || (message.toolCalls?.length ?? 0) > 0
+  // 4-pack item B: subscribe to the renderer-local bookmark set so a badge
+  // appears the moment `/bookmark` resolves. Subscribing per-message keeps
+  // the rerender scope tight to messages whose bookmark state actually
+  // flips, at the cost of N subscribers; for chat thread sizes this is a
+  // wash vs. broadcasting via context.
+  const bookmarks = useSyncExternalStore(subscribeBookmarks, getBookmarksSnapshot)
+  const isBookmarked = bookmarks.has(message.id)
 
   return (
     <div className="flex gap-3">
@@ -90,6 +98,14 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
           <span className="font-medium text-muted-foreground">Assistant</span>
           {isStreaming && <Pulse label="thinking" />}
           {isError && <span className="text-destructive">error</span>}
+          {isBookmarked && (
+            <span
+              className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300"
+              title="Bookmarked via /bookmark"
+            >
+              bookmarked
+            </span>
+          )}
         </div>
 
         {hasActivity && (

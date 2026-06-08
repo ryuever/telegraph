@@ -19,6 +19,7 @@ import { PageletAgentService } from '../pagelet-agent-service'
 import { createChatAgentEventProjectionState, projectAgentEventToChat } from '../agent-event-projector'
 import { upsertToolCall } from '../chat-tool-calls'
 import { upsertSubagentUpdate } from '../chat-subagents'
+import { addBookmark } from '../bookmark-store'
 import { groupPersistedRuns, sortRunsForSessionTimeline } from '../persisted-run-groups'
 import {
   loadSettings,
@@ -569,11 +570,39 @@ export function ChatPanel({ agent }: Props) {
   const seedText = composerKey ? (draftBySession[composerKey] ?? '') : ''
   const [composerRemountKey, setComposerRemountKey] = useState(0)
 
+  /**
+   * 4-pack item B: intercept `/bookmark` slash command and route to the
+   * extension-registered handler instead of sending it as a chat turn.
+   *
+   * UX (per design decision in the planning Q&A): typing `/bookmark` with
+   * no argument bookmarks the most recent assistant message in the active
+   * conversation. If there isn't one (empty thread, or thread starts with
+   * a user turn that hasn't been answered yet) the command is silently
+   * dropped — we don't want to surface extension plumbing as a chat error
+   * to the user.
+   *
+   * The extension's `invoke` callback returns `{ ok: true, bookmarked: id }`
+   * on success; we then update the renderer-local bookmark-store so
+   * `ChatMessages` can paint the badge without round-tripping. Failures
+   * arrive as `{ ok: false }` envelopes from the pagelet (no throw) and
+   * are intentionally swallowed for the demo — a real product would
+   * surface them via a toast.
+   */
   const handleSendMessage = useCallback(
     (text: string) => {
+      if (text === '/bookmark') {
+        if (!agentService.invokeCommand) return
+        const lastAssistant = [...active.messages].reverse().find(m => m.role === 'assistant')
+        if (!lastAssistant) return
+        const messageId = lastAssistant.id
+        void agentService.invokeCommand('bookmark', { messageId }).then(result => {
+          if (result.ok) addBookmark(messageId)
+        })
+        return
+      }
       void sendMessage(text)
     },
-    [sendMessage]
+    [active.messages, agentService, sendMessage]
   )
   const [collapsed, setCollapsed] = useState(false)
 

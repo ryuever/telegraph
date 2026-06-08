@@ -29,6 +29,7 @@ const resolvePermissionRequestMock = vi.fn(() => Promise.resolve(true))
 const listSubagentsMock = vi.fn(() => Promise.resolve([]))
 const getSubagentResultMock = vi.fn(() => Promise.resolve(null))
 const cancelSubagentMock = vi.fn(() => Promise.resolve(false))
+const invokeCommandMock = vi.fn(() => Promise.resolve({ ok: true as const, result: undefined as unknown }))
 const client: IChatPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   send: sendMock,
@@ -46,6 +47,7 @@ const client: IChatPageletService = {
   listSubagents: listSubagentsMock,
   getSubagentResult: getSubagentResultMock,
   cancelSubagent: cancelSubagentMock,
+  invokeCommand: invokeCommandMock,
   onStreamEvent: vi.fn((callback: (event: ChatStreamEvent) => void) => {
     streamCallback = callback
     return { unsubscribe }
@@ -207,6 +209,18 @@ describe('PageletAgentService', () => {
     expect(listSubagentsMock).toHaveBeenCalled()
     expect(getSubagentResultMock).toHaveBeenCalledWith('child-1', true)
     expect(cancelSubagentMock).toHaveBeenCalledWith('child-1')
+  })
+
+  it('forwards slash-command invocations to the pagelet client and returns the envelope verbatim', async () => {
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    invokeCommandMock.mockResolvedValueOnce({ ok: true as const, result: { bookmarked: 'm_42' } as unknown })
+    await expect(service.invokeCommand?.('bookmark', { messageId: 'm_42' })).resolves.toEqual({
+      ok: true,
+      result: { bookmarked: 'm_42' },
+    })
+    expect(invokeCommandMock).toHaveBeenCalledWith('bookmark', { messageId: 'm_42' })
   })
 
   it('forwards persisted run console calls through the pagelet service', async () => {

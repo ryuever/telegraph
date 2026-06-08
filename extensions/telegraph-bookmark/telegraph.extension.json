@@ -1,0 +1,22 @@
+{
+  "id": "@telegraph/bookmark",
+  "name": "Telegraph Bookmark",
+  "displayName": "Telegraph Bookmark",
+  "version": "0.1.0",
+  "engines": {
+    "telegraph": ">=0.1.0"
+  },
+  "pagelets": ["chat"],
+  "activationEvents": ["onCommand:bookmark"],
+  "contributes": {
+    "commands": [
+      {
+        "id": "bookmark",
+        "title": "Toggle bookmark on a chat message",
+        "command": "/bookmark"
+      }
+    ]
+  },
+  "permissions": [],
+  "main": "./src/extension.ts"
+}

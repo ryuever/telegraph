@@ -2,6 +2,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ChatMessages } from '../components/ChatMessages'
+import { addBookmark, clearBookmarks } from '../bookmark-store'
 import type { ChatMessage } from '@/apps/chat/application/common'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -18,6 +19,7 @@ afterEach(() => {
   root = undefined
   host?.remove()
   host = undefined
+  clearBookmarks()
 })
 
 describe('ChatMessages', () => {
@@ -75,6 +77,51 @@ describe('ChatMessages', () => {
     ])
     expect(document.querySelector('td strong')?.textContent).toBe('ready')
     expect(document.querySelector('td code')?.textContent).toBe('hold')
+  })
+
+  it('renders a bookmark badge on assistant messages present in the bookmark store', () => {
+    addBookmark('msg-assistant')
+    renderMessages([
+      {
+        id: 'msg-assistant',
+        role: 'assistant',
+        content: 'pinned answer',
+        createdAt: 1,
+      },
+    ])
+    const badge = Array.from(document.querySelectorAll('span'))
+      .find(node => node.textContent === 'bookmarked')
+    expect(badge).toBeDefined()
+    expect(badge?.getAttribute('title')).toBe('Bookmarked via /bookmark')
+  })
+
+  it('does not render a bookmark badge for messages not in the bookmark store', () => {
+    renderMessages([
+      {
+        id: 'msg-assistant',
+        role: 'assistant',
+        content: 'unbookmarked answer',
+        createdAt: 1,
+      },
+    ])
+    const badge = Array.from(document.querySelectorAll('span'))
+      .find(node => node.textContent === 'bookmarked')
+    expect(badge).toBeUndefined()
+  })
+
+  it('does not paint a badge on user messages even if their id collides with a bookmark', () => {
+    addBookmark('msg-user')
+    renderMessages([
+      {
+        id: 'msg-user',
+        role: 'user',
+        content: 'a question',
+        createdAt: 1,
+      },
+    ])
+    const badge = Array.from(document.querySelectorAll('span'))
+      .find(node => node.textContent === 'bookmarked')
+    expect(badge).toBeUndefined()
   })
 })
 

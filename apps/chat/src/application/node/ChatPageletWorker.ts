@@ -20,6 +20,7 @@ import {
   type ChatRunTraceImportResult,
   type ChatSubagentRecordSnapshot,
   type ChatStreamEvent,
+  type ChatCommandInvocationResult,
 } from '@/apps/chat/application/common';
 import { assertChatRunTraceBundle } from '@/apps/chat/application/common/trace-bundle';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
@@ -228,6 +229,43 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
           const manager = this.subagents;
           if (!manager) return false;
           return manager.abort(childRunId);
+        },
+
+        /**
+         * 4-pack item B (telegraph-bookmark): renderer-driven slash-command
+         * dispatch. The chat composer pre-parses input like `/bookmark` into
+         * `{ commandId, args }` and invokes the extension-registered command
+         * handler living inside this pagelet's CapabilityHost.
+         *
+         * Failure modes are returned as `{ ok: false, error }` envelopes (not
+         * thrown across the RPC boundary) so renderer code stays defensive
+         * against extension-author bugs without try/catch noise per call. See
+         * the doc comment on `IChatPageletService.invokeCommand` for the
+         * envelope contract.
+         */
+        invokeCommand: async (commandId: string, args?: unknown): Promise<ChatCommandInvocationResult> => {
+          await this.extensionsReady;
+          const host = this.telegraphHost;
+          if (!host) {
+            return { ok: false, error: 'extension host not initialised' };
+          }
+          const command = host.getCommand(commandId);
+          if (!command) {
+            return { ok: false, error: `command not found: ${commandId}` };
+          }
+          if (!command.invoke) {
+            // CapabilityHost.ts:104 — `invoke` undefined means renderer-side
+            // handling. Forward this as an explicit error so the chat layer
+            // doesn't silently swallow a misconfigured command.
+            return { ok: false, error: `command "${commandId}" has no invoke handler (renderer-side)` };
+          }
+          try {
+            const result = await command.invoke(args);
+            return { ok: true, result };
+          } catch (err) {
+            const error = err instanceof Error ? err.message : String(err);
+            return { ok: false, error };
+          }
         },
 
         onStreamEvent: (callback: (event: ChatStreamEvent) => void): { unsubscribe: () => void } => {

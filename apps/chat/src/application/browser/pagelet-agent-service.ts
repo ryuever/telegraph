@@ -14,6 +14,7 @@ import {
   type ChatConfiguredModelDescriptorSnapshot,
   type ChatAgentRunStatus,
   type ChatSubagentRecordSnapshot,
+  type ChatCommandInvocationResult,
   type ChatDeleteSessionRunsResult,
   chatStreamBelongsToRun,
   isAgentStreamEvent,
@@ -284,6 +285,23 @@ export class PageletAgentService implements AgentService {
     await waitForChatPageletReady(signal)
     throwIfAborted(signal)
     return getChatPageletClient().cancelSubagent(childRunId)
+  }
+
+  /**
+   * Browser-side forwarder for slash-command dispatch (4-pack item B). The
+   * pagelet end already wraps thrown errors into the `{ ok: false }` arm,
+   * so renderers can rely on the envelope and never see a rejected promise
+   * for an extension-author bug. Pre-ready waits piggy-back on the same
+   * `waitForChatPageletReady` poll used by every other RPC here.
+   */
+  async invokeCommand(
+    commandId: string,
+    args?: unknown,
+    signal?: AbortSignal,
+  ): Promise<ChatCommandInvocationResult> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().invokeCommand(commandId, args)
   }
 
   private getSettings(): ChatSendRequest['settings'] {

@@ -13,6 +13,7 @@ import type {
   ChatConfiguredModelDescriptorSnapshot,
   ChatSubagentRecordSnapshot,
   ChatStreamEvent,
+  ChatCommandInvocationResult,
   EventSubscription,
 } from '@/apps/chat/application/common'
 import type { AgentRunReplaySource } from '@/packages/agent/persistence/AgentRunRepository'
@@ -55,4 +56,14 @@ export interface AgentService {
   listSubagents(signal?: AbortSignal): Promise<ChatSubagentRecordSnapshot[]>
   getSubagentResult(childRunId: string, options?: { consume?: boolean; signal?: AbortSignal }): Promise<ChatSubagentRecordSnapshot | null>
   cancelSubagent(childRunId: string, signal?: AbortSignal): Promise<boolean>
+  /**
+   * Invoke an extension-registered slash command by id. Optional because not
+   * every AgentService implementation runs against a real pagelet (test
+   * doubles can omit it). Renderers that depend on slash commands MUST
+   * feature-detect: `if (agentService.invokeCommand) { ... }`.
+   *
+   * Result envelope mirrors `IChatPageletService.invokeCommand` — `{ ok }`
+   * discriminator carries either `result` or `error`.
+   */
+  invokeCommand?(commandId: string, args?: unknown, signal?: AbortSignal): Promise<ChatCommandInvocationResult>
 }

@@ -297,8 +297,34 @@ export interface IChatPageletService {
   listSubagents(): Promise<ChatSubagentRecordSnapshot[]>
   getSubagentResult(childRunId: string, consume?: boolean): Promise<ChatSubagentRecordSnapshot | null>
   cancelSubagent(childRunId: string): Promise<boolean>
+  /**
+   * Invoke an extension-registered slash command by id (the same id the
+   * extension passed to `host.registerCommand({ id, ... })`). Args are
+   * forwarded verbatim to the command's `invoke` callback; the return value
+   * is whatever the extension chose to return. Renderers typically pre-parse
+   * the user's `/foo bar` input into a structured args object before calling
+   * this RPC.
+   *
+   * Resolves with `{ ok: false, error: ... }` if no command with that id is
+   * active (extension not loaded / typo) or if the command has no `invoke`
+   * handler (renderer-side commands per CapabilityHost docs). Resolves with
+   * `{ ok: true, result }` on success. Errors thrown by the command's
+   * `invoke` are surfaced as `{ ok: false, error: e.message }` rather than
+   * propagated through the RPC boundary so the renderer never crashes on an
+   * extension-author bug.
+   */
+  invokeCommand(commandId: string, args?: unknown): Promise<ChatCommandInvocationResult>
   onStreamEvent(callback: (event: ChatStreamEvent) => void): EventSubscription
 }
+
+/**
+ * Result envelope for {@link IChatPageletService.invokeCommand}. Renderers
+ * pattern-match on `ok` to distinguish "command produced a value" from
+ * "command not found / command threw".
+ */
+export type ChatCommandInvocationResult =
+  | { ok: true; result: unknown }
+  | { ok: false; error: string }
 
 // ---------------------------------------------------------------------------
 // Model descriptor (for UI picker)
