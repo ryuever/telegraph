@@ -21,6 +21,9 @@ import {
   type ChatSubagentRecordSnapshot,
   type ChatStreamEvent,
   type ChatCommandInvocationResult,
+  type ChatNotifyCapability,
+  type ChatExtensionNotificationStreamEvent,
+  CHAT_NOTIFY_CAPABILITY_KEY,
 } from '@/apps/chat/application/common';
 import { assertChatRunTraceBundle } from '@/apps/chat/application/common/trace-bundle';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
@@ -36,7 +39,7 @@ import type { SubagentManager } from '@/extensions/telegraph-subagents/src/Subag
 import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
 import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
-import { createAgentHarness, selectRuntimeId } from '@/packages/agent/harness';
+import { createAgentHarness, HookBus, selectRuntimeId } from '@/packages/agent/harness';
 import type { AgentSessionStore, RuntimeRegistration } from '@/packages/agent/harness';
 import { createPageletRunCapabilities, FileAgentSessionStore } from '@/packages/agent/harness/node';
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent, type AgentRunRequest, type PermissionRequest, type RuntimeMessage } from '@/packages/agent-protocol';
@@ -101,6 +104,15 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
   private subagents: SubagentManager | undefined;
   private extensionHost: ExtensionHost | undefined;
   private telegraphHost: TelegraphExtensionHostImpl | undefined;
+  /**
+   * 4-pack item D: process-lifetime HookBus that backs the extension host's
+   * CapabilityHookRegistrar. Extensions subscribe to hooks (e.g. afterRun)
+   * once at activation time, but each chat run spins up its own
+   * AgentHarness with its own HookBus. We bridge by snapshotting this bus
+   * into AgentHarnessOptions.hooks for every harness instance — see
+   * `createHarnessForRun` callers.
+   */
+  private readonly extensionHookBus = new HookBus();
   private readonly extensionsReady: Promise<void> = this.activateExtensions();
   private readonly workspaceRoot = resolveTelegraphWorkspaceRoot();
   private readonly agentSessions = new FileAgentSessionStore(
@@ -328,11 +340,36 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
    * without the subagents extension active.
    */
   private async activateExtensions(): Promise<void> {
-    const hooks: CapabilityHookRegistrar = { on: () => () => { /* noop */ } };
+    // 4-pack item D: wire the extension host's CapabilityHookRegistrar to a
+    // worker-owned persistent HookBus instead of the previous noop. Every
+    // extension hook registration now lands in this.extensionHookBus and
+    // is replayed into each per-run AgentHarness via the bridge below.
+    const hooks: CapabilityHookRegistrar = {
+      on: (name, handler) => this.extensionHookBus.on(name, handler),
+    };
     const telegraphHost = new TelegraphExtensionHostImpl(hooks);
     const extensionHost = new ExtensionHost({ telegraph: telegraphHost, hooks });
     this.telegraphHost = telegraphHost;
     this.extensionHost = extensionHost;
+
+    // 4-pack item D: publish the chat-side notify capability into the
+    // extension host's custom registry *before* activating any extensions,
+    // so extension factories can resolve it during their own activation.
+    // Each call synthesizes a ChatExtensionNotificationStreamEvent and pushes
+    // it to streamListeners (renderer side will route it to a toast/banner).
+    const notify: ChatNotifyCapability = input => {
+      const event: ChatExtensionNotificationStreamEvent = {
+        type: 'extension_notification',
+        runId: input.runId,
+        sessionId: input.sessionId,
+        extensionId: input.extensionId,
+        level: input.level ?? 'info',
+        message: input.message,
+        ts: Date.now(),
+      };
+      this.emitStreamEvent(event);
+    };
+    telegraphHost.registerCustom(CHAT_NOTIFY_CAPABILITY_KEY, notify);
 
     try {
       const extensionsDir = resolveExtensionsDirectory();
@@ -415,6 +452,10 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       const agentHarness = createAgentHarness({
         defaultRuntimeId: 'pi-ai',
         sessionStore: this.sessionStoreForRun(req),
+        // 4-pack item D: replay extension-registered hooks into this run's
+        // HookBus. Snapshot happens fresh per run so an extension activated
+        // mid-session still gets its `afterRun` etc. for the next run.
+        hooks: this.extensionHookBus.snapshot(),
         runtimes: [
           { id: 'pi-ai', create: () => new PiAiRuntime() },
           { id: 'pi-embedded', create: () => new PiEmbeddedRuntime() },

@@ -1,0 +1,28 @@
+{
+  "id": "@telegraph/completion-notify",
+  "name": "Telegraph Completion Notify",
+  "displayName": "Telegraph Completion Notify",
+  "version": "0.1.0",
+  "engines": {
+    "telegraph": ">=0.1.0"
+  },
+  "pagelets": ["chat"],
+  "activationEvents": ["onRun"],
+  "contributes": {
+    "hooks": [
+      {
+        "id": "afterRun-notify",
+        "hook": "afterRun"
+      }
+    ],
+    "messageRenderers": [
+      {
+        "id": "completion-notify-banner",
+        "match": "system:run-completed",
+        "componentId": "completion-notify-banner"
+      }
+    ]
+  },
+  "permissions": [],
+  "main": "./src/extension.ts"
+}

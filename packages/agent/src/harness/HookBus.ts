@@ -46,6 +46,32 @@ export class HookBus {
     return this.handlers.get(name)?.length ?? 0
   }
 
+  /**
+   * Export every registered handler keyed by hook name. The return value is
+   * shaped to be passed straight into `AgentHarnessOptions.hooks`, which is
+   * how `ChatPageletWorker` bridges a process-lifetime extension HookBus
+   * into the per-run harness HookBus (D-016 + 4-pack item D).
+   *
+   * The snapshot is a *copy* of the internal handler lists, so later
+   * subscriptions or unsubscriptions on this bus do not retroactively
+   * mutate the snapshot. Callers that need rebind semantics must re-snapshot
+   * each time. Handler functions themselves are passed by reference (no
+   * wrapping), so they continue to share identity with the original
+   * subscribers — extensions can still `off()` against this bus.
+   */
+  snapshot(): { [N in HookName]?: HookHandler<N>[] } {
+    const out: { [N in HookName]?: HookHandler<N>[] } = {}
+    for (const [name, handlers] of this.handlers.entries()) {
+      // The HookHandler<N> family is discriminated on N, so a heterogeneous
+      // Map iteration cannot be re-narrowed without a runtime switch on
+      // every hook name. We trade that ceremony for a contained cast — the
+      // handler identities were stored via the typed `on<N>(...)` overload
+      // so each list is internally consistent.
+      ;(out as Record<HookName, ReadonlyArray<unknown>>)[name] = [...handlers]
+    }
+    return out
+  }
+
   async emit<N extends Exclude<HookName, 'input'>>(name: N, payload: HookPayload<N>): Promise<void> {
     const handlers = this.handlers.get(name) ?? []
     for (const handler of handlers) {

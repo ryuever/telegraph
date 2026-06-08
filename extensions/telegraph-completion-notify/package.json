@@ -1,0 +1,23 @@
+{
+  "name": "@telegraph/extension-telegraph-completion-notify",
+  "version": "0.0.0",
+  "description": "Telegraph 4-pack demo extension: subscribes to the afterRun hook and surfaces a notification via the chat pagelet's notify capability; also registers a register-only MessageRenderer contribution for completion banners.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@telegraph/agent-capabilities": "workspace:*",
+    "@telegraph/agent-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.8"
+  }
+}

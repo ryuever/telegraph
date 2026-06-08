@@ -157,7 +157,56 @@ export interface ChatPermissionPendingStreamEvent {
   permissionRequest: ChatPermissionRequestSnapshot
 }
 
-export type ChatStreamEvent = AgentEvent | ChatRunQueuedStreamEvent | ChatPermissionPendingStreamEvent
+/**
+ * 4-pack item D: notify surface that the chat pagelet exposes through
+ * the extension host's custom registry under
+ * {@link CHAT_NOTIFY_CAPABILITY_KEY}. Extensions resolve it via
+ * `host.getCustom(CHAT_NOTIFY_CAPABILITY_KEY)` during activation and call
+ * it from inside hook handlers (or whenever) to surface a toast/banner.
+ *
+ * Implementations MUST be synchronous and side-effect-only — the result
+ * is intentionally void so extension authors don't accidentally await
+ * delivery inside a hot model path (I-002 deadlock pattern equivalent
+ * for the stream channel).
+ */
+export interface ChatNotifyCapability {
+  (input: {
+    extensionId: string
+    level?: 'info' | 'warn' | 'error'
+    message: string
+    runId?: string
+    sessionId?: string
+  }): void
+}
+
+/** Custom-registry key used by {@link ChatNotifyCapability}. */
+export const CHAT_NOTIFY_CAPABILITY_KEY = 'chat.notify'
+
+/**
+ * 4-pack item D: extension-originated notification surfaced as a stream
+ * event so the renderer can show a toast/banner without rendering it as a
+ * conversation message. Emitted whenever an extension calls
+ * `host.notify({ ... })` (see ChatPageletWorker's notify capability).
+ *
+ * `runId` is optional because some extensions notify in response to
+ * lifecycle events outside a run (activation, periodic timers); chat
+ * surfaces these as global toasts not tied to any conversation.
+ */
+export interface ChatExtensionNotificationStreamEvent {
+  type: 'extension_notification'
+  runId?: string
+  sessionId?: string
+  extensionId: string
+  level: 'info' | 'warn' | 'error'
+  message: string
+  ts: number
+}
+
+export type ChatStreamEvent =
+  | AgentEvent
+  | ChatRunQueuedStreamEvent
+  | ChatPermissionPendingStreamEvent
+  | ChatExtensionNotificationStreamEvent
 
 export function isChatRunQueuedStreamEvent(event: ChatStreamEvent): event is ChatRunQueuedStreamEvent {
   return event.type === 'run_queued'
@@ -167,10 +216,20 @@ export function isChatPermissionPendingStreamEvent(event: ChatStreamEvent): even
   return event.type === 'permission_pending'
 }
 
+export function isChatExtensionNotificationStreamEvent(
+  event: ChatStreamEvent,
+): event is ChatExtensionNotificationStreamEvent {
+  return event.type === 'extension_notification'
+}
+
 export function isChatTransportStreamEvent(
   event: ChatStreamEvent,
-): event is ChatRunQueuedStreamEvent | ChatPermissionPendingStreamEvent {
-  return event.type === 'run_queued' || event.type === 'permission_pending'
+): event is ChatRunQueuedStreamEvent | ChatPermissionPendingStreamEvent | ChatExtensionNotificationStreamEvent {
+  return (
+    event.type === 'run_queued' ||
+    event.type === 'permission_pending' ||
+    event.type === 'extension_notification'
+  )
 }
 
 export function isAgentStreamEvent(event: ChatStreamEvent): event is AgentEvent {

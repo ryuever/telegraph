@@ -20,6 +20,13 @@ import { createChatAgentEventProjectionState, projectAgentEventToChat } from '..
 import { upsertToolCall } from '../chat-tool-calls'
 import { upsertSubagentUpdate } from '../chat-subagents'
 import { addBookmark } from '../bookmark-store'
+import {
+  dismissNotification,
+  getNotificationsSnapshot,
+  pushExtensionNotification,
+  subscribeNotifications,
+  type ExtensionNotificationEntry,
+} from '../extension-notification-store'
 import { groupPersistedRuns, sortRunsForSessionTimeline } from '../persisted-run-groups'
 import {
   loadSettings,
@@ -39,6 +46,7 @@ import type {
 import {
   chatStreamBelongsToRun,
   isAgentStreamEvent,
+  isChatExtensionNotificationStreamEvent,
   isChatPermissionPendingStreamEvent,
   isChatRunQueuedStreamEvent,
 } from '@/apps/chat/application/common'
@@ -92,6 +100,18 @@ export function ChatPanel({ agent }: Props) {
   const [traceScopeAllChats, setTraceScopeAllChats] = useState(true)
 
   const traceRows = useSyncExternalStore(subscribeLlmTraceRows, getLlmTraceRowsSnapshot, getLlmTraceRowsSnapshot)
+  /**
+   * 4-pack item D: extension-pushed notifications rendered as a stacked
+   * toast list. The store is populated from the stream-event subscription
+   * below; the renderer just mirrors the snapshot via
+   * `useSyncExternalStore` so dismissals + new arrivals trigger a tiny
+   * re-render without going through useChat.
+   */
+  const extensionNotifications = useSyncExternalStore(
+    subscribeNotifications,
+    getNotificationsSnapshot,
+    getNotificationsSnapshot,
+  )
 
   const appendLlmTrace = useCallback((info: { sessionId: string; runId: string; trace: LlmTracePayload }) => {
     appendLlmTraceRow({ ...info, ts: Date.now() })
@@ -266,6 +286,16 @@ export function ChatPanel({ agent }: Props) {
     void agentService.subscribeToStreamEvents(event => {
       if (isChatRunQueuedStreamEvent(event)) {
         ensureRemoteRun(event)
+        return
+      }
+
+      // 4-pack item D: extension-originated toast surface. Notifications
+      // are *global* — they fire from extension hook handlers that may
+      // not be associated with any remote-mirrored chat run, so we route
+      // them to the dedicated notification store before the remoteRuns
+      // matching below (which would silently drop unmatched events).
+      if (isChatExtensionNotificationStreamEvent(event)) {
+        pushExtensionNotification(event)
         return
       }
 
@@ -723,6 +753,76 @@ export function ChatPanel({ agent }: Props) {
         onClose={() => { setSettingsOpen(false); }}
         onSave={handleSaveSettings}
       />
+
+      <ExtensionNotificationToasts
+        entries={extensionNotifications}
+        onDismiss={dismissNotification}
+      />
+    </div>
+  )
+}
+
+function ExtensionNotificationToasts({
+  entries,
+  onDismiss,
+}: {
+  entries: ReadonlyArray<ExtensionNotificationEntry>
+  onDismiss: (id: string) => void
+}) {
+  if (entries.length === 0) return null
+  return (
+    <div
+      // Pointer-events shim: the wrapper does not intercept clicks on
+      // chat content beneath it; only the toast cards themselves do.
+      className="pointer-events-none fixed right-4 top-4 z-50 flex w-80 flex-col gap-2"
+    >
+      {entries.map(entry => (
+        <ExtensionNotificationToast
+          key={entry.id}
+          entry={entry}
+          onDismiss={() => { onDismiss(entry.id); }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ExtensionNotificationToast({
+  entry,
+  onDismiss,
+}: {
+  entry: ExtensionNotificationEntry
+  onDismiss: () => void
+}) {
+  // Level → tailwind palette. Kept inline (no util fn) because there are
+  // only three branches and the variants don't recur anywhere else.
+  const palette = entry.level === 'error'
+    ? 'border-red-500/60 bg-red-950/40 text-red-100'
+    : entry.level === 'warn'
+      ? 'border-amber-500/60 bg-amber-950/30 text-amber-100'
+      : 'border-border bg-card text-foreground'
+  return (
+    <div
+      role="status"
+      data-testid="extension-notification-toast"
+      data-notification-id={entry.id}
+      data-notification-level={entry.level}
+      className={`pointer-events-auto rounded-md border px-3 py-2 text-[12px] shadow-lg ${palette}`}
+    >
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="truncate font-mono text-[10.5px] text-muted-foreground">
+          {entry.extensionId}
+        </span>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss notification"
+          className="rounded text-[11px] leading-none text-muted-foreground hover:text-foreground"
+        >
+          ×
+        </button>
+      </div>
+      <div className="leading-snug">{entry.message}</div>
     </div>
   )
 }
