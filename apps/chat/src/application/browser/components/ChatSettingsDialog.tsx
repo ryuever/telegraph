@@ -285,7 +285,7 @@ function ModelTab({
       <Field label="Execution backend">
         <select
           value={draft.backend}
-          onChange={e => { onSetBackend(e.target.value as ChatModelSettings['backend']); }}
+          onChange={e => { onSetBackend(e.target.value); }}
           className={selectClass}
         >
           {runtimeCapabilities.map(runtime => (
@@ -330,7 +330,7 @@ function OrchestrationTab({
         <select
           value={draft.orchestration}
           onChange={e =>
-            { onSetOrchestration(e.target.value as ChatModelSettings['orchestration']); }
+            { onSetOrchestration(e.target.value); }
           }
           className={selectClass}
         >

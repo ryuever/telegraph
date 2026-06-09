@@ -59,12 +59,10 @@ export type AgentBackendKind =
   | 'langgraph'
   | 'vercel-ai'
   | 'telegraph-orchestrator'
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | (string & {})
+  | (string & Record<never, never>)
 export type AgentOrchestrationMode =
   | 'none'
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | (string & {})
+  | (string & Record<never, never>)
 export type AgentOrchestrationPattern = 'chain' | 'parallel'
 
 // ---------------------------------------------------------------------------

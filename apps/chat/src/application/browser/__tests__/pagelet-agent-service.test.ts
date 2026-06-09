@@ -29,7 +29,9 @@ const resolvePermissionRequestMock = vi.fn(() => Promise.resolve(true))
 const listSubagentsMock = vi.fn(() => Promise.resolve([]))
 const getSubagentResultMock = vi.fn(() => Promise.resolve(null))
 const cancelSubagentMock = vi.fn(() => Promise.resolve(false))
-const invokeCommandMock = vi.fn(() => Promise.resolve({ ok: true as const, result: undefined as unknown }))
+const invokeCommandMock = vi.fn<IChatPageletService['invokeCommand']>(() =>
+  Promise.resolve({ ok: true, result: undefined })
+)
 const client: IChatPageletService = {
   info: vi.fn(() => Promise.resolve('ready')),
   send: sendMock,
@@ -113,6 +115,27 @@ describe('PageletAgentService', () => {
 
     expect(chunks).toEqual(['hello'])
     expect(statuses).toContain('completed')
+    expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('rejects when the pagelet run fails', async () => {
+    sendMock.mockResolvedValueOnce({
+      runId: 'run-failed',
+      status: 'failed',
+      error: 'missing model credentials',
+    })
+
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const statuses: string[] = []
+    const service = new PageletAgentService()
+
+    await expect(service.send({
+      conversation: conversationFixture(),
+      onChunk: vi.fn(),
+      onStatus: status => { statuses.push(status); },
+    })).rejects.toThrow('missing model credentials')
+
+    expect(statuses).toContain('failed')
     expect(unsubscribe).toHaveBeenCalled()
   })
 
@@ -215,8 +238,8 @@ describe('PageletAgentService', () => {
     const { PageletAgentService } = await import('../pagelet-agent-service')
     const service = new PageletAgentService()
 
-    invokeCommandMock.mockResolvedValueOnce({ ok: true as const, result: { bookmarked: 'm_42' } as unknown })
-    await expect(service.invokeCommand?.('bookmark', { messageId: 'm_42' })).resolves.toEqual({
+    invokeCommandMock.mockResolvedValueOnce({ ok: true, result: { bookmarked: 'm_42' } })
+    await expect(service.invokeCommand('bookmark', { messageId: 'm_42' })).resolves.toEqual({
       ok: true,
       result: { bookmarked: 'm_42' },
     })

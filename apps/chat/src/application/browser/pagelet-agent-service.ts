@@ -169,6 +169,7 @@ export class PageletAgentService implements AgentService {
           onStatus?.('completed')
         } else {
           onStatus?.('failed')
+          throw new Error(result.error ?? `Chat run ${result.status}`)
         }
       } finally {
         removeAbortListener()

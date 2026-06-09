@@ -405,7 +405,6 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
       // events; successful activations are silent.
       onLifecycleEvent: ev => {
         if (ev.type === 'activation_failed' || ev.type === 'deactivation_failed') {
-          // eslint-disable-next-line no-console
           console.error(`[chat-worker:extension:${ev.type}] ${ev.extensionId}: ${ev.error?.message ?? 'no message'}`);
         }
       },
@@ -1196,7 +1195,7 @@ function denyDecision(reason: string): PermissionDecision {
  * directly under `extensions/`.
  */
 function resolveExtensionsDirectory(): string {
-  const candidates = [
+  const candidates: readonly [string, string, string] = [
     join(process.cwd(), 'extensions'),
     join(process.cwd(), '..', '..', 'extensions'),
     join(process.cwd(), '..', '..', '..', 'extensions'),
@@ -1204,5 +1203,5 @@ function resolveExtensionsDirectory(): string {
   const found = candidates.find(candidate =>
     existsSync(join(candidate, 'telegraph-subagents', EXTENSION_MANIFEST_FILENAME))
   );
-  return found ?? candidates[0]!;
+  return found ?? candidates[0];
 }
