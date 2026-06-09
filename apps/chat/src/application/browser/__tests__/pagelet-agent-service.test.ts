@@ -4,13 +4,14 @@ import type {
   ChatRunTraceBundle,
   ChatStreamEvent,
   IChatPageletService,
+  AgentRuntimeSettings,
 } from '@/apps/chat/application/common'
-import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { ChatConversation } from '../types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let streamCallback: ((event: ChatStreamEvent) => void) | null = null
+let runtimeSettings: AgentRuntimeSettings
 const unsubscribe = vi.fn()
 const sendMock = vi.fn((_: ChatSendRequest): Promise<ChatSendResult> => new Promise<ChatSendResult>(() => {}))
 const cancelMock = vi.fn(() => Promise.resolve(true))
@@ -20,6 +21,11 @@ const getRunMock = vi.fn(() => Promise.resolve(null))
 const listRunEventsMock = vi.fn(() => Promise.resolve([]))
 const listRuntimeCapabilitiesMock = vi.fn(() => Promise.resolve([]))
 const listConfiguredModelsMock = vi.fn(() => Promise.resolve([]))
+const getRuntimeSettingsMock = vi.fn(() => Promise.resolve(runtimeSettings))
+const updateRuntimeSettingsMock = vi.fn((settings: AgentRuntimeSettings) => {
+  runtimeSettings = settings
+  return Promise.resolve(settings)
+})
 const exportRunTraceBundleMock = vi.fn(() => Promise.resolve(null))
 const importRunTraceBundleMock = vi.fn((bundle: ChatRunTraceBundle) => Promise.resolve({
   status: 'imported' as const,
@@ -43,6 +49,8 @@ const client: IChatPageletService = {
   listRunEvents: listRunEventsMock,
   listRuntimeCapabilities: listRuntimeCapabilitiesMock,
   listConfiguredModels: listConfiguredModelsMock,
+  getRuntimeSettings: getRuntimeSettingsMock,
+  updateRuntimeSettings: updateRuntimeSettingsMock,
   exportRunTraceBundle: exportRunTraceBundleMock,
   importRunTraceBundle: importRunTraceBundleMock,
   listPendingPermissions: listPendingPermissionsMock,
@@ -65,7 +73,7 @@ describe('PageletAgentService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     streamCallback = null
-    installLocalStorage()
+    runtimeSettings = defaultRuntimeSettings()
   })
 
   it('cancels the pagelet run and unsubscribes when aborted', async () => {
@@ -181,13 +189,19 @@ describe('PageletAgentService', () => {
   })
 
   it('normalizes design-only runtime settings before sending chat runs', async () => {
-    localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+    runtimeSettings = {
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
+      apiKey: '',
+      authMode: 'api-key',
       backend: 'telegraph-design-build',
       orchestration: 'none',
-      taskCapabilityProfile: { kind: 'design-build' },
-    }))
+      taskCapabilityProfile: {
+        kind: 'design-build',
+        scopes: [],
+        artifactPolicy: 'preview',
+      },
+    }
     sendMock.mockResolvedValueOnce({ runId: 'run-normalized', status: 'completed' })
 
     const { PageletAgentService } = await import('../pagelet-agent-service')
@@ -429,15 +443,17 @@ function conversationWithHistoryFixture(): ChatConversation {
   }
 }
 
-function installLocalStorage(): void {
-  const values = new Map<string, string>()
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => { values.set(key, value); },
-      removeItem: (key: string) => { values.delete(key); },
-      clear: () => { values.clear(); },
-    },
-  })
+function defaultRuntimeSettings(): AgentRuntimeSettings {
+  return {
+    provider: 'minimax-cn',
+    modelId: 'MiniMax-M2.7',
+    apiKey: '',
+    authMode: 'api-key',
+    backend: 'pi-ai',
+    orchestration: 'none',
+    orchestrationPattern: 'chain',
+    worktreeIsolation: false,
+    extensionBlocklist: [],
+    taskCapabilityProfile: { kind: 'default' },
+  }
 }

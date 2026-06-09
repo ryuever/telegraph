@@ -1,15 +1,11 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  AGENT_MODEL_SETTINGS_STORAGE_KEY,
-} from '@/packages/agent/browser/runtime-settings-storage'
 import type { RuntimeSettings } from '@/packages/agent-protocol'
 import { DesignRuntimeSettingsDialog } from '../DesignRuntimeSettingsDialog'
 import {
-  DESIGN_RUNTIME_SETTINGS_STORAGE_KEY,
+  type DesignRuntimeSettings,
   loadDesignRuntimeSettings,
-  saveDesignRuntimeSettings,
 } from '../design-runtime-settings'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 
@@ -32,9 +28,7 @@ describe('DesignRuntimeSettingsDialog', () => {
   })
 
   it('loads design-build defaults when no runtime settings were saved', () => {
-    const settings = loadDesignRuntimeSettings({
-      getItem: () => null,
-    })
+    const settings = loadDesignRuntimeSettings()
 
     expect(settings).toEqual(expect.objectContaining({
       backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
@@ -49,30 +43,8 @@ describe('DesignRuntimeSettingsDialog', () => {
     }))
   })
 
-  it('normalizes saved chat backend settings to the design-build runtime', () => {
-    const settings = loadDesignRuntimeSettings({
-      getItem: key => key === AGENT_MODEL_SETTINGS_STORAGE_KEY
-        ? JSON.stringify({
-          provider: 'minimax-cn',
-          modelId: 'MiniMax-M2.7',
-          backend: 'pi-ai',
-          orchestration: 'telegraph-subagents',
-          taskCapabilityProfile: { kind: 'default' },
-        } satisfies RuntimeSettings)
-        : null,
-    })
-
-    expect(settings).toEqual(expect.objectContaining({
-      provider: 'minimax-cn',
-      modelId: 'MiniMax-M2.7',
-      backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
-      orchestration: 'none',
-      taskCapabilityProfile: { kind: 'default' },
-    }))
-  })
-
-  it('saves a design-build run profile into runtime settings storage', () => {
-    const storage = new Map<string, string>()
+  it('saves a design-build run profile through onSave', () => {
+    let saved: DesignRuntimeSettings | undefined
     const settings: RuntimeSettings = {
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
@@ -92,9 +64,7 @@ describe('DesignRuntimeSettingsDialog', () => {
           settings={settings}
           onClose={() => {}}
           onSave={next => {
-            saveDesignRuntimeSettings(next, {
-              setItem: (key, value) => { storage.set(key, value) },
-            })
+            saved = next
           }}
         />
       )
@@ -114,18 +84,17 @@ describe('DesignRuntimeSettingsDialog', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    const saved = JSON.parse(storage.get(AGENT_MODEL_SETTINGS_STORAGE_KEY) ?? '{}') as RuntimeSettings
-    expect(saved.backend).toBe(TELEGRAPH_DESIGN_BUILD_RUNTIME_ID)
-    expect(saved.orchestration).toBe('none')
-    expect(saved.taskCapabilityProfile).toEqual({
+    expect(saved?.backend).toBe(TELEGRAPH_DESIGN_BUILD_RUNTIME_ID)
+    expect(saved?.orchestration).toBe('none')
+    expect(saved?.taskCapabilityProfile).toEqual({
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read'],
       artifactPolicy: 'preview',
     })
   })
 
-  it('saves the selected theme pack separately from model runtime settings', () => {
-    const storage = new Map<string, string>()
+  it('saves the selected theme pack through onSave', () => {
+    let saved: DesignRuntimeSettings | undefined
     const settings: RuntimeSettings = {
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
@@ -145,9 +114,7 @@ describe('DesignRuntimeSettingsDialog', () => {
           settings={settings}
           onClose={() => {}}
           onSave={next => {
-            saveDesignRuntimeSettings(next, {
-              setItem: (key, value) => { storage.set(key, value) },
-            })
+            saved = next
           }}
         />
       )
@@ -167,13 +134,13 @@ describe('DesignRuntimeSettingsDialog', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(JSON.parse(storage.get(DESIGN_RUNTIME_SETTINGS_STORAGE_KEY) ?? '{}')).toEqual({
+    expect(saved?.designSystem).toEqual({
       themePackId: 'studio-dark',
     })
   })
 
   it('adds repo write scope when artifact apply after confirmation is enabled', () => {
-    const storage = new Map<string, string>()
+    let saved: RuntimeSettings | undefined
     const settings: RuntimeSettings = {
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
@@ -197,9 +164,7 @@ describe('DesignRuntimeSettingsDialog', () => {
           settings={settings}
           onClose={() => {}}
           onSave={next => {
-            saveDesignRuntimeSettings(next, {
-              setItem: (key, value) => { storage.set(key, value) },
-            })
+            saved = next
           }}
         />
       )
@@ -217,9 +182,8 @@ describe('DesignRuntimeSettingsDialog', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    const saved = JSON.parse(storage.get(AGENT_MODEL_SETTINGS_STORAGE_KEY) ?? '{}') as RuntimeSettings
-    expect(saved.backend).toBe(TELEGRAPH_DESIGN_BUILD_RUNTIME_ID)
-    expect(saved.taskCapabilityProfile).toEqual({
+    expect(saved?.backend).toBe(TELEGRAPH_DESIGN_BUILD_RUNTIME_ID)
+    expect(saved?.taskCapabilityProfile).toEqual({
       kind: 'design-build',
       scopes: ['artifact:write', 'repo:read', 'repo:write'],
       artifactPolicy: 'apply-after-confirm',

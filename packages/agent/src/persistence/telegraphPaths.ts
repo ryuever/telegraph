@@ -36,11 +36,7 @@ export function resolveTelegraphDataDir(startDir = process.cwd()): string {
   return join(resolveTelegraphWorkspaceRoot(startDir), '.telegraph')
 }
 
-/**
- * Pi stores sessions at `~/.pi/agent/sessions/--<cwd>--/`.
- * Telegraph run ledgers stay workspace-local but use the same encoded path idea
- * when a session-scoped directory is needed.
- */
+/** Encode a workspace path for session-scoped directory names. */
 export function encodeTelegraphWorkspaceSegment(workspaceRoot: string): string {
   const encoded = resolve(workspaceRoot).replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')
   return `--${encoded}--`

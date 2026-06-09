@@ -8,6 +8,7 @@ import type { RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
 import {
   DEFAULT_DESIGN_THEME_PACK_ID,
   defaultDesignProfile,
+  normalizeDesignRuntimeSettings,
   splitSettingList,
   type DesignRuntimeSettings,
 } from './design-runtime-settings'
@@ -62,7 +63,7 @@ export function DesignRuntimeSettingsDialog({
   }
 
   const save = (): void => {
-    onSave(draft)
+    onSave(normalizeDesignRuntimeSettings(draft))
     onClose()
   }
 

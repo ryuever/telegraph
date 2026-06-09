@@ -32,7 +32,12 @@ import {
 } from '@/packages/agent/harness/node';
 import { PiAiRuntime } from '@/packages/agent/runtime/PiAiRuntime';
 import { PiEmbeddedRuntime } from '@/packages/agent/runtime/PiEmbeddedRuntime';
-import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
+import {
+  listPiConfiguredModels,
+  readProjectRuntimeSettings,
+  readProjectRuntimeSettingsWithDesignSystem,
+  writeProjectRuntimeSettings,
+} from '@/packages/agent/runtime/pi-ai-provider-config';
 import { EXTENSION_MANIFEST_FILENAME, ExtensionHost } from '@/packages/agent-extensions';
 import { buildExtensionAliasMap } from '@/apps/main/application/node/extension-aliases';
 import {
@@ -116,6 +121,12 @@ export class DesignPageletWorker extends PageletWorker<ISharedService> {
           Promise.resolve({ pong: now, serverTime: Date.now() }),
         listConfiguredModels: async (): Promise<DesignConfiguredModelDescriptorSnapshot[]> =>
           listPiConfiguredModels(),
+        getRuntimeSettings: (): Promise<RuntimeSettings> =>
+          Promise.resolve(readProjectRuntimeSettingsWithDesignSystem()),
+        updateRuntimeSettings: async (settings: RuntimeSettings): Promise<RuntimeSettings> => {
+          await writeProjectRuntimeSettings(settings);
+          return readProjectRuntimeSettings();
+        },
         sendAgent: (request: DesignAgentSendRequest): Promise<DesignAgentSendResult> =>
           this.handleSendAgent(request),
         cancelAgent: (runId: string): Promise<boolean> =>
@@ -951,5 +962,7 @@ function resolveTelegraphSubagentsRoot(): string {
     join(process.cwd(), '..', '..', '..', 'extensions', 'telegraph-subagents'),
   ];
   const found = candidates.find(candidate => existsSync(join(candidate, EXTENSION_MANIFEST_FILENAME)));
-  return found ?? candidates[0]!;
+  const fallback = candidates[0];
+  if (!fallback) throw new Error('telegraph-subagents search path is empty');
+  return found ?? fallback;
 }

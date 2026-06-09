@@ -30,7 +30,7 @@ import {
 import { groupPersistedRuns, sortRunsForSessionTimeline } from '../persisted-run-groups'
 import {
   loadSettings,
-  saveSettings,
+  toRuntimeSettings,
   type ChatModelSettings,
 } from '../model-settings'
 import type { AgentService, LlmTracePayload } from '../types'
@@ -42,6 +42,7 @@ import type {
   ChatRunTraceBundle,
   ChatRuntimeCapabilityDescriptorSnapshot,
   ChatRunQueuedStreamEvent,
+  AgentRuntimeSettings,
 } from '@/apps/chat/application/common'
 import {
   chatStreamBelongsToRun,
@@ -122,6 +123,31 @@ export function ChatPanel({ agent }: Props) {
     return new PageletAgentService()
   }, [agent])
 
+  const persistSettings = useCallback((next: ChatModelSettings) => {
+    setSettings(next)
+    if (!agentService.updateRuntimeSettings) return
+    void agentService.updateRuntimeSettings(toRuntimeSettings(next))
+      .then(saved => {
+        setSettings(settingsFromRuntime(saved))
+      })
+      .catch(() => {
+        // Keep the optimistic UI state; the next mount/focus reload will recover.
+      })
+  }, [agentService])
+
+  useEffect(() => {
+    if (!agentService.getRuntimeSettings) return
+    const controller = new AbortController()
+    agentService.getRuntimeSettings(controller.signal)
+      .then(next => {
+        if (!controller.signal.aborted) setSettings(settingsFromRuntime(next))
+      })
+      .catch(() => {
+        // Default settings remain visible while the pagelet warms up.
+      })
+    return () => { controller.abort(); }
+  }, [agentService])
+
   useEffect(() => {
     if (!settingsOpen || !agentService.listRuntimeCapabilities) return
     const controller = new AbortController()
@@ -153,14 +179,14 @@ export function ChatPanel({ agent }: Props) {
             modelId: fallback.id,
           }
           setSettings(nextSettings)
-          saveSettings(nextSettings)
+          persistSettings(nextSettings)
         }
       })
       .catch(() => {
         // Keep the last configured-model snapshot if the pagelet is still warming up.
       })
     return () => { controller.abort(); }
-  }, [agentService, settings, settingsOpen])
+  }, [agentService, persistSettings, settings, settingsOpen])
 
   useEffect(() => {
     if (!agentService.deleteSessionRuns) return
@@ -637,8 +663,7 @@ export function ChatPanel({ agent }: Props) {
   const [collapsed, setCollapsed] = useState(false)
 
   const handleSaveSettings = (next: ChatModelSettings) => {
-    setSettings(next)
-    saveSettings(next)
+    persistSettings(next)
   }
 
   const modelOptions = useMemo(
@@ -660,9 +685,8 @@ export function ChatPanel({ agent }: Props) {
     const [provider, modelId] = nextValue.split('::')
     if (!provider || !modelId) return
     const nextSettings: ChatModelSettings = { ...settings, provider, modelId }
-    setSettings(nextSettings)
-    saveSettings(nextSettings)
-  }, [settings])
+    persistSettings(nextSettings)
+  }, [persistSettings, settings])
 
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground">
@@ -870,6 +894,26 @@ function findEffectiveRuntimeCapability(
     ? 'telegraph-subagents'
     : settings.backend
   return capabilities.find(item => item.id === runtimeId)
+}
+
+function settingsFromRuntime(runtime: AgentRuntimeSettings): ChatModelSettings {
+  const defaults = loadSettings()
+  return {
+    ...defaults,
+    provider: runtime.provider || defaults.provider,
+    modelId: runtime.modelId || defaults.modelId,
+    backend: runtime.backend ?? defaults.backend,
+    apiKey: '',
+    authMode: runtime.authMode === 'subscription' ? 'subscription' : 'api-key',
+    subscriptionProvider: runtime.subscriptionProvider,
+    subscriptionCredentials: undefined,
+    baseUrl: undefined,
+    orchestration: runtime.orchestration ?? defaults.orchestration,
+    orchestrationPattern: runtime.orchestrationPattern === 'parallel' ? 'parallel' : 'chain',
+    worktreeIsolation: runtime.worktreeIsolation ?? defaults.worktreeIsolation,
+    extensionBlocklist: runtime.extensionBlocklist ?? defaults.extensionBlocklist,
+    taskCapabilityProfile: runtime.taskCapabilityProfile ?? defaults.taskCapabilityProfile,
+  }
 }
 
 function PermissionApprovalTray({

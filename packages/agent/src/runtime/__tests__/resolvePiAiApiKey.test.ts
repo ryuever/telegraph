@@ -24,23 +24,23 @@ function baseSettings(): AgentRuntimeSettings {
 }
 
 describe('resolvePiAiApiKey', () => {
-  let previousPiAgentDir: string | undefined
   let previousEnvKey: string | undefined
+  let previousWorkspaceRoot: string | undefined
 
   beforeEach(() => {
     getOAuthApiKeyMock.mockReset()
-    tempDir = mkdtempSync(join(tmpdir(), 'telegraph-pi-auth-'))
-    previousPiAgentDir = process.env.PI_CODING_AGENT_DIR
+    tempDir = mkdtempSync(join(tmpdir(), 'telegraph-agent-config-'))
     previousEnvKey = process.env.TELEGRAPH_UNIT_API_KEY
-    process.env.PI_CODING_AGENT_DIR = tempDir
+    previousWorkspaceRoot = process.env.TELEGRAPH_WORKSPACE_ROOT
+    process.env.TELEGRAPH_WORKSPACE_ROOT = tempDir
     delete process.env.TELEGRAPH_UNIT_API_KEY
   })
 
   afterEach(() => {
-    if (previousPiAgentDir === undefined) {
-      delete process.env.PI_CODING_AGENT_DIR
+    if (previousWorkspaceRoot === undefined) {
+      delete process.env.TELEGRAPH_WORKSPACE_ROOT
     } else {
-      process.env.PI_CODING_AGENT_DIR = previousPiAgentDir
+      process.env.TELEGRAPH_WORKSPACE_ROOT = previousWorkspaceRoot
     }
     if (previousEnvKey === undefined) {
       delete process.env.TELEGRAPH_UNIT_API_KEY
@@ -70,10 +70,8 @@ describe('resolvePiAiApiKey', () => {
     })).rejects.toThrow('no API key found')
   })
 
-  it('resolves api keys from auth.json', async () => {
-    writeAuthJson({
-      'unit-provider': { type: 'api_key', key: 'auth-json-key' },
-    })
+  it('resolves api keys from project .env.local', async () => {
+    writeProjectEnv('project-config-key')
 
     const result = await resolvePiAiApiKey({
       ...baseSettings(),
@@ -81,24 +79,34 @@ describe('resolvePiAiApiKey', () => {
     })
 
     expect(result).toMatchObject({
-      apiKey: 'auth-json-key',
+      apiKey: 'project-config-key',
       authMode: 'api-key',
-      source: 'auth-json',
+      source: 'project-config',
     })
   })
 
-  it('interpolates env references from auth.json api keys', async () => {
+  it('resolves env references from project config api keys', async () => {
     process.env.TELEGRAPH_UNIT_API_KEY = 'env-ref-key'
-    writeAuthJson({
-      'unit-provider': { type: 'api_key', key: '$TELEGRAPH_UNIT_API_KEY' },
-    })
+    writeProjectEnv('', 'TELEGRAPH_UNIT_API_KEY')
 
     await expect(resolvePiAiApiKey({
       ...baseSettings(),
       apiKey: '',
     })).resolves.toMatchObject({
       apiKey: 'env-ref-key',
-      source: 'auth-json',
+      source: 'project-config',
+    })
+  })
+
+  it('resolves env references from project .env.local', async () => {
+    writeProjectEnv('local-env-file-key', 'TELEGRAPH_UNIT_API_KEY')
+
+    await expect(resolvePiAiApiKey({
+      ...baseSettings(),
+      apiKey: '',
+    })).resolves.toMatchObject({
+      apiKey: 'local-env-file-key',
+      source: 'project-config',
     })
   })
 
@@ -153,6 +161,18 @@ describe('resolvePiAiApiKey', () => {
   })
 })
 
-function writeAuthJson(value: Record<string, unknown>): void {
-  writeFileSync(join(tempDir, 'auth.json'), JSON.stringify(value, null, 2), 'utf-8')
+function writeProjectEnv(apiKey: string, apiKeyEnvName = 'TELEGRAPH_UNIT_API_KEY'): void {
+  writeFileSync(join(tempDir, '.env.local'), [
+    `TELEGRAPH_AGENT_RUNTIME=${JSON.stringify({ provider: 'unit-provider', modelId: 'gpt-4o-mini', authMode: 'api-key' })}`,
+    `TELEGRAPH_AGENT_PROVIDERS=${JSON.stringify({
+      'unit-provider': {
+        name: 'Unit Provider',
+        api: 'openai-completions',
+        apiKeyEnv: apiKeyEnvName,
+        models: [{ id: 'gpt-4o-mini', name: 'gpt-4o-mini' }],
+      },
+    })}`,
+    apiKey ? `${apiKeyEnvName}=${apiKey}` : '',
+    '',
+  ].filter(Boolean).join('\n'), 'utf-8')
 }

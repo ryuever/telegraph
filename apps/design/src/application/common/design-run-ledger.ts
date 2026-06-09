@@ -59,7 +59,7 @@ export function sanitizeDesignRunConsoleEvents(events: AgentEvent[]): AgentEvent
 
     if (shouldFlushDesignAssistantSnapshot(event)) {
       for (const requestId of [...assistantByRequest.keys()]) {
-        flushAssistant(event.runId, requestId, event.producerVersion, event.ts)
+        flushAssistant(agentEventRunId(event), requestId, event.producerVersion, event.ts)
       }
     }
 
@@ -97,6 +97,10 @@ export function shouldFlushDesignAssistantSnapshot(event: AgentEvent): boolean {
     event.type === 'run_cancelled' ||
     event.type === 'child_run_completed' ||
     event.type === 'step_completed'
+}
+
+function agentEventRunId(event: AgentEvent): string | undefined {
+  return 'runId' in event && typeof event.runId === 'string' ? event.runId : undefined
 }
 
 function isThinkingRuntimeLog(event: AgentEvent): boolean {

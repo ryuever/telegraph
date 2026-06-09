@@ -1,6 +1,7 @@
 import { RUNTIME_CONTRACT_SCHEMA_VERSION, type AgentEvent } from '@/packages/agent-protocol'
 import { describe, expect, it, vi } from 'vitest'
 import { FileAgentRunRepository } from '@/packages/agent/persistence/AgentRunRepository'
+import type { AgentRunEventRecord } from '@/packages/agent/persistence/AgentRunRepository'
 import { BufferedAgentRunEventWriter } from '@/packages/agent/persistence/BufferedAgentRunEventWriter'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -38,8 +39,12 @@ describe('DesignRunLedgerWriter', () => {
   })
 
   it('flushes assistant text before tool_call', async () => {
-    const append = vi.fn(async () => [])
-    const inner = { append, flushRun: vi.fn(async () => []), flushAll: vi.fn(async () => []) }
+    const append = vi.fn<(runId: string, event: AgentEvent) => Promise<AgentRunEventRecord[]>>(() => Promise.resolve([]))
+    const inner = {
+      append,
+      flushRun: vi.fn(() => Promise.resolve([])),
+      flushAll: vi.fn(() => Promise.resolve([])),
+    }
     const writer = new DesignRunLedgerWriter(inner as never)
 
     await writer.append('run-1', assistantDelta('draft'))

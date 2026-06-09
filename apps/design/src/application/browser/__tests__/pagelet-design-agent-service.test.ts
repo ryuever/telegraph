@@ -11,18 +11,22 @@ import type {
   DesignDeleteSessionRunsResult,
   IDesignPageletService,
 } from '@/apps/design/application/common'
-import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
-import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
+import { RUNTIME_CONTRACT_SCHEMA_VERSION, type RuntimeSettings } from '@/packages/agent-protocol'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
-import { DESIGN_RUNTIME_SETTINGS_STORAGE_KEY } from '../design-runtime-settings'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let agentEventCallback: ((event: DesignAgentStreamEvent) => void) | null = null
+let runtimeSettings: RuntimeSettings & { designSystem?: { themePackId?: string } }
 const sendAgentMock = vi.fn(
   (_: DesignAgentSendRequest): Promise<DesignAgentSendResult> => new Promise<DesignAgentSendResult>(() => {}),
 )
 const cancelAgentMock = vi.fn(() => Promise.resolve(true))
 const listConfiguredModelsMock = vi.fn(() => Promise.resolve([]))
+const getRuntimeSettingsMock = vi.fn(() => Promise.resolve(runtimeSettings))
+const updateRuntimeSettingsMock = vi.fn((settings: RuntimeSettings) => {
+  runtimeSettings = settings
+  return Promise.resolve(settings)
+})
 const listAgentRunsMock = vi.fn(() => Promise.resolve([]))
 const deleteAgentSessionRunsMock = vi.fn((sessionId: string): Promise<DesignDeleteSessionRunsResult> =>
   Promise.resolve({ sessionId, deletedRunIds: [] }))
@@ -75,6 +79,8 @@ const client: IDesignPageletService = {
   sendAgent: sendAgentMock,
   cancelAgent: cancelAgentMock,
   listConfiguredModels: listConfiguredModelsMock,
+  getRuntimeSettings: getRuntimeSettingsMock,
+  updateRuntimeSettings: updateRuntimeSettingsMock,
   listAgentRuns: listAgentRunsMock,
   deleteAgentSessionRuns: deleteAgentSessionRunsMock,
   getAgentRun: getAgentRunMock,
@@ -100,7 +106,7 @@ describe('PageletDesignAgentService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     agentEventCallback = null
-    installLocalStorage()
+    runtimeSettings = defaultRuntimeSettings()
   })
 
   it('cancels the pagelet run and unsubscribes when aborted', async () => {
@@ -220,16 +226,18 @@ describe('PageletDesignAgentService', () => {
   })
 
   it('passes the saved design task capability profile into pagelet runs', async () => {
-    globalThis.localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+    runtimeSettings = {
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
+      apiKey: '',
+      authMode: 'api-key',
       backend: 'pi-ai',
       taskCapabilityProfile: {
         kind: 'design-build',
         scopes: ['artifact:write', 'repo:read'],
         artifactPolicy: 'preview',
       },
-    }))
+    }
     sendAgentMock.mockImplementationOnce((request) => {
       return Promise.resolve({ runId: request.runId, status: 'completed' })
     })
@@ -293,9 +301,10 @@ describe('PageletDesignAgentService', () => {
   })
 
   it('passes saved theme pack context into design runs', async () => {
-    globalThis.localStorage.setItem(DESIGN_RUNTIME_SETTINGS_STORAGE_KEY, JSON.stringify({
-      themePackId: 'studio-dark',
-    }))
+    runtimeSettings = {
+      ...defaultRuntimeSettings(),
+      designSystem: { themePackId: 'studio-dark' },
+    }
     sendAgentMock.mockImplementationOnce((request) => {
       return Promise.resolve({ runId: request.runId, status: 'completed' })
     })
@@ -325,16 +334,18 @@ describe('PageletDesignAgentService', () => {
   })
 
   it('passes saved design settings into artifact patch preview and apply requests', async () => {
-    globalThis.localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+    runtimeSettings = {
       provider: 'minimax-cn',
       modelId: 'MiniMax-M2.7',
+      apiKey: '',
+      authMode: 'api-key',
       backend: 'pi-ai',
       taskCapabilityProfile: {
         kind: 'design-build',
         scopes: ['artifact:write', 'repo:read', 'repo:write'],
         artifactPolicy: 'apply-after-confirm',
       },
-    }))
+    }
 
     const { PageletDesignAgentService } = await import('../pagelet-design-agent-service')
     const service = new PageletDesignAgentService()
@@ -441,15 +452,18 @@ describe('PageletDesignAgentService', () => {
   })
 })
 
-function installLocalStorage(): void {
-  const values = new Map<string, string>()
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => { values.set(key, value); },
-      removeItem: (key: string) => { values.delete(key); },
-      clear: () => { values.clear(); },
-    },
-  })
+function defaultRuntimeSettings(): RuntimeSettings & { designSystem?: { themePackId?: string } } {
+  return {
+    provider: 'zai',
+    modelId: 'glm-5.1',
+    apiKey: '',
+    authMode: 'api-key',
+    backend: 'pi-ai',
+    orchestration: 'none',
+    orchestrationPattern: 'chain',
+    worktreeIsolation: false,
+    extensionBlocklist: [],
+    taskCapabilityProfile: { kind: 'default' },
+    designSystem: { themePackId: 'shadcn-new-york-neutral' },
+  }
 }

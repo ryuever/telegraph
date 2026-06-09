@@ -9,15 +9,8 @@ import {
 } from '@/apps/chat/application/common'
 import type { AgentRuntimeSettings } from '@/apps/chat/application/common'
 import type { RuntimeTaskCapabilityProfile } from '@/packages/agent-protocol'
-import {
-  AGENT_MODEL_SETTINGS_STORAGE_KEY,
-  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
-  writeRuntimeSettingsToStorage,
-} from '@/packages/agent/browser/runtime-settings-storage'
 
 export type { AgentRuntimeSettings, ModelDescriptor }
-
-const STORAGE_KEY = AGENT_MODEL_SETTINGS_STORAGE_KEY
 
 export interface ModelSelection {
   provider: string
@@ -135,44 +128,7 @@ export function getDefaultModelFromEnv(envModels: EnvModelConfig[]): {
 }
 
 export function loadSettings(): ChatModelSettings {
-  if (typeof window === 'undefined') return DEFAULT_SETTINGS
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY)
-    if (!raw) return DEFAULT_SETTINGS
-    const parsed = JSON.parse(raw) as Partial<ChatModelSettings>
-    return {
-      provider: parsed.provider ?? DEFAULT_SETTINGS.provider,
-      modelId: parsed.modelId ?? DEFAULT_SETTINGS.modelId,
-      backend: normalizeBackend(parsed.backend),
-      apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : DEFAULT_SETTINGS.apiKey,
-      authMode: normalizeAuthMode(parsed.authMode),
-      subscriptionProvider: typeof parsed.subscriptionProvider === 'string'
-        ? parsed.subscriptionProvider
-        : undefined,
-      subscriptionCredentials: normalizeSubscriptionCredentials(parsed.subscriptionCredentials),
-      baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : DEFAULT_SETTINGS.baseUrl,
-      orchestration: normalizeOrchestration(parsed.orchestration),
-      orchestrationPattern: parsed.orchestrationPattern ?? DEFAULT_SETTINGS.orchestrationPattern,
-      worktreeIsolation: parsed.worktreeIsolation ?? DEFAULT_SETTINGS.worktreeIsolation,
-      extensionBlocklist: normalizeExtensionBlocklist(parsed.extensionBlocklist),
-      taskCapabilityProfile: normalizeTaskCapabilityProfile(parsed.taskCapabilityProfile),
-    }
-  } catch {
-    return DEFAULT_SETTINGS
-  }
-}
-
-export function saveSettings(settings: ChatModelSettings) {
-  if (typeof window === 'undefined') return
-  try {
-    writeRuntimeSettingsToStorage({
-      ...settings,
-      apiKey: '',
-      baseUrl: undefined,
-      subscriptionCredentials: undefined,
-    }, window.localStorage)
-  } catch { /* noop */ }
+  return DEFAULT_SETTINGS
 }
 
 export function toRuntimeSettings(
@@ -244,45 +200,6 @@ export function getConfiguredModelOptions(
   return models.filter(model => model.provider === provider)
 }
 
-function normalizeTaskCapabilityProfile(value: unknown): RuntimeTaskCapabilityProfile {
-  if (!value || typeof value !== 'object') return DEFAULT_SETTINGS.taskCapabilityProfile
-  const profile = value as Partial<RuntimeTaskCapabilityProfile>
-
-  switch (profile.kind) {
-    case 'readonly-workspace':
-      return { kind: 'readonly-workspace', scopes: stringList(profile.scopes) }
-    case 'shell-automation':
-      return {
-        kind: 'shell-automation',
-        commands: stringList(profile.commands),
-        cwdPolicy: profile.cwdPolicy === 'restricted' ? 'restricted' : 'workspace',
-      }
-    case 'coding-edit':
-      return {
-        kind: 'coding-edit',
-        scopes: stringList(profile.scopes),
-        patchPolicy: profile.patchPolicy === 'apply-after-confirm'
-          ? 'apply-after-confirm'
-          : 'preview',
-      }
-    case 'design-build':
-      return {
-        kind: 'design-build',
-        scopes: stringList(profile.scopes),
-        artifactPolicy: profile.artifactPolicy === 'apply-after-confirm'
-          ? 'apply-after-confirm'
-          : 'preview',
-      }
-    default:
-      return DEFAULT_SETTINGS.taskCapabilityProfile
-  }
-}
-
-function stringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.filter(item => typeof item === 'string')
-}
-
 function normalizeBackend(value: unknown): AgentBackendKind {
   if (
     value === 'pi-ai' ||
@@ -295,40 +212,4 @@ function normalizeBackend(value: unknown): AgentBackendKind {
     return value
   }
   return DEFAULT_SETTINGS.backend
-}
-
-function normalizeOrchestration(value: unknown): AgentOrchestrationMode {
-  if (value === 'none' || value === 'telegraph-subagents') return value
-  return DEFAULT_SETTINGS.orchestration
-}
-
-function normalizeAuthMode(value: unknown): 'api-key' | 'subscription' {
-  return value === 'subscription' ? 'subscription' : 'api-key'
-}
-
-function normalizeSubscriptionCredentials(
-  value: unknown,
-): ProviderAuthSettings['subscriptionCredentials'] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const record = value as Record<string, unknown>
-  if (
-    typeof record.refresh !== 'string' ||
-    typeof record.access !== 'string' ||
-    typeof record.expires !== 'number'
-  ) {
-    return undefined
-  }
-  return {
-    ...record,
-    refresh: record.refresh,
-    access: record.access,
-    expires: record.expires,
-  }
-}
-
-function normalizeExtensionBlocklist(value: unknown): string[] {
-  if (!Array.isArray(value)) return DEFAULT_SETTINGS.extensionBlocklist
-  const normalized = value
-    .filter((item): item is string => typeof item === 'string')
-  return [...new Set(normalized)]
 }

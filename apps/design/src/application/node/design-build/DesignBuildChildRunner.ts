@@ -415,9 +415,9 @@ function toAgentRuntimeSettings(settings: RuntimeSettings | undefined): AgentRun
     baseUrl: settings.baseUrl,
     backend: settings.backend === TELEGRAPH_DESIGN_BUILD_RUNTIME_ID
       ? 'pi-ai'
-      : settings.backend as AgentRuntimeSettings['backend'],
-    orchestration: settings.orchestration as AgentRuntimeSettings['orchestration'],
-    orchestrationPattern: settings.orchestrationPattern as AgentRuntimeSettings['orchestrationPattern'],
+      : settings.backend,
+    orchestration: settings.orchestration,
+    orchestrationPattern: settings.orchestrationPattern === 'parallel' ? 'parallel' : 'chain',
     worktreeIsolation: settings.worktreeIsolation,
     extensionBlocklist: settings.extensionBlocklist,
     taskCapabilityProfile: settings.taskCapabilityProfile,

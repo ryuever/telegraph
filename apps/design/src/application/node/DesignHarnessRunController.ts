@@ -43,10 +43,10 @@ export class DesignHarnessRunController {
     this.unsubscribeFromManager?.()
     this.subagentManager = manager
     this.unsubscribeFromManager = manager.addListener({
-      onCreate: record => this.emitSubagentRecord(record),
-      onUpdate: record => this.emitSubagentRecord(record),
-      onStart: record => this.emitSubagentRecord(record),
-      onComplete: record => this.emitSubagentRecord(record),
+      onCreate: record => { this.emitSubagentRecord(record) },
+      onUpdate: record => { this.emitSubagentRecord(record) },
+      onStart: record => { this.emitSubagentRecord(record) },
+      onComplete: record => { this.emitSubagentRecord(record) },
     })
   }
 

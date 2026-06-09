@@ -23,17 +23,31 @@ export function DesignPanel(): JSX.Element {
 
   const saveRuntimeSettings = useCallback((next: DesignRuntimeSettings): void => {
     const normalized = normalizeDesignRuntimeSettings(next)
-    saveDesignRuntimeSettings(normalized)
     setRuntimeSettings(normalized)
-  }, [])
+    saveDesignRuntimeSettings(normalized)
+    void agent.updateRuntimeSettings(normalized)
+      .then(saved => {
+        setRuntimeSettings(saved)
+      })
+      .catch(() => {
+        // Keep optimistic UI state; refresh will recover when the pagelet is available.
+      })
+  }, [agent])
 
   const selectModel = useCallback((provider: string, modelId: string): void => {
     setRuntimeSettings(current => {
       const next = selectDesignRuntimeModel(current, provider, modelId)
       saveDesignRuntimeSettings(next)
+      void agent.updateRuntimeSettings(next)
+        .then(saved => {
+          setRuntimeSettings(saved)
+        })
+        .catch(() => {
+          // Keep optimistic selection; refresh will recover later.
+        })
       return next
     })
-  }, [])
+  }, [agent])
 
   const refreshConfiguredModels = useCallback((signal?: AbortSignal): void => {
     setModelsLoading(true)
@@ -41,8 +55,13 @@ export function DesignPanel(): JSX.Element {
       .then(items => {
         if (signal?.aborted) return
         setConfiguredModels(items)
-        setRuntimeSettings(loadDesignRuntimeSettings())
-        setModelsLoading(false)
+        void agent.getRuntimeSettings(signal)
+          .then(next => {
+            if (!signal?.aborted) setRuntimeSettings(next)
+          })
+          .finally(() => {
+            if (!signal?.aborted) setModelsLoading(false)
+          })
       })
       .catch(() => {
         if (!signal?.aborted) setModelsLoading(false)
@@ -59,19 +78,6 @@ export function DesignPanel(): JSX.Element {
     const onFocus = (): void => { refreshConfiguredModels() }
     window.addEventListener('focus', onFocus)
     return () => { window.removeEventListener('focus', onFocus) }
-  }, [refreshConfiguredModels])
-
-  useEffect(() => {
-    const onStorage = (): void => { refreshConfiguredModels() }
-    const onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') refreshConfiguredModels()
-    }
-    window.addEventListener('storage', onStorage)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
   }, [refreshConfiguredModels])
 
   useEffect(() => {

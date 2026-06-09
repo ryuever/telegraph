@@ -1,6 +1,7 @@
 import type { AgentSendOptions, AgentService } from './types'
 import type { RuntimeMessage } from '@/packages/agent-protocol'
 import {
+  type AgentRuntimeSettings,
   type ChatMessage,
   type ChatSendRequest,
   type ChatStreamEvent,
@@ -24,7 +25,6 @@ import {
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
 import { createChatAgentEventProjectionState, projectAgentEventToChat } from './agent-event-projector'
-import { loadSettings, toRuntimeSettings } from './model-settings'
 
 const READY_ATTEMPTS = 40
 const READY_INTERVAL_MS = 500
@@ -69,7 +69,7 @@ export class PageletAgentService implements AgentService {
 
     const runId = globalThis.crypto.randomUUID()
 
-    const settings = this.getSettings()
+    const settings = await this.getSettings(signal)
 
     onLlmTrace?.({
       runId,
@@ -236,6 +236,18 @@ export class PageletAgentService implements AgentService {
     return getChatPageletClient().listConfiguredModels()
   }
 
+  async getRuntimeSettings(signal?: AbortSignal): Promise<AgentRuntimeSettings> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().getRuntimeSettings()
+  }
+
+  async updateRuntimeSettings(settings: AgentRuntimeSettings, signal?: AbortSignal): Promise<AgentRuntimeSettings> {
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    return getChatPageletClient().updateRuntimeSettings(settings)
+  }
+
   async exportRunTraceBundle(runId: string, signal?: AbortSignal): Promise<ChatRunTraceBundle | null> {
     await waitForChatPageletReady(signal)
     throwIfAborted(signal)
@@ -305,8 +317,17 @@ export class PageletAgentService implements AgentService {
     return getChatPageletClient().invokeCommand(commandId, args)
   }
 
-  private getSettings(): ChatSendRequest['settings'] {
-    return toRuntimeSettings(loadSettings())
+  private async getSettings(signal?: AbortSignal): Promise<ChatSendRequest['settings']> {
+    if (signal?.aborted) throwIfAborted(signal)
+    await waitForChatPageletReady(signal)
+    throwIfAborted(signal)
+    const settings = await getChatPageletClient().getRuntimeSettings()
+    return {
+      ...settings,
+      backend: settings.backend === 'telegraph-design-build'
+        ? 'pi-ai'
+        : settings.backend ?? 'pi-ai',
+    }
   }
 }
 

@@ -36,7 +36,6 @@ export const PI_AI_OAUTH_PROVIDER_NAMES: Readonly<Record<string, string>> = {
 };
 
 const OAUTH_PROVIDER_IDS = new Set(Object.keys(PI_AI_OAUTH_PROVIDER_NAMES));
-const API_KEY_PROVIDER_IDS = new Set(Object.keys(PI_AI_API_KEY_PROVIDER_NAMES));
 
 /** Built-in defaults from pi-ai model registry (provider-level). */
 export const PI_AI_PROVIDER_DEFAULT_BASE_URLS: Readonly<Partial<Record<string, string>>> = {
@@ -61,45 +60,6 @@ export const PI_AI_PROVIDER_DEFAULT_BASE_URLS: Readonly<Partial<Record<string, s
   xai: 'https://api.x.ai/v1',
   zai: 'https://api.z.ai/api/coding/paas/v4',
 };
-
-export interface PiAiProviderConfigFromJson {
-  baseUrl?: string;
-  api?: string;
-  apiKey?: string;
-}
-
-export function parseProviderConfigFromModelsJson(
-  content: string,
-  providerId: string,
-): PiAiProviderConfigFromJson {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const providers = (parsed as { providers?: unknown }).providers;
-    if (!providers || typeof providers !== 'object' || Array.isArray(providers)) return {};
-    const providerConfig = (providers as Record<string, unknown>)[providerId];
-    if (!providerConfig || typeof providerConfig !== 'object' || Array.isArray(providerConfig)) return {};
-    const record = providerConfig as Record<string, unknown>;
-    return {
-      baseUrl: typeof record.baseUrl === 'string' ? record.baseUrl : undefined,
-      api: typeof record.api === 'string' ? record.api : undefined,
-      apiKey: typeof record.apiKey === 'string' ? record.apiKey : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
-
-export function resolveProviderBaseUrl(providerId: string, modelsJsonContent: string): string {
-  const fromJson = parseProviderConfigFromModelsJson(modelsJsonContent, providerId).baseUrl;
-  if (fromJson?.trim()) return fromJson.trim();
-  return PI_AI_PROVIDER_DEFAULT_BASE_URLS[providerId] ?? '';
-}
-
-export function resolveProviderApiKey(providerId: string, modelsJsonContent: string): string {
-  const fromJson = parseProviderConfigFromModelsJson(modelsJsonContent, providerId).apiKey;
-  return fromJson?.trim() ?? '';
-}
 
 export function buildPiAiProviderCatalog(
   customProviderIds: string[] = [],
@@ -151,16 +111,4 @@ export function buildPiAiProviderCatalog(
   }
 
   return [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
-}
-
-export function parseCustomProviderIdsFromModelsJson(content: string): string[] {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
-    const providers = (parsed as { providers?: unknown }).providers;
-    if (!providers || typeof providers !== 'object' || Array.isArray(providers)) return [];
-    return Object.keys(providers).filter((id) => !API_KEY_PROVIDER_IDS.has(id) && !OAUTH_PROVIDER_IDS.has(id));
-  } catch {
-    return [];
-  }
 }

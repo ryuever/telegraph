@@ -12,11 +12,10 @@ import type {
 import type { ISharedService } from '@/apps/shared/application/common';
 import type { IDaemonService } from '@/apps/daemon/application/common';
 import {
-  getPiAiModelsJson,
   getPiAiProviderConfig,
+  getPiAiRuntimeConfig,
   listPiAiModels,
   listPiAiProviders,
-  savePiAiModelsJson,
   testPiAiConnection,
   upsertPiAiModelConfig,
   upsertPiAiProviderConfig,
@@ -50,8 +49,7 @@ export class SettingWorker extends PageletWorker<ISharedService, IDaemonService>
         listPiAiProviders: () => listPiAiProviders(),
         listPiAiModels: (provider: string) => listPiAiModels(provider),
         testPiAiConnection: (input: PiAiConnectionTestInput) => testPiAiConnection(input),
-        getPiAiModelsJson: () => getPiAiModelsJson(),
-        savePiAiModelsJson: (content: string) => savePiAiModelsJson(content),
+        getPiAiRuntimeConfig: () => getPiAiRuntimeConfig(),
         upsertPiAiModelConfig: (input: PiAiModelConfigUpsertInput) => upsertPiAiModelConfig(input),
         getPiAiProviderConfig: (provider: string) => getPiAiProviderConfig(provider),
         upsertPiAiProviderConfig: (input: PiAiProviderConfigUpsertInput) => upsertPiAiProviderConfig(input),

@@ -15,7 +15,7 @@ import type {
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import {
   designSystemContextFromSettings,
-  loadDesignRuntimeSettings,
+  normalizeDesignRuntimeSettings,
   type DesignRuntimeSettings,
 } from './design-runtime-settings'
 import { getDesignPageletClient } from './getClient'
@@ -109,8 +109,8 @@ export class PageletDesignAgentService {
         runId,
         sessionId: options.sessionId,
         prompt: options.prompt,
-        settings: readRuntimeSettings(),
-        context: contextWithDesignSystem(options.context),
+        settings: await readRuntimeSettings(options.signal),
+        context: await contextWithDesignSystem(options.context, options.signal),
       }
 
       try {
@@ -142,6 +142,17 @@ export class PageletDesignAgentService {
     await waitForDesignPageletReady(signal)
     throwIfAborted(signal)
     return getDesignPageletClient().listConfiguredModels()
+  }
+
+  async getRuntimeSettings(signal?: AbortSignal): Promise<DesignRuntimeSettings> {
+    return readRuntimeSettings(signal)
+  }
+
+  async updateRuntimeSettings(settings: DesignRuntimeSettings, signal?: AbortSignal): Promise<DesignRuntimeSettings> {
+    await waitForDesignPageletReady(signal)
+    throwIfAborted(signal)
+    const saved = await getDesignPageletClient().updateRuntimeSettings(normalizeDesignRuntimeSettings(settings))
+    return normalizeDesignRuntimeSettings(saved)
   }
 
   async deleteAgentSessionRuns(sessionId: string, signal?: AbortSignal): Promise<DesignDeleteSessionRunsResult> {
@@ -195,7 +206,7 @@ export class PageletDesignAgentService {
       runId: globalThis.crypto.randomUUID(),
       sessionId: options.sessionId,
       artifactId: options.artifactId,
-      settings: readRuntimeSettings(),
+      settings: await readRuntimeSettings(options.signal),
       operations: options.operations,
     })
   }
@@ -213,7 +224,7 @@ export class PageletDesignAgentService {
       runId: globalThis.crypto.randomUUID(),
       sessionId: options.sessionId,
       artifactId: options.artifactId,
-      settings: readRuntimeSettings(),
+      settings: await readRuntimeSettings(options.signal),
       operations: options.operations,
     })
   }
@@ -239,12 +250,21 @@ export class PageletDesignAgentService {
   }
 }
 
-function readRuntimeSettings(): DesignRuntimeSettings {
-  return loadDesignRuntimeSettings(localStorage)
+async function readRuntimeSettings(signal?: AbortSignal): Promise<DesignRuntimeSettings> {
+  await waitForDesignPageletReady(signal)
+  throwIfAborted(signal)
+  const settings = await getDesignPageletClient().getRuntimeSettings()
+  return normalizeDesignRuntimeSettings(settings, {
+    forceDesignProfile: settings.taskCapabilityProfile?.kind === undefined ||
+      settings.taskCapabilityProfile.kind === 'default',
+  })
 }
 
-function contextWithDesignSystem(context: Record<string, unknown> | undefined): Record<string, unknown> {
-  const settings = readRuntimeSettings()
+async function contextWithDesignSystem(
+  context: Record<string, unknown> | undefined,
+  signal?: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const settings = await readRuntimeSettings(signal)
   return {
     ...context,
     designSystem: {

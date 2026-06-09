@@ -15,6 +15,7 @@ import type {
   ChatStreamEvent,
   ChatCommandInvocationResult,
   EventSubscription,
+  AgentRuntimeSettings,
 } from '@/apps/chat/application/common'
 import type { AgentRunReplaySource } from '@/packages/agent/persistence/AgentRunRepository'
 
@@ -48,6 +49,8 @@ export interface AgentService {
   listRunEvents?(runId: string, signal?: AbortSignal): Promise<ChatAgentRunEventRecordSnapshot[]>
   listRuntimeCapabilities?(signal?: AbortSignal): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>
   listConfiguredModels?(signal?: AbortSignal): Promise<ChatConfiguredModelDescriptorSnapshot[]>
+  getRuntimeSettings?(signal?: AbortSignal): Promise<AgentRuntimeSettings>
+  updateRuntimeSettings?(settings: AgentRuntimeSettings, signal?: AbortSignal): Promise<AgentRuntimeSettings>
   exportRunTraceBundle?(runId: string, signal?: AbortSignal): Promise<ChatRunTraceBundle | null>
   importRunTraceBundle?(bundle: ChatRunTraceBundle, signal?: AbortSignal): Promise<ChatRunTraceImportResult>
   listPendingPermissions?(runId?: string, signal?: AbortSignal): Promise<ChatPermissionRequestSnapshot[]>

@@ -40,7 +40,11 @@ import { TELEGRAPH_SUBAGENTS_MANAGER_KEY } from '@/extensions/telegraph-subagent
 import type { SubagentManager } from '@/extensions/telegraph-subagents/src/SubagentManager';
 import type { SubagentRecord } from '@/extensions/telegraph-subagents/src/types';
 import { createDemoOrchestratorRuntime } from '@/packages/agent/runtime/OrchestratorCoreRunner';
-import { listPiConfiguredModels } from '@/packages/agent/runtime/pi-ai-provider-config';
+import {
+  listPiConfiguredModels,
+  readProjectRuntimeSettings,
+  writeProjectRuntimeSettings,
+} from '@/packages/agent/runtime/pi-ai-provider-config';
 import { createAgentHarness, HookBus, selectRuntimeId } from '@/packages/agent/harness';
 import type { AgentSessionStore, RuntimeRegistration } from '@/packages/agent/harness';
 import { createPageletRunCapabilities, FileAgentSessionStore } from '@/packages/agent/harness/node';
@@ -191,6 +195,14 @@ export class ChatPageletWorker extends PageletWorker<ChatRunBrokerService> {
 
         listConfiguredModels: async (): Promise<ChatConfiguredModelDescriptorSnapshot[]> =>
           listPiConfiguredModels(),
+
+        getRuntimeSettings: (): Promise<ChatSendRequest['settings']> =>
+          Promise.resolve(readProjectRuntimeSettings() as ChatSendRequest['settings']),
+
+        updateRuntimeSettings: async (settings: ChatSendRequest['settings']): Promise<ChatSendRequest['settings']> => {
+          await writeProjectRuntimeSettings(settings);
+          return readProjectRuntimeSettings() as ChatSendRequest['settings'];
+        },
 
         exportRunTraceBundle: async (runId: string): Promise<ChatRunTraceBundle | null> => {
           await this.recoveredRunsReady;

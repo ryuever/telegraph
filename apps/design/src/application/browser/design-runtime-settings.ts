@@ -2,12 +2,6 @@ import type {
   RuntimeSettings,
   RuntimeTaskCapabilityProfile,
 } from '@/packages/agent-protocol'
-import {
-  AGENT_MODEL_SETTINGS_STORAGE_KEY,
-  LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY,
-  readRuntimeSettingsFromStorage,
-  writeRuntimeSettingsToStorage,
-} from '@/packages/agent/browser/runtime-settings-storage'
 import { TELEGRAPH_DESIGN_BUILD_RUNTIME_ID } from '@/apps/design/application/common/design-build'
 import {
   BUILTIN_THEME_PACKS,
@@ -20,29 +14,33 @@ export interface DesignRuntimeSettings extends RuntimeSettings {
   }
 }
 
-export const DESIGN_RUNTIME_SETTINGS_STORAGE_KEY = 'telegraph.design.runtimeSettings'
 export const DEFAULT_DESIGN_THEME_PACK_ID = 'shadcn-new-york-neutral'
+const DEFAULT_DESIGN_RUNTIME_SETTINGS: RuntimeSettings = {
+  provider: 'zai',
+  modelId: 'glm-5.1',
+  apiKey: '',
+  authMode: 'api-key',
+  backend: TELEGRAPH_DESIGN_BUILD_RUNTIME_ID,
+  orchestration: 'none',
+  orchestrationPattern: 'chain',
+  worktreeIsolation: false,
+  extensionBlocklist: [],
+  taskCapabilityProfile: defaultDesignProfile('design-build'),
+}
 
-export function loadDesignRuntimeSettings(
-  storage: Pick<Storage, 'getItem'> = globalThis.localStorage,
-): DesignRuntimeSettings {
+export function loadDesignRuntimeSettings(): DesignRuntimeSettings {
   return normalizeDesignRuntimeSettings({
-    ...readRuntimeSettingsFromStorage(storage),
-    designSystem: readDesignSettingsFromStorage(storage),
+    ...DEFAULT_DESIGN_RUNTIME_SETTINGS,
+    designSystem: { themePackId: DEFAULT_DESIGN_THEME_PACK_ID },
   }, {
-    forceDesignProfile: !hasSavedRuntimeSettings(storage),
+    forceDesignProfile: true,
   })
 }
 
 export function saveDesignRuntimeSettings(
-  settings: DesignRuntimeSettings,
-  storage: Pick<Storage, 'setItem'> = globalThis.localStorage,
+  _settings: DesignRuntimeSettings,
 ): void {
-  const normalized = normalizeDesignRuntimeSettings(settings)
-  writeRuntimeSettingsToStorage(normalized, storage)
-  storage.setItem(DESIGN_RUNTIME_SETTINGS_STORAGE_KEY, JSON.stringify({
-    themePackId: normalized.designSystem?.themePackId ?? DEFAULT_DESIGN_THEME_PACK_ID,
-  }))
+  // Runtime settings are persisted by the design pagelet into project config.
 }
 
 export function normalizeDesignRuntimeSettings(
@@ -92,24 +90,6 @@ export function designSystemContextFromSettings(settings: DesignRuntimeSettings)
           source: 'built-in',
         }
       : undefined,
-  }
-}
-
-function hasSavedRuntimeSettings(storage: Pick<Storage, 'getItem'>): boolean {
-  return storage.getItem(AGENT_MODEL_SETTINGS_STORAGE_KEY) !== null ||
-    storage.getItem(LEGACY_CHAT_MODEL_SETTINGS_STORAGE_KEY) !== null
-}
-
-function readDesignSettingsFromStorage(storage: Pick<Storage, 'getItem'>): DesignRuntimeSettings['designSystem'] {
-  const raw = storage.getItem(DESIGN_RUNTIME_SETTINGS_STORAGE_KEY)
-  if (!raw) return { themePackId: DEFAULT_DESIGN_THEME_PACK_ID }
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    return {
-      themePackId: normalizeThemePackId(typeof parsed.themePackId === 'string' ? parsed.themePackId : undefined),
-    }
-  } catch {
-    return { themePackId: DEFAULT_DESIGN_THEME_PACK_ID }
   }
 }
 

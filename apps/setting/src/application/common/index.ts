@@ -14,7 +14,7 @@ export interface PiAiProviderDescriptor {
   supportsApiKey: boolean;
   environmentKeyName?: string;
   authConfigured?: boolean;
-  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json';
+  authSource?: 'runtime' | 'project-config' | 'env' | 'subscription-settings';
   authLabel?: string;
 }
 
@@ -68,10 +68,13 @@ export interface PiAiModelConfigUpsertInput {
 
 export interface PiAiProviderConfigUpsertInput {
   provider: string;
+  modelId?: string;
+  modelLabel?: string;
   authMode?: PiAiProviderAuthMode;
   baseUrl?: string;
   api?: string;
   apiKey?: string;
+  apiKeyEnvName?: string;
   subscriptionProvider?: string;
   subscriptionCredentials?: {
     refresh: string;
@@ -82,13 +85,22 @@ export interface PiAiProviderConfigUpsertInput {
 }
 
 export interface PiAiProviderConfigSnapshot {
+  modelId?: string;
+  modelLabel?: string;
   baseUrl: string;
   api?: string;
   apiKey: string;
+  apiKeyEnvName?: string;
+  apiKeyConfigured?: boolean;
   authMode: PiAiProviderAuthMode;
   authConfigured: boolean;
-  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json';
+  authSource?: 'runtime' | 'project-config' | 'env' | 'subscription-settings';
   authLabel?: string;
+}
+
+export interface PiAiRuntimeConfigSnapshot extends PiAiProviderConfigSnapshot {
+  provider: string;
+  modelId: string;
 }
 
 export interface ISettingPageletService {
@@ -102,8 +114,7 @@ export interface ISettingPageletService {
   listPiAiProviders(): Promise<PiAiProviderDescriptor[]>;
   listPiAiModels(provider: string): Promise<PiAiModelDescriptor[]>;
   testPiAiConnection(input: PiAiConnectionTestInput): Promise<PiAiConnectionTestResult>;
-  getPiAiModelsJson(): Promise<string>;
-  savePiAiModelsJson(content: string): Promise<void>;
+  getPiAiRuntimeConfig(): Promise<PiAiRuntimeConfigSnapshot>;
   upsertPiAiModelConfig(input: PiAiModelConfigUpsertInput): Promise<void>;
   getPiAiProviderConfig(provider: string): Promise<PiAiProviderConfigSnapshot>;
   upsertPiAiProviderConfig(input: PiAiProviderConfigUpsertInput): Promise<void>;
@@ -120,9 +131,4 @@ export {
   PI_AI_OAUTH_PROVIDER_NAMES,
   PI_AI_PROVIDER_DEFAULT_BASE_URLS,
   buildPiAiProviderCatalog,
-  parseCustomProviderIdsFromModelsJson,
-  parseProviderConfigFromModelsJson,
-  resolveProviderApiKey,
-  resolveProviderBaseUrl,
 } from '@/apps/setting/application/common/pi-ai-provider-catalog';
-export type { PiAiProviderConfigFromJson } from '@/apps/setting/application/common/pi-ai-provider-catalog';

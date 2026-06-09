@@ -107,7 +107,7 @@ export interface ChatConfiguredModelDescriptorSnapshot {
   api?: string
   baseUrl?: string
   authConfigured: boolean
-  authSource?: 'auth-json' | 'oauth' | 'env' | 'models-json'
+  authSource?: 'runtime' | 'project-config' | 'env' | 'subscription-settings'
   authLabel?: string
 }
 
@@ -347,6 +347,8 @@ export interface IChatPageletService {
   listRunEvents(runId: string): Promise<ChatAgentRunEventRecordSnapshot[]>
   listRuntimeCapabilities(): Promise<ChatRuntimeCapabilityDescriptorSnapshot[]>
   listConfiguredModels(): Promise<ChatConfiguredModelDescriptorSnapshot[]>
+  getRuntimeSettings(): Promise<AgentRuntimeSettings>
+  updateRuntimeSettings(settings: AgentRuntimeSettings): Promise<AgentRuntimeSettings>
   exportRunTraceBundle(runId: string): Promise<ChatRunTraceBundle | null>
   importRunTraceBundle(bundle: ChatRunTraceBundle): Promise<ChatRunTraceImportResult>
   listPendingPermissions(runId?: string): Promise<ChatPermissionRequestSnapshot[]>
