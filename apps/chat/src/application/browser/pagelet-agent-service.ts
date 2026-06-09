@@ -21,10 +21,10 @@ import {
   isChatPermissionPendingStreamEvent,
   isChatRunQueuedStreamEvent,
 } from '@/apps/chat/application/common'
-import { readRuntimeSettingsFromStorage } from '@/packages/agent/browser/runtime-settings-storage'
 import { throwIfAborted, waitForPageletReady } from '@/packages/services/pagelet-host/browser/pagelet-ready'
 import { getChatPageletClient } from '@/apps/chat/application/browser/getClient'
 import { createChatAgentEventProjectionState, projectAgentEventToChat } from './agent-event-projector'
+import { loadSettings, toRuntimeSettings } from './model-settings'
 
 const READY_ATTEMPTS = 40
 const READY_INTERVAL_MS = 500
@@ -306,7 +306,7 @@ export class PageletAgentService implements AgentService {
   }
 
   private getSettings(): ChatSendRequest['settings'] {
-    return readRuntimeSettingsFromStorage(localStorage) as ChatSendRequest['settings']
+    return toRuntimeSettings(loadSettings())
   }
 }
 

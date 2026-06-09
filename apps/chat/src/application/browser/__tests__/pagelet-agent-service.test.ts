@@ -5,6 +5,7 @@ import type {
   ChatStreamEvent,
   IChatPageletService,
 } from '@/apps/chat/application/common'
+import { AGENT_MODEL_SETTINGS_STORAGE_KEY } from '@/packages/agent/browser/runtime-settings-storage'
 import { RUNTIME_CONTRACT_SCHEMA_VERSION } from '@/packages/agent-protocol'
 import type { ChatConversation } from '../types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -177,6 +178,33 @@ describe('PageletAgentService', () => {
         },
       ],
     }))
+  })
+
+  it('normalizes design-only runtime settings before sending chat runs', async () => {
+    localStorage.setItem(AGENT_MODEL_SETTINGS_STORAGE_KEY, JSON.stringify({
+      provider: 'minimax-cn',
+      modelId: 'MiniMax-M2.7',
+      backend: 'telegraph-design-build',
+      orchestration: 'none',
+      taskCapabilityProfile: { kind: 'design-build' },
+    }))
+    sendMock.mockResolvedValueOnce({ runId: 'run-normalized', status: 'completed' })
+
+    const { PageletAgentService } = await import('../pagelet-agent-service')
+    const service = new PageletAgentService()
+
+    await service.send({
+      conversation: conversationFixture(),
+      onChunk: vi.fn(),
+    })
+
+    const request = sendMock.mock.calls[0][0]
+    expect(request.settings.backend).toBe('pi-ai')
+    expect(request.settings.taskCapabilityProfile).toEqual({
+      kind: 'design-build',
+      scopes: [],
+      artifactPolicy: 'preview',
+    })
   })
 
   it('forwards pending permission requests from the pagelet stream', async () => {
