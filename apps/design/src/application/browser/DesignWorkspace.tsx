@@ -904,7 +904,7 @@ function DesignSessionActivityItem({ item }: { item: DesignSessionActivityEntry 
     return (
       <AgentReasoning
         title="Thinking"
-        status={logItem.status === 'running' ? 'running' : 'complete'}
+        status={agentStatusFromSessionLog(logItem.status)}
         subtitle={logItem.kind}
         summary={logItem.detail}
         defaultOpen={logItem.status === 'running'}

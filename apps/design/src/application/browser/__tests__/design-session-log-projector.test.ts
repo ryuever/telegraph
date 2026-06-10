@@ -97,7 +97,65 @@ describe('design-session-log-projector', () => {
       label: 'Thinking',
       detail: thinkingText,
       fullDetail: thinkingText,
-      status: 'info',
+      status: 'running',
+    })
+  })
+
+  it('streams thinking deltas into one request-scoped item and completes it with the run', () => {
+    let items = reduceDesignSessionLogItems([], {
+      type: 'agent_event',
+      runId: 'run-1',
+      event: {
+        type: 'runtime_log',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1',
+        requestId: 'req-1',
+        level: 'debug',
+        message: 'thinking_delta',
+        raw: { delta: 'Inspect ' },
+        ts: 8,
+      },
+    })
+
+    items = reduceDesignSessionLogItems(items, {
+      type: 'agent_event',
+      runId: 'run-1',
+      event: {
+        type: 'runtime_log',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1',
+        requestId: 'req-1',
+        level: 'debug',
+        message: 'thinking_delta',
+        raw: { delta: 'layout.' },
+        ts: 9,
+      },
+    })
+
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      id: 'run-1:thinking:req-1',
+      label: 'Thinking',
+      detail: 'Inspect layout.',
+      fullDetail: 'Inspect layout.',
+      status: 'running',
+    })
+
+    items = reduceDesignSessionLogItems(items, {
+      type: 'agent_event',
+      runId: 'run-1',
+      event: {
+        type: 'run_completed',
+        schemaVersion: RUNTIME_CONTRACT_SCHEMA_VERSION,
+        runId: 'run-1',
+        output: {},
+        ts: 10,
+      },
+    })
+
+    expect(items.find(item => item.id === 'run-1:thinking:req-1')).toMatchObject({
+      fullDetail: 'Inspect layout.',
+      status: 'completed',
     })
   })
 

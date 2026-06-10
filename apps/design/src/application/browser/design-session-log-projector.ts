@@ -26,9 +26,10 @@ export function reduceDesignSessionLogItems(
   event: DesignAgentStreamEvent,
 ): DesignSessionLogItem[] {
   const items = designSessionLogItemsFromEvent(event, previous)
-  if (items.length === 0) return previous
+  const finalized = finalizeThinkingItems(previous, thinkingTerminalStatusFromEvent(event))
+  if (items.length === 0) return finalized
 
-  const next = [...previous]
+  const next = [...finalized]
   for (const item of items) {
     const existingIndex = next.findIndex(entry => entry.id === item.id)
     if (existingIndex >= 0) {
@@ -274,6 +275,9 @@ function agentEventLogItems(
 
     case 'runtime_log': {
       const thinking = thinkingDeltaFromRaw(event.raw)
+      if (thinking) {
+        return [thinkingLogItem(streamRunId, event, thinking, previous)]
+      }
       const detail = thinking ?? event.message
       return [{
         id: `${event.runId ?? streamRunId}:runtime-log:${String(event.ts)}:${event.message}`,
@@ -290,6 +294,80 @@ function agentEventLogItems(
     default:
       return []
   }
+}
+
+function thinkingLogItem(
+  streamRunId: string,
+  event: Extract<AgentEvent, { type: 'runtime_log' }>,
+  delta: string,
+  previous: DesignSessionLogItem[],
+): DesignSessionLogItem {
+  const runId = event.runId ?? streamRunId
+  const id = thinkingLogItemId(runId, event.requestId)
+  const existing = previous.find(item => item.id === id)
+  const fullDetail = `${existing?.fullDetail ?? ''}${delta}`
+  return {
+    id,
+    ts: existing?.ts ?? event.ts,
+    runId,
+    kind: 'model',
+    label: 'Thinking',
+    detail: truncateDetail(fullDetail),
+    fullDetail,
+    status: 'running',
+  }
+}
+
+function thinkingLogItemId(runId: string, requestId: string | undefined): string {
+  return `${runId}:thinking:${requestId ?? 'run'}`
+}
+
+function finalizeThinkingItems(
+  items: DesignSessionLogItem[],
+  terminal: { runId: string; status: Extract<DesignSessionLogStatus, 'completed' | 'failed' | 'cancelled'> } | undefined,
+): DesignSessionLogItem[] {
+  if (!terminal) return items
+
+  const shouldFinalize = items.some(item =>
+    isThinkingLogItem(item) && item.runId === terminal.runId && item.status === 'running',
+  )
+  if (!shouldFinalize) return items
+
+  return items.map((item) => {
+    if (!isThinkingLogItem(item) || item.runId !== terminal.runId || item.status !== 'running') {
+      return item
+    }
+    return { ...item, status: terminal.status }
+  })
+}
+
+function thinkingTerminalStatusFromEvent(
+  event: DesignAgentStreamEvent,
+): { runId: string; status: Extract<DesignSessionLogStatus, 'completed' | 'failed' | 'cancelled'> } | undefined {
+  if (event.type === 'run_failed') {
+    return {
+      runId: event.runId,
+      status: event.error === 'Cancelled' ? 'cancelled' : 'failed',
+    }
+  }
+  if (event.type !== 'agent_event') return undefined
+
+  switch (event.event.type) {
+    case 'run_completed':
+      return { runId: event.event.runId, status: 'completed' }
+    case 'run_failed':
+      return { runId: event.event.runId, status: 'failed' }
+    case 'run_cancelled':
+      return { runId: event.event.runId, status: 'cancelled' }
+    case 'child_run_completed':
+      return { runId: event.event.childRunId, status: 'completed' }
+    default:
+      return undefined
+  }
+}
+
+function isThinkingLogItem(item: DesignSessionLogItem): boolean {
+  return item.kind === 'model' && item.label === 'Thinking'
 }
 
 function subagentSnapshotLogItem(
